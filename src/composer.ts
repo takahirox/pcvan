@@ -4,6 +4,8 @@ import { activeHuman } from './forums';
 
 interface ComposeDraft { authorId: string; title: string; body: string; replyToPostId?: string }
 interface ComposerActions {
+  configureMember(): void;
+  beforeCompose(): void;
   createMember(handle: string): Promise<void>;
   selectMember(id: string): Promise<void>;
   save(destination: ForumDestination, draft: ComposeDraft): Promise<void>;
@@ -16,7 +18,7 @@ export function mountComposer(root: HTMLElement, actions: ComposerActions) {
   section.setAttribute('aria-label', 'フォーラムの利用者設定');
   section.innerHTML = `
     <details>
-    <summary>利用者設定・新規登録 [reconstructed]</summary>
+    <summary>利用者設定・新規登録</summary>
     <label for="local-member">ローカル利用者</label>
     <select id="local-member" class="member"></select>
     <label>新しいハンドル <input class="handle" type="text" /></label>
@@ -24,10 +26,9 @@ export function mountComposer(root: HTMLElement, actions: ComposerActions) {
     <p class="member-message" aria-live="polite"></p>
     </details>
     <dialog aria-labelledby="compose-heading">
-      <h2 id="compose-heading">投稿エディター [D / reconstructed]</h2>
-      <p>1996–97年の編集・確認・返信キーは未確認です。この操作は創作の再構成です。</p>
+      <h2 id="compose-heading">投稿エディター</h2>
       <p class="destination"></p>
-      <p>初回送信時にローカル掲示板を作成します。創作デモはコピーされません。</p>
+      <p>初回送信時にローカル掲示板を作成します。</p>
       <div class="edit-fields">
         <label>投稿タイトル <input class="post-title" type="text" /></label>
         <label>投稿本文 <textarea class="post-body" rows="8"></textarea></label>
@@ -114,13 +115,13 @@ export function mountComposer(root: HTMLElement, actions: ComposerActions) {
   create.addEventListener('click', async () => {
     if (!handle.value.trim()) { message.textContent = 'ハンドルを入力してください。'; return; }
     create.disabled = true;
-    try { await actions.createMember(handle.value); handle.value = ''; message.textContent = ''; }
+    try { await actions.createMember(handle.value); handle.value = ''; message.textContent = '利用者を作成しました。'; }
     catch (reason) { message.textContent = `利用者を保存できませんでした。${String(reason)}`; }
     finally { create.disabled = false; }
   });
   select.addEventListener('change', async () => {
     select.disabled = true;
-    try { await actions.selectMember(select.value); message.textContent = ''; }
+    try { await actions.selectMember(select.value); message.textContent = '利用者を選択しました。'; }
     catch (reason) { message.textContent = `利用者を選択できませんでした。${String(reason)}`; }
     finally { select.disabled = false; }
   });
@@ -137,7 +138,7 @@ export function mountComposer(root: HTMLElement, actions: ComposerActions) {
     },
     open(target: ForumDestination, content: Backup, reply?: Post) {
       const memberId = activeHuman(content);
-      if (!memberId) { section.querySelector('details')!.open = true; message.textContent = '投稿・既読の記録にはローカル利用者を作成してください。'; handle.focus(); return; }
+      if (!memberId) { actions.configureMember(); section.querySelector('details')!.open = true; message.textContent = '投稿・既読の記録にはローカル利用者を作成してください。'; handle.focus(); return; }
       authorId = memberId;
       destination = target;
       parent = reply;
@@ -145,9 +146,10 @@ export function mountComposer(root: HTMLElement, actions: ComposerActions) {
       reviewed = undefined;
       title.value = reply ? `RE#${reply.number} ${reply.title}` : '';
       body.value = '';
-      section.querySelector('.destination')!.textContent = `${target.keyword} / ${target.name} — ${content.members.find((member) => member.id === memberId)!.handle}${reply ? ` / 返信先 RE#${reply.number}` : ''}`;
+      dialog.querySelector('.destination')!.textContent = `${target.keyword} / ${target.name} — ${content.members.find((member) => member.id === memberId)!.handle}${reply ? ` / 返信先 RE#${reply.number}` : ''}`;
       error.textContent = '';
       editing(true);
+      actions.beforeCompose();
       dialog.showModal();
       title.focus();
     },

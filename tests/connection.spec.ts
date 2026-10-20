@@ -1,3 +1,4 @@
+import { openSettings, closeSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -23,8 +24,6 @@ async function savedSession(page: Page): Promise<Session | null> {
 test('connection presentation can finish once, and commands cancel the wait without being lost', () => {
   const controller = new ConnectionController();
   expect(controller.screen).toBe('connecting');
-  expect(controller.welcome.join('\n')).toContain('[D / reconstructed]');
-  expect(controller.welcome.join('\n')).toContain('1996年の挨拶文は未確認');
   expect(controller.submit('J MITI').join('\n')).toContain('MITI / 未知の世界');
   expect(controller.screen).toBe('miti');
   expect(controller.completeConnection()).toEqual([]);
@@ -34,7 +33,7 @@ test('connection presentation can finish once, and commands cancel the wait with
   expect(controller.submit('13').join('\n')).toContain('接続は終了しています');
   expect(controller.submit(' reconnect ')).toEqual(controller.welcome);
   expect(controller.screen).toBe('connecting');
-  expect(controller.completeConnection().join('\n')).toContain('MAIN（1996年頃');
+  expect(controller.completeConnection().join('\n')).toContain('MAIN');
   expect(controller.screen).toBe('main');
   expect(controller.completeConnection()).toEqual([]);
 });
@@ -60,14 +59,15 @@ test('skip, automatic completion, logout and reconnect persist times without net
   const input = page.getByRole('textbox', { name: 'コマンド' });
   const output = page.locator('.output');
   await expect(skip).toBeVisible();
-  await expect(output).not.toContainText('MAIN（1996年頃');
+  await expect(output).not.toContainText('MAIN');
   await expect.poll(async () => (await savedSession(page))?.lastLoginAt).toBeTruthy();
   const firstLogin = (await savedSession(page))!.lastLoginAt;
   await skip.click();
-  await expect(output).toContainText('MAIN（1996年頃');
+  await expect(output).toContainText('MAIN');
   await expect(skip).toBeHidden();
   await expect(input).toBeFocused();
   await page.clock.runFor(2000);
+  await closeSettings(page);
   await input.fill('Q');
   await input.press('Enter');
   await expect.poll(async () => (await savedSession(page))?.lastLogoutAt).toBeTruthy();
@@ -75,6 +75,7 @@ test('skip, automatic completion, logout and reconnect persist times without net
   expect(loggedOut.lastLoginAt).toBe(firstLogin);
   await expect(page.locator('.session-times')).toContainText(loggedOut.lastLogoutAt!);
   await page.clock.runFor(2000);
+  await closeSettings(page);
   await input.fill('RECONNECT');
   await input.press('Enter');
   await expect(skip).toBeVisible();
@@ -83,9 +84,10 @@ test('skip, automatic completion, logout and reconnect persist times without net
   await page.clock.runFor(1200);
   await expect(skip).toBeHidden();
   expect((await output.textContent())!.trimEnd().endsWith(`\n${mainMenu.prompt.text}`)).toBe(true);
+  await closeSettings(page);
   await input.fill('13');
   await input.press('Enter');
-  await expect(output).toContainText('再構成の仮設ブリッジ');
+  await expect(output).toContainText('コミュニケーション');
   expect(await page.evaluate(() => (window as unknown as { connectionCalls: string[] }).connectionCalls)).toEqual([]);
   expect(requests).toEqual([]);
   await page.context().setOffline(false);
@@ -99,15 +101,18 @@ test('log download matches every displayed UTF-8 byte, including Japanese and li
   // A command during the connection effect immediately opens MAIN and is handled.
   const input = page.getByRole('textbox', { name: 'コマンド' });
   const line = '  日本語：ＡＢＣ　。、 ｶﾀｶﾅ <b>文字</b>  ';
+  await closeSettings(page);
   await input.fill(line);
   await input.press('Enter');
   await expect(page.getByRole('button', { name: '接続演出をスキップ' })).toBeHidden();
-  await expect(page.locator('.output')).toContainText('MAIN（1996年頃');
+  await expect(page.locator('.output')).toContainText('MAIN');
   const visible = (await page.locator('.output').textContent())!;
   expect(visible).toContain(`> ${line}\n`);
   expect(visible).toContain('\n 1 電子メール');
+  await closeSettings(page);
   await input.fill('書きかけの入力');
   const downloading = page.waitForEvent('download');
+  await openSettings(page, 'display');
   await page.getByRole('button', { name: '端末ログを保存 (.txt)' }).click();
   const download = await downloading;
   expect(download.suggestedFilename()).toMatch(/^pcvan-terminal-.*\.txt$/);
@@ -143,14 +148,16 @@ test('queued forum reading survives logout and reconnect with one history entry 
   await expect(page.getByRole('button', { name: '接続演出をスキップ' })).toBeHidden();
   const visible = (await page.locator('.output').textContent())!;
   expect(visible).toContain('★タイトル (DEMO0001)');
-  expect(visible).toContain('シミュレーション接続を終了しました。');
+  expect(visible).toContain('接続を終了しました。');
   expect(visible).toContain('★タイトル (DEMO0002)');
   expect(visible.match(/> READ 1\n/g)).toHaveLength(1);
   const downloading = page.waitForEvent('download');
+  await openSettings(page, 'display');
   await page.getByRole('button', { name: '端末ログを保存 (.txt)' }).click();
   const download = await downloading;
   expect(await readFile((await download.path())!)).toEqual(Buffer.from(visible, 'utf8'));
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.focus();
   await input.press('ArrowUp');
   await expect(input).toHaveValue('READ 3');

@@ -1,4 +1,4 @@
-import { openSettings } from './settings-helpers';
+import { openSettings, closeSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -25,13 +25,9 @@ test('DAISIZEN sections preserve evidence labels without invented section number
   const controller = daisizen();
   const output = controller.submit('HELP').join('\n');
   for (const section of evidence.daisizen.sections) {
-    expect(output).toContain(`${section.label} [B / provisional]`);
+    expect(output).toContain(`${section.label}`);
     expect(section.selector).toBeNull();
   }
-  expect(output).toContain(evidence.daisizen.source_url);
-  expect(output).toContain('1992年');
-  expect(output).toContain('1996–1997年');
-  expect(output).toContain('[D / reconstructed]');
   expect(evidence.daisizen.jump.input).toBeNull();
   controller.submit('MAIN');
   expect(controller.submit('J DAISIZEN').join('\n')).toContain('移動先が見つかりません');
@@ -43,7 +39,7 @@ test('all seven DAISIZEN boards are independently selectable with scoped numbers
   const output = controller.submit('FORUMS').join('\n');
   expect(evidence.daisizen.forums.map((forum) => forum.number)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   for (const forum of evidence.daisizen.forums) {
-    expect(output).toContain(`${forum.number} ${forum.label} [B / provisional]`);
+    expect(output).toContain(`${forum.number} ${forum.label}`);
     expect(controller.submit(String(forum.number)).join('\n')).toContain(`DAISIZEN / ${forum.label} / 投稿一覧`);
     expect(controller.screen).toBe('forum');
     expect(controller.submit('1').join('\n')).toContain('この画面では使えない');
@@ -60,12 +56,12 @@ test('MITI route reaches numbered original demos; gaps and invalid reads preserv
   const controller = miti();
   const listing = controller.submit('LIST').join('\n');
   expect(listing.indexOf('#1 ')).toBeLessThan(listing.indexOf('#3 '));
-  expect(listing).toContain('創作デモ投稿 [D / reconstructed]');
+  expect(listing).not.toMatch(/創作|再構成|https?:/);
   const read = controller.submit(' read   1 ').join('\n');
   expect(read).toContain('#1/9001　資料室');
   expect(read).toContain('★タイトル (DEMO0001)  96/07/06  12:34');
   expect(read).toContain('★内容\n  架空の星');
-  expect(read).toContain(demos.posts[0]!.body);
+  expect(read).toContain('架空の星を見つけたら、どんな名前を付けますか。');
   for (const invalid of ['READ 2', 'READ 999', 'READ 0', 'READ -1', 'READ 1.5', 'READ 9007199254740992', 'READ 1 extra', 'Q', 'J MITI']) {
     expect(controller.submit(invalid).join('\n')).toMatch(/ありません|この画面では使えない/);
     expect(controller.screen).toBe('miti-materials');
@@ -148,6 +144,7 @@ test('empty DAISIZEN board and invalid forum selectors preserve navigation', () 
 
 async function send(page: Page, line: string, expected: string) {
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.fill(line);
   await input.press('Enter');
   await expect.poll(async () => {
@@ -183,8 +180,8 @@ test('keyboard reading works offline; restore replaces displayed posts without r
   await expect(page.locator('.output b')).toHaveCount(0);
   await send(page, 'READ 2', 'その番号の投稿はありません');
   await send(page, 'READ 4', '#4/12　資料室');
-  await send(page, 'MAIN', 'MAIN（1996年頃');
-  await send(page, '13', '再構成の仮設ブリッジ');
+  await send(page, 'MAIN', 'MAIN');
+  await send(page, '13', 'コミュニケーション');
   await send(page, '2', '大自然＆動植物');
   await send(page, 'FORUMS', '7 伝言板／企画室');
   await send(page, '1', '投稿一覧');
@@ -205,6 +202,7 @@ test('rapid submitted commands retain screen order while content loads', async (
   await page.goto('/');
   const input = page.getByRole('textbox', { name: 'コマンド' });
   for (const line of ['J MITI', '3', '9', 'READ 3']) {
+    await closeSettings(page);
     await input.fill(line);
     await input.press('Enter');
   }
@@ -227,7 +225,9 @@ test('failed forum reads show an error without stale content and leave return co
   await send(page, 'READ 3', '投稿の読み込みに失敗しました');
   const output = (await page.locator('.output').textContent())!;
   expect(output.slice(output.lastIndexOf('> READ 3\n'))).not.toContain('★内容');
+  await expect(page.locator('.settings-notice')).toContainText('保存の状態');
+  await openSettings(page, 'storage');
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('ローカル保存エラー');
   await send(page, 'BACK', 'MITI / フォーラム');
-  await send(page, 'MAIN', 'MAIN（1996年頃');
+  await send(page, 'MAIN', 'MAIN');
 });

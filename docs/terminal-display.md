@@ -9,7 +9,8 @@ remain sourced from `data/pcvan/` and the
 
 ## Controls and accessibility
 
-The always-visible **表示速度（シミュレーション）** selector offers 300, 1200,
+Under **設定 / Options → 表示・速度**, the
+**表示速度（シミュレーション）** selector offers 300, 1200,
 2400 and 9600 bps plus **Instant（即時）**. These are nominal display simulations;
 no modem, serial port or line-speed measurement is involved. The default is
 2400 bps. **全文表示 (Esc)** reveals all currently pending text. Escape works
@@ -26,14 +27,35 @@ the controller or IndexedDB queue. Rapid submissions retain the app's existing
 acceptance order: command echoes are immediate, while responses wait for the
 serialized command controller. This does not reorder already accepted text.
 
-**端末の外観・操作ガイド** contains the three palettes, the optional effects
-checkbox, session timestamps and keyboard help. Effects default off and never blink, move or cover
-the input caret. **利用者設定・新規登録**, **ローカル AI 設定・投稿の出自**,
-**JSON バックアップ・復元** and **オフライン保存・容量・バックアップ** expand
-independently. All existing actions remain inside these sections. Trying to write
-without a local human automatically opens the user section. The offline backup
-link opens the backup section before navigating to it. Storage errors remain
-visible even with backup settings collapsed.
+**設定 / Options** opens one named native modal dialog containing display/speed,
+member, local AI, JSON backup, offline/storage, help, and About groups. None of
+these groups or their summaries appear beneath the terminal. Display contains
+palettes, optional effects, session timestamps and the transcript download;
+**操作ガイド** contains keyboard help. The small **全文表示 (Esc)** button
+remains beside the terminal status. Effects default off and never blink, move or
+cover the caret.
+
+Settings supports pointer/keyboard opening, visible focus, cyclic Tab order,
+Escape and a close button. Closing restores the previous focus synchronously;
+IME confirmation does not close it. Writing without a local human opens member
+settings and focuses the handle input. The post editor is a separate sibling
+modal, never nested inside Settings. The offline backup link expands the existing
+backup controls. Control nodes and their original event handlers are reused;
+preferences, member data and JSON formats are unchanged.
+
+Detailed AI progress and storage success/errors remain in Settings. Changes while
+it is closed add a dot to the trigger and a short polite status directing users
+to Settings. Opening clears that indication without clearing the underlying
+message. Repeated unchanged statuses and disabled activity do not create noise.
+
+Ordinary connection, menus, HELP and article navigation omit provenance paragraphs,
+URLs and evidence tags. **このシステムについて / 出典・制約** preserves the
+browser-only scope, differing eras, verified routes versus provisional labels,
+invented bridge/helper commands, header uncertainty, fictional demo IDs and local
+AI provenance, with links to original sources and research. Demo reading uses
+short excerpts without explanatory paragraphs; the original fixture text and
+metadata remain unchanged and linked from About. Stored user/AI posts are rendered
+verbatim. No display filter is applied to imported or user-authored content.
 
 Enter submits; IME confirmation does not. Up/Down browse history and retain the
 draft. PageUp/PageDown scroll output from the input. Shift+Tab focuses the
@@ -41,8 +63,14 @@ transcript; browser scroll keys, including Left/Right, work there; Tab returns t
 the input. Long lines use horizontal scrolling without reflow, retaining menu
 columns, spaces, full/half-width text and newlines. The input scrolls to its real
 caret. Visible text remains selectable in every theme, including with effects.
-The Japanese monospace font stack uses installed fonts only; exact glyph metrics
-and fallback coverage depend on the operating system.
+The terminal uses 14px-equivalent text at the default root size with a 1.4 line
+height, scaling with browser zoom or text enlargement. The local stack prefers MS Gothic and
+Osaka-Mono, then Noto Sans Mono CJK JP, BIZ UDGothic and the browser's monospace.
+Kerning, ligatures and proportional kana/alternate spacing are disabled on output.
+These are presentation choices, not a verified original PC-VAN font. No font is
+bundled, downloaded or extracted. Fallback glyph coverage still depends on the OS;
+tests measure Japanese/full/half-width cells and MAIN alignment with available
+fonts and forced monospace fallback at desktop/mobile sizes and enlarged text.
 
 With `prefers-reduced-motion: reduce`, the default is Instant with effects off.
 Changes to this media preference are followed until a display preference is

@@ -1,4 +1,4 @@
-import { openSettings } from './settings-helpers';
+import { openSettings, closeSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -18,6 +18,7 @@ test('visible backup downloads all local data, and command history survives relo
   await openSettings(page, 'storage');
   await expect(page.getByText('容量制限やブラウザーの操作で消えることがあります。', { exact: false })).toBeVisible();
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.fill('echo  保存する ｶﾅ');
   await input.press('Enter');
   const backup = await downloadBackup(page);
@@ -28,6 +29,7 @@ test('visible backup downloads all local data, and command history survives relo
   await page.reload();
   // Export is queued after startup, so the restored in-memory history is ready.
   expect((await downloadBackup(page)).session.commandHistory).toEqual(backup.session.commandHistory);
+  await closeSettings(page);
   await input.focus();
   await input.press('ArrowUp');
   await expect(input).toHaveValue('echo  保存する ｶﾅ');
@@ -50,6 +52,7 @@ test('restore requires confirmation; confirmed replace preserves every field and
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
   expect(await downloadBackup(page)).toEqual(fixture);
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.focus();
   await input.press('ArrowUp');
   await expect(input).toHaveValue('echo  日本語');
@@ -74,9 +77,11 @@ test('reload bounds a restored history and keeps recalled edits separate from pe
   const saved = (await downloadBackup(page)).session.commandHistory;
   expect(saved).toEqual(fixture.session!.commandHistory.slice(-100));
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.fill('未送信の下書き');
   await input.press('ArrowUp');
   await expect(input).toHaveValue('履歴 104');
+  await closeSettings(page);
   await input.fill('編集中の履歴');
   await input.press('ArrowUp');
   await expect(input).toHaveValue('履歴 103');
@@ -116,11 +121,15 @@ test('simulated quota errors are visible while backup and the terminal remain us
     };
   });
   await page.goto('/');
+  await expect(page.locator('.settings-notice')).toContainText('保存の状態');
+  await openSettings(page, 'storage');
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('保存容量が足りません。');
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.fill('echo still usable');
   await input.press('Enter');
   await expect(page.locator('.output')).toContainText('still usable');
+  await openSettings(page, 'storage');
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('保存容量が足りません。');
   expect((await downloadBackup(page)).session).toBeNull();
   expect(errors).toEqual([]);
@@ -131,10 +140,13 @@ test('unavailable IndexedDB is reported without claiming to save data or breakin
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => Object.defineProperty(window, 'indexedDB', { value: undefined }));
   await page.goto('/');
+  await expect(page.locator('.settings-notice')).toContainText('保存の状態');
+  await openSettings(page, 'storage');
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('IndexedDB is unavailable');
   await openSettings(page, 'storage');
   await expect(page.getByRole('button', { name: 'JSON バックアップを保存' })).toBeDisabled();
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.fill('echo usable');
   await input.press('Enter');
   await expect(page.locator('.output')).toContainText('usable');

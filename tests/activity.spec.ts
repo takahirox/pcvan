@@ -1,3 +1,4 @@
+import { openSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { AiActivity, Backup } from '../src/storage/schema';
@@ -208,8 +209,9 @@ test('opt-in persists; reopening generates a bounded backlog with fictional time
   await page.goto('http://127.0.0.1:14374');
   await expect(page.locator('.ai-activity-message')).toContainText('無効');
   expect(await page.evaluate(() => window.activityMock.loads)).toBe(0);
-  await page.locator('.ai-controls').evaluate((element) => { (element as HTMLDetailsElement).open = true; });
+  await openSettings(page, 'ai');
   await page.locator('.ai-activity-cap').fill('4');
+  await openSettings(page, 'ai');
   await page.locator('.ai-activity-save').click();
   await expect(page.locator('.ai-message')).toContainText('有効');
   expect(await page.evaluate(() => window.activityMock.loads)).toBe(0);
@@ -241,14 +243,15 @@ test('cancel keeps terminal usable, late output is ignored, retry skips committe
   await page.addInitScript(() => { window.activityMock.mode = 'wait'; });
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.activityMock.calls)).toBe(1);
-  await page.locator('.ai-controls').evaluate((element) => { (element as HTMLDetailsElement).open = true; });
   const command = page.getByRole('textbox', { name: 'コマンド', exact: true });
   await command.fill('HELP'); await command.press('Enter');
   await expect(page.locator('.output')).toContainText('MAIN');
+  await openSettings(page, 'ai');
   await page.locator('.ai-stop').click();
   await page.evaluate(() => { window.activityMock.mode = 'ok'; window.activityMock.release?.(); });
   await expect(page.locator('.ai-runs')).toContainText('cancelled');
   expect((await snapshot(page)).posts.filter((post) => post.simulation)).toHaveLength(0);
+  await openSettings(page, 'ai');
   await page.locator('.ai-activity-retry').click();
   await expect(page.locator('.ai-activity-message')).toContainText('3/3');
   expect((await snapshot(page)).posts.filter((post) => post.simulation)).toHaveLength(3);
@@ -282,7 +285,7 @@ for (const mode of ['load-fail', 'fail', 'invalid', 'unsupported']) {
     const command = page.getByRole('textbox', { name: 'コマンド', exact: true });
     await command.fill('HELP'); await command.press('Enter');
     await expect(page.locator('.output')).toContainText('MAIN');
-    await page.locator('.ai-controls').evaluate((element) => { (element as HTMLDetailsElement).open = true; });
+    await openSettings(page, 'ai');
     await page.locator('.ai-activity-disable').click();
     await expect(page.locator('.ai-activity-message')).toContainText('無効');
     await page.reload();

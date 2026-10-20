@@ -1,4 +1,4 @@
-import { openSettings } from './settings-helpers';
+import { openSettings, closeSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { backupFixture } from './backup-fixture';
@@ -39,7 +39,7 @@ async function setup(page: Page) {
     }
   ` }));
   await page.goto('http://127.0.0.1:14374');
-  await page.getByText('ローカル AI 設定・投稿の出自', { exact: false }).click();
+  await openSettings(page, 'ai');
   await expect(page.locator('.storage-status')).toContainText('ローカル保存を利用できます');
 }
 
@@ -51,6 +51,7 @@ async function restore(page: Page, fixture = backupFixture()) {
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
   await expect(page.locator('.storage-status')).toContainText('バックアップを復元しました');
+  await openSettings(page, 'ai');
   await page.locator('.ai-forum').selectOption('forum');
 }
 
@@ -64,12 +65,14 @@ async function snapshot(page: Page): Promise<Backup> {
 }
 
 async function load(page: Page) {
+  await openSettings(page, 'ai');
   await page.locator('.ai-load').click();
   await expect(page.locator('.ai-message')).toContainText('準備ができました');
 }
 
 async function command(page: Page, line: string, response: string) {
   const before = (await page.locator('.output').textContent())!.length;
+  await closeSettings(page);
   await page.getByRole('textbox', { name: 'コマンド', exact: true }).fill(line);
   await page.getByRole('textbox', { name: 'コマンド', exact: true }).press('Enter');
   await expect.poll(async () => (await page.locator('.output').textContent())!.slice(before)).toContain(response);
@@ -82,13 +85,17 @@ test('explicit lazy load, model/persona selection, validated preview and single 
   expect(imports).toBe(0);
   expect((await snapshot(page)).members).toEqual([]);
   await restore(page);
+  await openSettings(page, 'ai');
   await page.locator('.ai-model').selectOption('Qwen2.5-1.5B-Instruct-q4f16_1-MLC');
+  await openSettings(page, 'ai');
   await page.locator('.ai-persona').selectOption('kusabue');
+  await openSettings(page, 'ai');
   await page.locator('.ai-reply').selectOption('first');
   const before = await snapshot(page);
   await load(page);
   expect(imports).toBe(1);
   expect(await page.evaluate(() => window.aiMock.loads)).toEqual(['Qwen2.5-1.5B-Instruct-q4f16_1-MLC']);
+  await openSettings(page, 'ai');
   await page.locator('.ai-generate').click();
   await expect(page.locator('.ai-preview')).toContainText('草笛 [架空の AI]');
   expect(await snapshot(page)).toEqual(before);
@@ -105,7 +112,7 @@ test('explicit lazy load, model/persona selection, validated preview and single 
   await command(page, '9', '投稿一覧');
   await command(page, 'READ 8', post.body);
   await page.reload();
-  await page.locator('.ai-controls summary').click();
+  await openSettings(page, 'ai');
   await expect(page.locator('.ai-records')).toContainText('fictional-ai:kusabue');
   await expect(page.locator('.ai-message')).toContainText('AI はオフ');
   expect((await snapshot(page)).posts).toEqual(after.posts);
@@ -115,17 +122,22 @@ test('malformed generation never posts, discarding is inert, and deleting the pa
   await setup(page); await restore(page); await load(page);
   const before = await snapshot(page);
   await page.evaluate(() => { window.aiMock.mode = 'malformed'; });
+  await openSettings(page, 'ai');
   await page.locator('.ai-generate').click();
   await expect(page.locator('.ai-message')).toContainText('AI を利用できません');
   await expect(page.locator('.ai-send')).toBeHidden();
   expect(await snapshot(page)).toEqual(before);
   await page.evaluate(() => { window.aiMock.mode = 'ok'; });
   await load(page);
+  await openSettings(page, 'ai');
   await page.locator('.ai-generate').click();
   await expect(page.locator('.ai-preview')).toBeVisible();
+  await openSettings(page, 'ai');
   await page.locator('.ai-discard').click();
   expect(await snapshot(page)).toEqual(before);
+  await openSettings(page, 'ai');
   await page.locator('.ai-reply').selectOption('reply');
+  await openSettings(page, 'ai');
   await page.locator('.ai-generate').click();
   await expect(page.locator('.ai-preview')).toBeVisible();
   await page.evaluate(async () => {
@@ -135,6 +147,7 @@ test('malformed generation never posts, discarding is inert, and deleting the pa
     await repo.delete('posts', 'reply'); repo.close();
   });
   const deleted = await snapshot(page);
+  await openSettings(page, 'ai');
   await page.locator('.ai-send').click();
   await expect(page.locator('.ai-message')).toContainText('AI 投稿を保存できません');
   expect(await snapshot(page)).toEqual(deleted);
@@ -144,24 +157,29 @@ test('cancel load or generation ignores late results; restore invalidates pendin
   await setup(page); await restore(page);
   const before = await snapshot(page);
   await page.evaluate(() => { window.aiMock.mode = 'load-wait'; });
+  await openSettings(page, 'ai');
   await page.locator('.ai-load').click();
   await expect(page.locator('.ai-progress')).toHaveAttribute('value', '0.42');
+  await openSettings(page, 'ai');
   await page.locator('.ai-stop').click();
   await page.evaluate(() => { window.aiMock.complete?.(); window.aiMock.mode = 'ok'; });
   await expect(page.locator('.ai-message')).toContainText('キャンセル');
   await expect(page.locator('.ai-generate')).toBeDisabled();
   await load(page);
   await page.evaluate(() => { window.aiMock.mode = 'generate-wait'; });
+  await openSettings(page, 'ai');
   await page.locator('.ai-generate').click();
   await expect.poll(() => page.evaluate(() => window.aiMock.prompts.length)).toBe(1);
   // Commands continue while the adapter is pending; inference never holds the queue.
   await command(page, 'J MITI', 'MITI / 未知の世界');
+  await openSettings(page, 'ai');
   await page.locator('.ai-stop').click();
   await page.evaluate(() => { window.aiMock.complete?.(); window.aiMock.mode = 'ok'; });
   await expect(page.locator('.ai-preview')).toBeHidden();
   expect((await snapshot(page)).posts).toEqual(before.posts);
   await load(page);
   await page.evaluate(() => { window.aiMock.mode = 'generate-wait'; });
+  await openSettings(page, 'ai');
   await page.locator('.ai-generate').click();
   await expect.poll(() => page.evaluate(() => window.aiMock.prompts.length)).toBe(2);
   await restore(page);
@@ -182,6 +200,7 @@ for (const mode of ['load-fail', 'inference-fail']) {
     await command(page, '3', 'MITI / フォーラム');
     await command(page, '9', '投稿一覧');
     await command(page, 'READ 1', 'こんにちは');
+    await closeSettings(page);
     await page.getByRole('textbox', { name: 'コマンド', exact: true }).fill('WRITE');
     await page.getByRole('textbox', { name: 'コマンド', exact: true }).press('Enter');
     await page.getByLabel('投稿タイトル', { exact: true }).fill('手動投稿');
@@ -200,7 +219,7 @@ test('unsupported WebGPU has no model requests and preserves ordinary commands',
   page.on('request', (request) => { if (/webllm-(adapter|worker)/.test(request.url())) aiAssets.push(request.url()); });
   await page.addInitScript(() => { Object.defineProperty(navigator, 'gpu', { value: undefined }); });
   await page.goto('/');
-  await page.locator('.ai-controls summary').click();
+  await openSettings(page, 'ai');
   await expect(page.locator('.ai-message')).toContainText('WebGPU が利用できない');
   await expect(page.locator('.ai-load')).toBeDisabled();
   await command(page, 'J MITI', 'MITI / 未知の世界');
@@ -209,4 +228,25 @@ test('unsupported WebGPU has no model requests and preserves ordinary commands',
   await command(page, 'READ 1', '★内容');
   expect(external).toEqual([]);
   expect(aiAssets).toEqual([]);
+});
+
+test('background model progress stays inspectable after Settings closes without replacing the terminal', async ({ page }) => {
+  await setup(page);
+  await restore(page);
+  await page.evaluate(() => { window.aiMock.mode = 'load-wait'; });
+  await page.locator('.ai-load').click();
+  await expect(page.locator('.ai-progress')).toHaveAttribute('value', '0.42');
+  await expect(page.locator('.ai-message')).toBeVisible();
+  await closeSettings(page);
+  const before = await page.locator('.output').textContent();
+  await page.evaluate(() => { window.aiMock.complete?.(); });
+  await expect(page.locator('.settings-notice')).toContainText('AIの状態が更新されました');
+  await expect(page.locator('.open-settings')).toContainText('•');
+  expect(await page.locator('.output').textContent()).toBe(before);
+  await openSettings(page, 'ai');
+  await expect(page.locator('.ai-message')).toContainText('準備ができました');
+  await page.evaluate(() => { window.aiMock.mode = 'inference-fail'; });
+  await page.locator('.ai-generate').click();
+  await expect(page.locator('.ai-message')).toContainText('再試行はモデル読込から');
+  await expect(page.locator('.ai-load')).toBeEnabled();
 });

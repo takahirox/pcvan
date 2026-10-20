@@ -6,7 +6,7 @@ export function mountOfflineControls(root: HTMLElement) {
   section.innerHTML = `
     <p class="network-status" role="status"></p>
     <details>
-    <summary>オフライン保存・容量・バックアップ [reconstructed]</summary>
+    <summary>オフライン保存・容量・バックアップ</summary>
     <button type="button" class="cache-shell">端末をオフライン用に保存</button>
     <p class="shell-status" role="status">端末は未保存です。初回はオンラインで保存してください。</p>
     <p>端末の保存と AI モデルの重みは別です。モデルは自動ダウンロードしません。

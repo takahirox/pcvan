@@ -1,9 +1,9 @@
+import { openSettings, closeSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { ConnectionController } from '../src/connection';
 import { backupFixture } from './backup-fixture';
-import { openSettings } from './settings-helpers';
 
 test.use({ reducedMotion: 'no-preference' });
 
@@ -24,6 +24,7 @@ async function restore(page: Page, data: unknown) {
 
 test('controlled frames preserve graphemes, exact spacing, asynchronous append order and bounded batches', async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');
+  await openSettings(page, 'display');
   await page.locator('.terminal-speed').selectOption('instant');
   const result = await page.evaluate(async () => {
     const path = '/src/output-renderer.ts';
@@ -99,13 +100,16 @@ test('commands flush preceding text, skip preserves later output, and download i
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   await page.goto('/');
+  await openSettings(page, 'display');
   await page.locator('.terminal-speed').selectOption('300');
   const input = page.getByRole('textbox', { name: 'コマンド', exact: true });
+  await closeSettings(page);
   await input.fill('J MITI'); await input.press('Enter');
   await expect(page.locator('.reveal-output')).toBeEnabled();
   const controller = new ConnectionController();
   const expected = [...controller.welcome, ...controller.completeConnection(), '> J MITI', ...controller.submit('J MITI')].join('\n');
   expect(await page.locator('.output').textContent()).not.toBe(expected);
+  await closeSettings(page);
   await input.fill('未送信 😀 ｶﾅ');
   await input.dispatchEvent('compositionstart');
   await input.press('Enter');
@@ -113,17 +117,21 @@ test('commands flush preceding text, skip preserves later output, and download i
   await expect(page.locator('.reveal-output')).toBeEnabled();
   await input.dispatchEvent('compositionend');
   const downloading = page.waitForEvent('download');
+  await openSettings(page, 'display');
   await page.locator('.download-log').click();
   expect(await readFile((await (await downloading).path())!, 'utf8')).toBe(expected);
   await expect(input).toHaveValue('未送信 😀 ｶﾅ');
   // Esc reveals accepted text, leaving both session and draft intact.
+  await closeSettings(page);
   await input.press('Escape');
   expect(await page.locator('.output').textContent()).toBe(expected);
   await expect(page.locator('.reveal-output')).toBeDisabled();
   await expect(page.getByRole('log')).toHaveAttribute('aria-live', 'off');
+  await closeSettings(page);
   await input.fill('3'); await input.press('Enter');
   await expect(page.locator('.reveal-output')).toBeEnabled();
   // Submit again while the preceding response is still entirely unpainted.
+  await closeSettings(page);
   await input.fill('9'); await input.press('Enter');
   await expect(page.locator('.output')).toContainText('MITI / フォーラム');
   const prior = `${expected}\n> 3\n${controller.submit('3').join('\n')}\n> 9`;
@@ -133,8 +141,10 @@ test('commands flush preceding text, skip preserves later output, and download i
   const all = `${prior}\n${controller.submit('9').join('\n')}`;
   expect(await page.locator('.output').textContent()).toBe(all);
   await expect(input).toBeFocused();
+  await closeSettings(page);
   await input.fill('READ 1'); await input.press('Enter');
   await expect(page.locator('.reveal-output')).toBeEnabled();
+  await openSettings(page, 'display');
   await page.locator('.terminal-speed').selectOption('instant');
   await expect(page.locator('.output')).toContainText('★内容');
   await expect(page.locator('.reveal-output')).toBeDisabled();
@@ -142,9 +152,10 @@ test('commands flush preceding text, skip preserves later output, and download i
 
 test('display settings reload and round-trip in v1 backups; invalid values leave the world unchanged', async ({ page }) => {
   await page.goto('/');
-  await page.locator('.display-controls summary').click();
+  await openSettings(page, 'display');
   await page.getByRole('combobox', { name: '表示色', exact: true }).selectOption('amber');
   await page.getByLabel('光彩・走査線').check();
+  await openSettings(page, 'display');
   await page.locator('.terminal-speed').selectOption('1200');
   const saved = await backup(page);
   const setting = { id: 'terminal-display', value: { version: 1, theme: 'amber', speed: '1200', effects: true } };
@@ -153,6 +164,7 @@ test('display settings reload and round-trip in v1 backups; invalid values leave
   await expect(page.locator('.terminal')).toHaveAttribute('data-theme', 'amber');
   await expect(page.locator('.terminal')).toHaveClass(/effects/);
   await expect(page.locator('.terminal-speed')).toHaveValue('1200');
+  await openSettings(page, 'display');
   await page.locator('.terminal-speed').selectOption('instant');
   await restore(page, saved);
   await expect(page.locator('.terminal-speed')).toHaveValue('1200');
@@ -183,8 +195,9 @@ test('reduced motion defaults to Instant with effects off and permits an explici
   await expect(page.locator('.terminal-speed')).toHaveValue('2400');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.locator('.terminal-speed')).toHaveValue('instant');
+  await openSettings(page, 'display');
   await page.locator('.terminal-speed').selectOption('300');
-  await page.locator('.display-controls summary').click();
+  await openSettings(page, 'display');
   await page.getByLabel('光彩・走査線').check();
   await backup(page); // Wait for serialized persistence before reloading.
   await page.reload();
@@ -200,8 +213,10 @@ for (const width of [320, 1280]) {
     for (const selector of ['.display-controls', '.member-controls details', '.storage-controls details', '.ai-controls', '.offline-controls details']) {
       await expect(page.locator(selector)).not.toHaveAttribute('open');
     }
+    await openSettings(page, 'display');
     await page.locator('.terminal-speed').selectOption('instant');
     const input = page.getByRole('textbox', { name: 'コマンド', exact: true });
+    await closeSettings(page);
     await input.fill(`日本語 😀 ｶﾅ ${'長い行'.repeat(80)}末尾`); await input.press('Enter');
     await expect(page.locator('.output')).toContainText('末尾');
     const layout = await page.evaluate(() => {
@@ -216,10 +231,12 @@ for (const width of [320, 1280]) {
     expect(layout.screenHeight).toBeGreaterThan(layout.viewport * 0.45);
     expect(layout).toMatchObject({ fits: true, promptFits: true, scrolls: true, whiteSpace: 'pre' });
     // Selection remains literal with all three themes and effects enabled.
-    await page.locator('.display-controls summary').click();
+    await openSettings(page, 'display');
     await page.getByLabel('光彩・走査線').check();
     for (const theme of ['white', 'green', 'amber']) {
+      await openSettings(page, 'display');
       await page.getByRole('combobox', { name: '表示色', exact: true }).selectOption(theme);
+      await closeSettings(page);
       const selected = await page.locator('.output').evaluate((node) => {
         const range = document.createRange(); range.selectNodeContents(node);
         const selection = getSelection()!; selection.removeAllRanges(); selection.addRange(range);

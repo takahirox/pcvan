@@ -12,6 +12,7 @@ import { mountComposer } from './composer';
 import { mountAiControls } from './ai/controls';
 import { postInput, validateGeneration } from './ai/generation';
 import { mountOfflineControls } from './offline/controls';
+import { mountSettings } from './settings';
 import './style.css';
 
 const controller = new ConnectionController();
@@ -99,7 +100,7 @@ const terminal = mountTerminal(root, {
           canSubmit = false;
           const parent = reply && data.posts.find((post) => post.number === Number(reply[1]));
           if (reply && (!parent || data.source !== 'local')) {
-            terminal.append(...session.append('返信先のローカル投稿がありません。創作デモには返信できません。'));
+            terminal.append(...session.append('返信先のローカル投稿がありません。見本の投稿には返信できません。'));
           } else if (data.source === 'local' && !data.available) {
             // Missing boards can be created on send; ambiguous mappings cannot.
             const sigs = content.sigs.filter((sig) => sig.keyword.toUpperCase() === target.keyword);
@@ -156,7 +157,10 @@ const terminal = mountTerminal(root, {
 });
 terminal.append(...session.transcript);
 updateConnection();
+const settings = mountSettings(root);
 const composer = mountComposer(root, {
+  configureMember: () => settings.open('member'),
+  beforeCompose: () => settings.close(),
   createMember: (handle) => enqueue(async () => {
     await (await repository).createHumanMember(handle);
     await refreshContent();
@@ -224,3 +228,4 @@ window.addEventListener('pageshow', (event) => {
   if (event.persisted) void ai.openActivity().catch((error) => controls.reportError(error));
 });
 mountOfflineControls(root);
+settings.collect();

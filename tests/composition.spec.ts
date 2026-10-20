@@ -1,4 +1,4 @@
-import { openSettings } from './settings-helpers';
+import { openSettings, closeSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { Backup } from '../src/storage/schema';
@@ -7,6 +7,7 @@ import { backupFixture } from './backup-fixture';
 async function send(page: Page, line: string, expected: string) {
   const start = (await page.locator('.output').textContent())!.length;
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.fill(line);
   await input.press('Enter');
   await expect.poll(async () => {
@@ -17,6 +18,7 @@ async function send(page: Page, line: string, expected: string) {
 
 async function command(page: Page, line: string) {
   const input = page.getByRole('textbox', { name: 'コマンド' });
+  await closeSettings(page);
   await input.fill(line);
   await input.press('Enter');
 }
@@ -71,12 +73,10 @@ test('create, review, edit and cancel preserve Japanese text without accidental 
   await enterForum(page);
   await command(page, 'WRITE');
   await expect(page.locator('.member-message')).toContainText('ローカル利用者を作成');
-  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(page.getByRole('dialog', { name: '設定 / Options', exact: true })).toBeVisible();
   await createMember(page, '日本語の人');
   const before = await snapshot(page);
   await command(page, 'WRITE');
-  await expect(page.getByRole('dialog')).toContainText('[D / reconstructed]');
-  await expect(page.getByRole('dialog')).toContainText('未確認');
   const title = '  日本語　ｶﾅ <b>題</b>  ';
   const body = '  一行目\n\n日本語の複数行　。\n<b>文字</b>\n末尾  \n';
   await fillDraft(page, title, body);
@@ -123,7 +123,7 @@ test('create, review, edit and cancel preserve Japanese text without accidental 
 test('empty fields never send; replies use allocated numbers and navigable references', async ({ page }) => {
   await page.goto('/');
   await enterForum(page);
-  await send(page, 'REPLY 1', '創作デモには返信できません');
+  await send(page, 'REPLY 1', '見本の投稿には返信できません');
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'MITI';
   fixture.forums[0]!.boardNo = 9;
@@ -167,7 +167,7 @@ test('read markers are separate by human member and forum, monotonic and persist
   fixture.sigs[0]!.keyword = 'DAISIZEN';
   fixture.readStates = [];
   await restore(page, fixture);
-  await send(page, '13', '再構成の仮設ブリッジ');
+  await send(page, '13', 'コミュニケーション');
   await send(page, '2', '大自然＆動植物');
   await send(page, 'FORUMS', '7 伝言板／企画室');
   await send(page, '1', '#4 返事 RE#1 [未読]');
@@ -186,11 +186,13 @@ test('read markers are separate by human member and forum, monotonic and persist
     { memberId: second.id, forumId: 'forum', lastReadNumber: 1 },
     { memberId: second.id, forumId: 'other', lastReadNumber: 1 },
   ]));
+  await openSettings(page, 'member');
   await page.getByLabel('ローカル利用者', { exact: true }).selectOption('human');
   await expect.poll(async () => (await snapshot(page)).settings.find((setting) => setting.id === 'active-human-member')?.value).toBe('human');
   await page.reload();
+  await openSettings(page, 'member');
   await expect(page.getByLabel('ローカル利用者', { exact: true })).toHaveValue('human');
-  await send(page, '13', '再構成の仮設ブリッジ');
+  await send(page, '13', 'コミュニケーション');
   await send(page, '2', '大自然＆動植物');
   await send(page, 'FORUMS', '7 伝言板／企画室');
   await send(page, '2', '#1  [未読]');

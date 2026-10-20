@@ -1,4 +1,4 @@
-import { openSettings } from './settings-helpers';
+import { openSettings, closeSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
@@ -10,6 +10,7 @@ async function command(page: Page, line: string, response: string) {
   const output = page.locator('.output');
   const start = (await output.textContent())!.length;
   const input = page.getByRole('textbox', { name: 'コマンド', exact: true });
+  await closeSettings(page);
   await input.fill(line);
   await input.press('Enter');
   await expect.poll(async () => (await output.textContent())!.slice(start)).toContain(response);
@@ -48,8 +49,6 @@ async function restore(page: Page, saved: Backup) {
 async function post(page: Page, title: string, body: string, line = 'WRITE') {
   await command(page, line, `> ${line}`);
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toContainText('[D / reconstructed]');
-  await expect(dialog).toContainText('未確認');
   await page.getByLabel('投稿タイトル', { exact: true }).fill(title);
   await page.getByLabel('投稿本文', { exact: true }).fill(body);
   await page.getByRole('button', { name: '内容を確認', exact: true }).click();
@@ -86,14 +85,11 @@ function observe(context: BrowserContext, origin: string) {
   return { unexpected, aiAssets, errors };
 }
 
-test('journey: all MAIN mappings and historical evidence boundaries through keyboard navigation', async ({ page }) => {
+test('journey: all MAIN mappings and concise screens through keyboard navigation', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.output')).toContainText('番号またはコマンド=');
-  await expect(page.locator('.output')).toContainText('シミュレーション接続中… [D / reconstructed]');
-  await expect(page.locator('.output')).toContainText('1996年の挨拶文は未確認');
+  await expect(page.locator('.output')).toContainText('PC-VAN 接続中…');
   const greeting = await command(page, 'HELP', '番号またはコマンド=');
-  expect(greeting).toContain('[C / provisional]');
-  expect(greeting).toContain('1997年全期間のメニューとしては未確認');
   const labels = [
     '電子メール', '索引', 'ニュース', 'データベース', '公共情報と政治', 'ビジネス',
     'インターネット', 'コンピュータ', 'ショッピングモール', '電子出版', '趣味', '生活',
@@ -111,40 +107,31 @@ test('journey: all MAIN mappings and historical evidence boundaries through keyb
     expect(greeting).toContain(`${selector!.padStart(2)} ${label}`);
     const result = await command(page, selector!, `${selector} ${label}`);
     if (selector === '13') {
-      expect(result).toContain('[D / reconstructed]');
-      expect(result).toContain('実際のサブメニュー項目・プロンプトは未確認');
       await command(page, 'MAIN', '番号またはコマンド=');
     } else if (selector === 'Q') {
-      await command(page, 'RECONNECT', 'シミュレーション接続中');
+      await command(page, 'RECONNECT', 'PC-VAN 接続中');
       await command(page, 'HELP', '番号またはコマンド=');
     } else expect(result).toContain('未実装');
   }
   await command(page, 'J UNKNOWN', '移動先が見つかりません');
   const input = page.getByRole('textbox', { name: 'コマンド', exact: true });
+  await closeSettings(page);
   await input.fill('未送信');
   await input.press('ArrowUp');
   await expect(input).toHaveValue('J UNKNOWN');
   await input.press('ArrowDown');
   await expect(input).toHaveValue('未送信');
   for (const [line, destination] of [['J MITI', '未知の世界'], ['3', 'フォーラム'], ['9', '資料室']]) {
-    const result = await command(page, line!, `MITI / ${destination}`);
-    expect(result).toContain('経路の出典 [B / verified]');
-    expect(result).toContain('画面・配置・プロンプトは再構成 [D / reconstructed]');
-    expect(result).toContain('完全な SIG メニューではありません');
+    await command(page, line!, `MITI / ${destination}`);
     await command(page, 'invalid', 'この画面では使えない');
   }
   const reading = await command(page, 'READ 1', '★内容');
   expect(reading).toMatch(/#1[^\n]*資料室\n★タイトル \([^)]+\)  \d{2}\/\d{2}\/\d{2}  \d{2}:\d{2}\n[^\n]+\n★内容\n/);
-  expect(reading).toContain('創作デモ投稿 [D / reconstructed]');
-  expect(reading).toContain('ヘッダー構造は保存史料を参考に再構成');
   await command(page, 'MAIN', '番号またはコマンド=');
-  await command(page, '13', '史実の番号ではありません');
-  const daisizen = await command(page, '2', '大自然＆動植物');
-  expect(daisizen).toContain('構成の出典 [B / provisional]');
-  expect(daisizen).toContain('端末の番号・プロンプト・ジャンプ入力は未確認');
+  await command(page, '13', '1 未知の世界');
+  await command(page, '2', '大自然＆動植物');
   for (const service of ['MAIL', 'LIBRARY', 'OLT', 'OSL', 'CONFERENCE']) {
-    const notice = await command(page, service, '未実装の案内画面 [D / reconstructed]');
-    expect(notice).toContain('当時のサービス画面を再現したものではありません');
+    await command(page, service, 'サービスの操作・送受信・ファイル転送は利用できません');
     await command(page, 'BACK', '大自然＆動植物');
   }
   // Verified route/header citations must never authenticate invented prompts.
@@ -162,11 +149,11 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
     const page = await context.newPage();
     await page.goto(baseURL!);
     expect((await backup(page)).posts).toEqual([]);
-    await page.locator('.ai-controls summary').click();
+    await openSettings(page, 'ai');
     await expect(page.locator('.ai-message')).toContainText('WebGPU が利用できない');
     await expect(page.locator('.ai-load')).toBeDisabled();
     await expect(page.locator('input[type="password"], input[name*="api-key" i]')).toHaveCount(0);
-    await page.locator('.offline-controls summary').click();
+    await openSettings(page, 'offline');
     await page.locator('.cache-shell').click();
     await expect(page.locator('.shell-status')).toContainText('オフライン用に保存済み');
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -174,14 +161,13 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
     await page.reload();
     await expect(page.locator('.network-status')).toContainText('オフライン');
     await enterForum(page);
-    await command(page, 'READ 1', '創作デモ投稿');
+    await command(page, 'READ 1', '★タイトル (DEMO0001)');
     await createHuman(page);
     const title = '旅の記録　ｶﾅ';
     const body = '一行目\n\n  二行目 <b>文字のまま</b>  \n';
     await post(page, title, body);
     await command(page, 'LIST', `#1 ${title} [未読]`);
-    const reading = await command(page, 'READ 1', body);
-    expect(reading).toContain('ローカル保存の投稿');
+    await command(page, 'READ 1', body);
     await expect(page.locator('.output b')).toHaveCount(0);
     await command(page, 'LIST', `#1 ${title} [既読]`);
     await post(page, `RE#1 ${title}`, '返信です。\nオフラインから。', 'REPLY 1');
@@ -271,8 +257,9 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   await createHuman(page);
   await enterForum(page);
   await post(page, '人間の話題', '自分で書いた最初の話題です。');
-  await page.locator('.ai-controls summary').click();
+  await openSettings(page, 'ai');
   await page.locator('.ai-activity-cap').fill('2');
+  await openSettings(page, 'ai');
   await page.locator('.ai-activity-save').click();
   await expect(page.locator('.ai-message')).toContainText('有効');
   expect(await workerStats(page)).toEqual({ generations: 0, loads: 0 });
@@ -282,7 +269,7 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   // before advancing time, otherwise that write can consume the idle interval.
   expect((await backup(page)).session!.lastLogoutAt).toBe(start.toISOString());
   await page.clock.setFixedTime(reconnect);
-  await command(page, 'RECONNECT', 'シミュレーション接続中');
+  await command(page, 'RECONNECT', 'PC-VAN 接続中');
   await expect.poll(async () => (await workerStats(page)).generations).toBe(2);
   await command(page, 'HELP', '番号またはコマンド=');
   const interrupted = await backup(page);
@@ -310,7 +297,7 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   await command(resumed, 'READ 3', '[架空の投稿時刻]');
   await command(resumed, 'MAIN', '番号またはコマンド=');
   await command(resumed, 'Q', '接続を終了しました');
-  await command(resumed, 'RECONNECT', 'シミュレーション接続中');
+  await command(resumed, 'RECONNECT', 'PC-VAN 接続中');
   await command(resumed, 'HELP', '番号またはコマンド=');
   expect((await backup(resumed)).posts).toEqual(recovered.posts);
   expect((await workerStats(resumed)).generations).toBe(1);
@@ -325,10 +312,12 @@ for (const mode of ['invalid', 'failure'] as const) {
     await createHuman(page);
     await enterForum(page);
     await post(page, '元の話題', 'AI がなくても使えます。');
-    await page.locator('.ai-controls summary').click();
+    await openSettings(page, 'ai');
     await page.locator('.ai-forum').selectOption({ index: 0 });
+    await openSettings(page, 'ai');
     await page.locator('.ai-load').click();
     await expect(page.locator('.ai-message')).toContainText('準備ができました');
+    await openSettings(page, 'ai');
     await page.locator('.ai-generate').click();
     await expect(page.locator('.ai-message')).toContainText('端末・閲覧・手動投稿は利用できます');
     await expect(page.locator('.ai-send')).toBeHidden();

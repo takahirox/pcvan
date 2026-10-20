@@ -1,4 +1,4 @@
-import { openSettings } from './settings-helpers';
+import { openSettings, closeSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -20,7 +20,7 @@ function daisizen() {
   return controller;
 }
 
-test('service helpers are explicitly reconstructed alongside provisional historical names', () => {
+test('service helpers preserve provisional metadata and show concise operational labels', () => {
   const controller = daisizen();
   const output = controller.submit('HELP').join('\n');
   for (const [input, label] of entries) {
@@ -28,8 +28,8 @@ test('service helpers are explicitly reconstructed alongside provisional histori
     expect(section.selector).toBeNull();
     expect(section.status).toBe('provisional');
     expect(section.demo_entry).toEqual({ input, evidence_category: 'D', status: 'reconstructed' });
-    expect(output).toContain(`${label} [B / provisional]`);
-    expect(output).toContain(`${input}: ${label}の未実装案内（創作の操作補助 [D / reconstructed]）`);
+    expect(output).toContain(`${label}`);
+    expect(output).toContain(`${input}: ${label}（利用不可）`);
   }
 });
 
@@ -41,12 +41,6 @@ for (const [input, label] of entries) {
     expect(controller.screen).toBe('daisizen-service');
     expect(controller.needsContent).toBe(false);
     expect(output.join('\n')).toContain(`大自然＆動植物（DAISIZEN） / ${label}`);
-    expect(output.join('\n')).toContain('[B / provisional]');
-    expect(output.join('\n')).toContain(evidence.daisizen.source_url);
-    expect(output.join('\n')).toContain('1996–1997年');
-    expect(output.join('\n')).toContain('未実装の案内画面 [D / reconstructed]');
-    expect(output.join('\n')).toContain('当時のサービス画面を再現したものではありません');
-    expect(output.join('\n')).toContain('コマンドと');
     expect(output.join('\n')).toContain('サービスの操作・送受信・ファイル転送は利用できません');
     for (const command of ['1', '2', 'Q', 'E', 'H', 'RB1', 'TL1', 'DL1', 'KW', 'LIST', 'READ 1', 'SEND hello', 'UPLOAD file', 'hello', '<b>発言</b>', 'FORUMS', ...entries.map(([helper]) => helper)]) {
       expect(controller.submit(command).join('\n')).toContain('この画面では使えない');
@@ -96,6 +90,7 @@ test('keyboard placeholders work offline without service requests or changing lo
   await page.context().setOffline(true);
   const input = page.getByRole('textbox', { name: 'コマンド' });
   const send = async (line: string, expected: string) => {
+    await closeSettings(page);
     await input.fill(line);
     await input.press('Enter');
     await expect.poll(async () => {
@@ -104,11 +99,11 @@ test('keyboard placeholders work offline without service requests or changing lo
     }).toContain(expected);
     await expect(input).toBeFocused();
   };
-  await send('13', '再構成の仮設ブリッジ');
+  await send('13', 'コミュニケーション');
   await send('2', 'MAIL: 電子メール');
   for (const [helper, label] of entries) {
     await send(helper, `大自然＆動植物（DAISIZEN） / ${label}`);
-    await send('HELP', '未実装の案内画面 [D / reconstructed]');
+    await send('HELP', 'サービスの操作・送受信・ファイル転送は利用できません');
     await send('SEND <b>発言</b>', 'この画面では使えない');
     await send('BACK', 'FORUMS: フォーラム一覧');
   }
@@ -116,7 +111,7 @@ test('keyboard placeholders work offline without service requests or changing lo
   await send('FORUMS', '7 伝言板／企画室');
   await send('1', '#4 返事');
   await send('READ 1', '★タイトル (human)');
-  await send('MAIN', 'MAIN（1996年頃');
+  await send('MAIN', 'MAIN');
   await send('J MITI', 'MITI / 未知の世界');
   await send('3', 'MITI / フォーラム');
   await send('9', 'MITI / 資料室');
