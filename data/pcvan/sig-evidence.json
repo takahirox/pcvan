@@ -10,7 +10,7 @@
       "input": null,
       "status": "provisional",
       "source_url": "https://www.chayagate.com/daisizen/index.htm",
-      "limitation": "Jump keyword unverified. The SIG name does not establish J DAISIZEN as a historical command."
+      "limitation": "The linked sig_list.htm guide names the jump code DAISIZEN, but does not show the exact J DAISIZEN input or its MAIN context. This route remains unsupported."
     },
     "sections": [
       {
@@ -23,7 +23,9 @@
         "label": "電子メール",
         "selector": null,
         "status": "provisional",
-        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+        "source_url": "https://www.chayagate.com/daisizen/index.htm",
+        "demo_entry": { "input": "MAIL", "evidence_category": "D", "status": "reconstructed" },
+        "unavailable_reason": "宛先入力・一覧・本文表示・送信・取消のコマンドと手順は未確認です。"
       },
       {
         "label": "フォーラム（電子掲示板）",
@@ -35,25 +37,33 @@
         "label": "ライブラリィ",
         "selector": null,
         "status": "provisional",
-        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+        "source_url": "https://www.chayagate.com/daisizen/index.htm",
+        "demo_entry": { "input": "LIBRARY", "evidence_category": "D", "status": "reconstructed" },
+        "unavailable_reason": "区分名は史料にありますが、項目選択・一覧・閲覧・登録のコマンドとプロンプトは未確認です。"
       },
       {
         "label": "電子会議室",
         "selector": null,
         "status": "provisional",
-        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+        "source_url": "https://www.chayagate.com/daisizen/index.htm",
+        "demo_entry": { "input": "CONFERENCE", "evidence_category": "D", "status": "reconstructed" },
+        "unavailable_reason": "会議室の選択・発言・閲覧・退出のコマンドと手順は未確認です。"
       },
       {
         "label": "ＯＬＴ（＊）",
         "selector": null,
         "status": "provisional",
-        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+        "source_url": "https://www.chayagate.com/daisizen/index.htm",
+        "demo_entry": { "input": "OLT", "evidence_category": "D", "status": "reconstructed" },
+        "unavailable_reason": "Online Talk の名称は確認できますが、入室・名前設定・発言・退出のコマンドと手順は未確認です。"
       },
       {
         "label": "ＯＳＬ",
         "selector": null,
         "status": "provisional",
-        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+        "source_url": "https://www.chayagate.com/daisizen/index.htm",
+        "demo_entry": { "input": "OSL", "evidence_category": "D", "status": "reconstructed" },
+        "unavailable_reason": "Online Software Library の区分名は確認できますが、一覧・転送・登録・取消のコマンドと手順は未確認です。"
       }
     ],
     "forums": [
