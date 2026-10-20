@@ -33,9 +33,10 @@ tooling, and that reported results match evidence. Failures, skipped checks, and
 unperformed checks must be disclosed with reasons.
 
 Follow the [current repository validation guidance](development-flow.md#validation-for-the-current-repository).
-There are no configured build/test commands at present. For documentation and
-templates, check syntax, links, whitespace, and consistency; do not require new
-runtime tooling or unrelated runtime, hardware/device, or deployment checks.
+Application build/test commands are documented in the [README](../README.md#validation).
+For documentation and templates, check syntax, links, whitespace, and consistency;
+do not require new runtime tooling or unrelated runtime, hardware/device, or
+deployment checks.
 
 Mandatory pre-merge acceptance must be achievable and verifiable before merge.
 Keep optional validation separate. Human confirmation, physical-device testing,
