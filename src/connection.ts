@@ -1,5 +1,6 @@
 import type { TerminalController } from './controller';
 import { PcvanController } from './navigation';
+import type { ForumContent } from './forums';
 
 const greeting = [
   'シミュレーション接続中… [D / reconstructed]',
@@ -15,6 +16,10 @@ export class ConnectionController implements TerminalController {
   readonly welcome = greeting;
 
   get screen() { return this.connecting ? 'connecting' : this.navigation.screen; }
+
+  get needsContent(): boolean { return this.navigation.needsContent; }
+
+  setContent(content: ForumContent): void { this.navigation.setContent(content); }
 
   completeConnection(): readonly string[] {
     if (!this.connecting) return [];

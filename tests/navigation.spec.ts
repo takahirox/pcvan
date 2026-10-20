@@ -126,8 +126,11 @@ test('browser navigation stays local through the route, errors, disconnect, and 
   const send = async (line: string, expected: string) => {
     await input.fill(line);
     await input.press('Enter');
-    const text = await output.textContent();
-    expect(text?.slice(text.lastIndexOf(`> ${line}`))).toContain(expected);
+    // Forum reads and their following commands wait for the local repository.
+    await expect.poll(async () => {
+      const text = (await output.textContent())!;
+      return text.slice(text.lastIndexOf(`> ${line}`));
+    }).toContain(expected);
     await expect(input).toBeFocused();
     expect(page.url()).toBe(initialUrl);
   };

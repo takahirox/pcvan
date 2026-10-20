@@ -43,13 +43,27 @@ function updateConnection(): void {
 }
 const terminal = mountTerminal(root, {
   submit: (line) => {
-    const before = controller.screen;
-    terminal.append(...session.submit(line));
-    const after = controller.screen;
-    updateConnection();
     if (!line.trim()) return;
+    completeConnection();
+    // Echo and history stay immediate even while IndexedDB is loading. Responses
+    // are serialized with restores so rapid commands use the correct screen/data.
+    session.history.add(line);
+    terminal.append(...session.append(`> ${line}`));
     commandsDuringHistoryLoad?.push(line);
     void enqueue(async () => {
+      const before = controller.screen;
+      let canSubmit = true;
+      if (controller.needsContent && !['MAIN', 'BACK'].includes(line.trim().toUpperCase())) {
+        try { controller.setContent(await (await repository).exportBackup()); }
+        catch (error) {
+          controls.reportError(error);
+          terminal.append(...session.append('投稿の読み込みに失敗しました。再試行してください。'));
+          canSubmit = false; // Do not display stale posts after a failed read.
+        }
+      }
+      if (canSubmit) terminal.append(...session.append(...controller.submit(line)));
+      const after = controller.screen;
+      updateConnection();
       const repo = await repository;
       if (before === 'disconnected' && after !== 'disconnected') {
         terminal.showSessionTimes(await repo.startSession());

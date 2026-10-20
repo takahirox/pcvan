@@ -114,3 +114,44 @@ test('log download matches every displayed UTF-8 byte, including Japanese and li
   expect(await readFile((await download.path())!)).toEqual(Buffer.from(visible, 'utf8'));
   await expect(input).toHaveValue('書きかけの入力');
 });
+
+test('queued forum reading survives logout and reconnect with one history entry per command', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-20T10:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-10-20T10:00:01Z'));
+  await page.goto('/');
+  await expect.poll(async () => (await savedSession(page))?.lastLoginAt).toBeTruthy();
+  const firstLogin = (await savedSession(page))!.lastLoginAt;
+  await page.clock.runFor(2000);
+  await page.context().setOffline(true);
+  const commands = ['J MITI', '3', '9', 'READ 1', 'MAIN', 'Q', 'RECONNECT', 'J MITI', '3', '9', 'READ 3'];
+  // Submit in one turn so navigation and timestamp transitions must use the
+  // queued screen state, even while preceding forum reads await IndexedDB.
+  await page.evaluate((lines) => {
+    const input = document.querySelector<HTMLInputElement>('#command')!;
+    const form = document.querySelector<HTMLFormElement>('.command-form')!;
+    for (const line of lines) {
+      input.value = line;
+      form.requestSubmit();
+    }
+  }, commands);
+  await expect.poll(async () => (await savedSession(page))?.commandHistory).toEqual(commands);
+  const saved = (await savedSession(page))!;
+  expect(saved.lastLoginAt).not.toBe(firstLogin);
+  expect(saved.lastLogoutAt).toBeTruthy();
+  await expect(page.locator('.session-times')).toContainText(saved.lastLoginAt!);
+  await expect(page.locator('.session-times')).toContainText(saved.lastLogoutAt!);
+  await expect(page.getByRole('button', { name: '接続演出をスキップ' })).toBeHidden();
+  const visible = (await page.locator('.output').textContent())!;
+  expect(visible).toContain('★タイトル (DEMO0001)');
+  expect(visible).toContain('シミュレーション接続を終了しました。');
+  expect(visible).toContain('★タイトル (DEMO0002)');
+  expect(visible.match(/> READ 1\n/g)).toHaveLength(1);
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: '端末ログを保存 (.txt)' }).click();
+  const download = await downloading;
+  expect(await readFile((await download.path())!)).toEqual(Buffer.from(visible, 'utf8'));
+  const input = page.getByRole('textbox', { name: 'コマンド' });
+  await input.focus();
+  await input.press('ArrowUp');
+  await expect(input).toHaveValue('READ 3');
+});

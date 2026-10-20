@@ -1,10 +1,13 @@
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import type { TerminalController } from './controller';
+import { emptyContent, forumName, forumPosts, renderPost } from './forums';
+import type { ForumContent } from './forums';
 
-const { miti } = sigEvidence;
+const { miti, daisizen } = sigEvidence;
 
-export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' | 'disconnected';
+export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
+  'daisizen' | 'daisizen-forums' | 'forum' | 'disconnected';
 
 // Layout is reconstructed. The fixture's CJK labels occupy two terminal cells
 // per character; ASCII occupies one. Padding never changes the label itself.
@@ -45,6 +48,15 @@ const demoPrompt = '再構成画面の入力=';
 export class PcvanController implements TerminalController {
   readonly welcome = renderMain();
   private currentScreen: Screen = 'main';
+  private content = emptyContent();
+  private boardNo = 9;
+
+  /** Refreshed by the app from #6's repository before forum commands. */
+  setContent(content: ForumContent): void { this.content = content; }
+
+  get needsContent(): boolean {
+    return ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
+  }
 
   get screen(): Screen {
     return this.currentScreen;
@@ -70,7 +82,8 @@ export class PcvanController implements TerminalController {
       case 'communication':
         // This selector is a visibly reconstructed bridge, not historical data.
         if (command === '1') return this.enter('miti');
-        return this.handleReconstructed(command, '1 / MAIN / HELP');
+        if (command === '2') return this.enter('daisizen');
+        return this.handleReconstructed(command, '1 / 2 / MAIN / HELP');
       case 'miti':
         if (command === miti.steps[1]!.input) return this.enter('miti-forums');
         return this.handleReconstructed(command, `${miti.steps[1]!.input} / MAIN / HELP`);
@@ -78,11 +91,62 @@ export class PcvanController implements TerminalController {
         if (command === miti.steps[2]!.input) return this.enter('miti-materials');
         return this.handleReconstructed(command, `${miti.steps[2]!.input} / MAIN / HELP`);
       case 'miti-materials':
-        return this.handleReconstructed(command, 'MAIN / HELP');
+        return this.handleForum(command, 'MITI', 9);
+      case 'daisizen':
+        if (command === 'FORUMS') return this.enter('daisizen-forums');
+        if (command === 'BACK') return this.enter('communication');
+        return this.handleReconstructed(command, 'FORUMS / BACK / MAIN / HELP');
+      case 'daisizen-forums': {
+        const forum = daisizen.forums.find((item) => String(item.number) === command);
+        if (forum) { this.boardNo = forum.number; return this.enter('forum'); }
+        if (command === 'BACK') return this.enter('daisizen');
+        return this.handleReconstructed(command, '1–7 / BACK / MAIN / HELP');
+      }
+      case 'forum':
+        return this.handleForum(command, 'DAISIZEN', this.boardNo);
       case 'disconnected':
         if (command === 'RECONNECT') return this.enter('main');
         return ['接続は終了しています。RECONNECT で再接続してください（創作の操作補助）。'];
     }
+  }
+
+  private handleForum(command: string, keyword: 'MITI' | 'DAISIZEN', boardNo: number): readonly string[] {
+    if (command === 'BACK') return this.enter(keyword === 'MITI' ? 'miti-forums' : 'daisizen-forums');
+    if (command === 'LIST') return this.render();
+    const read = /^READ ([1-9]\d*)$/.exec(command);
+    if (read && Number.isSafeInteger(Number(read[1]))) {
+      const data = forumPosts(this.content, keyword, boardNo);
+      const post = data.posts.find((item) => item.number === Number(read[1]));
+      return post ? [
+        ...this.forumNotice(data.source),
+        ...renderPost(post, forumName(keyword, boardNo)),
+        this.forumHelp,
+        demoPrompt,
+      ] : ['その番号の投稿はありません。画面は変わりません。', this.forumHelp, demoPrompt];
+    }
+    return this.handleReconstructed(command, 'LIST / READ 番号 / BACK / MAIN / HELP');
+  }
+
+  private readonly forumHelp = 'LIST: 投稿一覧 / READ 番号: 本文 / BACK: フォーラム一覧（創作の操作補助 [D / reconstructed]）';
+
+  private forumNotice(source: 'demo' | 'local'): string[] {
+    return [
+      source === 'demo' ? '創作デモ投稿 [D / reconstructed]：架空のID・日時・本文。実在の投稿ではありません。'
+        : 'ローカル保存の投稿：本文・ID・日時は利用者のデータであり、史料ではありません。',
+      'ヘッダーの出典 [A / verified]: https://www.rumic.org/forum/rumicworld/rumic2491.html',
+      'ヘッダー構造は保存史料を参考に再構成。日時はUTC表示。/の後の数の意味・行数の算定規則は未確認です。',
+    ];
+  }
+
+  private renderForum(keyword: 'MITI' | 'DAISIZEN', boardNo: number): string[] {
+    const data = forumPosts(this.content, keyword, boardNo);
+    return [
+      `${keyword} / ${forumName(keyword, boardNo)} / 投稿一覧（番号順）`,
+      ...this.forumNotice(data.source),
+      ...(!data.available ? ['対応するローカルフォーラムが見つからないか、重複しています。']
+        : data.posts.length ? data.posts.map((post) => `#${post.number} ${post.title}`) : ['投稿はありません。']),
+      this.forumHelp,
+    ];
   }
 
   private handleReconstructed(command: string, allowed: string): readonly string[] {
@@ -107,9 +171,29 @@ export class PcvanController implements TerminalController {
         'コミュニケーション（再構成の仮設ブリッジ [D / reconstructed]）',
         'この時代の実際のサブメニュー項目・プロンプトは未確認です。',
         `1 ${miti.name}（MITI）へ：デモ用の創作経路。史実の番号ではありません。`,
+        `2 ${daisizen.name}へ：デモ用の創作経路。史実の番号ではありません。`,
         returnHelp,
         demoPrompt,
       ];
+      case 'daisizen': return [
+        daisizen.name,
+        `構成の出典 [${daisizen.evidence_category} / ${daisizen.status}]: ${daisizen.source_url}`,
+        '年代不明のアーカイブ構成です。1996–1997年の構成は未確認（山のフォーラムは1992年に独立との記述あり）。',
+        ...daisizen.sections.map((section) => `${section.label} [${daisizen.evidence_category} / ${section.status}]`),
+        '上記は史料のセクション名です。端末の番号・プロンプト・ジャンプ入力は未確認です。',
+        'FORUMS: フォーラム一覧 / BACK: コミュニケーション（創作の操作補助 [D / reconstructed]）',
+        'フォーラム以外のサービスは未実装です。',
+        returnHelp, demoPrompt,
+      ];
+      case 'daisizen-forums': return [
+        `${daisizen.name} / フォーラム（電子掲示板）`,
+        `構成の出典 [${daisizen.evidence_category} / ${daisizen.status}]: ${daisizen.source_url}`,
+        '年代不明の7掲示板。1996–1997年への適用は暫定です。番号による選択・画面・プロンプトは再構成 [D / reconstructed]。',
+        ...daisizen.forums.map((forum) => `${forum.number} ${forum.label} [${daisizen.evidence_category} / ${forum.status}]`),
+        'BACK: SIG に戻る（創作の操作補助）',
+        returnHelp, demoPrompt,
+      ];
+      case 'forum': return [...this.renderForum('DAISIZEN', this.boardNo), returnHelp, demoPrompt];
       default: {
         const step = this.currentScreen === 'miti' ? 0 : this.currentScreen === 'miti-forums' ? 1 : 2;
         const evidence = miti.steps[step]!;
@@ -118,7 +202,7 @@ export class PcvanController implements TerminalController {
           `MITI / ${evidence.destination}`,
           `経路の出典 [${miti.evidence_category} / ${evidence.status}]: ${evidence.source_url}`,
           '1996年の経路記述のみ確認済み。画面・配置・プロンプトは再構成 [D / reconstructed]。',
-          ...(next ? [`${next.input} ${next.destination}`] : ['資料室の内容は未実装です。']),
+          ...(next ? [`${next.input} ${next.destination}`] : this.renderForum('MITI', 9)),
           '完全な SIG メニューではありません。Q など他の史実コマンドの動作は未確認です。',
           returnHelp,
           demoPrompt,
