@@ -1,0 +1,154 @@
+{
+  "id": "main-circa-1996",
+  "era": "circa 1996; unchanged availability in 1997 is unverified",
+  "evidence_category": "C",
+  "status": "provisional",
+  "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm",
+  "scope": "Retrospective MAIN transcription, not an original screen capture or the separate undated NEC variant.",
+  "normalization": "Selectors use ASCII; decorative gaps in labels 15/16 use single spaces. Screen column layout is not specified.",
+  "prompt": {
+    "text": "番号またはコマンド=",
+    "status": "provisional",
+    "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+  },
+  "entries": [
+    {
+      "selector": "1",
+      "label": "電子メール",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "2",
+      "label": "索引",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "3",
+      "label": "ニュース",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "4",
+      "label": "データベース",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "5",
+      "label": "公共情報と政治",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "6",
+      "label": "ビジネス",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "7",
+      "label": "インターネット",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "8",
+      "label": "コンピュータ",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "9",
+      "label": "ショッピングモール",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "10",
+      "label": "電子出版",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "11",
+      "label": "趣味",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "12",
+      "label": "生活",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "13",
+      "label": "コミュニケーション",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "14",
+      "label": "ＰＣ－ＶＡＮ利用情報（無料）",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "15",
+      "label": "☆★☆ おすすめ ☆★☆",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "16",
+      "label": "☆★☆ わかばマーク ☆★☆",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "17",
+      "label": "ＢＩＧＬＯＢＥガイド",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "18",
+      "label": "インターサイト",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "19",
+      "label": "ＢＩＧＬＯＢＥイベント（無料）",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "20",
+      "label": "ＢＩＧＬＯＢＥ情報誌ご案内",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "21",
+      "label": "オリンピック特設コーナー",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "X",
+      "label": "旧電子メール",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    },
+    {
+      "selector": "Q",
+      "label": "終了",
+      "status": "provisional",
+      "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm"
+    }
+  ]
+}
