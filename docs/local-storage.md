@@ -39,11 +39,12 @@ split the world across storage systems.
 ## Forum reading
 
 The historical directory in `src/navigation.ts` uses the unchanged evidence
-fixtures. The app supplies `PcvanController.setContent()` with a consistent
-`exportBackup()` snapshot before forum commands. Command responses and restores
-share the existing queue; input echo and history remain immediate. Failed reads
-report an error without showing cached posts; `MAIN` and `BACK` work without a
-successful content read. Reading does not mutate posts or read-state records.
+fixtures. The app supplies `PcvanController.setContent()` through the connection
+wrapper with a consistent `exportBackup()` snapshot before forum commands.
+Command responses and restores share the existing queue; input echo and history
+remain immediate. Failed reads report an error without showing cached posts;
+`MAIN` and `BACK` work without a successful content read. Reading does not mutate
+posts or read-state records.
 
 `src/forums.ts` maps stored SIGs by case-insensitive `keyword` (`MITI` or
 `DAISIZEN`) and stored forums by `sigId` plus `boardNo` (MITI `9`, DAISIZEN
@@ -111,8 +112,8 @@ repo.close();
 | `updatePost(id, {title, body})` | Edits text; preserves IDs, numbers, author, timestamps, origin, and reply linkage. Missing posts are rejected. |
 | `delete(store, key)` | Rejects deletion while referenced; delete children first. Missing records are a no-op. Deleted post numbers are never reused by normal creation. |
 | `getSession()` / `setSession(sessionOrNull)` | Reads/replaces the singleton metadata record; `null` removes it. |
-| `startSession()` / `endSession()` | Atomically updates the respective timestamp, retaining history and the other timestamp; returns the session. |
-| `recordCommand(line)` | Atomically appends to persisted history; concurrent appends do not overwrite each other. Returns the session. |
+| `startSession()` / `endSession()` | Atomically updates the respective timestamp and retains the other timestamp; returns the session. Starting also bounds history to the newest 100 nonblank entries. |
+| `recordCommand(line)` | Atomically appends nonblank input and retains the newest 100 nonblank entries; concurrent appends do not overwrite each other. Returns the session. |
 | `exportBackup()` / `exportJson()` | Returns a document / formatted JSON string, from one consistent readonly transaction. |
 | `replaceFromJson(text, {confirmReplace})` | Requires literal `true`; validates before writing, then clears and inserts every store in one atomic transaction. |
 | `close()` | Releases the connection. Old connections also close on `versionchange`; reload before further use. |
@@ -132,13 +133,18 @@ integer counters are rejected; numbers are not wrapped.
 `cause`. A blocked open asks the user to close other tabs. A newer database version
 is not downgraded or deleted. No automatic retry or destructive recovery occurs.
 
-The shell calls `startSession()` on opening and persists submitted nonblank commands.
-The transcript and input draft remain in memory. The navigation controller's
-simulated disconnect does not call `endSession()`; `lastLogoutAt` stays `null`
-until a caller invokes it, or retains the imported value. A browser tab close is
-not recorded as a reliable logout event.
-Command rendering remains immediate; writes, backup and restore are queued in
-this tab. Repository methods perform no external awaits inside transactions; see
+The shell calls `startSession()` on opening/reloading and on `RECONNECT`, calls
+`endSession()` for an explicit MAIN `Q` logout, and persists submitted nonblank
+commands. The latest timestamps appear below the terminal in UTC. A browser tab
+close is not recorded as a reliable logout event. Imported session records remain
+exact until a subsequent start or command append applies the history bound;
+in-memory recall is always limited to 100 nonblank entries.
+The transcript, input draft and edits to recalled input remain in memory. The
+terminal's **端末ログを保存 (.txt)** downloads the displayed transcript, including
+scrollback, as UTF-8 text without modifying local data; it is separate from JSON
+backup/restore. Neither the transcript nor unsubmitted drafts are in JSON backups.
+Command echo remains immediate; responses, writes, backup and restore are queued
+in this tab. Repository methods perform no external awaits inside transactions; see
 [the IndexedDB transaction lifecycle](https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction).
 
 ## Version 1 JSON document

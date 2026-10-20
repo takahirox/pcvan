@@ -147,6 +147,8 @@ test('browser navigation stays local through the route, errors, disconnect, and 
   await send('MAIN', mainMenu.prompt.text);
   await send('Q', '接続を終了しました');
   await send('J MITI', '接続は終了しています');
-  await send('RECONNECT', 'MAIN（1996年頃');
+  await send('RECONNECT', 'シミュレーション接続中');
+  await page.getByRole('button', { name: '接続演出をスキップ' }).click();
+  expect((await output.textContent())!.split('> RECONNECT')[1]).toContain('MAIN（1996年頃');
   expect(navigations).toEqual([]);
 });

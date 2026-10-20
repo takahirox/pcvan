@@ -182,3 +182,70 @@ app omits line count rather than inferring one. Demo seeds remain in memory and
 do not modify local backups. The earlier native IME, physical-device,
 assistive-technology, Safari/Firefox, and deployment limitations still apply.
 No post-merge verification is required for #7.
+
+## Connection sessions, command history and terminal logs (#9)
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2, using the merged
+#4/#5/#6 interfaces from `main` at `e867c028b8e3d11f32878d6905630ae5e145d8b8`.
+The assigned worktree initially contained the earlier documentation-only baseline;
+the merged prerequisites were brought into this worktree before implementation.
+
+- `npm ci`: passed, with zero reported vulnerabilities.
+- `npx playwright install chromium`: passed.
+- `npm run build`: passed TypeScript checking and static production build.
+- `npm test`: **54 tests passed** in Chromium, including the production build.
+  New checks cover the reconstructed connection greeting, skip and automatic
+  completion, immediate command handling during the effect, explicit logout and
+  reconnect timestamps, timestamp survival after reload, and offline operation.
+- The connection test rejects calls to fetch, XHR, WebSocket, EventSource,
+  WebRTC, WebTransport, beacon and Web Serial APIs; it observes no API calls or
+  network requests during the local connection/navigation sequence.
+- History checks cover the newest 100 nonblank commands, bounds on both startup
+  and concurrent repository appends, restoration after reload, draft recovery,
+  recalled edits, and keeping those unsubmitted edits out of saved history.
+- The downloaded `.txt` file matches the entire displayed transcript byte for
+  byte in UTF-8, including Japanese, full/half-width characters, spaces, embedded
+  line breaks and literal HTML. The draft is preserved and excluded from export.
+- Inspected a full-page screenshot at 320 × 568: connection skip, transcript
+  export and command input remain usable. Automated narrow-viewport checks pass.
+- Validated all 11 local Markdown links/anchors in the README and affected
+  storage/validation documentation. Reviewed the final diff and passed
+  `git diff --cached --check` for all staged changes.
+
+The initial test run had three failures: a new test assumed the wrong MAIN prompt,
+the navigation test expected immediate MAIN on reconnect, and the scrollback test
+used a Control+Home shortcut that does not scroll the focused log on this macOS
+Chromium host. Tests now use the fixture prompt, explicitly skip the reconstructed
+reconnect effect, and use native Home on macOS (Control+Home elsewhere). The final
+full suite passes without retries.
+
+Rendering remains immediate; no optional slow-rendering mode was added. Historical
+comparison was not performed because no new dated login evidence was available.
+Safari/Firefox, native IME and screen-reader checks remain unperformed. Browser
+tab close/crash is deliberately not treated as a reliable logout. No deployed
+site or real modem/device was used. Issue #9 requires no post-merge verification.
+
+## Issue #7 integration with session/history/log behavior
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+Merged `main` at `e6356a30575185ebddbdec8af2e80c5a131c857e` to resolve the
+reviewed conflicts in the entry point, README, and validation record. Retained
+both forum reading and #9's connection presentation, session timestamps, bounded
+history, and transcript download. The connection wrapper forwards forum content;
+command processing and timestamp transitions use the serialized screen state.
+Input echo/history and cancellation of an active connection effect stay immediate.
+
+- `npm ci`: passed, with zero reported vulnerabilities.
+- `npx playwright install chromium`: passed.
+- `npm test`: **65 tests passed**, including the production TypeScript/Vite build
+  and the combined navigation, forum, connection, terminal, repository, and backup
+  suites in Chromium. A new integration test submits forum reads, logout,
+  reconnect, and further reading in one turn while offline. It verifies login
+  and logout timestamps, exactly one history entry per command, recall, and a
+  byte-for-byte transcript download containing the rendered posts.
+- Reviewed the combined diff, validated all 14 local Markdown links and heading
+  anchors in the README and affected documentation, and passed
+  `git diff --cached --check`. No unresolved merge entries remain.
+
+The earlier browser/device and historical-evidence limitations remain applicable.
+No deployment was performed; no post-merge verification is required for #7.

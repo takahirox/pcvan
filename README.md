@@ -24,6 +24,11 @@ IndexedDB in this browser profile. The transcript and input draft remain in memo
 
 ## Use the terminal
 
+- Opening the app or using `RECONNECT` shows a reconstructed connection greeting
+  for 1.2 seconds, then returns to MAIN. **接続演出をスキップ** or submitting a
+  command ends the wait immediately; that command is processed normally. Input
+  echo and history remain immediate. This uses no modem, device, or network API, and
+  does not claim to reproduce the unknown 1996 login greeting.
 - Enter submits the command; Japanese IME composition confirmation is guarded
   against submission. MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`.
 - MAIN `13` opens a visibly reconstructed Communication bridge: its convenience
@@ -52,13 +57,23 @@ IndexedDB in this browser profile. The transcript and input draft remain in memo
 - `Q` ends the simulated connection only at MAIN. `RECONNECT` starts again at
   MAIN after disconnecting; it is a reconstructed convenience. Commands never
   navigate the browser or connect to an external service.
-- Up/Down recall commands and restore the draft when returning past the newest.
+- The latest login and explicit `Q` logout times appear below the terminal in UTC
+  and persist locally. Opening/reloading and `RECONNECT` update login time;
+  closing a tab is not recorded as a reliable logout.
+- Up/Down recall the newest 100 nonblank commands, restored after reload, and
+  restore the draft when returning past the newest. Edits to recalled commands
+  survive moving away and back within that browsing pass; only submitted text
+  is added to saved history.
 - PageUp/PageDown scroll the transcript while the command input keeps focus.
 - Shift+Tab from the input focuses the output. Use the browser's scroll keys
   (including Left/Right for long lines), then Tab to return to the input.
 - Output preserves spaces and newlines. Long output scrolls horizontally;
   the single-line input scrolls to its caret. Text is selectable and copied as
   plain text, without interpreting HTML or escape sequences.
+- **端末ログを保存 (.txt)** downloads the entire current transcript (including
+  scrollback and reconnects) as UTF-8 plain text with exact line breaks. The
+  unsubmitted input draft is excluded. Download before reloading to keep the log;
+  JSON backups contain local data/history but do not contain the transcript.
 
 ## Local data and backups
 
@@ -114,13 +129,16 @@ static file hosting, with no server-side application process.
   of the DOM. `main.ts` restores/persists recalled commands through the repository.
   `session.append(...text)` records additional output;
   pass its return value to `terminal.append(...)` to display it.
+- `src/connection.ts`: reconstructed connection/reconnection step around the
+  navigation controller; the entry point schedules its cancellable completion.
 - `src/controller.ts`: the small `TerminalController` interface (`welcome` and
   `submit(line)`) and the original synthetic controller retained for isolated
   shell tests.
 - `src/navigation.ts`: `PcvanController`, with per-session screen state and
   screen-scoped commands. MAIN labels and MITI route steps come directly from
   the JSON fixtures, without combining historical menu variants. `screen` is a
-  read-only state identifier; `main.ts` wires a fresh controller to the terminal.
+  read-only state identifier; `main.ts` wires it through `ConnectionController`
+  to the terminal.
 - `src/forums.ts`: resolves evidence-backed boards to repository posts or original
   demo fixtures, and renders headers without trimming or reflowing post text.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
@@ -149,6 +167,9 @@ MITI steps, reconstructed Communication bridge, screen-scoped numbers, invalid
 commands/jumps, disconnect/reconnect, and absence of browser navigation.
 Forum checks cover all seven DAISIZEN boards, MITI reading, optional header
 fields, whitespace, gaps, empty/missing/ambiguous forums, and live restore reads.
+Connection checks cover skip/automatic completion, command cancellation, timestamp
+persistence, no network/modem API calls, bounded history with recalled edits, and
+byte-for-byte UTF-8 transcript download.
 See [the implementation validation record](docs/validation.md) for commands
 actually run and browser checks not performed.
 
