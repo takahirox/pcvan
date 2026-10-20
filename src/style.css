@@ -50,6 +50,8 @@ button { padding: 0.25rem 0.75rem; cursor: pointer; }
 button:hover { background: #333; }
 :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 #keyboard-help { margin-top: 0.75rem; }
+.session-controls { margin-top: 0.5rem; font-size: 0.8rem; }
+.session-times { margin: 0.25rem 0; overflow-wrap: anywhere; }
 .storage-controls { margin-top: 0.75rem; font-size: 0.8rem; }
 .storage-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .storage-actions label { max-width: 100%; }

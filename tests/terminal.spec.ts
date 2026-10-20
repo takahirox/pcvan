@@ -76,7 +76,7 @@ test('keyboard scrollback keeps the input draft and allows returning through Tab
   await expect(input).toHaveValue('unfinished');
   await input.press('Shift+Tab');
   await expect(log).toBeFocused();
-  await log.press('Home', { modifiers: ['Control'] });
+  await log.press(process.platform === 'darwin' ? 'Home' : 'Control+Home');
   await expect.poll(() => log.evaluate((element) => element.scrollTop)).toBe(0);
   await log.press('Tab');
   await expect(input).toBeFocused();

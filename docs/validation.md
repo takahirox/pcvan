@@ -143,3 +143,45 @@ documented in the local-storage contract.
 
 The browser checks not performed above remain unperformed; this integration
 adds no required post-merge verification.
+
+## Connection sessions, command history and terminal logs (#9)
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2, using the merged
+#4/#5/#6 interfaces from `main` at `e867c028b8e3d11f32878d6905630ae5e145d8b8`.
+The assigned worktree initially contained the earlier documentation-only baseline;
+the merged prerequisites were brought into this worktree before implementation.
+
+- `npm ci`: passed, with zero reported vulnerabilities.
+- `npx playwright install chromium`: passed.
+- `npm run build`: passed TypeScript checking and static production build.
+- `npm test`: **54 tests passed** in Chromium, including the production build.
+  New checks cover the reconstructed connection greeting, skip and automatic
+  completion, immediate command handling during the effect, explicit logout and
+  reconnect timestamps, timestamp survival after reload, and offline operation.
+- The connection test rejects calls to fetch, XHR, WebSocket, EventSource,
+  WebRTC, WebTransport, beacon and Web Serial APIs; it observes no API calls or
+  network requests during the local connection/navigation sequence.
+- History checks cover the newest 100 nonblank commands, bounds on both startup
+  and concurrent repository appends, restoration after reload, draft recovery,
+  recalled edits, and keeping those unsubmitted edits out of saved history.
+- The downloaded `.txt` file matches the entire displayed transcript byte for
+  byte in UTF-8, including Japanese, full/half-width characters, spaces, embedded
+  line breaks and literal HTML. The draft is preserved and excluded from export.
+- Inspected a full-page screenshot at 320 × 568: connection skip, transcript
+  export and command input remain usable. Automated narrow-viewport checks pass.
+- Validated all 11 local Markdown links/anchors in the README and affected
+  storage/validation documentation. Reviewed the final diff and passed
+  `git diff --cached --check` for all staged changes.
+
+The initial test run had three failures: a new test assumed the wrong MAIN prompt,
+the navigation test expected immediate MAIN on reconnect, and the scrollback test
+used a Control+Home shortcut that does not scroll the focused log on this macOS
+Chromium host. Tests now use the fixture prompt, explicitly skip the reconstructed
+reconnect effect, and use native Home on macOS (Control+Home elsewhere). The final
+full suite passes without retries.
+
+Rendering remains immediate; no optional slow-rendering mode was added. Historical
+comparison was not performed because no new dated login evidence was available.
+Safari/Firefox, native IME and screen-reader checks remain unperformed. Browser
+tab close/crash is deliberately not treated as a reliable logout. No deployed
+site or real modem/device was used. Issue #9 requires no post-merge verification.

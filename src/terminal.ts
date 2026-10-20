@@ -1,7 +1,10 @@
+import type { Session } from './storage/schema';
+
 interface TerminalActions {
   submit(line: string): void;
   previous(current: string): string;
   next(current: string): string;
+  completeConnection?(): void;
 }
 
 // DOM rendering and keyboard behavior only; no command parsing or stored history.
@@ -23,6 +26,11 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
         <button type="submit">送信</button>
       </form>
     </section>
+    <div class="session-controls">
+      <button type="button" class="skip-connection" hidden>接続演出をスキップ</button>
+      <button type="button" class="download-log">端末ログを保存 (.txt)</button>
+      <p class="session-times">セッション時刻を読み込み中…</p>
+    </div>
     <p id="keyboard-help">Enter: 送信 · ↑ / ↓: 入力履歴 · PageUp / PageDown: 出力をスクロール<br />
       Tab: 出力・入力へ移動 · 出力にフォーカスして ← / →: 横スクロール</p>
   `;
@@ -31,6 +39,22 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   const output = root.querySelector<HTMLPreElement>('.output')!;
   const input = root.querySelector<HTMLInputElement>('input')!;
   const form = root.querySelector<HTMLFormElement>('form')!;
+  const skip = root.querySelector<HTMLButtonElement>('.skip-connection')!;
+  skip.addEventListener('click', () => {
+    actions.completeConnection?.();
+    input.focus({ preventScroll: true });
+  });
+  root.querySelector('.download-log')!.addEventListener('click', () => {
+    // Snapshot exactly the displayed text, including Japanese and embedded newlines.
+    const url = URL.createObjectURL(new Blob([output.textContent ?? ''], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pcvan-terminal-${new Date().toISOString().replaceAll(':', '-')}.txt`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
   let composing = false;
   let hasOutput = false;
 
@@ -64,6 +88,11 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
 
   input.focus({ preventScroll: true });
   return {
+    setConnecting(connecting: boolean) { skip.hidden = !connecting; },
+    showSessionTimes(saved: Session | null) {
+      root.querySelector('.session-times')!.textContent =
+        `最終ログイン: ${saved?.lastLoginAt ?? '記録なし'} / 最終ログアウト: ${saved?.lastLogoutAt ?? '記録なし'} (UTC)`;
+    },
     append(...text: readonly string[]) {
       if (text.length === 0) return;
       const atBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 2;
