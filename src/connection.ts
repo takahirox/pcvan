@@ -20,6 +20,8 @@ export class ConnectionController implements TerminalController {
   get needsContent(): boolean { return this.navigation.needsContent; }
 
   setContent(content: ForumContent): void { this.navigation.setContent(content); }
+  setMemberId(id: string | undefined): void { this.navigation.setMemberId(id); }
+  get forum() { return this.navigation.forum; }
 
   completeConnection(): readonly string[] {
     if (!this.connecting) return [];

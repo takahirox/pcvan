@@ -1,9 +1,20 @@
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import demoPosts from '../data/pcvan/demo-posts.json' with { type: 'json' };
 import type { Backup, Post } from './storage/schema';
+import { ACTIVE_MEMBER_SETTING } from './storage/repository';
 
-export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'>;
+export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'readStates'>>;
 export const emptyContent = (): ForumContent => ({ sigs: [], forums: [], posts: [] });
+
+export function activeHuman(content: Backup): string | undefined {
+  const humans = content.members.filter((member) => member.actor === 'human');
+  const selected = content.settings.find((setting) => setting.id === ACTIVE_MEMBER_SETTING)?.value;
+  return humans.find((member) => member.id === selected)?.id ?? humans[0]?.id;
+}
+
+export function replyReference(post: Post, posts: readonly Post[]): Post | undefined {
+  return posts.find((parent) => parent.id === post.replyToPostId && parent.forumId === post.forumId);
+}
 
 // IDs, dates, titles and bodies are original fiction. Historical evidence is
 // confined to the SIG/board directory, never the demonstration's contents.

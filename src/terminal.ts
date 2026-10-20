@@ -25,6 +25,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
           autocapitalize="off" spellcheck="false" aria-describedby="keyboard-help" />
         <button type="submit">送信</button>
       </form>
+      <a class="reply-reference" href="#referenced-post" hidden></a>
     </section>
     <div class="session-controls">
       <button type="button" class="skip-connection" hidden>接続演出をスキップ</button>
@@ -40,6 +41,13 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   const input = root.querySelector<HTMLInputElement>('input')!;
   const form = root.querySelector<HTMLFormElement>('form')!;
   const skip = root.querySelector<HTMLButtonElement>('.skip-connection')!;
+  const reference = root.querySelector<HTMLAnchorElement>('.reply-reference')!;
+  let referenceNumber: number | null = null;
+  reference.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (referenceNumber !== null) actions.submit(`READ ${referenceNumber}`);
+    input.focus({ preventScroll: true });
+  });
   skip.addEventListener('click', () => {
     actions.completeConnection?.();
     input.focus({ preventScroll: true });
@@ -88,6 +96,11 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
 
   input.focus({ preventScroll: true });
   return {
+    showReplyReference(number: number | null) {
+      referenceNumber = number;
+      reference.hidden = number === null;
+      reference.textContent = number === null ? '' : `返信先 RE#${number} を読む`;
+    },
     setConnecting(connecting: boolean) { skip.hidden = !connecting; },
     showSessionTimes(saved: Session | null) {
       root.querySelector('.session-times')!.textContent =
