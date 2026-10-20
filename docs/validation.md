@@ -249,3 +249,42 @@ Input echo/history and cancellation of an active connection effect stay immediat
 
 The earlier browser/device and historical-evidence limitations remain applicable.
 No deployment was performed; no post-merge verification is required for #7.
+
+## Issue #13 service evidence and unavailable entry points
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+The assigned checkpoint predated the application prerequisites; incorporated
+merged `main` at `75b5606989d9f0e64aac8e486894b73b075af7df` before implementing
+this Issue. Reused its SIG fixtures, screen-scoped controller, terminal, storage
+and forum navigation.
+
+- Inspected the DAISIZEN memorial and its linked participation guide, the
+  preserved 1996 ECOM session, and the CROCUS/秀Term description on Vector.
+  Recorded source eras, period documentation versus retrospective material,
+  library/OSL category variants and unresolved commands in the
+  [research record](research/pcvan-1996-1997.md#olt-mail-library-and-related-services-issue-13).
+  No service has sufficiently evidenced interactive command semantics; all
+  five new routes therefore end in explicitly reconstructed unavailable notices.
+- `npm ci`: passed, zero reported vulnerabilities.
+- `npx playwright install chromium`: passed.
+- Final `npm test`: **73 tests passed** with the default eight workers and no
+  retries, including the TypeScript/Vite production build. Eight new service
+  tests cover evidence labels, every placeholder, invalid/service/ECOM input,
+  stable HELP/BACK/MAIN, scope, and SIG/forum regressions. The production browser
+  check visits all five services with keyboard input while offline, verifies
+  no network requests/browser navigation, then reads DAISIZEN and MITI posts.
+  A downloaded backup confirms all content, read states and settings are unchanged.
+- Before the final passing run, the full suite failed twice (default workers
+  and two workers) in the existing scrollback test. An isolated run passed.
+  It measured scroll position while serialized command responses were still
+  arriving. The test now waits for the final uniquely identified command's
+  response before scrolling; no terminal behavior or keyboard mapping changed.
+- Parsed every JSON fixture with duplicate-key rejection; checked five unique
+  reconstructed helpers and retained null historical section selectors.
+  Validated 13 local Markdown links/anchors in the changed documentation and
+  README. Reviewed the Issue-specific diff and passed staged whitespace checks.
+
+Optional scanned-manual comparison, other browsers, native IME and screen-reader
+checks were not performed. No copyrighted source snapshots, screenshots, posts
+or software binaries were embedded. No deployment was performed; no post-merge
+verification is required for #13.

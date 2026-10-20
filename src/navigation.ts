@@ -5,9 +5,10 @@ import { emptyContent, forumName, forumPosts, renderPost } from './forums';
 import type { ForumContent } from './forums';
 
 const { miti, daisizen } = sigEvidence;
+const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
-  'daisizen' | 'daisizen-forums' | 'forum' | 'disconnected';
+  'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected';
 
 // Layout is reconstructed. The fixture's CJK labels occupy two terminal cells
 // per character; ASCII occupies one. Padding never changes the label itself.
@@ -50,6 +51,7 @@ export class PcvanController implements TerminalController {
   private currentScreen: Screen = 'main';
   private content = emptyContent();
   private boardNo = 9;
+  private service = services[0]!;
 
   /** Refreshed by the app from #6's repository before forum commands. */
   setContent(content: ForumContent): void { this.content = content; }
@@ -92,10 +94,16 @@ export class PcvanController implements TerminalController {
         return this.handleReconstructed(command, `${miti.steps[2]!.input} / MAIN / HELP`);
       case 'miti-materials':
         return this.handleForum(command, 'MITI', 9);
-      case 'daisizen':
+      case 'daisizen': {
         if (command === 'FORUMS') return this.enter('daisizen-forums');
+        const service = services.find((section) => section.demo_entry!.input === command);
+        if (service) { this.service = service; return this.enter('daisizen-service'); }
         if (command === 'BACK') return this.enter('communication');
-        return this.handleReconstructed(command, 'FORUMS / BACK / MAIN / HELP');
+        return this.handleReconstructed(command, `FORUMS / ${services.map((section) => section.demo_entry!.input).join(' / ')} / BACK / MAIN / HELP`);
+      }
+      case 'daisizen-service':
+        if (command === 'BACK') return this.enter('daisizen');
+        return this.handleReconstructed(command, 'BACK / MAIN / HELP');
       case 'daisizen-forums': {
         const forum = daisizen.forums.find((item) => String(item.number) === command);
         if (forum) { this.boardNo = forum.number; return this.enter('forum'); }
@@ -182,7 +190,17 @@ export class PcvanController implements TerminalController {
         ...daisizen.sections.map((section) => `${section.label} [${daisizen.evidence_category} / ${section.status}]`),
         '上記は史料のセクション名です。端末の番号・プロンプト・ジャンプ入力は未確認です。',
         'FORUMS: フォーラム一覧 / BACK: コミュニケーション（創作の操作補助 [D / reconstructed]）',
-        'フォーラム以外のサービスは未実装です。',
+        ...services.map((section) => `${section.demo_entry!.input}: ${section.label}の未実装案内（創作の操作補助 [${section.demo_entry!.evidence_category} / ${section.demo_entry!.status}]）`),
+        returnHelp, demoPrompt,
+      ];
+      case 'daisizen-service': return [
+        `${daisizen.name} / ${this.service.label}`,
+        `名称の出典 [${daisizen.evidence_category} / ${this.service.status}]: ${this.service.source_url}`,
+        '年代不明のアーカイブ構成です。1996–1997年の実際のメニュー・操作は未確認です。',
+        '未実装の案内画面 [D / reconstructed]：当時のサービス画面を再現したものではありません。',
+        this.service.unavailable_reason!,
+        'サービスの操作・送受信・ファイル転送は利用できません。',
+        'BACK: SIG に戻る（創作の操作補助 [D / reconstructed]）',
         returnHelp, demoPrompt,
       ];
       case 'daisizen-forums': return [
