@@ -1,7 +1,13 @@
 export class CommandHistory {
-  private readonly lines: string[] = [];
+  private lines: string[] = [];
   private cursor = 0;
   private draft = '';
+
+  replace(lines: readonly string[]): void {
+    this.lines = [...lines];
+    this.cursor = this.lines.length;
+    this.draft = '';
+  }
 
   add(line: string): void {
     this.lines.push(line);

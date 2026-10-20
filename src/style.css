@@ -50,3 +50,9 @@ button { padding: 0.25rem 0.75rem; cursor: pointer; }
 button:hover { background: #333; }
 :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 #keyboard-help { margin-top: 0.75rem; }
+.storage-controls { margin-top: 0.75rem; font-size: 0.8rem; }
+.storage-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.storage-actions label { max-width: 100%; }
+.storage-actions input { width: 14rem; max-width: 100%; }
+.storage-controls p { margin: 0.25rem 0; }
+button:disabled { opacity: 0.5; cursor: default; }
