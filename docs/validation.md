@@ -74,3 +74,72 @@ provisional retrospective transcription, MITI evidence verifies only the stated
 route, and the Communication bridge and convenience commands are visibly
 reconstructed. The earlier browser/device limitations above still apply.
 No deployment was performed; Issue #5 requires no post-merge verification.
+
+## Issue #6 local storage validation
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+The assigned checkpoint did not include #4's prerequisite shell. Fetched `main`
+at `426411d` and merged it into this worktree as directed by #6's dependency
+comment; this includes the shell merge `b3c2ac5` and #3's historical fixtures.
+The implementation adds no dependencies or changes to the lockfile.
+
+- `npm ci`: successful; npm reported zero vulnerabilities.
+- `npx playwright install chromium`: successful.
+- `npm run build`: successful application type-check and static production build.
+- `npm test`: **19 tests passed**, including the 6 existing shell/session checks.
+  The suite builds the production assets and serves them on port 14373; a second
+  Vite server on 14374 exposes the repository module to real Chromium IndexedDB.
+  Both servers refuse to reuse unrelated processes and are stopped by Playwright.
+- Repository checks cover an empty world; all entities/settings/session JSON
+  round-trip with IDs, timestamps, relationships, Japanese text and allocation
+  gaps intact; created-post reload persistence; pagination; CRUD/reference
+  protection; rejected imports with unchanged prior state; confirmation required
+  by the API; and database connection closure on a version upgrade.
+- Two pages with independent connections concurrently created 40 posts in the
+  same forum. All IDs and per-forum numbers were unique; another forum allocated
+  independently, and deletion did not reuse a number.
+- A native unique-index request failure injected during replacement rolled back
+  earlier clears/inserts. Simulated quota exceptions also rolled back replacement
+  and a post insertion whose following counter update failed. The replacement
+  test verifies that no unhandled page errors escape.
+- Production UI checks cover actual JSON downloads; persisted command recall
+  after reload; file selection; confirmation/cancellation of replacement; restored
+  history and content after reload; invalid-file error reporting; and continued
+  terminal/backup use after simulated quota failure. Unavailable IndexedDB is
+  reported with no claim of successful persistence or unhandled page error.
+- `git diff --cached --check`: passed for all staged changes. Local Markdown
+  file links and heading anchors in the README and affected documentation checked.
+
+The first storage test run exposed delayed terminal output/history and unhandled
+request rejections when an injected synchronous write failure interrupted a batch
+of import writes. Fixed immediate rendering with queued persistence and awaited
+each import request inside the transaction; the full updated suite passed.
+
+### Browser checks not performed for #6
+
+Actual disk exhaustion, browser-driven eviction, private-profile shutdown,
+OS/browser crash durability, and Safari/Firefox were not exercised. Quota tests
+inject `QuotaExceededError`; they do not exhaust the host's storage. Reload and
+concurrency checks ran in Chromium. Native IME, screen-reader, and physical-device
+checks remain unperformed as described above. No published deployment was tested.
+Issue #6 requires no post-merge verification.
+
+### Integration with current main before PR publication
+
+Merged `main` at `27fd8108dd105cad0d452f9af4fd1f6b59c05e2c`, including #5's
+navigation controller. Resolved the entry-point conflict by retaining that
+controller with the storage/history wiring; combined both documentation updates.
+The simulated disconnect remains separate from repository session timestamps as
+documented in the local-storage contract.
+
+- `npm ci`: passed, with zero reported vulnerabilities.
+- `npm test`: **48 tests passed** in Chromium, including the production
+  type-check/build and all navigation, terminal, repository, and backup controls
+  checks. No test changes were needed for the integration.
+- A Python check validated all 19 local Markdown links and heading anchors in
+  the README and development/review/storage/validation documentation.
+- Reviewed the final changes and checked staged whitespace with
+  `git diff --cached --check`: passed.
+
+The browser checks not performed above remain unperformed; this integration
+adds no required post-merge verification.
