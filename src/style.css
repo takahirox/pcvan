@@ -1,0 +1,52 @@
+:root {
+  color-scheme: dark;
+  font-family: "Noto Sans Mono CJK JP", "BIZ UDGothic", "MS Gothic", "Osaka-Mono", monospace;
+  color: #e8e8e8;
+  background: #111;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 100rem;
+  margin: auto;
+  padding: clamp(0.75rem, 2vw, 2rem);
+}
+header { margin-bottom: 1rem; }
+h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+header p, #keyboard-help { margin: 0.25rem 0 0; color: #bcbcbc; font-size: 0.8rem; }
+.terminal {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 12rem;
+  border: 1px solid #737373;
+  background: #171717;
+}
+.transcript { flex: 1; min-height: 0; overflow: auto; padding: 1rem; }
+.output {
+  margin: 0;
+  font: inherit;
+  white-space: pre;
+  tab-size: 4;
+  overflow-wrap: normal;
+}
+.command-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-top: 1px solid #737373;
+}
+input, button { font: inherit; color: inherit; background: #171717; border: 1px solid #8c8c8c; }
+input { flex: 1; min-width: 6rem; width: 0; padding: 0.25rem 0.5rem; }
+button { padding: 0.25rem 0.75rem; cursor: pointer; }
+button:hover { background: #333; }
+:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+#keyboard-help { margin-top: 0.75rem; }
