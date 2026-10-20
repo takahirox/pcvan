@@ -150,6 +150,31 @@ eviction may make data unavailable. Keep downloaded backups outside the browser.
 See [the local repository API and versioned backup format](docs/local-storage.md)
 for the storage contract used by future SIG/forum controllers.
 
+## Optional offline use and retention
+
+On an initial online visit to a production build on HTTPS or localhost, expand
+**オフライン保存・容量・バックアップ**, press **端末をオフライン用に保存**
+and wait for **保存済み** before going offline.
+The terminal, fixtures, local reading/posting and JSON backup/restore can then
+reload without a backend or login. This opt-in saves only the small app shell;
+it never downloads model weights. Development mode does not install a worker.
+The panel shows the browser's online/offline signal, approximate site storage
+usage, persistence status/request and a link to JSON backup/restore.
+
+AI remains optional and off after reload. **選択モデルの保存を確認** checks the
+selected model's weight manifest and shards without downloading missing weights.
+Cached weights alone do not guarantee offline AI: runtime, tokenizer, config,
+compiled libraries and a supported GPU must also be available. No initial network
+or model availability is implied by “browser-only.” Keep JSON backups outside the
+browser; eviction or clearing site data can remove shell, weights and user data.
+Persistence can reduce automatic eviction, but does not replace backups.
+
+Updates wait for all app tabs to close, preserving unsaved editors while open.
+After saving drafts, close all app tabs and reopen to use a pending release.
+Only this deployment's obsolete shell caches are removed; user IndexedDB records
+and model caches are not migrated or deleted by app-shell updates. See
+[offline behavior and reproducible checks](docs/offline.md).
+
 ## Build static assets
 
 ```sh
@@ -157,8 +182,8 @@ npm run build
 npm run preview
 ```
 
-`build` type-checks the application and writes `dist/index.html` plus bundled
-CSS/JavaScript in `dist/assets/`. Deploy the contents of `dist/` to any static
+`build` type-checks the application and writes `dist/index.html`, a versioned
+`dist/sw.js` and bundled CSS/JavaScript in `dist/assets/`. Deploy the contents of `dist/` to any static
 HTTP/HTTPS host, including a subdirectory; asset URLs are relative. The preview
 command serves the built files locally for checking. Production requires only
 static file hosting, with no server-side application process.
@@ -192,6 +217,8 @@ static file hosting, with no server-side application process.
   optional settings/inspection controls and the lazy WebLLM worker adapter.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
   controls. Composition and reading use the existing v1 backup schema.
+- `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
+  offline/retention panel and build-generated app-shell worker.
 - `tests/`: controller/session checks and browser interaction checks.
 
 ## Validation
@@ -224,6 +251,9 @@ and unchanged local content after visiting services and returning to forums.
 Connection checks cover skip/automatic completion, command cancellation, timestamp
 persistence, no network/modem API calls, bounded history with recalled edits, and
 byte-for-byte UTF-8 transcript download.
+Offline checks cover a real service worker under a deployment subpath, offline
+reload/post/backup/restore, missing AI assets, failed installs and updates,
+cache eviction/repair, multi-tab update waiting and IndexedDB retention.
 See [the implementation validation record](docs/validation.md) for commands
 actually run and browser checks not performed.
 

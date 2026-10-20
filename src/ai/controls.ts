@@ -11,7 +11,9 @@ interface AiActions {
 /** Kept outside the historical terminal. Dependencies are injectable for GPU-free tests. */
 export function mountAiControls(root: HTMLElement, actions: AiActions,
   factory: AdapterFactory = async () => (await import('./webllm-adapter')).createWebLlmAdapter(),
-  supported = requireWebGpu()) {
+  supported = requireWebGpu(),
+  probeCache: (modelId: string) => Promise<boolean> = async (id) =>
+    (await import('./webllm-adapter')).modelWeightsCached(id)) {
   const section = document.createElement('details');
   section.className = 'ai-controls';
   section.innerHTML = `
@@ -24,6 +26,8 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       文脈は同じ掲示板の直近最大 4 件のローカル創作投稿の抜粋です。</p>
     <div class="ai-fields">
       <label>AI モデル <select class="ai-model"></select></label>
+      <button type="button" class="ai-cache-check">選択モデルの保存を確認</button>
+      <p class="ai-cache-status" role="status"></p>
       <button type="button" class="ai-load">モデルを読み込む（初回ダウンロード）</button>
       <button type="button" class="ai-stop">AI を停止・解放</button>
       <label>モデル読込の進捗 <progress class="ai-progress" max="1" value="0"></progress></label>
@@ -56,6 +60,8 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   const preview = get<HTMLElement>('preview');
   const message = get<HTMLElement>('message');
   const progress = get<HTMLProgressElement>('progress');
+  const cacheCheck = get<HTMLButtonElement>('cache-check');
+  const cacheStatus = get<HTMLElement>('cache-status');
   for (const row of models) model.add(new Option(row.label, row.id));
   for (const row of personas) persona.add(new Option(`${row.handle} — 架空の AI (${row.id})`, row.id));
   for (const row of personas) {
@@ -68,6 +74,8 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   let loadedModel: string | undefined;
   let operation: AbortController | undefined;
   let saving = false;
+  let checking = false;
+  let cacheCheckId = 0;
   let draft: { raw: string; request: GenerationRequest; modelId: string } | undefined;
 
   function buttons() {
@@ -76,6 +84,26 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     generate.disabled = !loadedModel || !forum.value || saving || !!operation;
     stop.disabled = saving || (!adapter && !operation);
     send.disabled = discard.disabled = saving || !!operation;
+    cacheCheck.disabled = checking || saving || !!operation;
+  }
+  function unknownCache() {
+    cacheCheckId++; checking = false;
+    cacheStatus.textContent = '選択モデルの重み：未確認です。端末の保存だけでは AI をオフライン利用できません。';
+  }
+  async function checkCache() {
+    const id = ++cacheCheckId;
+    const selected = model.value;
+    checking = true; buttons();
+    cacheStatus.textContent = '選択モデルの重みを確認しています（重みのダウンロードはしません）…';
+    try {
+      const cached = await probeCache(selected);
+      if (id !== cacheCheckId) return;
+      cacheStatus.textContent = cached
+        ? '選択モデルの重み：保存済みです。設定・トークナイザー・実行ファイルの欠落や削除、GPU の状態によりオフライン読込が失敗する場合があります。利用可能かはモデル読込で確認します。'
+        : '選択モデルの重み：未保存または不完全です。オフライン AI は利用できません。オンラインで明示的にモデルを読み込んでください。';
+    } catch {
+      if (id === cacheCheckId) cacheStatus.textContent = '選択モデルの保存状態を確認できません。実行ファイルの未保存や保存領域の制限が考えられます。オフライン AI は保証できません。端末・手動投稿は利用できます。';
+    } finally { if (id === cacheCheckId) { checking = false; buttons(); } }
   }
   function clearDraft() { draft = undefined; preview.hidden = send.hidden = discard.hidden = true; preview.textContent = ''; }
   function cancel() {
@@ -100,9 +128,10 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     if (Array.from(reply.options).some((option) => option.value === selected)) reply.value = selected;
   }
   function profile() { get('profile').textContent = personas.find((row) => row.id === persona.value)!.profile; }
-  profile(); unavailable(); buttons();
+  profile(); unavailable(); unknownCache(); buttons();
+  cacheCheck.addEventListener('click', () => { void checkCache(); });
   stop.addEventListener('click', () => { cancel(); message.textContent = 'AI をキャンセルし、モデルを解放しました。端末・手動投稿は利用できます。'; });
-  model.addEventListener('change', () => { cancel(); unavailable(); });
+  model.addEventListener('change', () => { cancel(); unavailable(); unknownCache(); buttons(); });
   persona.addEventListener('change', () => { clearDraft(); profile(); });
   forum.addEventListener('change', () => { clearDraft(); reply.value = ''; updateReplies(); buttons(); });
   reply.addEventListener('change', clearDraft);
@@ -111,6 +140,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   load.addEventListener('click', async () => {
     if (!supported || operation || saving) return;
     cancel();
+    unknownCache();
     const task = new AbortController(); operation = task; buttons();
     message.textContent = 'モデルを読み込んでいます。停止ボタンでキャンセルできます。';
     try {
@@ -125,6 +155,8 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       if (task.signal.aborted) return;
       loadedModel = model.value; progress.value = 1;
       message.textContent = 'AI の準備ができました。投稿案を生成して確認できます。';
+      // Loaded into memory is distinct from persistent cache availability.
+      void checkCache();
     } catch (error) { if (!task.signal.aborted) { cancel(); failure(error); } }
     finally { if (operation === task) operation = undefined; buttons(); }
   });
