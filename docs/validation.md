@@ -444,24 +444,6 @@ second-browser and real-weight/GPU checks were not performed. No deployment,
 publication or external writes were performed; no post-merge verification is
 required for #12.
 
-## Issue #11 integration with offline safeguards
-
-Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
-Resolved conflicts with `main` at
-`b78f2748f727e7de793dde3689dc3013467dab39` in the application startup,
-AI controls and documentation. Retained reconnect activity planning and lifecycle
-hooks alongside optional offline controls, cache inspection and offline model
-load safeguards; preserved both Issues' validation records.
-
-- `npm ci`: passed, zero reported vulnerabilities.
-- `npm test -- --workers=2`: **107 tests passed** (18.9 seconds), including the
-  TypeScript check and production build, reconnect scheduling/recovery,
-  offline shell updates/retention and model-cache checks. No retries.
-- `node --check scripts/service-worker.js`, local Markdown link checks and
-  `git diff --cached --check`: passed.
-- The existing Vite advisory for large optional WebLLM chunks remains. No model
-  weights were downloaded; no real GPU, deployment or publication was used.
-
 ## Issue #26 GitHub Pages deployment
 
 Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
@@ -494,3 +476,21 @@ URL, published URL and actual result. If deployment requires owner setup, record
 the precise **Settings → Pages → Source: GitHub Actions** blocker and keep
 publication verification pending until resolved. No live deployment or Pages
 settings change was performed during pre-merge validation.
+
+## Issue #11 integration with offline safeguards
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+Resolved conflicts with `main` at
+`b78f2748f727e7de793dde3689dc3013467dab39` in the application startup,
+AI controls and documentation. Retained reconnect activity planning and lifecycle
+hooks alongside optional offline controls, cache inspection and offline model
+load safeguards; preserved both Issues' validation records.
+
+- `npm ci`: passed, zero reported vulnerabilities.
+- `npm test -- --workers=2`: **107 tests passed** (18.9 seconds), including the
+  TypeScript check and production build, reconnect scheduling/recovery,
+  offline shell updates/retention and model-cache checks. No retries.
+- `node --check scripts/service-worker.js`, local Markdown link checks and
+  `git diff --cached --check`: passed.
+- The existing Vite advisory for large optional WebLLM chunks remains. No model
+  weights were downloaded; no real GPU, deployment or publication was used.
