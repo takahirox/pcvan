@@ -1,3 +1,4 @@
+import { openSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -170,6 +171,7 @@ test('keyboard reading works offline; restore replaces displayed posts without r
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'MITI';
   fixture.forums[0]!.boardNo = 9;
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'local.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();

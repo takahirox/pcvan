@@ -1,3 +1,4 @@
+import { openSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -80,6 +81,7 @@ test('keyboard placeholders work offline without service requests or changing lo
   await page.goto('/');
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'DAISIZEN';
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({
     name: 'local.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)),
   });
@@ -124,6 +126,7 @@ test('keyboard placeholders work offline without service requests or changing lo
   expect(navigations).toEqual([]);
 
   const downloadPromise = page.waitForEvent('download');
+  await openSettings(page, 'storage');
   await page.getByRole('button', { name: 'JSON バックアップを保存' }).click();
   const download = await downloadPromise;
   const saved = JSON.parse(await readFile((await download.path())!, 'utf8'));

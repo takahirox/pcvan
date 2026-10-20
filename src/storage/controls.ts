@@ -9,6 +9,8 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
   section.tabIndex = -1;
   section.setAttribute('aria-label', 'ローカルデータ');
   section.innerHTML = `
+    <details>
+    <summary>JSON バックアップ・復元</summary>
     <div class="storage-actions">
       <button type="button" class="backup" disabled>JSON バックアップを保存</button>
       <label>復元ファイル <input class="backup-file" type="file" accept=".json,application/json" disabled /></label>
@@ -16,9 +18,15 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     </div>
     <p>データはこのブラウザー内に保存されます。容量制限やブラウザーの操作で消えることがあります。
       大切なデータは JSON バックアップを保存してください。</p>
+    </details>
     <p class="storage-status" role="status" aria-label="ローカル保存の状態" aria-live="polite">ローカル保存を準備しています…</p>
   `;
   root.append(section);
+  root.addEventListener('click', (event) => {
+    if ((event.target as HTMLElement).closest('a[href="#local-backup"]')) {
+      section.querySelector('details')!.open = true;
+    }
+  });
   const backup = section.querySelector<HTMLButtonElement>('.backup')!;
   const file = section.querySelector<HTMLInputElement>('.backup-file')!;
   const restore = section.querySelector<HTMLButtonElement>('.restore')!;

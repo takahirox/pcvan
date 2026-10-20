@@ -31,6 +31,14 @@ export interface Session {
 }
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export interface Setting { id: string; value: JsonValue }
+export const TERMINAL_SETTING = 'terminal-display';
+export type TerminalSpeed = '300' | '1200' | '2400' | '9600' | 'instant';
+export interface TerminalPreferences {
+  version: 1;
+  theme: 'white' | 'green' | 'amber';
+  speed: TerminalSpeed;
+  effects: boolean;
+}
 export interface Records {
   members: Member;
   sigs: Sig;
@@ -137,6 +145,13 @@ export function validateSession(value: unknown): asserts value is Session {
   value.commandHistory.forEach((line) => string(line, false));
 }
 
+export function validateTerminalPreferences(value: unknown): asserts value is TerminalPreferences {
+  fields(value, ['version', 'theme', 'speed', 'effects']);
+  if (value.version !== 1 || !['white', 'green', 'amber'].includes(value.theme as string) ||
+      !['300', '1200', '2400', '9600', 'instant'].includes(value.speed as string) ||
+      typeof value.effects !== 'boolean') invalid('Invalid terminal display preferences.');
+}
+
 export function validateRecord<S extends Store>(store: S, value: unknown): asserts value is Records[S] {
   switch (store) {
     case 'members':
@@ -175,6 +190,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
       if (value.id === 'ai-activity') validateActivity(value.value);
+      if (value.id === TERMINAL_SETTING) validateTerminalPreferences(value.value);
       break;
   }
 }

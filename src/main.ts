@@ -5,7 +5,8 @@ import { openRepository } from './storage/repository';
 import type { Session } from './storage/repository';
 import { mountStorageControls } from './storage/controls';
 import { ACTIVE_MEMBER_SETTING } from './storage/repository';
-import type { Backup } from './storage/schema';
+import { TERMINAL_SETTING } from './storage/schema';
+import type { Backup, JsonValue } from './storage/schema';
 import { activeHuman, forumPosts, replyReference } from './forums';
 import { mountComposer } from './composer';
 import { mountAiControls } from './ai/controls';
@@ -40,8 +41,13 @@ const startup = enqueue(async () => {
   await refreshContent();
   return (await repository).openActivity();
 });
+let displayPreferencesLoaded = false;
 async function refreshContent(): Promise<Backup> {
   const content = await (await repository).exportBackup();
+  if (!displayPreferencesLoaded) {
+    terminal.restorePreferences(content.settings);
+    displayPreferencesLoaded = true;
+  }
   controller.setContent(content);
   controller.setMemberId(activeHuman(content));
   composer.refresh(content);
@@ -68,6 +74,7 @@ const terminal = mountTerminal(root, {
     // are serialized with restores so rapid commands use the correct screen/data.
     session.history.add(line);
     terminal.append(...session.append(`> ${line}`));
+    terminal.reveal();
     commandsDuringHistoryLoad?.push(line);
     void enqueue(async () => {
       const before = controller.screen;
@@ -139,6 +146,13 @@ const terminal = mountTerminal(root, {
   previous: (current) => session.history.previous(current),
   next: (current) => session.history.next(current),
   completeConnection,
+  savePreferences: (preferences) => {
+    // Mark the in-memory choice immediately; startup must not overwrite it.
+    displayPreferencesLoaded = true;
+    void enqueue(async () => {
+      await (await repository).put('settings', { id: TERMINAL_SETTING, value: preferences as unknown as JsonValue });
+    }).catch((error) => controls.reportError(error));
+  },
 });
 terminal.append(...session.transcript);
 updateConnection();
@@ -187,6 +201,7 @@ const controls = mountStorageControls(root, repository, enqueue, (text) => loadH
   const repo = await repository;
   await repo.replaceFromJson(text, { confirmReplace: true });
   terminal.showReplyReference(null);
+  displayPreferencesLoaded = false;
   await refreshContent();
   return repo.getSession();
 }));

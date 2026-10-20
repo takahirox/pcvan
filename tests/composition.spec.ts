@@ -1,3 +1,4 @@
+import { openSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { Backup } from '../src/storage/schema';
@@ -27,6 +28,7 @@ async function enterForum(page: Page) {
 }
 
 async function createMember(page: Page, handle: string) {
+  await openSettings(page, 'member');
   await page.getByLabel('新しいハンドル').fill(handle);
   await page.getByRole('button', { name: '人間の利用者を作成' }).click();
   await expect(page.getByLabel('ローカル利用者', { exact: true })).toContainText(handle);
@@ -52,6 +54,7 @@ async function snapshot(page: Page) {
 }
 
 async function restore(page: Page, fixture: Backup) {
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'local.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();

@@ -1,39 +1,64 @@
-import type { Session } from './storage/schema';
+import { TERMINAL_SETTING, validateTerminalPreferences } from './storage/schema';
+import type { Session, Setting, TerminalPreferences } from './storage/schema';
+import { OutputRenderer } from './output-renderer';
 
 interface TerminalActions {
   submit(line: string): void;
   previous(current: string): string;
   next(current: string): string;
   completeConnection?(): void;
+  savePreferences?(preferences: TerminalPreferences): void;
 }
 
 // DOM rendering and keyboard behavior only; no command parsing or stored history.
 export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   root.innerHTML = `
-    <header>
-      <h1>pcvan / テキスト端末</h1>
-      <p>1996年頃の MAIN（暫定）· 再構成のローカルセッション</p>
-    </header>
-    <section class="terminal" aria-label="テキスト端末">
-      <div class="transcript" role="log" aria-label="出力履歴"
-        aria-live="polite" aria-relevant="additions" tabindex="0">
-        <pre class="output"></pre>
+    <section class="terminal" aria-label="テキスト端末" data-theme="white">
+      <header class="terminal-header">
+        <div><h1>PC-VAN <span>/ テキスト端末</span></h1>
+          <p>1996年頃の MAIN（暫定）· ローカル再構成</p></div>
+        <span class="terminal-badge">ブラウザー内セッション</span>
+      </header>
+      <div class="terminal-status">
+        <span class="connection-status" role="status">接続演出中</span>
+        <label>表示速度（シミュレーション）
+          <select class="terminal-speed" aria-label="表示速度（シミュレーション）">
+            <option value="300">300 bps</option><option value="1200">1200 bps</option>
+            <option value="2400" selected>2400 bps</option><option value="9600">9600 bps</option>
+            <option value="instant">Instant（即時）</option>
+          </select>
+        </label>
+        <button type="button" class="reveal-output" aria-keyshortcuts="Escape" disabled>全文表示 (Esc)</button>
       </div>
-      <form class="command-form">
-        <label for="command">コマンド <span aria-hidden="true">&gt;</span></label>
-        <input id="command" name="command" type="text" autocomplete="off"
-          autocapitalize="off" spellcheck="false" aria-describedby="keyboard-help" />
-        <button type="submit">送信</button>
-      </form>
+      <div class="terminal-screen">
+        <div class="transcript" role="log" aria-label="出力履歴" aria-live="off" tabindex="0">
+          <pre class="output"></pre>
+        </div>
+        <form class="command-form">
+          <label for="command"><span class="sr-only">コマンド</span><span aria-hidden="true">&gt;</span></label>
+          <input id="command" name="command" type="text" autocomplete="off"
+            autocapitalize="off" spellcheck="false" aria-describedby="keyboard-help" />
+          <button type="submit">送信</button>
+        </form>
+      </div>
       <a class="reply-reference" href="#referenced-post" hidden></a>
+      <div class="session-controls">
+        <button type="button" class="skip-connection" hidden>接続演出をスキップ</button>
+        <button type="button" class="download-log">端末ログを保存 (.txt)</button>
+      </div>
     </section>
-    <div class="session-controls">
-      <button type="button" class="skip-connection" hidden>接続演出をスキップ</button>
-      <button type="button" class="download-log">端末ログを保存 (.txt)</button>
+    <div class="output-announcement sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    <details class="display-controls">
+      <summary>端末の外観・操作ガイド [reconstructed]</summary>
+      <label>表示色 <select class="terminal-theme"><option value="white">白</option>
+        <option value="green">緑（蛍光体風）</option><option value="amber">琥珀</option></select></label>
+      <label><input class="terminal-effects" type="checkbox" /> 光彩・走査線</label>
       <p class="session-times">セッション時刻を読み込み中…</p>
-    </div>
-    <p id="keyboard-help">Enter: 送信 · ↑ / ↓: 入力履歴 · PageUp / PageDown: 出力をスクロール<br />
-      Tab: 出力・入力へ移動 · 出力にフォーカスして ← / →: 横スクロール</p>
+      <p>外観・速度は創作のシミュレーションです。史実の画面・実際の回線速度ではありません。</p>
+      <p id="keyboard-help">Enter: 送信 · ↑ / ↓: 入力履歴 · PageUp / PageDown: 出力をスクロール<br />
+        Tab: 出力・入力へ移動 · 出力にフォーカスして ← / →: 横スクロール<br />
+        Esc: 待機中の全文を表示（入力・出力内） · Instant: 以後の出力を即時表示</p>
+    </details>
   `;
 
   const transcript = root.querySelector<HTMLDivElement>('.transcript')!;
@@ -42,6 +67,54 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   const form = root.querySelector<HTMLFormElement>('form')!;
   const skip = root.querySelector<HTMLButtonElement>('.skip-connection')!;
   const reference = root.querySelector<HTMLAnchorElement>('.reply-reference')!;
+  const shell = root.querySelector<HTMLElement>('.terminal')!;
+  const reveal = root.querySelector<HTMLButtonElement>('.reveal-output')!;
+  const speed = root.querySelector<HTMLSelectElement>('.terminal-speed')!;
+  const theme = root.querySelector<HTMLSelectElement>('.terminal-theme')!;
+  const effects = root.querySelector<HTMLInputElement>('.terminal-effects')!;
+  const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  const defaults = (): TerminalPreferences => ({ version: 1, theme: 'white',
+    speed: motion.matches ? 'instant' : '2400', effects: false });
+  let preferences = defaults();
+  let explicit = false;
+  const painted = document.createTextNode('');
+  output.append(painted);
+  const renderer = new OutputRenderer(preferences.speed, (text) => {
+    const atBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 2;
+    // Append literal text in one batch per frame, preserving selection and the input.
+    painted.appendData(text);
+    if (atBottom) transcript.scrollTop = transcript.scrollHeight;
+  }, (pending) => { reveal.disabled = !pending; }, (text) => {
+    // Streaming itself is silent. Announce a complete drained batch once.
+    root.querySelector('.output-announcement')!.textContent = text;
+  });
+  function apply(value: TerminalPreferences) {
+    preferences = { ...value };
+    shell.dataset.theme = value.theme;
+    shell.classList.toggle('effects', value.effects);
+    speed.value = value.speed;
+    theme.value = value.theme;
+    effects.checked = value.effects;
+    renderer.setSpeed(value.speed);
+  }
+  apply(preferences);
+  function changed() {
+    explicit = true;
+    apply({ version: 1, theme: theme.value as TerminalPreferences['theme'],
+      speed: speed.value as TerminalPreferences['speed'], effects: effects.checked });
+    actions.savePreferences?.({ ...preferences });
+  }
+  speed.addEventListener('change', changed);
+  theme.addEventListener('change', changed);
+  effects.addEventListener('change', changed);
+  motion.addEventListener('change', () => { if (!explicit) apply(defaults()); });
+  reveal.addEventListener('click', () => { renderer.reveal(); input.focus({ preventScroll: true }); });
+  shell.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !composing && !event.isComposing && event.keyCode !== 229) {
+      event.preventDefault();
+      renderer.reveal();
+    }
+  });
   let referenceNumber: number | null = null;
   reference.addEventListener('click', (event) => {
     event.preventDefault();
@@ -53,8 +126,8 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
     input.focus({ preventScroll: true });
   });
   root.querySelector('.download-log')!.addEventListener('click', () => {
-    // Snapshot exactly the displayed text, including Japanese and embedded newlines.
-    const url = URL.createObjectURL(new Blob([output.textContent ?? ''], { type: 'text/plain;charset=utf-8' }));
+    // Include accepted output still waiting to be painted; exclude unsent drafts.
+    const url = URL.createObjectURL(new Blob([renderer.text], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
     link.download = `pcvan-terminal-${new Date().toISOString().replaceAll(':', '-')}.txt`;
@@ -64,7 +137,6 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   let composing = false;
-  let hasOutput = false;
 
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; });
@@ -90,6 +162,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
     if (composing) return;
     const line = input.value;
     input.value = '';
+    renderer.reveal();
     actions.submit(line);
     input.focus({ preventScroll: true });
   });
@@ -101,18 +174,23 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
       reference.hidden = number === null;
       reference.textContent = number === null ? '' : `返信先 RE#${number} を読む`;
     },
-    setConnecting(connecting: boolean) { skip.hidden = !connecting; },
+    reveal: () => renderer.reveal(),
+    restorePreferences(settings: Setting[]) {
+      const saved = settings.find((row) => row.id === TERMINAL_SETTING);
+      if (saved) {
+        validateTerminalPreferences(saved.value);
+        explicit = true;
+        apply(saved.value);
+      } else { explicit = false; apply(defaults()); }
+    },
+    setConnecting(connecting: boolean) {
+      skip.hidden = !connecting;
+      root.querySelector('.connection-status')!.textContent = connecting ? '接続演出中' : 'ローカル端末';
+    },
     showSessionTimes(saved: Session | null) {
       root.querySelector('.session-times')!.textContent =
         `最終ログイン: ${saved?.lastLoginAt ?? '記録なし'} / 最終ログアウト: ${saved?.lastLogoutAt ?? '記録なし'} (UTC)`;
     },
-    append(...text: readonly string[]) {
-      if (text.length === 0) return;
-      const atBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 2;
-      // Never interpret controller output as HTML or replace the input element.
-      output.append(document.createTextNode(`${hasOutput ? '\n' : ''}${text.join('\n')}`));
-      hasOutput = true;
-      if (atBottom) transcript.scrollTop = transcript.scrollHeight;
-    },
+    append: (...text: readonly string[]) => renderer.append(...text),
   };
 }
