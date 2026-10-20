@@ -1,3 +1,4 @@
+import { openSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createServer } from 'node:http';
@@ -74,6 +75,7 @@ async function restore(page: Page) {
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'MITI';
   fixture.forums[0]!.boardNo = 9;
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator('.restore').click();
@@ -83,6 +85,7 @@ async function restore(page: Page) {
 
 async function backup(page: Page) {
   const downloaded = page.waitForEvent('download');
+  await openSettings(page, 'storage');
   await page.locator('.backup').click();
   return JSON.parse(await readFile((await (await downloaded).path())!, 'utf8'));
 }

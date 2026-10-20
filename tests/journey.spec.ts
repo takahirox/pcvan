@@ -1,3 +1,4 @@
+import { openSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
@@ -24,6 +25,7 @@ async function enterForum(page: Page) {
 
 async function backup(page: Page): Promise<Backup> {
   const downloading = page.waitForEvent('download');
+  await openSettings(page, 'storage');
   await page.getByRole('button', { name: 'JSON バックアップを保存' }).click();
   const download = await downloading;
   expect(download.suggestedFilename()).toMatch(/^pcvan-backup-.*\.json$/);
@@ -31,6 +33,7 @@ async function backup(page: Page): Promise<Backup> {
 }
 
 async function restore(page: Page, saved: Backup) {
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({
     name: 'journey.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)),
   });
@@ -57,6 +60,7 @@ async function post(page: Page, title: string, body: string, line = 'WRITE') {
 }
 
 async function createHuman(page: Page) {
+  await openSettings(page, 'member');
   await page.getByLabel('新しいハンドル').fill('旅の利用者');
   await page.getByRole('button', { name: '人間の利用者を作成' }).click();
   await expect(page.getByLabel('ローカル利用者', { exact: true })).toContainText('旅の利用者');
@@ -151,7 +155,7 @@ test('journey: all MAIN mappings and historical evidence boundaries through keyb
 
 test('journey: offline human post, reply, unread, reload and JSON round-trip without WebGPU or backend', async ({ browser, baseURL }) => {
   // Fresh nonpersistent profile: no cookies, local world, service worker or keys.
-  const context = await browser.newContext();
+  const context = await browser.newContext({ reducedMotion: 'reduce' });
   const observed = observe(context, baseURL!);
   await context.addInitScript(() => Object.defineProperty(navigator, 'gpu', { value: undefined }));
   try {
@@ -189,7 +193,10 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
     const saved = await backup(page);
     expect(saved.posts).toHaveLength(2);
     expect(saved.posts.map((row) => row.origin)).toEqual(['local-human', 'local-human']);
-    expect(saved.posts[1]!.replyToPostId).toBe(saved.posts[0]!.id);
+    // Backups follow IndexedDB primary-key order, not random-ID creation order.
+    const original = saved.posts.find((row) => row.number === 1)!;
+    const reply = saved.posts.find((row) => row.number === 2)!;
+    expect(reply.replyToPostId).toBe(original.id);
     expect(saved.readStates).toEqual([{ memberId: saved.members[0]!.id, forumId: saved.forums[0]!.id, lastReadNumber: 2 }]);
     await page.reload();
     await enterForum(page);

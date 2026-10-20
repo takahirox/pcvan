@@ -539,3 +539,48 @@ tested here. Former-user nostalgic review remains optional and was not performed
 Tab closure recovery is tested; OS/browser-crash durability and real eviction
 are not established. No deployment was performed. No post-merge verification is
 required for #14.
+
+## Issue #29 terminal display and progressive output
+
+Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+Read the current open Issue #29 through GitHub and reinspected application wiring,
+storage validation, historical fixture boundaries and the existing test setup.
+
+- `npm ci`: passed, zero reported vulnerabilities.
+- `npm run build`: passed (TypeScript and production Vite assets). The existing
+  advisory about large optional WebLLM chunks remains; no new dependency or asset
+  download was added.
+- Final `npm test -- --workers=2`: **119 tests passed** (26.1 seconds), no retries.
+  Includes the production build, all previous forum/navigation, composition, AI,
+  backup/restore and offline `/pcvan/` checks. Functional journeys use the reduced
+  motion Instant default; the new display suite explicitly enables animation.
+- Six new tests cover controlled frame timing at all four nominal speeds, exact
+  UTF-8 costs, Japanese/full/half-width text, combining marks and joined emoji,
+  batched paints, interleaved asynchronous appends, queue overflow, skip and later
+  output, speed changes, commands and IME during animation, logical transcript
+  downloads with queued text and excluded drafts, persisted/versioned preferences,
+  old and invalid backups, reduced motion and explicit overrides. Responsive
+  checks cover 320×568 and 1280×800, native prompt visibility, selectable text in
+  all three themes, optional effects, collapsed settings and horizontal scroll.
+- Earlier targeted checks passed 19 existing regressions and six display tests.
+  Initial display integration failures used exact raw-label lookups that included
+  nested text/options; the checks now use accessible roles/names. A later full
+  run found an existing journey assertion that assumed random-ID backup order
+  equaled creation order. It now identifies parent/reply by forum post number;
+  the journey's separate browser context also explicitly requests reduced motion.
+  No production storage ordering or test assertions were removed to accommodate it.
+- Inspected local Chromium screenshots at desktop 1280×900 and mobile 320×568.
+  Moved timestamps into appearance settings and increased narrow-screen terminal
+  height so the transcript and prompt retain most of the viewport. Screenshots
+  were temporary inspection artifacts, not added runtime assets.
+- Changed Markdown files passed balanced-fence and local link/heading-anchor
+  checks. `node --check scripts/service-worker.js`, `git diff --check` and
+  `git diff --cached --check` passed.
+
+See [display controls and implementation limits](terminal-display.md) for the
+UTF-8/8N1 approximation, explicit Unicode fallback, bounded pending queue,
+command/reveal ordering, accessibility behavior and optional v1 settings record.
+Historical fixtures and command meanings remain unchanged. Real GPU/model loading,
+physical devices, native IME, assistive technology and other browser engines were
+not tested. No deployment, push, PR, merge or GitHub comment was performed. No
+post-merge verification is required for #29.

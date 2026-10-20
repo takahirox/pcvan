@@ -15,11 +15,14 @@ export function mountComposer(root: HTMLElement, actions: ComposerActions) {
   section.className = 'member-controls';
   section.setAttribute('aria-label', 'フォーラムの利用者設定');
   section.innerHTML = `
+    <details>
+    <summary>利用者設定・新規登録 [reconstructed]</summary>
     <label for="local-member">ローカル利用者</label>
     <select id="local-member" class="member"></select>
     <label>新しいハンドル <input class="handle" type="text" /></label>
     <button type="button" class="create-member">人間の利用者を作成</button>
     <p class="member-message" aria-live="polite"></p>
+    </details>
     <dialog aria-labelledby="compose-heading">
       <h2 id="compose-heading">投稿エディター [D / reconstructed]</h2>
       <p>1996–97年の編集・確認・返信キーは未確認です。この操作は創作の再構成です。</p>
@@ -134,7 +137,7 @@ export function mountComposer(root: HTMLElement, actions: ComposerActions) {
     },
     open(target: ForumDestination, content: Backup, reply?: Post) {
       const memberId = activeHuman(content);
-      if (!memberId) { message.textContent = '投稿・既読の記録にはローカル利用者を作成してください。'; handle.focus(); return; }
+      if (!memberId) { section.querySelector('details')!.open = true; message.textContent = '投稿・既読の記録にはローカル利用者を作成してください。'; handle.focus(); return; }
       authorId = memberId;
       destination = target;
       parent = reply;

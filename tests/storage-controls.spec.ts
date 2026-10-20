@@ -1,3 +1,4 @@
+import { openSettings } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -5,6 +6,7 @@ import { backupFixture } from './backup-fixture';
 
 async function downloadBackup(page: Page) {
   const downloading = page.waitForEvent('download');
+  await openSettings(page, 'storage');
   await page.getByRole('button', { name: 'JSON バックアップを保存' }).click();
   const download = await downloading;
   expect(download.suggestedFilename()).toMatch(/^pcvan-backup-.*\.json$/);
@@ -13,6 +15,7 @@ async function downloadBackup(page: Page) {
 
 test('visible backup downloads all local data, and command history survives reload', async ({ page }) => {
   await page.goto('/');
+  await openSettings(page, 'storage');
   await expect(page.getByText('容量制限やブラウザーの操作で消えることがあります。', { exact: false })).toBeVisible();
   const input = page.getByRole('textbox', { name: 'コマンド' });
   await input.fill('echo  保存する ｶﾅ');
@@ -34,6 +37,7 @@ test('restore requires confirmation; confirmed replace preserves every field and
   await page.goto('/');
   const before = await downloadBackup(page);
   const fixture = backupFixture();
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
   page.once('dialog', (dialog) => dialog.dismiss());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
@@ -59,6 +63,7 @@ test('reload bounds a restored history and keeps recalled edits separate from pe
   await page.goto('/');
   const fixture = backupFixture();
   fixture.session!.commandHistory = Array.from({ length: 105 }, (_, i) => `履歴 ${i}`);
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({
     name: 'history.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)),
   });
@@ -92,6 +97,7 @@ test('invalid restore displays an error and does not change existing data', asyn
   const before = await downloadBackup(page);
   let dialogs = 0;
   page.on('dialog', async (dialog) => { dialogs++; await dialog.dismiss(); });
+  await openSettings(page, 'storage');
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{"format":"pcvan-local","version":999}') });
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('ローカル保存エラー');
@@ -126,6 +132,7 @@ test('unavailable IndexedDB is reported without claiming to save data or breakin
   await page.addInitScript(() => Object.defineProperty(window, 'indexedDB', { value: undefined }));
   await page.goto('/');
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('IndexedDB is unavailable');
+  await openSettings(page, 'storage');
   await expect(page.getByRole('button', { name: 'JSON バックアップを保存' })).toBeDisabled();
   const input = page.getByRole('textbox', { name: 'コマンド' });
   await input.fill('echo usable');

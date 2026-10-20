@@ -62,8 +62,8 @@ draft remain in memory.
   unchanged. Headers use UTC dates; secondary display numbers have no assigned
   meaning, and the uncertain historical line-count field is omitted.
 - Create a local human with **新しいハンドル** → **人間の利用者を作成**, or select
-  an existing human under **ローカル利用者**. In a forum, `WRITE` opens a title and
-  multiline body editor; `REPLY number` prefills `RE#number` and retains the
+  an existing human under **ローカル利用者**, inside **利用者設定・新規登録**.
+  In a forum, `WRITE` opens a title and multiline body editor; `REPLY number` prefills `RE#number` and retains the
   referenced post ID. **内容を確認** reviews the exact text; **編集に戻る** edits it,
   **この内容で投稿する** sends it, and **投稿をキャンセル** or Escape discards it.
   Enter in the title or Japanese IME confirmation never sends a post. Blank
@@ -86,7 +86,8 @@ draft remain in memory.
 - `Q` ends the simulated connection only at MAIN. `RECONNECT` starts again at
   MAIN after disconnecting; it is a reconstructed convenience. Commands never
   navigate the browser or connect to an external service.
-- The latest login and explicit `Q` logout times appear below the terminal in UTC
+- The latest login and explicit `Q` logout times appear in
+  **端末の外観・操作ガイド** below the terminal in UTC
   and persist locally. Opening/reloading and `RECONNECT` update login time;
   closing a tab is not recorded as a reliable logout.
 - Up/Down recall the newest 100 nonblank commands, restored after reload, and
@@ -100,9 +101,26 @@ draft remain in memory.
   the single-line input scrolls to its caret. Text is selectable and copied as
   plain text, without interpreting HTML or escape sequences.
 - **端末ログを保存 (.txt)** downloads the entire current transcript (including
-  scrollback and reconnects) as UTF-8 plain text with exact line breaks. The
-  unsubmitted input draft is excluded. Download before reloading to keep the log;
+  scrollback, reconnects and queued text awaiting display) as UTF-8 plain text
+  with exact line breaks. The unsubmitted input draft is excluded. Download before reloading to keep the log;
   JSON backups contain local data/history but do not contain the transcript.
+
+## Terminal appearance and output speed
+
+The terminal screen and prompt share one bezel. Secondary user, AI, backup and
+offline controls expand independently below it. **端末の外観・操作ガイド** offers
+neutral white, green phosphor and amber themes with optional static glow/scanlines.
+These are reconstructed aesthetics, not authenticated PC-VAN screenshots.
+
+**表示速度（シミュレーション）** offers 300/1200/2400/9600 bps and **Instant**.
+The default is 2400 bps, or Instant with reduced motion. Effects default off.
+**全文表示 (Esc)** reveals queued text; a submitted command also reveals earlier
+text before its immediate echo. Changing speed reveals the current backlog.
+Theme, speed and effects persist locally and travel with JSON backups; an explicit
+choice overrides the motion-aware defaults. The animation uses UTF-8 byte costs
+at nominal bps / 10 bytes per second, preserving whole Unicode graphemes. This is
+a perception simulation, not a historical encoding or measured modem connection.
+See [display controls, accessibility, timing and limitations](docs/terminal-display.md).
 
 ## Optional local AI
 
@@ -129,7 +147,8 @@ for prompt bounds, validation, caching, network use and optional hardware checks
 
 ## Local data and backups
 
-Use **JSON バックアップを保存** below the terminal to download all local data.
+Expand **JSON バックアップ・復元** below the terminal and use
+**JSON バックアップを保存** to download all local data.
 Select a JSON file with **復元ファイル**, then **全データを置き換えて復元** to
 validate it and confirm replacement of the entire local world. Restore does not
 merge data; export the old world first if you want to keep it. Invalid files or
@@ -241,6 +260,8 @@ it is resolved.
   presentation. `mountTerminal` accepts submit/history callbacks and returns
   `append(...text)`, which appends literal text without replacing or focusing the
   input. It follows new output only if the transcript was already at the bottom.
+- `src/output-renderer.ts`: bounded progressive display queue and independent logical
+  log, with UTF-8 grapheme costs and batched animation frames.
 - `src/session.ts`, `src/history.ts`: transcript and command recall, independent
   of the DOM. `main.ts` restores/persists recalled commands through the repository.
   `session.append(...text)` records additional output;
