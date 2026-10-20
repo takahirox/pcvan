@@ -6,7 +6,8 @@ import type { Session } from './storage/repository';
 import { mountStorageControls } from './storage/controls';
 import './style.css';
 
-const session = new TerminalSession(new PcvanController());
+const controller = new PcvanController();
+const session = new TerminalSession(controller);
 const root = document.querySelector<HTMLElement>('#app')!;
 const repository = openRepository();
 // Serialize startup, command persistence and backups/restores. The controller stays
@@ -29,10 +30,23 @@ async function loadHistory(load: () => Promise<Session | null>): Promise<void> {
 const startup = enqueue(() => loadHistory(async () => (await repository).startSession()));
 const terminal = mountTerminal(root, {
   submit: (line) => {
-    terminal.append(...session.submit(line));
     if (!line.trim()) return;
+    // Echo and history stay immediate even while IndexedDB is loading. Responses
+    // are serialized with restores so rapid commands use the correct screen/data.
+    session.history.add(line);
+    terminal.append(...session.append(`> ${line}`));
     commandsDuringHistoryLoad?.push(line);
     void enqueue(async () => {
+      let canSubmit = true;
+      if (controller.needsContent && !['MAIN', 'BACK'].includes(line.trim().toUpperCase())) {
+        try { controller.setContent(await (await repository).exportBackup()); }
+        catch (error) {
+          controls.reportError(error);
+          terminal.append(...session.append('投稿の読み込みに失敗しました。再試行してください。'));
+          canSubmit = false; // Do not display stale posts after a failed read.
+        }
+      }
+      if (canSubmit) terminal.append(...session.append(...controller.submit(line)));
       await (await repository).recordCommand(line);
     }).catch((error) => controls.reportError(error));
   },

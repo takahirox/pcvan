@@ -4,7 +4,8 @@ The application stores its local world in IndexedDB, database `pcvan-local`,
 database version **1**. There are no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. A clean browser profile starts
 with no members, SIGs, forums, posts, read states, or settings. Opening the terminal
-creates only local session metadata. Research fixtures are not automatically seeded.
+creates only local session metadata. Research fixtures are not automatically
+seeded into storage; the reader has a separately labeled in-memory demo fallback.
 
 Storage belongs to the browser profile and origin (scheme, hostname, and port).
 Changing the development port or moving hosts opens a different local world.
@@ -34,6 +35,39 @@ errors. When storage is unavailable, the terminal still works in memory and
 reports persistence failures. A quota failure leaves export available if the
 database can still be read. There is no localStorage fallback that could silently
 split the world across storage systems.
+
+## Forum reading
+
+The historical directory in `src/navigation.ts` uses the unchanged evidence
+fixtures. The app supplies `PcvanController.setContent()` with a consistent
+`exportBackup()` snapshot before forum commands. Command responses and restores
+share the existing queue; input echo and history remain immediate. Failed reads
+report an error without showing cached posts; `MAIN` and `BACK` work without a
+successful content read. Reading does not mutate posts or read-state records.
+
+`src/forums.ts` maps stored SIGs by case-insensitive `keyword` (`MITI` or
+`DAISIZEN`) and stored forums by `sigId` plus `boardNo` (MITI `9`, DAISIZEN
+`1`–`7`). Stored record IDs do not need to match fixture IDs. One matching SIG
+and board are required: a missing or ambiguous mapping reports unavailability,
+and an empty stored forum stays empty. Posts are sorted by ascending `number`;
+allocation gaps and missing read numbers do not change the active screen.
+
+When no stored SIG matches, the reader uses the original, explicitly synthetic
+[demo posts](../data/pcvan/demo-posts.json). These read-only seeds exist only in
+the bundled app, never overwrite local records, and are not exported in backups.
+They use fictional `DEMO` identities and dates. No historical bodies or real user
+IDs were imported. Other local SIGs and forums remain stored/exportable but are
+outside this evidence-backed directory.
+
+The post renderer preserves the exact title/body strings, including full-width
+spaces, blank lines, trailing spaces, and literal HTML. UTC dates are a stable
+presentation choice. `displaySecondNumber` is displayed only when present;
+its meaning is unknown, and it is not a total, reply parent, or pagination limit.
+The renderer accepts an optional explicit line-count display value, but the app
+omits it because the v1 post schema has no such field. It never derives a count
+from body lines: the historical counting rule (title, blank lines, wrapping,
+etc.) is unverified. No schema/version change is needed for reading. See the
+[header evidence and limitations](research/pcvan-1996-1997.md#synthetic-post-header-demonstration).
 
 ## TypeScript repository API
 

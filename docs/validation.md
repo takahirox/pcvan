@@ -143,3 +143,42 @@ documented in the local-storage contract.
 
 The browser checks not performed above remain unperformed; this integration
 adds no required post-merge verification.
+
+# Issue #7 SIG directories and forum reading validation
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+The assigned checkpoint contained only the earlier collaboration documentation.
+Fetched and merged `main` at `e867c028b8e3d11f32878d6905630ae5e145d8b8`,
+which includes merged #3–#6, into the assigned worktree before implementation.
+The historical evidence fixtures and v1 repository/backup schema are unchanged.
+
+- `npm ci`: passed, with no reported vulnerabilities.
+- `npm run build`: passed the TypeScript check and production Vite build.
+- `npm test`: **58 tests passed**, including the production build and all
+  existing navigation, terminal, repository, and backup checks in Chromium.
+  Ten new tests cover the provisional DAISIZEN section directory and all seven
+  boards, MITI's verified route into reading, numbered ordering independent of
+  timestamps/IDs, optional header fields, exact Japanese whitespace, synthetic
+  demo provenance, empty/missing/ambiguous forums, missing post numbers and
+  invalid commands, offline reading, literal HTML, live restore and reload,
+  rapid commands, and failed reads with usable return commands.
+- A first attempt stopped before testing because port 14373 was occupied; a
+  scoped listener check found no remaining listener and the next run started
+  normally. That run passed 56/57 checks; the old navigation browser helper
+  assumed immediate responses. Updated it to wait for the response now queued
+  with local storage reads. The final complete run passed all 58 checks.
+- Reviewed the implementation diff, checked local documentation links and
+  anchors, parsed the demo fixture with duplicate-key rejection, and checked
+  staged whitespace with `git diff --cached --check`.
+
+The DAISIZEN source was accessible and its directory agrees with the existing
+fixture. Optional manual header comparison with the external archived sample
+was not completed because that URL was inaccessible through the browsing tool;
+MITI's HTTPS source also returned 403. Header structure and route provenance
+therefore reuse #3's documented evidence, without copying archived bodies or IDs.
+Historical secondary-number meanings and line-count rules remain unknown; the
+app omits line count rather than inferring one. Demo seeds remain in memory and
+do not modify local backups. The earlier native IME, physical-device,
+assistive-technology, Safari/Firefox, and deployment limitations still apply.
+No post-merge verification is required for #7.

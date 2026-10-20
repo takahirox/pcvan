@@ -27,15 +27,26 @@ IndexedDB in this browser profile. The transcript and input draft remain in memo
 - Enter submits the command; Japanese IME composition confirmation is guarded
   against submission. MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`.
 - MAIN `13` opens a visibly reconstructed Communication bridge: its convenience
-  selector `1` leads to MITI, but is not a historical submenu number. Other MAIN
-  entries except `Q` remain safe, unimplemented selections that report their
-  fixture labels without changing screens.
+  selectors `1` and `2` lead to MITI and DAISIZEN; neither is a historical submenu
+  number. Other MAIN entries except `Q` remain safe, unimplemented selections
+  that report their fixture labels without changing screens.
 - From MAIN, `J MITI` → `3` → `9` follows the documented 1996 route to 未知の世界,
   フォーラム, and 資料室. Only these route steps are verified; the displayed
-  screens/prompts are reconstructed placeholders, not complete SIG menus.
+  screens/prompts are reconstructed, not complete SIG menus. 資料室 lists posts.
   Numbers apply only to the current screen. Unknown commands preserve state.
-- `HELP` redisplays the active screen; `MAIN` returns from the bridge/MITI
-  screens. These helpers, case-insensitive input, and whitespace tolerance are
+- Reach DAISIZEN with `13` → `2` → `FORUMS`, then select `1`–`7`.
+  Its archived section names and seven numbered boards retain their provisional
+  evidence labels: their applicability to 1996–1997 is unresolved. The bridge,
+  `FORUMS`, number selection behavior, and prompts are reconstructed. The archive
+  does not establish `J DAISIZEN`; that command remains unsupported.
+- Within a forum, `LIST` shows posts in ascending post-number order and
+  `READ number` shows a header and the exact stored Japanese title/body.
+  `BACK` returns to the forum directory. These reading/back commands are original
+  demo controls, not verified PC-VAN commands. Missing numbers leave the screen
+  unchanged. Headers use UTC dates; secondary display numbers have no assigned
+  meaning, and the uncertain historical line-count field is omitted.
+- `HELP` redisplays the active screen; `MAIN` returns from all connected submenus
+  and forums. These helpers, case-insensitive input, and whitespace tolerance are
   explicitly reconstructed conveniences. No ECOM or generic BBS shortcuts are
   assigned global meanings.
 - `Q` ends the simulated connection only at MAIN. `RECONNECT` starts again at
@@ -57,8 +68,23 @@ validate it and confirm replacement of the entire local world. Restore does not
 merge data; export the old world first if you want to keep it. Invalid files or
 failed writes leave existing data intact. Storage errors appear below the controls.
 
-A clean profile starts with empty content; only session metadata is created on
-opening. Data persists across reloads but browser retention is not guaranteed.
+A clean profile starts with empty stored content; only session metadata is
+created on opening. MITI's 資料室 and DAISIZEN's first board have explicitly
+synthetic, original demo posts from `data/pcvan/demo-posts.json` as an in-memory
+fallback. Demo posts use fictional `DEMO` IDs/dates and are not written to
+IndexedDB or included in backups. The other demo boards are empty.
+
+Stored SIGs map to the evidence directory by `keyword` (`MITI`/`DAISIZEN`, case
+insensitive), and forums by `boardNo` (`9` for MITI, `1`–`7` for DAISIZEN).
+Existing stored SIGs take precedence over demos, including empty or missing
+boards. Ambiguous mappings are reported without choosing arbitrary content.
+Other local SIGs/boards are outside this historical directory. The app reads a
+consistent repository snapshot before forum commands, including after restores;
+read failures are reported without displaying stale posts. Reading does not
+change stored posts or read-state records. See the
+[forum implementation notes](docs/local-storage.md#forum-reading).
+
+Data persists across reloads but browser retention is not guaranteed.
 Changing the origin/profile, clearing site data, private browsing, or browser
 eviction may make data unavailable. Keep downloaded backups outside the browser.
 See [the local repository API and versioned backup format](docs/local-storage.md)
@@ -95,9 +121,11 @@ static file hosting, with no server-side application process.
   screen-scoped commands. MAIN labels and MITI route steps come directly from
   the JSON fixtures, without combining historical menu variants. `screen` is a
   read-only state identifier; `main.ts` wires a fresh controller to the terminal.
+- `src/forums.ts`: resolves evidence-backed boards to repository posts or original
+  demo fixtures, and renders headers without trimming or reflowing post text.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
-  controls. Content creation currently uses the repository API while later Issues
-  add SIG/forum interactions.
+  controls. Content creation currently uses the repository API; SIG/forum reading
+  uses those stored posts without changing the backup schema.
 - `tests/`: controller/session checks and browser interaction checks.
 
 ## Validation
@@ -119,6 +147,8 @@ module tests also start a Vite server on port 14374; both test ports must be fre
 Navigation checks cover every MAIN mapping, the two-column fixture rendering,
 MITI steps, reconstructed Communication bridge, screen-scoped numbers, invalid
 commands/jumps, disconnect/reconnect, and absence of browser navigation.
+Forum checks cover all seven DAISIZEN boards, MITI reading, optional header
+fields, whitespace, gaps, empty/missing/ambiguous forums, and live restore reads.
 See [the implementation validation record](docs/validation.md) for commands
 actually run and browser checks not performed.
 
