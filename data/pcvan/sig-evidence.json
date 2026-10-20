@@ -1,0 +1,133 @@
+{
+  "daisizen": {
+    "name": "大自然＆動植物（DAISIZEN）",
+    "era": "Undated past configuration on an operator memorial carrying April 2026 text; applicability to 1996–1997 is unresolved.",
+    "evidence_category": "B",
+    "status": "provisional",
+    "source_url": "https://www.chayagate.com/daisizen/index.htm",
+    "limitation": "The source also records a mountain-forum split in summer 1992. This list is not a complete terminal-menu dump.",
+    "jump": {
+      "input": null,
+      "status": "provisional",
+      "source_url": "https://www.chayagate.com/daisizen/index.htm",
+      "limitation": "Jump keyword unverified. The SIG name does not establish J DAISIZEN as a historical command."
+    },
+    "sections": [
+      {
+        "label": "このＳＩＧについて",
+        "selector": null,
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "label": "電子メール",
+        "selector": null,
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "label": "フォーラム（電子掲示板）",
+        "selector": null,
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "label": "ライブラリィ",
+        "selector": null,
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "label": "電子会議室",
+        "selector": null,
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "label": "ＯＬＴ（＊）",
+        "selector": null,
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "label": "ＯＳＬ",
+        "selector": null,
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      }
+    ],
+    "forums": [
+      {
+        "number": 1,
+        "label": "自然の森／ＦＲＥＥ",
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "number": 2,
+        "label": "風の谷住民会議",
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "number": 3,
+        "label": "ダーウィン図書館",
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "number": 4,
+        "label": "大自然絵巻",
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "number": 5,
+        "label": "バードウォッチング",
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "number": 6,
+        "label": "山のフォーラム",
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      },
+      {
+        "number": 7,
+        "label": "伝言板／企画室",
+        "status": "provisional",
+        "source_url": "https://www.chayagate.com/daisizen/index.htm"
+      }
+    ]
+  },
+  "miti": {
+    "name": "未知の世界",
+    "era": "Route statement dated 1996-01-01; page publication/revision date unestablished.",
+    "evidence_category": "B",
+    "status": "verified",
+    "source_url": "https://www.asyura2.com/profile.htm",
+    "accessed_url": "http://www.asyura2.com/profile.htm",
+    "scope": "Firsthand route from MAIN only; not a complete SIG menu or confirmation for 1997. HTTPS returned 403; HTTP text inspected.",
+    "steps": [
+      {
+        "input": "J MITI",
+        "destination": "未知の世界",
+        "status": "verified",
+        "source_url": "https://www.asyura2.com/profile.htm"
+      },
+      {
+        "input": "3",
+        "destination": "フォーラム",
+        "status": "verified",
+        "source_url": "https://www.asyura2.com/profile.htm"
+      },
+      {
+        "input": "9",
+        "destination": "資料室",
+        "status": "verified",
+        "source_url": "https://www.asyura2.com/profile.htm"
+      }
+    ]
+  }
+}
