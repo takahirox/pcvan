@@ -15,19 +15,11 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   root.innerHTML = `
     <section class="terminal" aria-label="テキスト端末" data-theme="white">
       <header class="terminal-header">
-        <div><h1>PC-VAN <span>/ テキスト端末</span></h1>
-          <p>1996年頃の MAIN（暫定）· ローカル再構成</p></div>
-        <span class="terminal-badge">ブラウザー内セッション</span>
+        <h1>PC-VAN</h1>
+        <button type="button" class="open-settings" aria-haspopup="dialog" aria-controls="settings-dialog">設定 / Options</button>
       </header>
       <div class="terminal-status">
-        <span class="connection-status" role="status">接続演出中</span>
-        <label>表示速度（シミュレーション）
-          <select class="terminal-speed" aria-label="表示速度（シミュレーション）">
-            <option value="300">300 bps</option><option value="1200">1200 bps</option>
-            <option value="2400" selected>2400 bps</option><option value="9600">9600 bps</option>
-            <option value="instant">Instant（即時）</option>
-          </select>
-        </label>
+        <span class="connection-status" role="status">接続中</span>
         <button type="button" class="reveal-output" aria-keyshortcuts="Escape" disabled>全文表示 (Esc)</button>
       </div>
       <div class="terminal-screen">
@@ -44,17 +36,26 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
       <a class="reply-reference" href="#referenced-post" hidden></a>
       <div class="session-controls">
         <button type="button" class="skip-connection" hidden>接続演出をスキップ</button>
-        <button type="button" class="download-log">端末ログを保存 (.txt)</button>
       </div>
     </section>
     <div class="output-announcement sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
     <details class="display-controls">
-      <summary>端末の外観・操作ガイド [reconstructed]</summary>
+      <summary>表示・速度</summary>
+        <label>表示速度（シミュレーション）
+          <select class="terminal-speed" aria-label="表示速度（シミュレーション）">
+            <option value="300">300 bps</option><option value="1200">1200 bps</option>
+            <option value="2400" selected>2400 bps</option><option value="9600">9600 bps</option>
+            <option value="instant">Instant（即時）</option>
+          </select>
+        </label>
+      <button type="button" class="download-log">端末ログを保存 (.txt)</button>
       <label>表示色 <select class="terminal-theme"><option value="white">白</option>
         <option value="green">緑（蛍光体風）</option><option value="amber">琥珀</option></select></label>
       <label><input class="terminal-effects" type="checkbox" /> 光彩・走査線</label>
       <p class="session-times">セッション時刻を読み込み中…</p>
-      <p>外観・速度は創作のシミュレーションです。史実の画面・実際の回線速度ではありません。</p>
+    </details>
+    <details class="help-controls">
+      <summary>操作ガイド</summary>
       <p id="keyboard-help">Enter: 送信 · ↑ / ↓: 入力履歴 · PageUp / PageDown: 出力をスクロール<br />
         Tab: 出力・入力へ移動 · 出力にフォーカスして ← / →: 横スクロール<br />
         Esc: 待機中の全文を表示（入力・出力内） · Instant: 以後の出力を即時表示</p>
@@ -63,7 +64,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
 
   const transcript = root.querySelector<HTMLDivElement>('.transcript')!;
   const output = root.querySelector<HTMLPreElement>('.output')!;
-  const input = root.querySelector<HTMLInputElement>('input')!;
+  const input = root.querySelector<HTMLInputElement>('#command')!;
   const form = root.querySelector<HTMLFormElement>('form')!;
   const skip = root.querySelector<HTMLButtonElement>('.skip-connection')!;
   const reference = root.querySelector<HTMLAnchorElement>('.reply-reference')!;
@@ -185,7 +186,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
     },
     setConnecting(connecting: boolean) {
       skip.hidden = !connecting;
-      root.querySelector('.connection-status')!.textContent = connecting ? '接続演出中' : 'ローカル端末';
+      root.querySelector('.connection-status')!.textContent = connecting ? '接続中' : '入力待ち';
     },
     showSessionTimes(saved: Session | null) {
       root.querySelector('.session-times')!.textContent =

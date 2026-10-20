@@ -1,4 +1,4 @@
-import { openSettings } from './settings-helpers';
+import { openSettings, closeSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createServer } from 'node:http';
@@ -53,9 +53,7 @@ async function saveShell(page: Page) {
 }
 
 async function openOffline(page: Page) {
-  if (await page.locator('.offline-controls details').getAttribute('open') === null) {
-    await page.locator('.offline-controls summary').click();
-  }
+  await openSettings(page, 'offline');
 }
 
 async function update(page: Page) {
@@ -93,6 +91,7 @@ async function backup(page: Page) {
 async function command(page: Page, text: string, response: string) {
   const input = page.getByRole('textbox', { name: 'コマンド', exact: true });
   const length = (await page.locator('.output').textContent())!.length;
+  await closeSettings(page);
   await input.fill(text); await input.press('Enter');
   await expect.poll(async () => (await page.locator('.output').textContent())!.slice(length)).toContain(response);
 }
@@ -135,7 +134,7 @@ test('production assets and opt-in service worker resolve under /pcvan/', async 
     }
 
     // Exercise the real dynamic import without loading a model or needing WebGPU.
-    await page.locator('.ai-controls summary').click();
+    await openSettings(page, 'ai');
     await page.locator('.ai-cache-check').click();
     await expect(page.locator('.ai-cache-status')).toContainText('未保存または不完全');
     expect(requests.some((url) => url.startsWith(`${base}assets/webllm-adapter-`))).toBe(true);
@@ -173,7 +172,7 @@ test('opt-in minimal shell reloads offline on a subpath; missing AI leaves local
     await expect(page.locator('.network-status')).toContainText('オフライン');
     await page.reload();
     await expect(page.locator('.shell-status')).toContainText('オフライン用に保存済み');
-    await page.locator('.ai-controls summary').click();
+    await openSettings(page, 'ai');
     await page.locator('.ai-load').click();
     await expect(page.locator('.ai-message')).toContainText('端末・閲覧・手動投稿は利用できます');
     await command(page, 'J MITI', 'MITI / 未知の世界');
@@ -319,8 +318,9 @@ test('real WebLLM cache probe detects missing manifest, partial shards, complete
   const external: string[] = [];
   page.on('request', (request) => { if (!request.url().startsWith('http://127.0.0.1:')) external.push(request.url()); });
   await page.goto('http://127.0.0.1:14374');
-  await page.locator('.ai-controls summary').click();
+  await openSettings(page, 'ai');
   await expect(page.locator('.ai-cache-status')).toContainText('未確認');
+  await openSettings(page, 'ai');
   await page.locator('.ai-cache-check').click();
   await expect(page.locator('.ai-cache-status')).toContainText('未保存または不完全');
   const modelUrl = prebuiltAppConfig.model_list.find((row) => row.model_id === 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC')!.model;
@@ -331,18 +331,24 @@ test('real WebLLM cache probe detects missing manifest, partial shards, complete
     await cache.put(`${base}test-shard-0.bin`, new Response('synthetic test data, not weights'));
     return base;
   }, modelUrl);
+  await openSettings(page, 'ai');
   await page.locator('.ai-cache-check').click();
   await expect(page.locator('.ai-cache-status')).toContainText('未保存または不完全');
   await page.evaluate(async (base) => { await (await caches.open('webllm/model')).put(`${base}test-shard-1.bin`, new Response('synthetic test data')); }, modelBase);
+  await openSettings(page, 'ai');
   await page.locator('.ai-cache-check').click();
   await expect(page.locator('.ai-cache-status')).toContainText('保存済み');
   await expect(page.locator('.ai-cache-status')).toContainText('欠落や削除');
+  await openSettings(page, 'ai');
   await page.locator('.ai-model').selectOption('Qwen2.5-1.5B-Instruct-q4f16_1-MLC');
   await expect(page.locator('.ai-cache-status')).toContainText('未確認');
+  await openSettings(page, 'ai');
   await page.locator('.ai-cache-check').click();
   await expect(page.locator('.ai-cache-status')).toContainText('未保存または不完全');
+  await openSettings(page, 'ai');
   await page.locator('.ai-model').selectOption('Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
   await page.evaluate(async (base) => { await (await caches.open('webllm/model')).delete(`${base}test-shard-0.bin`); }, modelBase);
+  await openSettings(page, 'ai');
   await page.locator('.ai-cache-check').click();
   await expect(page.locator('.ai-cache-status')).toContainText('未保存または不完全');
   expect(external).toEqual([]);

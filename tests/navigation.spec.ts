@@ -5,7 +5,7 @@ import { PcvanController } from '../src/navigation';
 
 const { miti } = sigEvidence;
 
-test('MAIN renders the entire fixture, provenance, two numbered columns, and X/Q', () => {
+test('MAIN renders the entire menu with two numbered columns and X/Q', () => {
   const controller = new PcvanController();
   const output = controller.welcome.join('\n');
   expect(mainMenu.entries.map((entry) => entry.selector)).toEqual([
@@ -14,9 +14,6 @@ test('MAIN renders the entire fixture, provenance, two numbered columns, and X/Q
   for (const entry of mainMenu.entries) {
     expect(output).toContain(`${entry.selector.padStart(2)} ${entry.label}`);
   }
-  expect(output).toContain(`[${mainMenu.evidence_category} / ${mainMenu.status}]`);
-  expect(output).toContain(mainMenu.source_url);
-  expect(output).toContain('1997年全期間のメニューとしては未確認');
   // The first ten rows have two intact, ordered numbered entries; row 11
   // contains the unpaired item. X/Q are separate from the numbered columns.
   const rows = controller.welcome.filter((line) => /^\s*\d+ /.test(line));
@@ -38,8 +35,6 @@ for (const entry of mainMenu.entries) {
     expect(result).toContain(`${entry.selector} ${entry.label}`);
     if (entry.selector === '13') {
       expect(controller.screen).toBe('communication');
-      expect(result).toContain('[D / reconstructed]');
-      expect(result).toContain('実際のサブメニュー項目・プロンプトは未確認');
     } else if (entry.selector === 'Q') {
       expect(controller.screen).toBe('disconnected');
       expect(result).toContain('RECONNECT');
@@ -58,20 +53,17 @@ test('the documented MITI sequence uses each screen’s own numeric mapping', ()
     const output = controller.submit(step.input).join('\n');
     expect(controller.screen).toBe(['miti', 'miti-forums', 'miti-materials'][index]);
     expect(output).toContain(`MITI / ${step.destination}`);
-    expect(output).toContain(step.source_url);
-    expect(output).toContain('[B / verified]');
-    expect(output).toContain('[D / reconstructed]');
   }
   expect(controller.submit('9').join('\n')).toContain('この画面では使えない');
   expect(controller.screen).toBe('miti-materials');
 });
 
-test('Communication has a clearly invented bridge, and MAIN is an explicit return helper', () => {
+test('Communication bridge and MAIN return helper preserve routing', () => {
   const controller = new PcvanController();
   expect(controller.submit('1').join('\n')).toContain('電子メール');
   expect(controller.screen).toBe('main');
   controller.submit('13');
-  expect(controller.submit('HELP').join('\n')).toContain('史実の番号ではありません');
+  expect(controller.submit('HELP').join('\n')).toContain('1 未知の世界');
   controller.submit('1');
   expect(controller.screen).toBe('miti');
   expect(controller.submit('MAIN')).toEqual(controller.welcome);
@@ -135,7 +127,7 @@ test('browser navigation stays local through the route, errors, disconnect, and 
     expect(page.url()).toBe(initialUrl);
   };
   await page.context().setOffline(true);
-  await send('13', '史実の番号ではありません');
+  await send('13', '1 未知の世界');
   await send('1', 'MITI / 未知の世界');
   await send('Q', 'この画面では使えない');
   await send('3', 'MITI / フォーラム');
@@ -147,8 +139,8 @@ test('browser navigation stays local through the route, errors, disconnect, and 
   await send('MAIN', mainMenu.prompt.text);
   await send('Q', '接続を終了しました');
   await send('J MITI', '接続は終了しています');
-  await send('RECONNECT', 'シミュレーション接続中');
+  await send('RECONNECT', 'PC-VAN 接続中');
   await page.getByRole('button', { name: '接続演出をスキップ' }).click();
-  expect((await output.textContent())!.split('> RECONNECT')[1]).toContain('MAIN（1996年頃');
+  expect((await output.textContent())!.split('> RECONNECT')[1]).toContain('MAIN');
   expect(navigations).toEqual([]);
 });

@@ -4,6 +4,14 @@ import type { Backup, Post } from './storage/schema';
 import { ACTIVE_MEMBER_SETTING } from './storage/repository';
 
 export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'readStates'>>;
+// Reader copy omits explanatory paragraphs; the original fiction and all evidence
+// metadata remain intact in the fixture linked from Settings → About.
+const demoReading: Record<string, { title: string; body: string }> = {
+  'demo-miti-1': { title: '空想観察ノート', body: '  架空の星を見つけたら、どんな名前を付けますか。' },
+  'demo-miti-3': { title: '資料のしおり', body: 'ここには架空の観察メモを置いています。' },
+  'demo-daisizen-1': { title: '小さな庭の便り', body: '　空想の庭に、丸い葉が一枚増えました。\n  葉の色：みどり　　風：そよそよ' },
+};
+
 export const emptyContent = (): ForumContent => ({ sigs: [], forums: [], posts: [] });
 
 export function activeHuman(content: Backup): string | undefined {
@@ -33,7 +41,7 @@ export function forumPosts(content: ForumContent, keyword: 'MITI' | 'DAISIZEN', 
   return {
     source: 'demo' as const,
     available: true,
-    posts: demoPosts.posts.filter((post) => post.forumId === `${keyword}:${boardNo}`).sort((a, b) => a.number - b.number),
+    posts: demoPosts.posts.map((post) => ({ ...post, ...demoReading[post.id] })).filter((post) => post.forumId === `${keyword}:${boardNo}`).sort((a, b) => a.number - b.number),
   };
 }
 

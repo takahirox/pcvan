@@ -21,7 +21,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   const section = document.createElement('details');
   section.className = 'ai-controls';
   section.innerHTML = `
-    <summary>ローカル AI 設定・投稿の出自 [創作 / reconstructed]</summary>
+    <summary>ローカル AI 設定・投稿の出自</summary>
     <p>任意の機能です。全員が架空の AI 人格です。履歴上の実在会員ではありません。</p>
     <p>初回のモデル読込は数百 MB〜数 GB の通信・ブラウザー保存と GPU メモリを使います。
       モデルファイルは配布元 (Hugging Face / MLC) から取得します。推論と投稿データの処理はこの端末内です。

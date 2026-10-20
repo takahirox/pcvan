@@ -33,7 +33,7 @@ draft remain in memory.
   does not claim to reproduce the unknown 1996 login greeting.
 - Enter submits the command; Japanese IME composition confirmation is guarded
   against submission. MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`.
-- MAIN `13` opens a visibly reconstructed Communication bridge: its convenience
+- MAIN `13` opens a Communication bridge: its convenience
   selectors `1` and `2` lead to MITI and DAISIZEN; neither is a historical submenu
   number. Other MAIN entries except `Q` remain safe, unimplemented selections
   that report their fixture labels without changing screens.
@@ -42,8 +42,8 @@ draft remain in memory.
   screens/prompts are reconstructed, not complete SIG menus. 資料室 lists posts.
   Numbers apply only to the current screen. Unknown commands preserve state.
 - Reach DAISIZEN with `13` → `2` → `FORUMS`, then select `1`–`7`.
-  Its archived section names and seven numbered boards retain their provisional
-  evidence labels: their applicability to 1996–1997 is unresolved. The bridge,
+  Its archived section names and seven numbered boards retain provisional
+  evidence metadata in Settings and fixtures: their applicability to 1996–1997 is unresolved. The bridge,
   `FORUMS`, number selection behavior, and prompts are reconstructed. The archive
   guide names the jump code DAISIZEN but does not show the exact `J DAISIZEN`
   input/context; that command remains unsupported.
@@ -56,7 +56,7 @@ draft remain in memory.
   subsystem is implemented. Unsupported input preserves the notice and local
   content. See the [service evidence and decision](docs/research/pcvan-1996-1997.md#olt-mail-library-and-related-services-issue-13).
 - Within a forum, `LIST` shows posts in ascending post-number order and
-  `READ number` shows a header and the exact stored Japanese title/body.
+  `READ number` shows a header and the exact stored local Japanese title/body.
   `BACK` returns to the forum directory. These reading/back commands are original
   demo controls, not verified PC-VAN commands. Missing numbers leave the screen
   unchanged. Headers use UTC dates; secondary display numbers have no assigned
@@ -68,8 +68,8 @@ draft remain in memory.
   **この内容で投稿する** sends it, and **投稿をキャンセル** or Escape discards it.
   Enter in the title or Japanese IME confirmation never sends a post. Blank
   titles/bodies are rejected. Failed sends keep the draft for an explicit retry.
-  All compose prompts, confirmation controls, and reply commands are clearly
-  labeled reconstructions: the 1996–97 interactions remain unverified.
+  The About section documents compose/confirmation/reply controls as
+  reconstructions: the 1996–97 interactions remain unverified.
 - Confirmed first send creates the local SIG/board if needed, with no demo-copy
   step. Local post numbers are allocated transactionally per forum. Demo posts
   cannot receive replies. Replies show `RE#number`; when reading a reply, the
@@ -87,7 +87,7 @@ draft remain in memory.
   MAIN after disconnecting; it is a reconstructed convenience. Commands never
   navigate the browser or connect to an external service.
 - The latest login and explicit `Q` logout times appear in
-  **端末の外観・操作ガイド** below the terminal in UTC
+  **設定 / Options → 表示・速度** in UTC
   and persist locally. Opening/reloading and `RECONNECT` update login time;
   closing a tab is not recorded as a reliable logout.
 - Up/Down recall the newest 100 nonblank commands, restored after reload, and
@@ -107,10 +107,20 @@ draft remain in memory.
 
 ## Terminal appearance and output speed
 
-The terminal screen and prompt share one bezel. Secondary user, AI, backup and
-offline controls expand independently below it. **端末の外観・操作ガイド** offers
-neutral white, green phosphor and amber themes with optional static glow/scanlines.
-These are reconstructed aesthetics, not authenticated PC-VAN screenshots.
+The terminal screen and prompt fill the ordinary viewport. **設定 / Options**
+opens one accessible dialog with display/speed, member, AI, JSON backup,
+offline/storage, keyboard help and **このシステムについて / 出典・制約** groups.
+Escape or **閉じる** returns to the session without changing its draft. The post
+editor remains a separate dialog. AI progress and storage errors appear inside
+Settings; background changes add a small notification dot and accessible status.
+
+Ordinary output uses concise navigation and operational notices. About contains
+the evidence categories, source links, era limitations, invented controls,
+fictional DEMO identities and AI provenance. Original fixtures and research are
+preserved; demo reading uses short excerpts, while local posts retain their exact
+text. Display offers white, green and amber themes with optional static glow and
+scanlines, plus a compact local Japanese monospace stack. No font downloads are
+required. These are reconstructed aesthetics, not authenticated PC-VAN screens.
 
 **表示速度（シミュレーション）** offers 300/1200/2400/9600 bps and **Instant**.
 The default is 2400 bps, or Instant with reduced motion. Effects default off.
@@ -147,7 +157,7 @@ for prompt bounds, validation, caching, network use and optional hardware checks
 
 ## Local data and backups
 
-Expand **JSON バックアップ・復元** below the terminal and use
+Open **設定 / Options → JSON バックアップ・復元** and use
 **JSON バックアップを保存** to download all local data.
 Select a JSON file with **復元ファイル**, then **全データを置き換えて復元** to
 validate it and confirm replacement of the entire local world. Restore does not
@@ -318,9 +328,12 @@ fields, whitespace, gaps, empty/missing/ambiguous forums, and live restore reads
 Composition checks cover edit/review/cancel/send, blank drafts, Japanese multiline
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.
-Service checks cover all five placeholder routes, evidence tags, scoped helpers,
+Service checks cover all five placeholder routes, preserved fixture evidence, scoped helpers,
 unsupported input, return paths, offline keyboard use without network requests,
 and unchanged local content after visiting services and returning to forums.
+Immersion checks cover clean ordinary output, hidden settings, About/source discovery,
+modal focus/Escape/IME, missing-member handoff, Japanese cell widths and menu
+alignment with fallback fonts, mobile layout and text scaling.
 Connection checks cover skip/automatic completion, command cancellation, timestamp
 persistence, no network/modem API calls, bounded history with recalled edits, and
 byte-for-byte UTF-8 transcript download.

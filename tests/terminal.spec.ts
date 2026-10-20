@@ -8,7 +8,7 @@ test('starts without services and submits Japanese text as plain text with exact
   const input = page.getByRole('textbox', { name: 'コマンド' });
   const output = page.locator('.output');
   await expect(input).toBeFocused();
-  await expect(output).toContainText('MAIN（1996年頃・回顧転記／暫定）');
+  await expect(output).toContainText('MAIN');
   // No network, storage, GPU, or model service is needed after the static files load.
   await page.context().setOffline(true);
   const line = 'echo   日本語：ＡＢＣ　。、 ｶﾀｶﾅ <b>文字</b>  ';
@@ -20,7 +20,7 @@ test('starts without services and submits Japanese text as plain text with exact
   await expect(input).toBeFocused();
   await input.fill('13');
   await input.press('Enter');
-  await expect(output).toContainText('再構成の仮設ブリッジ');
+  await expect(output).toContainText('コミュニケーション');
   await input.fill('help');
   await page.getByRole('button', { name: '送信' }).click();
   await expect(output).toContainText('MAIN に戻る');

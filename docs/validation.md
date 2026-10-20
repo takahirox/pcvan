@@ -584,3 +584,52 @@ Historical fixtures and command meanings remain unchanged. Real GPU/model loadin
 physical devices, native IME, assistive technology and other browser engines were
 not tested. No deployment, push, PR, merge or GitHub comment was performed. No
 post-merge verification is required for #29.
+
+## Issue #31 immersive terminal and consolidated Settings
+
+Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+Read the current open Issue #31 through GitHub, then inspected the current controls,
+connection/navigation copy, fixtures, persistence and production browser tooling.
+
+- `npm ci`: passed, zero reported vulnerabilities.
+- `npm run build`: passed (TypeScript and production assets). The existing large
+  optional WebLLM chunk advisory remains. No font asset, CDN, dependency or model
+  download was introduced.
+- Final `npm test -- --workers=2`: **125 tests passed** (32.3 seconds), no retries.
+  Includes the production build, all earlier regression checks and six added
+  checks for clean connection/reconnect, directory/forum/article/help/service
+  output, default-hidden settings, About discovery, keyboard/pointer modal use,
+  focus return, cyclic Tab/Escape, guarded IME, member creation and a queued WRITE
+  handing focus from Settings to the separate editor. Background stubbed model
+  loading verifies visible progress, notification after closing Settings, later
+  inspection and actionable inference failure without terminal replacement.
+- Character measurements cover ASCII, spaces, full-width kanji/kana/punctuation,
+  half-width kana and MAIN's ten paired columns at 320px and 1280px widths, with
+  default, missing-font and generic monospace fallback configurations. Enlarged
+  text, horizontal scrolling and selection remain usable. These checks establish
+  metrics for the fonts available to this Chromium installation, not every OS.
+- Updated existing journeys to open/close Settings explicitly while retaining
+  posting/reply/IME, model cancellation, theme/speed/skip, transcript download,
+  old v1 preferences and JSON round-trip, data errors and real offline worker
+  coverage under `/pcvan/`. Fixtures, research documents, storage schema and
+  persistence logic are unchanged. Demo reading shows concise excerpts; About
+  identifies the fictional IDs and links to the intact original fixture.
+- Earlier runs exposed a delayed focus-return race, hidden-control assumptions
+  in the previous tests, and collapsed-details descendants being included in Tab
+  boundaries. Focus restoration is now synchronous, the editor is a sibling
+  modal, and visible controls define the Tab boundaries. A new AI failure check
+  initially tried to click a stop button that is correctly disabled after failure;
+  it now checks the enabled model-reload recovery action. Repeated unchanged
+  storage failures remain inspectable without repeating a notification already
+  read. No assertions were skipped and no automatic retries were enabled.
+- Inspected temporary Chromium screenshots at 1280×900 and 320×568 plus the About
+  overlay. The terminal fills the ordinary viewport and source explanations stay
+  inside Settings. Screenshots are inspection artifacts, not runtime assets.
+- Changed Markdown files passed balanced-fence and local link/heading-anchor
+  checks. `node --check scripts/service-worker.js`, `git diff --check` and
+  `git diff --cached --check` passed.
+
+Real GPU/model downloads, native IME, screen readers, other browser engines,
+physical devices and nostalgic feedback were not tested. No deployment, push,
+PR, merge or GitHub comment was performed. No post-merge verification is required
+for #31. See [terminal controls and limits](terminal-display.md).
