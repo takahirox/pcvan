@@ -8,6 +8,8 @@ import { ACTIVE_MEMBER_SETTING } from './storage/repository';
 import type { Backup } from './storage/schema';
 import { activeHuman, forumPosts, replyReference } from './forums';
 import { mountComposer } from './composer';
+import { mountAiControls } from './ai/controls';
+import { postInput, validateGeneration } from './ai/generation';
 import './style.css';
 
 const controller = new ConnectionController();
@@ -41,6 +43,7 @@ async function refreshContent(): Promise<Backup> {
   controller.setContent(content);
   controller.setMemberId(activeHuman(content));
   composer.refresh(content);
+  ai.refresh(content);
   return content;
 }
 let connectionTimer: ReturnType<typeof setTimeout> | undefined;
@@ -150,7 +153,19 @@ const composer = mountComposer(root, {
     try { await refreshContent(); } catch (error) { controls.reportError(error); }
   }),
 });
+const ai = mountAiControls(root, {
+  read: () => enqueue(async () => (await repository).exportBackup()),
+  save: (request, raw, modelId) => enqueue(async () => {
+    const repo = await repository;
+    const generated = validateGeneration(raw, await repo.exportBackup(), request);
+    const input = postInput(generated, modelId);
+    await repo.createAiPost(input.member, input.post);
+    // Report refresh failures separately after the committed send to avoid duplicates.
+    try { await refreshContent(); } catch (error) { controls.reportError(error); }
+  }),
+});
 const controls = mountStorageControls(root, repository, enqueue, (text) => loadHistory(async () => {
+  ai.invalidate();
   const repo = await repository;
   await repo.replaceFromJson(text, { confirmReplace: true });
   terminal.showReplyReference(null);

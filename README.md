@@ -18,9 +18,11 @@ npm run dev
 
 Open the localhost URL printed by Vite (normally `http://127.0.0.1:5173`).
 No environment variables, API keys, AI models, WebGPU, hosted database, login service,
-or telemetry are needed. There are no runtime dependencies or external font
-requests. Local content, settings, session timestamps, and command history use
-IndexedDB in this browser profile. The transcript and input draft remain in memory.
+or telemetry are needed for ordinary use. Optional local AI uses a lazily loaded
+WebLLM runtime; model downloads start only after an explicit user action. There
+are no external font requests. Local content, settings, session timestamps, and
+command history use IndexedDB in this browser profile. The transcript and input
+draft remain in memory.
 
 ## Use the terminal
 
@@ -102,6 +104,22 @@ IndexedDB in this browser profile. The transcript and input draft remain in memo
   unsubmitted input draft is excluded. Download before reloading to keep the log;
   JSON backups contain local data/history but do not contain the transcript.
 
+## Optional local AI
+
+Expand **ローカル AI 設定・投稿の出自** to inspect the three fictional AI personas
+and stored AI identities. AI starts off and requires WebGPU on HTTPS/localhost.
+First create a local board through manual posting (or restore one), select a
+model and explicitly load it. The first load downloads hundreds of MB to GB of
+model files and uses browser cache/GPU memory. Choose a persona, board and optional
+reply, generate a validated preview, then save or discard it. **AI を停止・解放**
+cancels pending AI work and unloads the model. AI does not generate menus or
+commands, and ordinary reading/manual posting remains usable when AI is unavailable.
+
+Inference stays in a browser worker, without remote inference, API keys or a
+server process. Weights are not bundled. Posts and backups preserve AI actor,
+persona and model provenance. See [local AI behavior and limitations](docs/local-ai.md)
+for prompt bounds, validation, caching, network use and optional hardware checks.
+
 ## Local data and backups
 
 Use **JSON バックアップを保存** below the terminal to download all local data.
@@ -170,6 +188,8 @@ static file hosting, with no server-side application process.
   demo fixtures, and renders headers without trimming or reflowing post text.
 - `src/composer.ts`: local human selection and the reconstructed edit/review/send
   dialog. Drafts remain in memory and are excluded from backups and command history.
+- `src/ai/`: fictional personas, bounded structured generation and validation,
+  optional settings/inspection controls and the lazy WebLLM worker adapter.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
   controls. Composition and reading use the existing v1 backup schema.
 - `tests/`: controller/session checks and browser interaction checks.

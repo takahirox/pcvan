@@ -71,3 +71,12 @@ dialog h2 { font-size: 1rem; }
 .post-preview { white-space: pre-wrap; overflow-wrap: anywhere; }
 .compose-error { color: #ffd3a1; }
 .reply-reference { padding: 0.5rem; color: inherit; }
+.ai-controls { margin-top: 0.5rem; font-size: 0.8rem; }
+.ai-controls summary { cursor: pointer; }
+.ai-controls h2 { font-size: 0.9rem; }
+.ai-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.ai-fields label { display: inline-flex; align-items: center; gap: 0.5rem; max-width: 100%; }
+.ai-fields select { max-width: 100%; min-width: 0; }
+.ai-profile { flex-basis: 100%; }
+.ai-preview { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #737373; padding: 0.5rem; }
+.ai-controls li, .ai-message { overflow-wrap: anywhere; }

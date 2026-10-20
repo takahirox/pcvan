@@ -335,3 +335,38 @@ Optional scanned-manual comparison, other browsers, native IME and screen-reader
 checks were not performed. No copyrighted source snapshots, screenshots, posts
 or software binaries were embedded. No deployment was performed; no post-merge
 verification is required for #13.
+
+## Issue #10 optional browser-local AI personas
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+The assigned checkpoint predated its merged prerequisites; fetched and merged
+`main` at `ca0f3803c9da50c7056eb8a0d1d90302e8f5f973` (PR #22, following #6/#8)
+into the assigned worktree before implementing the AI integration. Reused the
+actual v1 IndexedDB records, transactional numbering and local-board interfaces.
+
+- Added pinned `@mlc-ai/web-llm` 0.2.86 and verified both offered Qwen2.5 model
+  IDs against that package's `prebuiltAppConfig`. No model weights are bundled.
+- `npm ci`: passed, zero reported vulnerabilities.
+- `npm test -- --workers=2`: **91 tests passed**, no retries, including the
+  TypeScript/Vite production build. Ten new AI tests cover bounded persona/SIG/
+  recent-local-post prompts, strict structured validation, atomic AI identity and
+  post creation/rollback, backup round-tripping, explicit lazy loading, selectable
+  models/personas, preview/save/discard, stale reply rejection, cancellation and
+  restore, offline/inference failures, unsupported WebGPU and ordinary terminal/
+  manual posting after AI failures. The real adapter's worker protocol is tested
+  with a mocked transport, including progress, JSON schema requests, truncation,
+  cancellation and worker failure. No test loads weights or needs a real GPU.
+- Earlier new-test runs caught escaped-newline and MessageEvent errors in the
+  mocks, incorrect command locators and test reply targets with existing children.
+  Corrected the tests before the final passing suite; no assertions were waived.
+- Vite reports its large-chunk advisory for the optional WebLLM runtime/worker
+  (about 6 MB each). The ordinary entry JS is about 60 KB; a production browser
+  check confirms the AI assets are not requested on ordinary unsupported use.
+- Reviewed the Issue-specific diff, local documentation links and staged
+  whitespace checks. Historical fixtures, menu definitions and command semantics
+  are unchanged by the AI implementation. See [the AI contract](local-ai.md).
+
+Optional real WebGPU/model-load and Japanese-quality evaluation was not performed;
+GPU compatibility, available VRAM, caching and generated prose quality vary by
+hardware/model. Other-browser and manual screen-reader checks were not performed.
+No deployment was performed. No post-merge verification is required for #10.
