@@ -236,6 +236,12 @@ npx playwright install chromium
 npm test
 ```
 
+For the connected MAIN → MITI → reading → human post/reply → reload and backup
+journeys, plus mocked production AI recovery/failure checks, run
+`npm run test:e2e`. See the [E2E evidence checklist](docs/e2e.md) for acceptance
+coverage, isolated-profile behavior and historical/hardware limitations. These
+tests need no backend, API key, real GPU or model download.
+
 `npm test` builds the application, starts a local preview, and runs Playwright
 against the production assets. Tests cover exact Japanese output and whitespace,
 literal HTML, submission/focus, history/drafts, simulated IME events, keyboard

@@ -461,3 +461,48 @@ load safeguards; preserved both Issues' validation records.
   `git diff --cached --check`: passed.
 - The existing Vite advisory for large optional WebLLM chunks remains. No model
   weights were downloaded; no real GPU, deployment or publication was used.
+
+## Issue #14 connected browser journeys
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+Read Issue #14 and its current readiness confirmation through GitHub. Verified
+the assigned checkpoint includes both final prerequisite merges, #11 at
+`71012713a61970d1f6628d80453ef52b642ef29e` and #12 at
+`b78f2748f727e7de793dde3689dc3013467dab39`. Reused the existing Playwright setup;
+no dependencies, production behavior or historical fixtures were changed.
+
+- `npm ci`: passed, zero reported vulnerabilities. The initial test command
+  before installation stopped with `playwright: command not found`; installation
+  resolved it. Chromium was already available, so no browser installation command
+  was needed or executed during this work.
+- `npm run test:e2e -- --workers=2`: **5 tests passed** (12.9 seconds), no retries.
+  Each journey runs against production assets with real IndexedDB and UI-driven
+  setup/backup/restore. Only the AI worker transport and WebGPU capability are
+  mocked; the production adapter, validation and persistence remain active.
+- `npm test -- --workers=2`: **112 tests passed** (27.9 seconds), no retries,
+  including the final journey assertions, TypeScript check and Vite production
+  build. Covers MAIN mappings, keyboard/errors, historical evidence boundaries,
+  offline posting/replies/read markers/reloads/JSON round-trip, unsupported WebGPU,
+  production AI recovery without duplicates and manual use after AI failures,
+  alongside all existing regression tests. No model weights were downloaded.
+- Earlier targeted runs exposed test assumptions: connection completion can
+  render MAIN before HELP, opening the editor moves focus to its title input,
+  and reply previews include the parent number. The next run caught a clock
+  race: visible logout output precedes queued session writes. The recovery
+  journey now waits for the UI backup queue to finish logout at the old time
+  before advancing the test clock. All corrections were to tests; no assertions
+  were skipped or retries enabled. The final full run passed after these fixes.
+- The existing Vite advisory for the large optional WebLLM chunks remains.
+  Ordinary unsupported/manual use requests no AI assets; request assertions
+  allow only local static GETs and reject backend/external request attempts.
+- Reviewed the Issue-specific diff, checked local Markdown links/anchors in the
+  changed documentation, and passed `git diff --cached --check`.
+
+The [E2E checklist](e2e.md) maps every acceptance criterion to repeatable evidence
+and records provisional visual/era details. Real GPU/model loading, real-weight
+cache reuse and Japanese generation-quality checks were not performed. Other
+browser engines, native IME, assistive technology and physical devices were not
+tested here. Former-user nostalgic review remains optional and was not performed.
+Tab closure recovery is tested; OS/browser-crash durability and real eviction
+are not established. No deployment was performed. No post-merge verification is
+required for #14.

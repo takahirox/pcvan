@@ -10,7 +10,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build --base=./",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:e2e": "playwright test tests/journey.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
