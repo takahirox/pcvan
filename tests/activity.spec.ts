@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import type { Backup } from '../src/storage/schema';
+import type { AiActivity, Backup } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
 
 const from = '2026-10-21T00:00:00.000Z';
@@ -170,6 +170,37 @@ async function snapshot(page: Page): Promise<Backup> {
     try { return await repo.exportBackup(); } finally { repo.close(); }
   });
 }
+
+test('queued HELP preserves the reconnect backlog and completes while inference is pending', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(threeDays));
+  await mockModel(page);
+  await page.goto('http://127.0.0.1:14374');
+  await expect(page.locator('.ai-activity-message')).toContainText('無効');
+  const command = page.getByRole('textbox', { name: 'コマンド', exact: true });
+  await command.fill('Q'); await command.press('Enter');
+  await expect.poll(async () => (await snapshot(page)).session?.commandHistory.at(-1)).toBe('Q');
+  await seed(page); // Enabled cap of three with a 72-hour-old watermark.
+  await page.evaluate(() => {
+    window.activityMock.mode = 'wait';
+    const input = document.querySelector<HTMLInputElement>('#command')!;
+    const form = document.querySelector<HTMLFormElement>('.command-form')!;
+    for (const line of ['RECONNECT', 'HELP']) {
+      input.value = line;
+      form.requestSubmit();
+    }
+  });
+  // Persisting HELP proves command processing is not waiting for generation.
+  await expect.poll(async () => (await snapshot(page)).session?.commandHistory.slice(-2)).toEqual(['RECONNECT', 'HELP']);
+  const pending = await snapshot(page);
+  const activity = pending.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity;
+  expect(activity.batch?.runs).toHaveLength(3);
+  expect(pending.posts.filter((post) => post.simulation)).toHaveLength(0);
+  await expect.poll(() => page.evaluate(() => window.activityMock.calls)).toBe(1);
+  await page.evaluate(() => { window.activityMock.mode = 'ok'; window.activityMock.release?.(); });
+  await expect(page.locator('.ai-activity-message')).toContainText('3/3');
+  expect((await snapshot(page)).posts.filter((post) => post.simulation)).toHaveLength(3);
+  expect(await page.evaluate(() => window.activityMock.calls)).toBe(3);
+});
 
 test('opt-in persists; reopening generates a bounded backlog with fictional time inspection', async ({ page }) => {
   await page.clock.setFixedTime(new Date(threeDays));

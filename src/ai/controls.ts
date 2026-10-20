@@ -262,11 +262,11 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   });
 
   return {
-    async openActivity() {
+    async openActivity(planned?: AiActivity) {
       if (!actions.activity || activityBusy || operation) return;
       budget.attempts = budget.committed = 0;
       const before = revision;
-      const state = await actions.activity.openActivity();
+      const state = planned ?? await actions.activity.openActivity();
       if (revision !== before) return;
       showActivity(state);
       if (state.maxPosts && models.some((row) => row.id === (state.batch?.modelId ?? state.modelId))) {
