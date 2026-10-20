@@ -1,4 +1,4 @@
-import { demoController } from './controller';
+import { PcvanController } from './navigation';
 import { TerminalSession } from './session';
 import { mountTerminal } from './terminal';
 import { openRepository } from './storage/repository';
@@ -6,7 +6,7 @@ import type { Session } from './storage/repository';
 import { mountStorageControls } from './storage/controls';
 import './style.css';
 
-const session = new TerminalSession(demoController);
+const session = new TerminalSession(new PcvanController());
 const root = document.querySelector<HTMLElement>('#app')!;
 const repository = openRepository();
 // Serialize startup, command persistence and backups/restores. The controller stays

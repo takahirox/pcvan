@@ -30,7 +30,7 @@ to refresh any in-memory views. Concurrent writes in other tabs are serialized
 before or after the replacement, and writes made afterwards are new local changes.
 
 The status below these controls reports opening, validation, write, and quota
-errors. When storage is unavailable, the demo terminal still works in memory and
+errors. When storage is unavailable, the terminal still works in memory and
 reports persistence failures. A quota failure leaves export available if the
 database can still be read. There is no localStorage fallback that could silently
 split the world across storage systems.
@@ -99,9 +99,10 @@ integer counters are rejected; numbers are not wrapped.
 is not downgraded or deleted. No automatic retry or destructive recovery occurs.
 
 The shell calls `startSession()` on opening and persists submitted nonblank commands.
-The transcript and input draft remain in memory. There is no logout command yet:
-`lastLogoutAt` stays `null` until a controller calls `endSession()`, or retains the
-imported value. A browser tab close is not recorded as a reliable logout event.
+The transcript and input draft remain in memory. The navigation controller's
+simulated disconnect does not call `endSession()`; `lastLogoutAt` stays `null`
+until a caller invokes it, or retains the imported value. A browser tab close is
+not recorded as a reliable logout event.
 Command rendering remains immediate; writes, backup and restore are queued in
 this tab. Repository methods perform no external awaits inside transactions; see
 [the IndexedDB transaction lifecycle](https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction).
