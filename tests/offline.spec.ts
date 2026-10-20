@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { backupFixture } from './backup-fixture';
 import { prebuiltAppConfig } from '@mlc-ai/web-llm';
@@ -93,6 +93,60 @@ async function command(page: Page, text: string, response: string) {
   await input.fill(text); await input.press('Enter');
   await expect.poll(async () => (await page.locator('.output').textContent())!.slice(length)).toContain(response);
 }
+
+test('production assets and opt-in service worker resolve under /pcvan/', async ({ page, context, request }) => {
+  const site = await deployment();
+  const base = `${site.origin}/pcvan/`;
+  const requests: string[] = [];
+  const failures: string[] = [];
+  context.on('request', (row) => requests.push(row.url()));
+  context.on('requestfailed', (row) => failures.push(row.url()));
+  page.on('pageerror', (error) => failures.push(error.message));
+  // Fail closed if this smoke check ever tries to fetch models or other hosts.
+  await context.route('**/*', (route) => route.request().url().startsWith(base)
+    ? route.continue() : route.abort());
+  try {
+    await page.goto(base);
+    await expect(page.getByRole('textbox', { name: 'コマンド', exact: true })).toBeVisible();
+    const entryUrls = await page.locator('script[src], link[rel="stylesheet"]').evaluateAll((nodes) =>
+      nodes.map((node) => node instanceof HTMLScriptElement ? node.src : (node as HTMLLinkElement).href));
+    expect(entryUrls.length).toBeGreaterThanOrEqual(2);
+    for (const url of entryUrls) {
+      expect(url.startsWith(`${base}assets/`)).toBe(true);
+      expect(requests).toContain(url);
+    }
+    expect(requests.some((url) => /webllm/.test(url))).toBe(false);
+    expect(await page.evaluate(() => navigator.serviceWorker.getRegistrations().then((rows) => rows.length))).toBe(0);
+
+    // Check every emitted asset, including lazy runtime chunks and the AI worker,
+    // against its bytes on disk so an HTML fallback cannot hide a missing file.
+    const assets = await readdir('dist/assets');
+    expect(assets.some((name) => name.startsWith('webllm-adapter-'))).toBe(true);
+    expect(assets.some((name) => name.startsWith('webllm-worker-'))).toBe(true);
+    for (const name of assets) {
+      const response = await request.get(`${base}assets/${name}`);
+      expect(response.status(), name).toBe(200);
+      expect(await response.body(), name).toEqual(await readFile(resolve('dist/assets', name)));
+      if (name.endsWith('.js')) expect(response.headers()['content-type']).toContain('javascript');
+      if (name.endsWith('.css')) expect(response.headers()['content-type']).toContain('text/css');
+    }
+
+    // Exercise the real dynamic import without loading a model or needing WebGPU.
+    await page.locator('.ai-controls summary').click();
+    await page.locator('.ai-cache-check').click();
+    await expect(page.locator('.ai-cache-status')).toContainText('未保存または不完全');
+    expect(requests.some((url) => url.startsWith(`${base}assets/webllm-adapter-`))).toBe(true);
+    await saveShell(page);
+    const registration = await page.evaluate(async () => {
+      const row = (await navigator.serviceWorker.getRegistration())!;
+      return { scope: row.scope, script: row.active!.scriptURL,
+        rootControlled: !!await navigator.serviceWorker.getRegistration(new URL('/', location.href).href) };
+    });
+    expect(registration).toEqual({ scope: base, script: `${base}sw.js`, rootControlled: false });
+    expect(requests.every((url) => url.startsWith(base))).toBe(true);
+    expect(failures).toEqual([]);
+  } finally { await page.close(); await site.close(); }
+});
 
 test('opt-in minimal shell reloads offline on a subpath; missing AI leaves local reading, posting, backup and restore usable', async ({ page, context }) => {
   const site = await deployment();
