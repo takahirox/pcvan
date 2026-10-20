@@ -43,7 +43,16 @@ IndexedDB in this browser profile. The transcript and input draft remain in memo
   Its archived section names and seven numbered boards retain their provisional
   evidence labels: their applicability to 1996–1997 is unresolved. The bridge,
   `FORUMS`, number selection behavior, and prompts are reconstructed. The archive
-  does not establish `J DAISIZEN`; that command remains unsupported.
+  guide names the jump code DAISIZEN but does not show the exact `J DAISIZEN`
+  input/context; that command remains unsupported.
+- At the DAISIZEN directory, `MAIL`, `LIBRARY`, `OLT`, `OSL`, and `CONFERENCE`
+  open service-specific unavailable notices for 電子メール, ライブラリィ,
+  ＯＬＴ（＊）, ＯＳＬ, and 電子会議室. These helpers and notice screens are
+  explicitly reconstructed (D); the historical names remain provisional (B).
+  `HELP` repeats the notice, `BACK` returns to the SIG, and `MAIN` returns to
+  MAIN. No reliable service command sequence was found, so no mail/chat/transfer
+  subsystem is implemented. Unsupported input preserves the notice and local
+  content. See the [service evidence and decision](docs/research/pcvan-1996-1997.md#olt-mail-library-and-related-services-issue-13).
 - Within a forum, `LIST` shows posts in ascending post-number order and
   `READ number` shows a header and the exact stored Japanese title/body.
   `BACK` returns to the forum directory. These reading/back commands are original
@@ -167,6 +176,9 @@ MITI steps, reconstructed Communication bridge, screen-scoped numbers, invalid
 commands/jumps, disconnect/reconnect, and absence of browser navigation.
 Forum checks cover all seven DAISIZEN boards, MITI reading, optional header
 fields, whitespace, gaps, empty/missing/ambiguous forums, and live restore reads.
+Service checks cover all five placeholder routes, evidence tags, scoped helpers,
+unsupported input, return paths, offline keyboard use without network requests,
+and unchanged local content after visiting services and returning to forums.
 Connection checks cover skip/automatic completion, command cancellation, timestamp
 persistence, no network/modem API calls, bounded history with recalled edits, and
 byte-for-byte UTF-8 transcript download.

@@ -64,9 +64,11 @@ test('keyboard scrollback keeps the input draft and allows returning through Tab
   const input = page.getByRole('textbox', { name: 'コマンド' });
   const log = page.getByRole('log');
   for (let i = 0; i < 12; i += 1) {
-    await input.fill('demo');
+    await input.fill(`demo ${i}`);
     await input.press('Enter');
   }
+  // Input echo is immediate; wait for the serialized response before scrolling.
+  await expect(page.locator('.output')).toContainText('> demo 11\nこの画面では使えないコマンドです。');
   const bottom = await log.evaluate((element) => element.scrollTop);
   expect(bottom).toBeGreaterThan(0);
   await input.fill('unfinished');
