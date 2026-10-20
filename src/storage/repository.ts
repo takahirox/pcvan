@@ -2,6 +2,7 @@ import {
   invalid, RepositoryError, stores, validateBackup, validateRecord, validateSession,
 } from './schema';
 import type { Backup, Forum, Key, NewPost, Post, Records, Session, Store } from './schema';
+import { COMMAND_HISTORY_LIMIT } from '../history';
 
 export * from './schema';
 export const DATABASE_NAME = 'pcvan-local';
@@ -218,7 +219,10 @@ export class LocalRepository {
   }
 
   startSession(): Promise<Session> {
-    return this.changeSession((session) => { session.lastLoginAt = new Date().toISOString(); });
+    return this.changeSession((session) => {
+      session.lastLoginAt = new Date().toISOString();
+      session.commandHistory = session.commandHistory.filter((line) => line.trim()).slice(-COMMAND_HISTORY_LIMIT);
+    });
   }
 
   endSession(): Promise<Session> {
@@ -226,7 +230,10 @@ export class LocalRepository {
   }
 
   recordCommand(line: string): Promise<Session> {
-    return this.changeSession((session) => { session.commandHistory.push(line); });
+    return this.changeSession((session) => {
+      if (line.trim()) session.commandHistory.push(line);
+      session.commandHistory = session.commandHistory.filter((entry) => entry.trim()).slice(-COMMAND_HISTORY_LIMIT);
+    });
   }
 
   exportBackup(): Promise<Backup> {

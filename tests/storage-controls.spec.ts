@@ -55,6 +55,38 @@ test('restore requires confirmation; confirmed replace preserves every field and
   expect(reloaded.settings).toEqual(fixture.settings);
 });
 
+test('reload bounds a restored history and keeps recalled edits separate from persisted commands', async ({ page }) => {
+  await page.goto('/');
+  const fixture = backupFixture();
+  fixture.session!.commandHistory = Array.from({ length: 105 }, (_, i) => `履歴 ${i}`);
+  await page.getByLabel('復元ファイル').setInputFiles({
+    name: 'history.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)),
+  });
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
+  await expect(page.getByRole('status')).toContainText('バックアップを復元しました。');
+  await page.reload();
+  const saved = (await downloadBackup(page)).session.commandHistory;
+  expect(saved).toEqual(fixture.session!.commandHistory.slice(-100));
+  const input = page.getByRole('textbox', { name: 'コマンド' });
+  await input.fill('未送信の下書き');
+  await input.press('ArrowUp');
+  await expect(input).toHaveValue('履歴 104');
+  await input.fill('編集中の履歴');
+  await input.press('ArrowUp');
+  await expect(input).toHaveValue('履歴 103');
+  await input.press('ArrowDown');
+  await expect(input).toHaveValue('編集中の履歴');
+  await input.press('ArrowDown');
+  await expect(input).toHaveValue('未送信の下書き');
+  // Exercise the actual keyboard handler beyond the oldest retained command.
+  await input.evaluate((element) => {
+    for (let i = 0; i < 110; i++) element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+  });
+  await expect(input).toHaveValue('履歴 5');
+  expect((await downloadBackup(page)).session.commandHistory).toEqual(saved);
+});
+
 test('invalid restore displays an error and does not change existing data', async ({ page }) => {
   await page.goto('/');
   const before = await downloadBackup(page);

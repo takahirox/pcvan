@@ -202,6 +202,21 @@ test('session operations persist timestamps and concurrent history appends', asy
   expect(result.cleared).toBeNull();
 });
 
+test('history retains the newest 100 commands on startup and on concurrent appends', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    await window.repo.setSession({ lastLoginAt: null, lastLogoutAt: null,
+      commandHistory: Array.from({ length: 120 }, (_, i) => `command ${i}`) });
+    const started = await window.repo.startSession();
+    await Promise.all([window.repo.recordCommand('new one'), window.repo.recordCommand('new two')]);
+    await window.repo.recordCommand('   ');
+    return { started, saved: await window.repo.getSession() };
+  });
+  expect(result.started.commandHistory).toEqual(Array.from({ length: 100 }, (_, i) => `command ${i + 20}`));
+  expect(result.saved?.commandHistory).toEqual([
+    ...Array.from({ length: 98 }, (_, i) => `command ${i + 22}`), 'new one', 'new two',
+  ]);
+});
+
 test('a failed counter write rolls back an already inserted post', async ({ page }) => {
   const fixture = backupFixture();
   await page.evaluate((data) => window.repo.replaceFromJson(JSON.stringify(data), { confirmReplace: true }), fixture);
