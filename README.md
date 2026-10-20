@@ -50,6 +50,24 @@ IndexedDB in this browser profile. The transcript and input draft remain in memo
   demo controls, not verified PC-VAN commands. Missing numbers leave the screen
   unchanged. Headers use UTC dates; secondary display numbers have no assigned
   meaning, and the uncertain historical line-count field is omitted.
+- Create a local human with **新しいハンドル** → **人間の利用者を作成**, or select
+  an existing human under **ローカル利用者**. In a forum, `WRITE` opens a title and
+  multiline body editor; `REPLY number` prefills `RE#number` and retains the
+  referenced post ID. **内容を確認** reviews the exact text; **編集に戻る** edits it,
+  **この内容で投稿する** sends it, and **投稿をキャンセル** or Escape discards it.
+  Enter in the title or Japanese IME confirmation never sends a post. Blank
+  titles/bodies are rejected. Failed sends keep the draft for an explicit retry.
+  All compose prompts, confirmation controls, and reply commands are clearly
+  labeled reconstructions: the 1996–97 interactions remain unverified.
+- Confirmed first send creates the local SIG/board if needed, with no demo-copy
+  step. Local post numbers are allocated transactionally per forum. Demo posts
+  cannot receive replies. Replies show `RE#number`; when reading a reply, the
+  **返信先 RE#number を読む** link reads the referenced local post.
+- Local lists show **未読** / **既読** for the selected human. Reading advances
+  that member/forum's saved highest read number; lower-numbered posts are then
+  considered read, including when reading out of order. Reading an older post
+  never moves the marker backwards. Selection and markers survive reload and
+  JSON backup/restore. Demo reading does not create read markers.
 - `HELP` redisplays the active screen; `MAIN` returns from all connected submenus
   and forums. These helpers, case-insensitive input, and whitespace tolerance are
   explicitly reconstructed conveniences. No ECOM or generic BBS shortcuts are
@@ -95,8 +113,8 @@ Existing stored SIGs take precedence over demos, including empty or missing
 boards. Ambiguous mappings are reported without choosing arbitrary content.
 Other local SIGs/boards are outside this historical directory. The app reads a
 consistent repository snapshot before forum commands, including after restores;
-read failures are reported without displaying stale posts. Reading does not
-change stored posts or read-state records. See the
+read failures are reported without displaying stale posts. Reading local posts
+updates the selected human's read marker without changing the posts. See the
 [forum implementation notes](docs/local-storage.md#forum-reading).
 
 Data persists across reloads but browser retention is not guaranteed.
@@ -141,9 +159,10 @@ static file hosting, with no server-side application process.
   to the terminal.
 - `src/forums.ts`: resolves evidence-backed boards to repository posts or original
   demo fixtures, and renders headers without trimming or reflowing post text.
+- `src/composer.ts`: local human selection and the reconstructed edit/review/send
+  dialog. Drafts remain in memory and are excluded from backups and command history.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
-  controls. Content creation currently uses the repository API; SIG/forum reading
-  uses those stored posts without changing the backup schema.
+  controls. Composition and reading use the existing v1 backup schema.
 - `tests/`: controller/session checks and browser interaction checks.
 
 ## Validation
@@ -167,6 +186,9 @@ MITI steps, reconstructed Communication bridge, screen-scoped numbers, invalid
 commands/jumps, disconnect/reconnect, and absence of browser navigation.
 Forum checks cover all seven DAISIZEN boards, MITI reading, optional header
 fields, whitespace, gaps, empty/missing/ambiguous forums, and live restore reads.
+Composition checks cover edit/review/cancel/send, blank drafts, Japanese multiline
+text, reply navigation and missing parents, transactional initialization/numbering,
+failed writes, and read markers across members, forums, connections and reloads.
 Connection checks cover skip/automatic completion, command cancellation, timestamp
 persistence, no network/modem API calls, bounded history with recalled edits, and
 byte-for-byte UTF-8 transcript download.

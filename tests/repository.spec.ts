@@ -248,3 +248,83 @@ test('version changes close old connections so an upgrade can finish', async ({ 
   });
   expect(result).toBe('storage');
 });
+
+test('concurrent first sends initialize one local board and allocate distinct numbers', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const member = await window.repo.createHumanMember('日本語の人');
+    const other = await window.repositoryModule.openRepository('test-world');
+    const destination = { keyword: 'MITI' as const, boardNo: 9, name: '資料室' };
+    const draft = { authorId: member.id, title: '投稿', body: '複数行\n本文', origin: 'local-human' };
+    try {
+      const posts = await Promise.all([window.repo.createForumPost(destination, draft), other.createForumPost(destination, draft)]);
+      const separate = await other.createForumPost({ keyword: 'DAISIZEN', boardNo: 1, name: '自然の森' }, draft);
+      return { member, posts, separate, backup: await window.repo.exportBackup() };
+    } finally { other.close(); }
+  });
+  expect(result.posts.map((post) => post.number).sort()).toEqual([1, 2]);
+  expect(new Set(result.posts.map((post) => post.id)).size).toBe(2);
+  expect(result.posts[0]!.forumId).toBe(result.posts[1]!.forumId);
+  expect(result.separate.number).toBe(1);
+  expect(result.backup.sigs).toHaveLength(2);
+  expect(result.backup.forums).toHaveLength(2);
+  expect(result.backup.settings).toContainEqual({ id: 'active-human-member', value: result.member.id });
+});
+
+test('invalid compose targets, blank drafts and AI authors leave all content unchanged', async ({ page }) => {
+  const fixture = backupFixture();
+  fixture.sigs[0]!.keyword = 'MITI';
+  fixture.forums[0]!.boardNo = 9;
+  await page.evaluate((data) => window.repo.replaceFromJson(JSON.stringify(data), { confirmReplace: true }), fixture);
+  const errors = await page.evaluate(async () => {
+    const target = { keyword: 'MITI' as const, boardNo: 9, name: '資料室' };
+    const draft = { authorId: 'human', title: '返事', body: '本文', origin: 'local-human' };
+    const attempts = [
+      () => window.repo.createForumPost(target, { ...draft, replyToPostId: 'missing' }),
+      () => window.repo.createForumPost(target, { ...draft, replyToPostId: 'third' }),
+      () => window.repo.createForumPost(target, { ...draft, authorId: 'ai' }),
+      () => window.repo.createForumPost(target, { ...draft, authorId: 'missing' }),
+      () => window.repo.createForumPost(target, { ...draft, title: '　 ' }),
+      () => window.repo.createForumPost(target, { ...draft, body: '\n ' }),
+      // Creating a new SIG/board must also roll back if its reply target is invalid.
+      () => window.repo.createForumPost({ keyword: 'DAISIZEN', boardNo: 1, name: '自然の森' }, { ...draft, replyToPostId: 'missing' }),
+    ];
+    const errors: string[] = [];
+    for (const attempt of attempts) {
+      try { await attempt(); errors.push('unexpected success'); }
+      catch (error) { errors.push((error as { code: string }).code); }
+    }
+    return errors;
+  });
+  expect(errors).toEqual(Array(7).fill('validation'));
+  expect(await page.evaluate(() => window.repo.exportBackup())).toEqual(fixture);
+});
+
+test('read high-water marks are monotonic across connections; failed writes and missing posts preserve state', async ({ page }) => {
+  const fixture = backupFixture();
+  fixture.readStates = [];
+  await page.evaluate((data) => window.repo.replaceFromJson(JSON.stringify(data), { confirmReplace: true }), fixture);
+  const result = await page.evaluate(async () => {
+    const other = await window.repositoryModule.openRepository('test-world');
+    try {
+      await Promise.all([window.repo.markRead('human', 'reply'), other.markRead('human', 'first')]);
+      const before = await window.repo.exportBackup();
+      const errors: string[] = [];
+      for (const [member, post] of [['human', 'missing'], ['ai', 'first'], ['missing', 'first']]) {
+        try { await window.repo.markRead(member!, post!); errors.push('unexpected success'); }
+        catch (error) { errors.push((error as { code: string }).code); }
+      }
+      const nativePut = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (value, key) {
+        if (this.name === 'readStates') throw new DOMException('Simulated quota', 'QuotaExceededError');
+        return key === undefined ? nativePut.call(this, value) : nativePut.call(this, value, key);
+      };
+      try { await window.repo.markRead('human', 'third'); }
+      catch (error) { errors.push((error as { code: string }).code); }
+      finally { IDBObjectStore.prototype.put = nativePut; }
+      return { before, after: await window.repo.exportBackup(), errors };
+    } finally { other.close(); }
+  });
+  expect(result.before.readStates).toEqual([{ memberId: 'human', forumId: 'forum', lastReadNumber: 4 }]);
+  expect(result.errors).toEqual(['validation', 'validation', 'validation', 'quota']);
+  expect(result.after).toEqual(result.before);
+});

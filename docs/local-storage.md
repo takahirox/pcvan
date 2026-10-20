@@ -43,8 +43,9 @@ fixtures. The app supplies `PcvanController.setContent()` through the connection
 wrapper with a consistent `exportBackup()` snapshot before forum commands.
 Command responses and restores share the existing queue; input echo and history
 remain immediate. Failed reads report an error without showing cached posts;
-`MAIN` and `BACK` work without a successful content read. Reading does not mutate
-posts or read-state records.
+`MAIN` and `BACK` work without a successful content read. Reading a local post
+advances the selected human's read marker before displaying it; failed marker
+writes report an error without displaying the post. Reading never mutates posts.
 
 `src/forums.ts` maps stored SIGs by case-insensitive `keyword` (`MITI` or
 `DAISIZEN`) and stored forums by `sigId` plus `boardNo` (MITI `9`, DAISIZEN
@@ -69,6 +70,56 @@ omits it because the v1 post schema has no such field. It never derives a count
 from body lines: the historical counting rule (title, blank lines, wrapping,
 etc.) is unverified. No schema/version change is needed for reading. See the
 [header evidence and limitations](research/pcvan-1996-1997.md#synthetic-post-header-demonstration).
+
+## Composition and read tracking
+
+`WRITE` and `REPLY number` are reconstructed forum commands, not documented
+PC-VAN shortcuts. The dialog labels its prompts, review, send and cancel controls
+as reconstructed because exact 1996–97 compose interactions remain unverified.
+It preserves Japanese text and whitespace, rejects blank titles/bodies, and
+requires an explicit review followed by a send click. Title Enter and IME
+confirmation cannot submit. Cancel/Escape writes no post or board; failed sends
+retain the reviewed draft for manual retry. Drafts are never saved in backups,
+history or the transcript. Only successful sends append a receipt to the log.
+
+Users can create and select local human members below the terminal. Creation
+atomically saves a human and the `active-human-member` setting; selection saves
+that setting. Imported worlds without a valid selection use their first human
+in database key order. AI members are excluded. Without a human, local posts can
+be read without markers, and composition asks the user to create a human first.
+
+Confirmed sends resolve the board by keyword/number inside the same transaction
+as post allocation. A missing SIG or board is created there; failure rolls back
+all initialization, the new post and its number increment. Ambiguous mappings
+are rejected. Demo messages are never copied, persisted or used as reply targets.
+The first local SIG takes precedence over demo fallback for that SIG, as with
+restored SIGs. Existing board counters and arbitrary stored IDs are retained.
+
+Replies retain `replyToPostId` and prefill a `RE#number` subject. Lists and reads
+derive references from the current parent's ID, so editing the subject cannot
+sever the relationship. A separate link reads the parent within the same forum;
+there is no comment tree. The repository revalidates the parent on send, including
+when another tab deletes it while the draft is open.
+
+The v1 `lastReadNumber` is a **high-water mark**, not a set of individual opened
+posts: reading number N marks all existing numbers up to N read for that human
+and forum. `markRead()` takes the maximum inside a transaction, so older reads
+and concurrent tabs cannot move it backwards. Demo reading never changes it.
+Lists compare each number to this marker. Selection, references and read markers
+are included in existing v1 JSON backups and survive reload/restore unchanged.
+Other tabs refresh the selected human and content on their next forum command.
+
+Additional repository methods (all resolve after transaction completion):
+
+| Method | Behavior |
+| --- | --- |
+| `createHumanMember(handle)` | Save a human plus the active-member setting atomically; reject blank handles. |
+| `createForumPost({ keyword, boardNo, name }, draft)` | Resolve/create the local board and insert a nonblank human-authored draft with the same allocation path as `createPost`; the draft omits `forumId`, `id`, `number`, and `createdAt`. |
+| `markRead(memberId, postId)` | Validate a human and local post, then advance their per-forum high-water mark atomically. |
+
+Generic `createPost`/import still preserve empty titles and bodies for existing
+data compatibility; the human compose path rejects them. No schema migration or
+new dependencies are needed.
 
 ## TypeScript repository API
 

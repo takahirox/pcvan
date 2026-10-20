@@ -249,3 +249,42 @@ Input echo/history and cancellation of an active connection effect stay immediat
 
 The earlier browser/device and historical-evidence limitations remain applicable.
 No deployment was performed; no post-merge verification is required for #7.
+
+## Forum composition, replies and read tracking (#8)
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+Read Issue #8 and its readiness comments, verified that PR #18 (#6) and PR #20
+(#7) were merged, then fetched and merged `main` at
+`75b5606989d9f0e64aac8e486894b73b075af7df` into the assigned worktree. Reused
+the existing directory, v1 schema, transactional allocation and command queue.
+
+- `npm ci`: passed, with zero reported vulnerabilities.
+- `npx playwright install chromium`: passed.
+- `npm run build`: passed TypeScript checking and the static Vite build.
+- `npm test`: **73 tests passed** in Chromium, including the production build.
+  Eight added tests cover create/review/edit/cancel/Escape, Japanese multiline
+  text and exact whitespace, simulated IME confirmation, blank fields, replies
+  and clickable parent references, missing/deleted/cross-forum parents, local
+  member selection, read-state reload persistence and member/forum isolation,
+  monotonic concurrent reads, concurrent first-send initialization and numbering,
+  separate board counters, and atomic rollback with retained drafts on failure.
+  The existing navigation, offline reading, session/history, log download,
+  backup/restore and narrow-viewport checks all pass.
+- Earlier runs exposed two new test/UI issues: the new helper could match an
+  earlier identical command's output, and the member selector needed an explicit
+  label association distinct from its enclosing section. Both were corrected;
+  the final complete run passed without retries.
+- Reviewed the implementation diff, checked local documentation links/anchors,
+  and passed `git diff --cached --check` including the new files.
+
+The referenced [forum archive index](https://www.rumic.org/forum/) was accessible.
+No historical compose prompts, confirmation sequence or shortcut keys were
+inferred from it. The editor and commands are explicitly reconstructed; existing
+header evidence remains unchanged. Read tracking uses the existing per-member,
+per-forum highest read number, as disclosed in the UI and storage documentation.
+Demo messages remain read-only, outside local backups and read tracking.
+
+Optional native Japanese IME composition and manual multiline paste were not
+performed; automated composition events and exact multiline fills were checked.
+Safari/Firefox, screen-reader and physical-device testing were not performed.
+No deployment or post-merge verification is required for #8.

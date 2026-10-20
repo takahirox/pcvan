@@ -1,12 +1,14 @@
 import {
   invalid, RepositoryError, stores, validateBackup, validateRecord, validateSession,
 } from './schema';
-import type { Backup, Forum, Key, NewPost, Post, Records, Session, Store } from './schema';
+import type { Backup, Forum, Key, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
 
 export * from './schema';
 export const DATABASE_NAME = 'pcvan-local';
 export const DATABASE_VERSION = 1;
+export const ACTIVE_MEMBER_SETTING = 'active-human-member';
+export interface ForumDestination { keyword: 'MITI' | 'DAISIZEN'; boardNo: number; name: string }
 const allStores = [...stores, 'session'];
 const emptySession = (): Session => ({ lastLoginAt: null, lastLogoutAt: null, commandHistory: [] });
 
@@ -145,21 +147,72 @@ export class LocalRepository {
 
   createPost(value: NewPost): Promise<Post> {
     const input = structuredClone(value);
+    return this.transaction(allStores, 'readwrite', (tx) => this.insertPost(tx, input));
+  }
+
+  private async insertPost(tx: IDBTransaction, input: NewPost): Promise<Post> {
+    const forums = tx.objectStore('forums');
+    const forum: Forum | undefined = await request(forums.get(input.forumId));
+    if (!forum) invalid('Missing forum.');
+    if (!await request(tx.objectStore('members').get(input.authorId))) invalid('Missing author.');
+    const post: Post = { ...input, id: createRecordId(), number: forum.nextPostNumber, createdAt: new Date().toISOString() };
+    validateRecord('posts', post);
+    if (post.replyToPostId !== undefined) {
+      const parent: Post | undefined = await request(tx.objectStore('posts').get(post.replyToPostId));
+      if (!parent || parent.forumId !== post.forumId) invalid('Missing reply parent in this forum.');
+    }
+    if (forum.nextPostNumber === Number.MAX_SAFE_INTEGER) invalid('Post number limit reached.');
+    await request(tx.objectStore('posts').add(post));
+    await request(forums.put({ ...forum, nextPostNumber: forum.nextPostNumber + 1 }));
+    return post;
+  }
+
+  createHumanMember(handle: string): Promise<Member> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
-      const forums = tx.objectStore('forums');
-      const forum: Forum | undefined = await request(forums.get(input.forumId));
-      if (!forum) invalid('Missing forum.');
-      if (!await request(tx.objectStore('members').get(input.authorId))) invalid('Missing author.');
-      const post: Post = { ...input, id: createRecordId(), number: forum.nextPostNumber, createdAt: new Date().toISOString() };
-      validateRecord('posts', post);
-      if (post.replyToPostId !== undefined) {
-        const parent: Post | undefined = await request(tx.objectStore('posts').get(post.replyToPostId));
-        if (!parent || parent.forumId !== post.forumId) invalid('Missing reply parent in this forum.');
-      }
-      if (forum.nextPostNumber === Number.MAX_SAFE_INTEGER) invalid('Post number limit reached.');
-      await request(tx.objectStore('posts').add(post));
-      await request(forums.put({ ...forum, nextPostNumber: forum.nextPostNumber + 1 }));
-      return post;
+      const member: Member = { id: createRecordId(), handle, actor: 'human' };
+      validateRecord('members', member);
+      await request(tx.objectStore('members').add(member));
+      await request(tx.objectStore('settings').put({ id: ACTIVE_MEMBER_SETTING, value: member.id }));
+      return member;
+    });
+  }
+
+  /** Create an empty local board only as part of a successful, explicit send. */
+  createForumPost(destination: ForumDestination, draft: Omit<NewPost, 'forumId'>): Promise<Post> {
+    const input = structuredClone(draft);
+    const target = structuredClone(destination);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (!input.title.trim() || !input.body.trim()) invalid('Title and body must not be blank.');
+      const member: Member | undefined = await request(tx.objectStore('members').get(input.authorId));
+      if (member?.actor !== 'human') invalid('Select a local human member.');
+      const sigStore = tx.objectStore('sigs');
+      const sigs: Records['sigs'][] = await request(sigStore.getAll());
+      const matching = sigs.filter((sig) => sig.keyword.toUpperCase() === target.keyword);
+      if (matching.length > 1) invalid('Ambiguous local SIG.');
+      const sig = matching[0] ?? { id: createRecordId(), keyword: target.keyword, title: target.keyword };
+      if (!matching.length) await request(sigStore.add(sig));
+      const forumStore = tx.objectStore('forums');
+      const forums: Forum[] = await request(forumStore.index('sigId').getAll(sig.id));
+      const boards = forums.filter((forum) => forum.boardNo === target.boardNo);
+      if (boards.length > 1) invalid('Ambiguous local forum.');
+      const forum = boards[0] ?? {
+        id: createRecordId(), sigId: sig.id, boardNo: target.boardNo, name: target.name, nextPostNumber: 1,
+      };
+      validateRecord('forums', forum);
+      if (!boards.length) await request(forumStore.add(forum));
+      return this.insertPost(tx, { ...input, forumId: forum.id });
+    });
+  }
+
+  /** A monotonic per-member/forum high-water mark, including across tabs. */
+  markRead(memberId: string, postId: string): Promise<void> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const member: Member | undefined = await request(tx.objectStore('members').get(memberId));
+      const post: Post | undefined = await request(tx.objectStore('posts').get(postId));
+      if (member?.actor !== 'human' || !post) invalid('Missing human member or post.');
+      const reads = tx.objectStore('readStates');
+      const old: Records['readStates'] | undefined = await request(reads.get([memberId, post.forumId]));
+      await request(reads.put({ memberId, forumId: post.forumId, lastReadNumber: Math.max(old?.lastReadNumber ?? 0, post.number) }));
     });
   }
 

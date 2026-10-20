@@ -4,6 +4,10 @@ import { mountTerminal } from './terminal';
 import { openRepository } from './storage/repository';
 import type { Session } from './storage/repository';
 import { mountStorageControls } from './storage/controls';
+import { ACTIVE_MEMBER_SETTING } from './storage/repository';
+import type { Backup } from './storage/schema';
+import { activeHuman, forumPosts, replyReference } from './forums';
+import { mountComposer } from './composer';
 import './style.css';
 
 const controller = new ConnectionController();
@@ -14,7 +18,7 @@ const repository = openRepository();
 // usable when storage is denied; the status reports failed persistence operations.
 let pending: Promise<unknown> = Promise.resolve();
 let commandsDuringHistoryLoad: string[] | null = null;
-function enqueue(action: () => Promise<void>): Promise<void> {
+function enqueue<T>(action: () => Promise<T>): Promise<T> {
   const task = pending.catch(() => {}).then(action);
   pending = task;
   return task;
@@ -28,7 +32,17 @@ async function loadHistory(load: () => Promise<Session | null>): Promise<void> {
     terminal.showSessionTimes(saved);
   } finally { commandsDuringHistoryLoad = null; }
 }
-const startup = enqueue(() => loadHistory(async () => (await repository).startSession()));
+const startup = enqueue(async () => {
+  await loadHistory(async () => (await repository).startSession());
+  await refreshContent();
+});
+async function refreshContent(): Promise<Backup> {
+  const content = await (await repository).exportBackup();
+  controller.setContent(content);
+  controller.setMemberId(activeHuman(content));
+  composer.refresh(content);
+  return content;
+}
 let connectionTimer: ReturnType<typeof setTimeout> | undefined;
 function completeConnection(): void {
   clearTimeout(connectionTimer);
@@ -53,12 +67,50 @@ const terminal = mountTerminal(root, {
     void enqueue(async () => {
       const before = controller.screen;
       let canSubmit = true;
+      let content: Backup | undefined;
+      terminal.showReplyReference(null);
       if (controller.needsContent && !['MAIN', 'BACK'].includes(line.trim().toUpperCase())) {
-        try { controller.setContent(await (await repository).exportBackup()); }
+        try { content = await refreshContent(); }
         catch (error) {
           controls.reportError(error);
           terminal.append(...session.append('投稿の読み込みに失敗しました。再試行してください。'));
           canSubmit = false; // Do not display stale posts after a failed read.
+        }
+      }
+      const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
+      const target = controller.forum;
+      if (canSubmit && target && content) {
+        const data = forumPosts(content, target.keyword, target.boardNo);
+        const reply = /^REPLY ([1-9]\d*)$/.exec(command);
+        const read = /^READ ([1-9]\d*)$/.exec(command);
+        if (command === 'WRITE' || reply) {
+          canSubmit = false;
+          const parent = reply && data.posts.find((post) => post.number === Number(reply[1]));
+          if (reply && (!parent || data.source !== 'local')) {
+            terminal.append(...session.append('返信先のローカル投稿がありません。創作デモには返信できません。'));
+          } else if (data.source === 'local' && !data.available) {
+            // Missing boards can be created on send; ambiguous mappings cannot.
+            const sigs = content.sigs.filter((sig) => sig.keyword.toUpperCase() === target.keyword);
+            const boards = content.forums.filter((forum) => forum.sigId === sigs[0]?.id && forum.boardNo === target.boardNo);
+            if (sigs.length !== 1 || boards.length > 1) {
+              terminal.append(...session.append('ローカルフォーラムが重複しているため投稿できません。'));
+            } else composer.open(target, content, parent || undefined);
+          } else composer.open(target, content, parent || undefined);
+        } else if (read && Number.isSafeInteger(Number(read[1]))) {
+          const post = data.posts.find((post) => post.number === Number(read[1]));
+          const memberId = activeHuman(content);
+          if (post && data.source === 'local' && memberId) {
+            try {
+              await (await repository).markRead(memberId, post.id);
+            } catch (error) {
+              controls.reportError(error);
+              terminal.append(...session.append('既読の保存に失敗しました。再試行してください。'));
+              canSubmit = false;
+            }
+          } else if (post && data.source === 'local') {
+            terminal.append(...session.append('既読を記録するにはローカル利用者を作成してください。'));
+          }
+          if (canSubmit && post) terminal.showReplyReference(replyReference(post, data.posts)?.number ?? null);
         }
       }
       if (canSubmit) terminal.append(...session.append(...controller.submit(line)));
@@ -80,9 +132,29 @@ const terminal = mountTerminal(root, {
 });
 terminal.append(...session.transcript);
 updateConnection();
+const composer = mountComposer(root, {
+  createMember: (handle) => enqueue(async () => {
+    await (await repository).createHumanMember(handle);
+    await refreshContent();
+  }),
+  selectMember: (id) => enqueue(async () => {
+    const repo = await repository;
+    if ((await repo.get('members', id))?.actor !== 'human') throw new Error('Missing human member.');
+    await repo.put('settings', { id: ACTIVE_MEMBER_SETTING, value: id });
+    await refreshContent();
+  }),
+  save: (target, draft) => enqueue(async () => {
+    const post = await (await repository).createForumPost(target, { ...draft, origin: 'local-human' });
+    terminal.append(...session.append(`投稿 #${post.number} を保存しました。LIST / READ ${post.number} で確認できます。`));
+    // A failed refresh after a committed send must never invite duplicate sends.
+    try { await refreshContent(); } catch (error) { controls.reportError(error); }
+  }),
+});
 const controls = mountStorageControls(root, repository, enqueue, (text) => loadHistory(async () => {
   const repo = await repository;
   await repo.replaceFromJson(text, { confirmReplace: true });
+  terminal.showReplyReference(null);
+  await refreshContent();
   return repo.getSession();
 }));
 void startup.catch((error) => controls.reportError(error));

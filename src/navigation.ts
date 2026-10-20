@@ -1,8 +1,9 @@
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import type { TerminalController } from './controller';
-import { emptyContent, forumName, forumPosts, renderPost } from './forums';
+import { emptyContent, forumName, forumPosts, renderPost, replyReference } from './forums';
 import type { ForumContent } from './forums';
+import type { ForumDestination } from './storage/repository';
 
 const { miti, daisizen } = sigEvidence;
 
@@ -50,9 +51,18 @@ export class PcvanController implements TerminalController {
   private currentScreen: Screen = 'main';
   private content = emptyContent();
   private boardNo = 9;
+  private memberId: string | undefined;
 
   /** Refreshed by the app from #6's repository before forum commands. */
   setContent(content: ForumContent): void { this.content = content; }
+  setMemberId(id: string | undefined): void { this.memberId = id; }
+
+  get forum(): ForumDestination | null {
+    const keyword = this.currentScreen === 'miti-materials' ? 'MITI' : this.currentScreen === 'forum' ? 'DAISIZEN' : null;
+    if (!keyword) return null;
+    const boardNo = keyword === 'MITI' ? 9 : this.boardNo;
+    return { keyword, boardNo, name: forumName(keyword, boardNo) };
+  }
 
   get needsContent(): boolean {
     return ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
@@ -117,17 +127,19 @@ export class PcvanController implements TerminalController {
     if (read && Number.isSafeInteger(Number(read[1]))) {
       const data = forumPosts(this.content, keyword, boardNo);
       const post = data.posts.find((item) => item.number === Number(read[1]));
+      const parent = post && replyReference(post, data.posts);
       return post ? [
         ...this.forumNotice(data.source),
         ...renderPost(post, forumName(keyword, boardNo)),
+        ...(parent ? [`返信先 RE#${parent.number} → READ ${parent.number}（再構成）`] : []),
         this.forumHelp,
         demoPrompt,
       ] : ['その番号の投稿はありません。画面は変わりません。', this.forumHelp, demoPrompt];
     }
-    return this.handleReconstructed(command, 'LIST / READ 番号 / BACK / MAIN / HELP');
+    return this.handleReconstructed(command, 'LIST / READ 番号 / WRITE / REPLY 番号 / BACK / MAIN / HELP');
   }
 
-  private readonly forumHelp = 'LIST: 投稿一覧 / READ 番号: 本文 / BACK: フォーラム一覧（創作の操作補助 [D / reconstructed]）';
+  private readonly forumHelp = 'LIST: 投稿一覧 / READ 番号: 本文 / WRITE: 新規投稿 / REPLY 番号: 返信 / BACK: フォーラム一覧（創作の操作補助 [D / reconstructed]）';
 
   private forumNotice(source: 'demo' | 'local'): string[] {
     return [
@@ -144,7 +156,14 @@ export class PcvanController implements TerminalController {
       `${keyword} / ${forumName(keyword, boardNo)} / 投稿一覧（番号順）`,
       ...this.forumNotice(data.source),
       ...(!data.available ? ['対応するローカルフォーラムが見つからないか、重複しています。']
-        : data.posts.length ? data.posts.map((post) => `#${post.number} ${post.title}`) : ['投稿はありません。']),
+        : data.posts.length ? data.posts.map((post) => {
+          const parent = replyReference(post, data.posts);
+          const reference = parent && post.title !== `RE#${parent.number}` && !post.title.startsWith(`RE#${parent.number} `)
+            ? ` RE#${parent.number}` : '';
+          const lastRead = this.content.readStates?.find((state) => state.memberId === this.memberId && state.forumId === post.forumId)?.lastReadNumber ?? 0;
+          return `#${post.number} ${post.title}${reference}${data.source === 'local' && this.memberId ? ` [${post.number <= lastRead ? '既読' : '未読'}]` : ''}`;
+        }) : ['投稿はありません。']),
+      '既読は選択中のローカル利用者ごとに、読んだ最大番号までを記録します。創作デモは対象外です。',
       this.forumHelp,
     ];
   }
