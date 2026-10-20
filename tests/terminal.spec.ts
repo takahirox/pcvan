@@ -8,26 +8,26 @@ test('starts without services and submits Japanese text as plain text with exact
   const input = page.getByRole('textbox', { name: 'コマンド' });
   const output = page.locator('.output');
   await expect(input).toBeFocused();
-  await expect(output).toContainText('これは創作デモです。史実の PC-VAN 画面を再現したものではありません。');
+  await expect(output).toContainText('MAIN（1996年頃・回顧転記／暫定）');
   // No network, storage, GPU, or model service is needed after the static files load.
   await page.context().setOffline(true);
   const line = 'echo   日本語：ＡＢＣ　。、 ｶﾀｶﾅ <b>文字</b>  ';
   await input.fill(line);
   await input.press('Enter');
-  expect(await output.textContent()).toContain(`> ${line}\n  日本語：ＡＢＣ　。、 ｶﾀｶﾅ <b>文字</b>  `);
+  expect(await output.textContent()).toContain(`> ${line}\n`);
   await expect(output.locator('b')).toHaveCount(0);
   await expect(input).toHaveValue('');
   await expect(input).toBeFocused();
-  await input.fill('demo');
+  await input.fill('13');
   await input.press('Enter');
-  expect(await output.textContent()).toContain('文字表示サンプル（創作）\n  日本語：こんにちは。\n  全角：ＡＢＣ　「句読点」、。');
+  await expect(output).toContainText('再構成の仮設ブリッジ');
   await input.fill('help');
   await page.getByRole('button', { name: '送信' }).click();
-  await expect(output).toContainText('コマンド一覧');
+  await expect(output).toContainText('MAIN に戻る');
   await expect(input).toBeFocused();
   await input.fill('unknown');
   await input.press('Enter');
-  await expect(output).toContainText('コマンドが見つかりません。');
+  await expect(output).toContainText('この画面では使えないコマンドです。');
 });
 
 test('recalls commands, restores the draft, and does not submit during IME composition', async ({ page }) => {

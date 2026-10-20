@@ -9,7 +9,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   root.innerHTML = `
     <header>
       <h1>pcvan / テキスト端末</h1>
-      <p>創作デモ · ローカルセッション</p>
+      <p>1996年頃の MAIN（暫定）· 再構成のローカルセッション</p>
     </header>
     <section class="terminal" aria-label="テキスト端末">
       <div class="transcript" role="log" aria-label="出力履歴"
