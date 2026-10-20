@@ -477,6 +477,27 @@ the precise **Settings → Pages → Source: GitHub Actions** blocker and keep
 publication verification pending until resolved. No live deployment or Pages
 settings change was performed during pre-merge validation.
 
+### Post-merge result (2026-10-20)
+
+PR #28 merged with merge commit
+`5e6c43aa97e7be95c0d4d83716060dc285e3fd9f` after Issue #26 was
+confirmed open immediately before the merge. The PR head matched the approved
+`c04fac8a69d88fc29fce61aece429797b7be4547`.
+
+- [Deployment run 39441872340](https://github.com/takahirox/pcvan/actions/runs/39441872340)
+  completed with **failure**. Dependency installation and the production build
+  succeeded. `actions/configure-pages@v6` failed at **Configure Pages** with
+  `Get Pages site failed` / `Not Found`, requesting that Pages be enabled and
+  configured to build using GitHub Actions. Upload and deployment were skipped.
+- The Pages API returned HTTP 404. An HTTPS HEAD request to
+  <https://takahirox.github.io/pcvan/> also returned HTTP 404.
+- **Owner-side blocker:** select **Settings → Pages → Build and deployment →
+  Source: GitHub Actions**, then rerun the failed workflow or dispatch it from
+  `main`. No Pages settings were changed during this verification.
+- Publication verification remains **pending** until that setup is resolved and
+  deployment succeeds. Live terminal rendering, successful asset loading and
+  opted-in Service Worker scope could not be verified at the unavailable site.
+
 ## Issue #11 integration with offline safeguards
 
 Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
