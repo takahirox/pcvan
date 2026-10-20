@@ -80,3 +80,7 @@ dialog h2 { font-size: 1rem; }
 .ai-profile { flex-basis: 100%; }
 .ai-preview { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #737373; padding: 0.5rem; }
 .ai-controls li, .ai-message { overflow-wrap: anywhere; }
+.offline-controls { margin-top: 0.75rem; font-size: 0.8rem; }
+.offline-controls p { margin: 0.25rem 0; }
+.offline-controls a { color: inherit; }
+.offline-controls summary { cursor: pointer; }

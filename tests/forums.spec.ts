@@ -173,7 +173,7 @@ test('keyboard reading works offline; restore replaces displayed posts without r
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'local.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status')).toContainText('バックアップを復元しました。');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
   await send(page, 'LIST', '#4 返事');
   await send(page, 'READ 1', '★タイトル (human)');
   const output = (await page.locator('.output').textContent())!;
@@ -225,7 +225,7 @@ test('failed forum reads show an error without stale content and leave return co
   await send(page, 'READ 3', '投稿の読み込みに失敗しました');
   const output = (await page.locator('.output').textContent())!;
   expect(output.slice(output.lastIndexOf('> READ 3\n'))).not.toContain('★内容');
-  await expect(page.getByRole('status')).toContainText('ローカル保存エラー');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('ローカル保存エラー');
   await send(page, 'BACK', 'MITI / フォーラム');
   await send(page, 'MAIN', 'MAIN（1996年頃');
 });

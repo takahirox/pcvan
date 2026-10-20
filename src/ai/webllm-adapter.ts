@@ -1,5 +1,9 @@
-import { WebWorkerMLCEngine } from '@mlc-ai/web-llm';
+import { hasModelInCache, WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 import type { GenerationPrompt, LocalLlmAdapter } from './generation';
+
+// WebLLM checks the tensor manifest and every referenced weight shard without
+// fetching missing files. This does not prove that config/tokenizer/WASM exist.
+export const modelWeightsCached = (modelId: string) => hasModelInCache(modelId);
 
 /** Loaded only by the user's model-load action. Termination cancels fetch and GPU work. */
 export function createWebLlmAdapter(): LocalLlmAdapter {
@@ -25,6 +29,10 @@ export function createWebLlmAdapter(): LocalLlmAdapter {
   }
   return {
     load: (modelId, progress, signal) => run(signal, async () => {
+      if (!navigator.onLine && !await modelWeightsCached(modelId)) {
+        throw new Error('選択モデルの重みが未保存です。オンラインでモデルを読み込んでください。');
+      }
+      signal.throwIfAborted();
       engine.setInitProgressCallback((report) => progress(report.progress));
       await engine.reload(modelId, { context_window_size: 4096 });
     }),
