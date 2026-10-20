@@ -150,6 +150,23 @@ export class LocalRepository {
     return this.transaction(allStores, 'readwrite', (tx) => this.insertPost(tx, input));
   }
 
+  /** Register a fictional AI and post atomically; never overwrite an existing identity. */
+  createAiPost(member: Member, value: NewPost): Promise<Post> {
+    const author = structuredClone(member);
+    const input = structuredClone(value);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      validateRecord('members', author);
+      if (author.actor !== 'ai' || input.authorId !== author.id || !input.origin.startsWith('local-ai:webllm:')) {
+        invalid('Expected an identified local AI post.');
+      }
+      const members = tx.objectStore('members');
+      const existing: Member | undefined = await request(members.get(author.id));
+      if (existing && (existing.actor !== 'ai' || existing.handle !== author.handle)) invalid('AI member ID is already in use.');
+      if (!existing) await request(members.add(author));
+      return this.insertPost(tx, input);
+    });
+  }
+
   private async insertPost(tx: IDBTransaction, input: NewPost): Promise<Post> {
     const forums = tx.objectStore('forums');
     const forum: Forum | undefined = await request(forums.get(input.forumId));

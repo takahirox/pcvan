@@ -1,7 +1,7 @@
 # Local repository and JSON backups
 
 The application stores its local world in IndexedDB, database `pcvan-local`,
-database version **1**. There are no runtime dependencies, network writes,
+database version **1**. The repository has no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. A clean browser profile starts
 with no members, SIGs, forums, posts, read states, or settings. Opening the terminal
 creates only local session metadata. Research fixtures are not automatically
@@ -115,11 +115,13 @@ Additional repository methods (all resolve after transaction completion):
 | --- | --- |
 | `createHumanMember(handle)` | Save a human plus the active-member setting atomically; reject blank handles. |
 | `createForumPost({ keyword, boardNo, name }, draft)` | Resolve/create the local board and insert a nonblank human-authored draft with the same allocation path as `createPost`; the draft omits `forumId`, `id`, `number`, and `createdAt`. |
+| `createAiPost(member, post)` | Register an AI member and allocate a post in an existing board atomically. Requires matching author ID, `actor: 'ai'` and `local-ai:webllm:` origin; rejects identity collisions. The AI caller validates generated content and selected IDs before this mutation. |
 | `markRead(memberId, postId)` | Validate a human and local post, then advance their per-forum high-water mark atomically. |
 
 Generic `createPost`/import still preserve empty titles and bodies for existing
 data compatibility; the human compose path rejects them. No schema migration or
-new dependencies are needed.
+new storage dependencies are needed. The optional AI integration uses the same
+v1 member/post records; see [local AI and provenance](local-ai.md).
 
 ## TypeScript repository API
 
