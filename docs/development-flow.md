@@ -50,10 +50,11 @@ not excuse missing requirements or necessary validation.
 
 ### Validation for the current repository
 
-The repository currently has no application files or configured build/test
-commands. Do not invent build, test, or runtime requirements, or add scaffolding,
-dependencies, CI, or tooling merely to document a process. Reinspect the
-repository for commands if tooling is added in the future.
+For application changes, follow the install/build/test commands in the
+[README](../README.md#validation). `npm test` builds the static app and runs
+session and browser interaction checks against its production assets. Select
+additional validation based on the Issue and files changed; do not add unrelated
+tooling merely to document a process.
 
 For templates and documentation, check Markdown and template syntax, local links
 (including heading anchors), whitespace, and consistency using available tools.
