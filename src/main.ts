@@ -38,6 +38,7 @@ async function loadHistory(load: () => Promise<Session | null>): Promise<void> {
 const startup = enqueue(async () => {
   await loadHistory(async () => (await repository).startSession());
   await refreshContent();
+  return (await repository).openActivity();
 });
 async function refreshContent(): Promise<Backup> {
   const content = await (await repository).exportBackup();
@@ -123,10 +124,15 @@ const terminal = mountTerminal(root, {
       const repo = await repository;
       if (before === 'disconnected' && after !== 'disconnected') {
         terminal.showSessionTimes(await repo.startSession());
+        // Persist the plan before queued commands can advance its watermark.
+        const activity = await repo.openActivity();
+        void ai.openActivity(activity).catch((error) => controls.reportError(error));
       }
       if (before !== 'disconnected' && after === 'disconnected') {
+        ai.invalidate();
         terminal.showSessionTimes(await repo.endSession());
       }
+      if (before !== 'disconnected') await repo.touchActivity();
       await repo.recordCommand(line);
     }).catch((error) => controls.reportError(error));
   },
@@ -156,6 +162,17 @@ const composer = mountComposer(root, {
 });
 const ai = mountAiControls(root, {
   read: () => enqueue(async () => (await repository).exportBackup()),
+  activity: {
+    openActivity: (now) => enqueue(async () => (await repository).openActivity(now)),
+    configureActivity: (maxPosts, modelId, now) => enqueue(async () => (await repository).configureActivity(maxPosts, modelId, now)),
+    setAiRunStatus: (id, status) => enqueue(async () => (await repository).setAiRunStatus(id, status)),
+    commitAiRun: (id, raw, signal) => enqueue(async () => {
+      signal?.throwIfAborted();
+      const post = await (await repository).commitAiRun(id, raw, signal);
+      try { await refreshContent(); } catch (error) { controls.reportError(error); }
+      return post;
+    }),
+  },
   save: (request, raw, modelId) => enqueue(async () => {
     const repo = await repository;
     const generated = validateGeneration(raw, await repo.exportBackup(), request);
@@ -173,5 +190,22 @@ const controls = mountStorageControls(root, repository, enqueue, (text) => loadH
   await refreshContent();
   return repo.getSession();
 }));
-void startup.catch((error) => controls.reportError(error));
+// Model work runs outside the storage/command queue so the terminal stays usable.
+void startup.then((activity) => ai.openActivity(activity)).catch((error) => controls.reportError(error));
+const touchActivity = () => {
+  if (controller.screen !== 'disconnected') {
+    void enqueue(async () => (await repository).touchActivity()).catch((error) => controls.reportError(error));
+  }
+};
+setInterval(() => { if (document.visibilityState === 'visible') touchActivity(); }, 60_000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') touchActivity();
+});
+window.addEventListener('pagehide', () => {
+  ai.invalidate();
+  touchActivity(); // Best effort on close; the last periodic/command watermark is already durable.
+});
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) void ai.openActivity().catch((error) => controls.reportError(error));
+});
 mountOfflineControls(root);

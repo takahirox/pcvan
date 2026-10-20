@@ -107,13 +107,20 @@ draft remain in memory.
 ## Optional local AI
 
 Expand **ローカル AI 設定・投稿の出自** to inspect the three fictional AI personas
-and stored AI identities. AI starts off and requires WebGPU on HTTPS/localhost.
+and stored AI identities. AI is off by default and requires WebGPU on HTTPS/localhost.
 First create a local board through manual posting (or restore one), select a
 model and explicitly load it. The first load downloads hundreds of MB to GB of
 model files and uses browser cache/GPU memory. Choose a persona, board and optional
 reply, generate a validated preview, then save or discard it. **AI を停止・解放**
 cancels pending AI work and unloads the model. AI does not generate menus or
 commands, and ordinary reading/manual posting remains usable when AI is unavailable.
+
+The separate reconnect activity cap defaults to **0**. Saving **1–12** opts into
+automatically generating and saving a bounded fictional backlog when reopening
+or reconnecting, with progress, cancel and retry controls. Nothing runs while the
+browser is closed. Simulated post times are marked fictional; inspection preserves
+the actual generation time and stable run ID. Interrupted retries cannot duplicate
+committed posts.
 
 Inference stays in a browser worker, without remote inference, API keys or a
 server process. Weights are not bundled. Posts and backups preserve AI actor,

@@ -115,6 +115,9 @@ Additional repository methods (all resolve after transaction completion):
 | --- | --- |
 | `createHumanMember(handle)` | Save a human plus the active-member setting atomically; reject blank handles. |
 | `createForumPost({ keyword, boardNo, name }, draft)` | Resolve/create the local board and insert a nonblank human-authored draft with the same allocation path as `createPost`; the draft omits `forumId`, `id`, `number`, and `createdAt`. |
+| `openActivity(now?)` / `configureActivity(maxPosts, modelId, now?)` | Persist/resume a bounded deterministic reconnect plan or save explicit opt-in (0 disables it). |
+| `touchActivity(now?)` | Advance an existing activity watermark monotonically without scheduling generation. |
+| `setAiRunStatus(id, status)` / `commitAiRun(id, raw, signal?)` | Persist pending-run progress; validate and atomically save a unique AI result with its completed status, member and number. Repeated commits return the existing result. |
 | `createAiPost(member, post)` | Register an AI member and allocate a post in an existing board atomically. Requires matching author ID, `actor: 'ai'` and `local-ai:webllm:` origin; rejects identity collisions. The AI caller validates generated content and selected IDs before this mutation. |
 | `markRead(memberId, postId)` | Validate a human and local post, then advance their per-forum high-water mark atomically. |
 
@@ -223,7 +226,7 @@ The root object has exactly these required fields (empty arrays are valid):
 | Member | `id`, `handle`, `actor: 'human' \| 'ai'` | — |
 | Sig | `id`, `keyword`, `title` | — |
 | Forum | `id`, `sigId`, `boardNo`, `name`, `nextPostNumber` | — |
-| Post | `id`, `forumId`, `number`, `authorId`, `title`, `body`, `createdAt`, `origin` | `displaySecondNumber`, `replyToPostId` |
+| Post | `id`, `forumId`, `number`, `authorId`, `title`, `body`, `createdAt`, `origin` | `displaySecondNumber`, `replyToPostId`, `simulation` |
 | ReadState | `memberId`, `forumId`, `lastReadNumber` | — |
 | Session | `lastLoginAt`, `lastLogoutAt`, `commandHistory` | — |
 | Setting | `id`, `value` | — |
@@ -232,8 +235,17 @@ IDs, handles, keywords, names, SIG titles, and origins are nonblank strings; pos
 title/body and history entries may be empty strings. IDs are unique **within each
 entity collection**, not globally across types. Read states are unique by their
 member/forum pair. Settings values may be any finite JSON value, including nested
-arrays/objects. No settings are created by default. This version has no AI-run
-records; `AiRun` is reserved for a later schema revision once its contract exists.
+arrays/objects. No settings are created by default. The reserved `ai-activity`
+setting is created when the user saves the reconnect activity configuration. Its
+validated value holds the opt-in/cap, activity watermark and at most one batch
+of 12 stable runs/statuses; it is included in backups. No IndexedDB version or
+store migration is needed. See [the reconnect activity contract](local-ai.md#fictional-activity-on-reconnect).
+
+A simulated AI post optionally includes `simulation: { runId, simulatedAt,
+fictional: true }`. `runId` equals its stable post ID and `simulatedAt` is a
+canonical timestamp explicitly labeled fictional. `createdAt` remains the actual
+generation/commit time. Old v1 backups without this field still import normally;
+older app versions that do not know it reject such new backups without writing.
 
 `boardNo`, `nextPostNumber`, and post `number` are positive safe integers.
 `displaySecondNumber` and `lastReadNumber` are nonnegative safe integers. The
