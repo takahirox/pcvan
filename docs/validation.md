@@ -370,3 +370,36 @@ Optional real WebGPU/model-load and Japanese-quality evaluation was not performe
 GPU compatibility, available VRAM, caching and generated prose quality vary by
 hardware/model. Other-browser and manual screen-reader checks were not performed.
 No deployment was performed. No post-merge verification is required for #10.
+
+## Issue #11 fictional activity between connections
+
+Validated on 2026-10-20 with Node.js 24.12.0 on macOS. The assigned checkpoint
+predated the prerequisites; fetched and merged `main` at
+`bfaadddb97350eda740d29b1eb166d3b42eaa2a9` (PR #23, including #9/#10) into the
+assigned worktree. Reused its WebLLM adapter, bounded prompts, strict output
+validation and transactional local post allocator.
+
+- `npm ci`: passed, zero reported vulnerabilities.
+- `npm test -- --workers=2`: **99 tests passed** in 14.0 seconds, no retries,
+  including the TypeScript/Vite production build and all existing terminal,
+  composition, backup, session, navigation and AI tests.
+- Eight new mocked-time/model browser tests cover 0/1/72-hour scheduling, varied
+  deterministic targets, configured/hard caps, zero default work and explicit
+  opt-in, fictional versus actual timestamps, backup round-trips, concurrent
+  duplicate commits, quota rollback at the status write, interrupted/retried
+  runs, tab closure, cancellation with late output, unsupported WebGPU, and
+  load/inference/validation failures with the terminal still usable.
+- The first full run exposed unwanted AI settings creation during ordinary
+  disabled commands. Activity state now starts only on explicit configuration;
+  default session metadata and existing backup behavior are preserved. The suite
+  also exposed an IME test snapshot taken before a queued command response;
+  the test now waits for that response before asserting composition is inert.
+- Vite retains the existing large-chunk advisory for the optional WebLLM runtime
+  and worker. Tests use mocks and never download weights or require a real GPU.
+- Reviewed the Issue-specific diff, local documentation links and staged
+  whitespace. No historical fixtures, backend or service-worker inference were
+  added. See [the reconnect activity contract](local-ai.md#fictional-activity-on-reconnect).
+
+Optional real-model conversation/coherence checks over manual reconnect cycles
+were not performed. No deployment was performed; no post-merge verification is
+required for #11.

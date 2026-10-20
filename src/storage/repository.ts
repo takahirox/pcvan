@@ -1,8 +1,11 @@
 import {
-  invalid, RepositoryError, stores, validateBackup, validateRecord, validateSession,
+  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession,
 } from './schema';
-import type { Backup, Forum, Key, Member, NewPost, Post, Records, Session, Store } from './schema';
+import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
+import { ACTIVITY_SETTING, emptyActivity, planActivity } from '../ai/activity';
+import { models } from '../ai/personas';
+import { postInput, validateGeneration } from '../ai/generation';
 
 export * from './schema';
 export const DATABASE_NAME = 'pcvan-local';
@@ -76,9 +79,12 @@ export class LocalRepository {
   close(): void { this.db.close(); }
 
   private async transaction<T>(scope: string[], mode: IDBTransactionMode,
-    action: (tx: IDBTransaction) => Promise<T>): Promise<T> {
+    action: (tx: IDBTransaction) => Promise<T>, signal?: AbortSignal): Promise<T> {
     try {
+      signal?.throwIfAborted();
       const tx = this.db.transaction(scope, mode);
+      const abort = () => { try { tx.abort(); } catch { /* Already settled. */ } };
+      signal?.addEventListener('abort', abort, { once: true });
       const done = new Promise<void>((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onabort = () => reject(tx.error ?? new DOMException('Transaction aborted.', 'AbortError'));
@@ -93,7 +99,7 @@ export class LocalRepository {
         try { tx.abort(); } catch { /* Already completed or aborted. */ }
         await done.catch(() => {});
         throw error;
-      }
+      } finally { signal?.removeEventListener('abort', abort); }
     } catch (error) { throw storageError(error); }
   }
 
@@ -155,24 +161,28 @@ export class LocalRepository {
     const author = structuredClone(member);
     const input = structuredClone(value);
     return this.transaction(allStores, 'readwrite', async (tx) => {
-      validateRecord('members', author);
-      if (author.actor !== 'ai' || input.authorId !== author.id || !input.origin.startsWith('local-ai:webllm:')) {
-        invalid('Expected an identified local AI post.');
-      }
-      const members = tx.objectStore('members');
-      const existing: Member | undefined = await request(members.get(author.id));
-      if (existing && (existing.actor !== 'ai' || existing.handle !== author.handle)) invalid('AI member ID is already in use.');
-      if (!existing) await request(members.add(author));
+      await this.registerAi(tx, author, input);
       return this.insertPost(tx, input);
     });
   }
 
-  private async insertPost(tx: IDBTransaction, input: NewPost): Promise<Post> {
+  private async registerAi(tx: IDBTransaction, author: Member, input: NewPost): Promise<void> {
+    validateRecord('members', author);
+    if (author.actor !== 'ai' || input.authorId !== author.id || !input.origin.startsWith('local-ai:webllm:')) {
+      invalid('Expected an identified local AI post.');
+    }
+    const members = tx.objectStore('members');
+    const existing: Member | undefined = await request(members.get(author.id));
+    if (existing && (existing.actor !== 'ai' || existing.handle !== author.handle)) invalid('AI member ID is already in use.');
+    if (!existing) await request(members.add(author));
+  }
+
+  private async insertPost(tx: IDBTransaction, input: NewPost, id = createRecordId()): Promise<Post> {
     const forums = tx.objectStore('forums');
     const forum: Forum | undefined = await request(forums.get(input.forumId));
     if (!forum) invalid('Missing forum.');
     if (!await request(tx.objectStore('members').get(input.authorId))) invalid('Missing author.');
-    const post: Post = { ...input, id: createRecordId(), number: forum.nextPostNumber, createdAt: new Date().toISOString() };
+    const post: Post = { ...input, id, number: forum.nextPostNumber, createdAt: new Date().toISOString() };
     validateRecord('posts', post);
     if (post.replyToPostId !== undefined) {
       const parent: Post | undefined = await request(tx.objectStore('posts').get(post.replyToPostId));
@@ -306,17 +316,102 @@ export class LocalRepository {
     });
   }
 
+  private async readActivity(tx: IDBTransaction, now: string): Promise<AiActivity> {
+    const row: Records['settings'] | undefined = await request(tx.objectStore('settings').get(ACTIVITY_SETTING));
+    const state = row?.value ?? emptyActivity(now);
+    validateActivity(state);
+    return state;
+  }
+
+  private async writeActivity(tx: IDBTransaction, state: AiActivity): Promise<AiActivity> {
+    validateActivity(state);
+    await request(tx.objectStore('settings').put({ id: ACTIVITY_SETTING, value: state as unknown as JsonValue }));
+    return state;
+  }
+
+  /** Opt-in applies from now, never accrues work while disabled. Zero also drops the pending batch. */
+  configureActivity(maxPosts: number, modelId: string, now = new Date().toISOString()): Promise<AiActivity> {
+    return this.transaction(['settings'], 'readwrite', async (tx) => {
+      if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
+      const state = await this.readActivity(tx, now);
+      return this.writeActivity(tx, { ...state, maxPosts, modelId, lastActivityAt: now,
+        batch: maxPosts === 0 ? null : state.batch });
+    });
+  }
+
+  /** Advance the watermark and persist the entire bounded plan in one transaction. */
+  openActivity(now = new Date().toISOString()): Promise<AiActivity> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      // Before opt-in the existing session timestamps suffice: no AI setting or work is created.
+      if (!await request(tx.objectStore('settings').count(ACTIVITY_SETTING))) return emptyActivity(now);
+      const state = await this.readActivity(tx, now);
+      const timestamp = new Date(Math.max(Date.parse(now), Date.parse(state.lastActivityAt))).toISOString();
+      const unfinished = state.batch?.runs.some((run) => run.status !== 'committed');
+      const batch = !state.maxPosts ? null : unfinished ? state.batch
+        : planActivity(await this.snapshot(tx), state, timestamp);
+      return this.writeActivity(tx, { ...state, lastActivityAt: timestamp, batch });
+    });
+  }
+
+  touchActivity(now = new Date().toISOString()): Promise<AiActivity> {
+    return this.transaction(['settings'], 'readwrite', async (tx) => {
+      if (!await request(tx.objectStore('settings').count(ACTIVITY_SETTING))) return emptyActivity(now);
+      const state = await this.readActivity(tx, now);
+      return this.writeActivity(tx, { ...state,
+        lastActivityAt: new Date(Math.max(Date.parse(now), Date.parse(state.lastActivityAt))).toISOString() });
+    });
+  }
+
+  setAiRunStatus(id: string, status: Exclude<AiRunStatus, 'committed'>): Promise<AiActivity> {
+    return this.transaction(['settings'], 'readwrite', async (tx) => {
+      const state = await this.readActivity(tx, new Date().toISOString());
+      const run = state.batch?.runs.find((row) => row.id === id);
+      if (!run || !state.maxPosts) invalid('AI activity is disabled or the run is missing.');
+      if (run.status !== 'committed') run.status = status;
+      return this.writeActivity(tx, state);
+    });
+  }
+
+  /** Run status, identity, number and result share a commit. No model work runs inside IDB. */
+  commitAiRun(id: string, raw: string, signal?: AbortSignal): Promise<Post | undefined> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const state = await this.readActivity(tx, new Date().toISOString());
+      const run = state.batch?.runs.find((row) => row.id === id);
+      const existing: Post | undefined = await request(tx.objectStore('posts').get(id));
+      // Stable post keys also cover an uncertain commit acknowledgement / old batch retry.
+      if (existing) {
+        if (existing.simulation?.runId !== id) invalid('AI run ID collision.');
+        if (run) { run.status = 'committed'; await this.writeActivity(tx, state); }
+        return existing;
+      }
+      if (!run || !state.maxPosts) invalid('AI activity is disabled or the run is missing.');
+      if (run.status === 'committed') return undefined; // A later explicit deletion stays deleted.
+      if (run.status !== 'running') invalid('AI run is not running.');
+      const target = { personaId: run.personaId, forumId: run.forumId,
+        ...(run.replyToPostId === undefined ? {} : { replyToPostId: run.replyToPostId }) };
+      const generated = validateGeneration(raw, await this.snapshot(tx), target);
+      const input = postInput(generated, state.batch!.modelId);
+      input.post.simulation = { runId: id, simulatedAt: run.simulatedAt, fictional: true };
+      await this.registerAi(tx, input.member, input.post);
+      const post = await this.insertPost(tx, input.post, id);
+      run.status = 'committed';
+      await this.writeActivity(tx, state);
+      return post;
+    }, signal);
+  }
+
+  private async snapshot(tx: IDBTransaction): Promise<Backup> {
+    const backup: Backup = { format: 'pcvan-local', version: 1, members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [], session: null };
+    await Promise.all(stores.map(async (store) => {
+      Object.assign(backup, { [store]: await request(tx.objectStore(store).getAll()) });
+    }));
+    backup.session = (await request(tx.objectStore('session').get('current'))) ?? null;
+    return backup;
+  }
+
   exportBackup(): Promise<Backup> {
     // One readonly transaction gives a consistent snapshot even during other-tab writes.
-    return this.transaction(allStores, 'readonly', async (tx) => {
-      const backup: Backup = { format: 'pcvan-local', version: 1, members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [], session: null };
-      await Promise.all(stores.map(async (store) => {
-        const rows = await request(tx.objectStore(store).getAll());
-        Object.assign(backup, { [store]: rows });
-      }));
-      backup.session = (await request(tx.objectStore('session').get('current'))) ?? null;
-      return backup;
-    });
+    return this.transaction(allStores, 'readonly', (tx) => this.snapshot(tx));
   }
 
   async exportJson(): Promise<string> { return JSON.stringify(await this.exportBackup(), null, 2); }

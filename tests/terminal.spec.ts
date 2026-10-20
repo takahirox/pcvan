@@ -47,6 +47,8 @@ test('recalls commands, restores the draft, and does not submit during IME compo
   await input.press('ArrowDown');
   await expect(input).toHaveValue('書きかけ');
 
+  // Wait for the serialized response before checking that IME adds no output.
+  await expect(page.locator('.output')).toContainText('> echo ｶﾅ\nこの画面では使えないコマンドです。');
   const before = await page.locator('.output').textContent();
   await input.dispatchEvent('compositionstart');
   await input.press('Enter');

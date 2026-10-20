@@ -44,11 +44,11 @@ export function forumName(keyword: 'MITI' | 'DAISIZEN', boardNo: number): string
 
 /** UTC keeps the stored date stable across browsers; spacing is reconstructed. */
 export function renderPost(post: Post, name: string, lineCount?: number): string[] {
-  const date = new Date(post.createdAt).toISOString();
+  const date = new Date(post.simulation?.simulatedAt ?? post.createdAt).toISOString();
   const stamp = `${date.slice(2, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}  ${date.slice(11, 16)}`;
   return [
     `#${post.number}${post.displaySecondNumber === undefined ? '' : `/${post.displaySecondNumber}`}　${name}`,
-    `★タイトル (${post.authorId})  ${stamp}${lineCount === undefined ? '' : `  ( ${lineCount})`}`,
+    `★タイトル (${post.authorId})  ${stamp}${post.simulation ? ' [架空の投稿時刻]' : ''}${lineCount === undefined ? '' : `  ( ${lineCount})`}`,
     post.title,
     '★内容',
     post.body,

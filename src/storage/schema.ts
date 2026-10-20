@@ -12,6 +12,16 @@ export interface Post {
   replyToPostId?: string;
   createdAt: string;
   origin: string;
+  simulation?: { runId: string; simulatedAt: string; fictional: true };
+}
+export type AiRunStatus = 'pending' | 'running' | 'committed' | 'failed' | 'cancelled';
+export interface AiRun {
+  id: string; personaId: string; forumId: string; replyToPostId?: string;
+  simulatedAt: string; status: AiRunStatus;
+}
+export interface AiBatch { id: string; from: string; to: string; modelId: string; runs: AiRun[] }
+export interface AiActivity {
+  version: 1; maxPosts: number; modelId: string; lastActivityAt: string; batch: AiBatch | null;
 }
 export interface ReadState { memberId: string; forumId: string; lastReadNumber: number }
 export interface Session {
@@ -94,6 +104,31 @@ function json(value: unknown): void {
   Object.values(value).forEach(json);
 }
 
+export function validateActivity(value: unknown): asserts value is AiActivity {
+  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch']);
+  if (value.version !== 1) invalid('Unknown AI activity version.');
+  integer(value.maxPosts, 0);
+  if ((value.maxPosts as number) > 12) invalid('AI activity cap exceeds 12.');
+  string(value.modelId); timestamp(value.lastActivityAt);
+  if (value.batch === null) return;
+  const batch = value.batch;
+  fields(batch, ['id', 'from', 'to', 'modelId', 'runs']);
+  string(batch.id); string(batch.modelId); timestamp(batch.from); timestamp(batch.to);
+  if (Date.parse(batch.to as string) <= Date.parse(batch.from as string) ||
+      !Array.isArray(batch.runs) || batch.runs.length > 12) invalid('Invalid AI activity batch.');
+  const ids = new Set<string>();
+  for (const run of batch.runs as unknown[]) {
+    fields(run, ['id', 'personaId', 'forumId', 'simulatedAt', 'status'], ['replyToPostId']);
+    string(run.id); string(run.personaId); string(run.forumId); timestamp(run.simulatedAt);
+    if (Object.hasOwn(run, 'replyToPostId')) string(run.replyToPostId);
+    if (ids.has(run.id) || !(run.id as string).startsWith(`${batch.id}:`) ||
+        Date.parse(run.simulatedAt as string) < Date.parse(batch.from as string) ||
+        Date.parse(run.simulatedAt as string) > Date.parse(batch.to as string) ||
+        !['pending', 'running', 'committed', 'failed', 'cancelled'].includes(run.status as string)) invalid('Invalid AI run.');
+    ids.add(run.id);
+  }
+}
+
 export function validateSession(value: unknown): asserts value is Session {
   fields(value, ['lastLoginAt', 'lastLogoutAt', 'commandHistory']);
   if (value.lastLoginAt !== null) timestamp(value.lastLoginAt);
@@ -120,11 +155,18 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'posts':
       fields(value, ['id', 'forumId', 'number', 'authorId', 'title', 'body', 'createdAt', 'origin'],
-        ['displaySecondNumber', 'replyToPostId']);
+        ['displaySecondNumber', 'replyToPostId', 'simulation']);
       string(value.id); string(value.forumId); string(value.authorId); string(value.origin);
       string(value.title, false); string(value.body, false); integer(value.number, 1); timestamp(value.createdAt);
       if (Object.hasOwn(value, 'displaySecondNumber')) integer(value.displaySecondNumber, 0);
       if (Object.hasOwn(value, 'replyToPostId')) string(value.replyToPostId);
+      if (Object.hasOwn(value, 'simulation')) {
+        const simulation = value.simulation;
+        fields(simulation, ['runId', 'simulatedAt', 'fictional']);
+        string(simulation.runId); timestamp(simulation.simulatedAt);
+        if (simulation.fictional !== true || simulation.runId !== value.id ||
+            !(value.origin as string).startsWith('local-ai:webllm:')) invalid('Expected a stable fictional AI run and time.');
+      }
       break;
     case 'readStates':
       fields(value, ['memberId', 'forumId', 'lastReadNumber']);
@@ -132,6 +174,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
+      if (value.id === 'ai-activity') validateActivity(value.value);
       break;
   }
 }
