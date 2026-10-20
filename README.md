@@ -195,6 +195,45 @@ HTTP/HTTPS host, including a subdirectory; asset URLs are relative. The preview
 command serves the built files locally for checking. Production requires only
 static file hosting, with no server-side application process.
 
+## GitHub Pages deployment
+
+Public URL: **[https://takahirox.github.io/pcvan/](https://takahirox.github.io/pcvan/)**.
+
+The [Deploy to GitHub Pages workflow](.github/workflows/pages.yml) installs locked
+dependencies with Node.js 24, builds `dist/`, and publishes it through the official
+GitHub Pages actions on every push to `main`. For a manual deployment, open
+**Actions → Deploy to GitHub Pages → Run workflow**, select **main**, and run it.
+Other branches do not publish. Deployment runs are serialized. No application
+secrets, backend, database service, or paid hosting are required.
+
+One-time repository setup: in **Settings → Pages → Build and deployment → Source**,
+select **GitHub Actions**. To diagnose failures, open the workflow in the
+repository's **Actions** tab, select the failed run, and inspect the failing
+step's logs. A Pages configuration failure may require the owner to select that
+source before rerunning the workflow.
+
+The existing relative asset base supports `/pcvan/`, including lazy WebLLM assets.
+Offline saving remains opt-in and registers `sw.js` with scope `/pcvan/`; AI model
+weights still require explicit opt-in. To reproduce the production subpath check
+locally after installing dependencies and Chromium as described in
+[Validation](#validation), run:
+
+```sh
+npm test -- tests/offline.spec.ts --grep 'production assets'
+```
+
+This checks entry scripts/CSS, all emitted assets including the lazy AI runtime
+and worker, and the opted-in Service Worker URL/scope without a GPU or model
+download. It does not establish successful public deployment.
+
+After merge, verify the resulting `main` workflow succeeds, visit the public URL
+over HTTPS, confirm the terminal renders and assets load without 404s, then opt
+into offline saving and inspect the Service Worker scope under `/pcvan/` in
+browser developer tools. Record the deployment run URL, published URL and actual
+results for Issue #26. Publication verification remains pending until performed;
+if Pages setup blocks it, record the precise owner-side blocker and retry after
+it is resolved.
+
 ## Structure
 
 - `index.html`, `src/main.ts`: page entry point and application wiring.

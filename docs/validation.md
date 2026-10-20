@@ -444,6 +444,39 @@ second-browser and real-weight/GPU checks were not performed. No deployment,
 publication or external writes were performed; no post-merge verification is
 required for #12.
 
+## Issue #26 GitHub Pages deployment
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+- `npm ci`: passed, zero reported vulnerabilities; dependency files unchanged.
+- `npx playwright install chromium`: passed.
+- `npm test -- --workers=2`: **108 tests passed** (23.1 seconds), no retries,
+  including the TypeScript check and production `vite build --base=./` build.
+  The new deployment smoke check reuses the offline suite's local `/pcvan/`
+  server: entry script/CSS URLs stay under that path, every emitted asset
+  (including lazy WebLLM runtime and worker files) matches its built bytes and
+  has the expected JavaScript/CSS MIME type, the real lazy cache-probe import
+  works, and optional offline saving registers `/pcvan/sw.js` with `/pcvan/`
+  scope while leaving the origin root uncontrolled. No worker is registered or
+  AI chunk requested on initial load. No external browser requests or page errors
+  occurred. The existing relative base therefore remains unchanged.
+- `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/pages.yml`:
+  passed workflow YAML, expressions and action checks.
+- Python Markdown checks: README local links/anchors and balanced code fences
+  passed. Final diff review and staged whitespace checks passed.
+- The existing Vite advisory for large optional WebLLM chunks remains. No model
+  weights were downloaded; optional second-browser and real GPU/model checks
+  were not performed.
+
+Required post-merge verification is **pending**: observe the resulting `main`
+deployment run, confirm success, visit <https://takahirox.github.io/pcvan/> over
+HTTPS, check terminal rendering and assets without 404s, and opt into offline
+saving to confirm the Service Worker scope stays under `/pcvan/`. Record the run
+URL, published URL and actual result. If deployment requires owner setup, record
+the precise **Settings → Pages → Source: GitHub Actions** blocker and keep
+publication verification pending until resolved. No live deployment or Pages
+settings change was performed during pre-merge validation.
+
 ## Issue #11 integration with offline safeguards
 
 Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
