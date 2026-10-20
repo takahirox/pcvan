@@ -55,7 +55,7 @@ async function restore(page: Page, fixture: Backup) {
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'local.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status')).toContainText('バックアップを復元しました。');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
 }
 
 async function fillDraft(page: Page, title: string, body: string) {

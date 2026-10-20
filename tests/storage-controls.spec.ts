@@ -43,7 +43,7 @@ test('restore requires confirmation; confirmed replace preserves every field and
     return dialog.accept();
   });
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status')).toContainText('バックアップを復元しました。');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
   expect(await downloadBackup(page)).toEqual(fixture);
   const input = page.getByRole('textbox', { name: 'コマンド' });
   await input.focus();
@@ -64,7 +64,7 @@ test('reload bounds a restored history and keeps recalled edits separate from pe
   });
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status')).toContainText('バックアップを復元しました。');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
   await page.reload();
   const saved = (await downloadBackup(page)).session.commandHistory;
   expect(saved).toEqual(fixture.session!.commandHistory.slice(-100));
@@ -94,7 +94,7 @@ test('invalid restore displays an error and does not change existing data', asyn
   page.on('dialog', async (dialog) => { dialogs++; await dialog.dismiss(); });
   await page.getByLabel('復元ファイル').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{"format":"pcvan-local","version":999}') });
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status')).toContainText('ローカル保存エラー');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('ローカル保存エラー');
   expect(dialogs).toBe(0);
   expect(await downloadBackup(page)).toEqual(before);
 });
@@ -110,12 +110,12 @@ test('simulated quota errors are visible while backup and the terminal remain us
     };
   });
   await page.goto('/');
-  await expect(page.getByRole('status')).toContainText('保存容量が足りません。');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('保存容量が足りません。');
   const input = page.getByRole('textbox', { name: 'コマンド' });
   await input.fill('echo still usable');
   await input.press('Enter');
   await expect(page.locator('.output')).toContainText('still usable');
-  await expect(page.getByRole('status')).toContainText('保存容量が足りません。');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('保存容量が足りません。');
   expect((await downloadBackup(page)).session).toBeNull();
   expect(errors).toEqual([]);
 });
@@ -125,7 +125,7 @@ test('unavailable IndexedDB is reported without claiming to save data or breakin
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => Object.defineProperty(window, 'indexedDB', { value: undefined }));
   await page.goto('/');
-  await expect(page.getByRole('status')).toContainText('IndexedDB is unavailable');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('IndexedDB is unavailable');
   await expect(page.getByRole('button', { name: 'JSON バックアップを保存' })).toBeDisabled();
   const input = page.getByRole('textbox', { name: 'コマンド' });
   await input.fill('echo usable');

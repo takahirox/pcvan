@@ -66,3 +66,26 @@ test('real WebLLM adapter uses structured worker requests, forwards progress, re
   expect(result.requests[0]!.content.chatOpts).toEqual([{ context_window_size: 4096 }]);
   expect(result.requests[1]!.kind).toBe('resetChat');
 });
+
+test('offline real adapter rejects uncached weights before any model reload request', async ({ page, context }) => {
+  await page.goto('http://127.0.0.1:14374');
+  // Import while online so this test isolates missing weights from missing JS.
+  await page.evaluate(async () => { const path = '/src/ai/webllm-adapter.ts'; await import(path); });
+  await context.setOffline(true);
+  const result = await page.evaluate(async () => {
+    const path = '/src/ai/webllm-adapter.ts';
+    const { createWebLlmAdapter } = await import(path) as typeof import('../src/ai/webllm-adapter');
+    const OriginalWorker = window.Worker;
+    const messages: unknown[] = [];
+    class FakeWorker { postMessage(message: unknown) { messages.push(message); } terminate() {} }
+    window.Worker = FakeWorker as unknown as typeof Worker;
+    const adapter = createWebLlmAdapter();
+    try {
+      await adapter.load('Qwen2.5-0.5B-Instruct-q4f16_1-MLC', () => {}, new AbortController().signal);
+      return { error: '', messages };
+    } catch (error) { return { error: String(error), messages }; }
+    finally { adapter.dispose(); window.Worker = OriginalWorker; }
+  });
+  expect(result.error).toContain('重みが未保存');
+  expect(result.messages).toEqual([]);
+});

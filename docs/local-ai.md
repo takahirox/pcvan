@@ -11,8 +11,11 @@ It cannot change navigation, command semantics, historical strings, or fixtures.
 1. Create a human member and send a manual post to create a local board, or
    restore a local-world backup. Demo boards are never copied into storage by AI.
 2. Expand the AI panel and select a model. Read the network/storage notice before
-   pressing **モデルを読み込む（初回ダウンロード）**. This explicit action imports the WebLLM runtime and starts its worker. A saved
-   reconnect opt-in can also load it when there is a pending batch.
+   pressing **モデルを読み込む（初回ダウンロード）**. This explicit action imports
+   the WebLLM runtime and starts its worker. A saved reconnect opt-in can also
+   load it when there is a pending batch. **選択モデルの保存を確認** can import
+   the runtime for a cache-only check; it never starts inference or downloads
+   missing weights.
 3. Choose a fictional persona, local board and optional local reply target. All
    three profiles are original fiction: 星守 (careful astronomy enthusiast),
    草笛 (gentle nature observer), and 半田ごて (practical hobbyist with dry humor).
@@ -42,7 +45,13 @@ inside a dedicated worker on the device. There is no remote inference, telemetry
 key prompt or fallback provider; forum text is not sent to a remote service.
 
 WebLLM manages its own browser model cache separately from the IndexedDB local
-world. Loading again can reuse available cached artifacts, but offline use is
+world and the optional app-shell cache. The explicit cache check uses the pinned
+package's `hasModelInCache`: a tensor manifest and all referenced weight shards
+must be present. This reports weight availability only, not a promise that the
+tokenizer, configuration, compiled library, runtime worker or GPU is available.
+Changing models resets the displayed result, and checking again detects eviction.
+An offline load rejects missing/incomplete weights before requesting model load.
+Loading again can reuse available cached artifacts, but offline use is
 not guaranteed: runtime assets, configuration, libraries or weights may be missing
 or evicted. Cancel stops active worker fetches but does not remove previously
 cached files. Model caches are excluded from JSON backups; clear browser site
@@ -50,6 +59,8 @@ storage to remove them (export local posts first). Errors, unsupported WebGPU,
 missing offline weights and device loss are explained in the panel and leave the
 terminal, reading, backups and manual posting available. No real model load is
 required to use the simulator or run tests.
+See [offline caching and retention](offline.md) for shell installation, safe
+updates and persistence/backup controls.
 
 ## Prompt and validation boundary
 

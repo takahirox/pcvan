@@ -85,7 +85,7 @@ test('keyboard placeholders work offline without service requests or changing lo
   });
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status')).toContainText('バックアップを復元しました。');
+  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
   const initialUrl = page.url();
   const requests: string[] = [];
   const navigations: string[] = [];

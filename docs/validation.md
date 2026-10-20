@@ -403,3 +403,61 @@ validation and transactional local post allocator.
 Optional real-model conversation/coherence checks over manual reconnect cycles
 were not performed. No deployment was performed; no post-merge verification is
 required for #11.
+
+## Issue #12 optional offline caching and retention safeguards
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+The assigned checkpoint contained the older documentation-only baseline. Fetched
+and merged current `main` at `bfaadddb97350eda740d29b1eb166d3b42eaa2a9`
+(merged #4/#6/#10 prerequisites), then reused the existing WebLLM cache API and
+v1 JSON backup/restore rather than reimplementing them.
+
+- `npm ci`: passed; zero reported vulnerabilities, no dependency changes.
+- Final `npm test`: **98 tests passed**, no retries (8.2 seconds), including the
+  TypeScript check and production Vite build. Seven added tests cover real
+  service-worker installation under a subdirectory, offline reload, local reading
+  and posting, JSON export/restore offline, missing AI runtime/weights, failed
+  install retry, eviction/repair, failed and mixed-release updates, two-tab waiting,
+  scoped cache cleanup and retained IndexedDB members/posts/read states/settings.
+  Storage API grant/denial/error/unsupported states are exercised. The real pinned
+  WebLLM probe checks missing manifest, partial and complete synthetic shards,
+  selection changes and eviction without external model downloads. The real
+  adapter rejects offline missing weights before issuing a model reload request.
+- Production shell cache contains exactly HTML, main JS and CSS; lazy AI assets
+  are absent until explicitly requested. Every allowed asset has a generated
+  SHA-256 integrity value. A repair with a newer HTML file is rejected without
+  overwriting the older complete cached shell. Updating does not touch model
+  caches, other app scopes or the local database schema.
+- Earlier runs found test assumptions about online automatic cache refill and
+  explicit storage refresh, plus ambiguous generic status locators and terminal
+  scrollback affected by an expanded utility panel. Corrected these checks,
+  named the existing local-data status and collapsed secondary utility controls.
+  The final full suite includes the existing scrollback and 320px viewport checks.
+- The existing Vite large-chunk advisory remains for optional WebLLM JS/worker
+  assets (about 6 MB each); these are excluded from shell pre-caching. No model
+  weights were downloaded and no real GPU/inference was required.
+- `node --check scripts/service-worker.js`, changed-document local link checks,
+  Issue-specific diff review and `git diff --cached --check`: passed.
+
+See [offline behavior and reproducible local checks](offline.md). Optional
+second-browser and real-weight/GPU checks were not performed. No deployment,
+publication or external writes were performed; no post-merge verification is
+required for #12.
+
+## Issue #11 integration with offline safeguards
+
+Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+Resolved conflicts with `main` at
+`b78f2748f727e7de793dde3689dc3013467dab39` in the application startup,
+AI controls and documentation. Retained reconnect activity planning and lifecycle
+hooks alongside optional offline controls, cache inspection and offline model
+load safeguards; preserved both Issues' validation records.
+
+- `npm ci`: passed, zero reported vulnerabilities.
+- `npm test -- --workers=2`: **107 tests passed** (18.9 seconds), including the
+  TypeScript check and production build, reconnect scheduling/recovery,
+  offline shell updates/retention and model-cache checks. No retries.
+- `node --check scripts/service-worker.js`, local Markdown link checks and
+  `git diff --cached --check`: passed.
+- The existing Vite advisory for large optional WebLLM chunks remains. No model
+  weights were downloaded; no real GPU, deployment or publication was used.

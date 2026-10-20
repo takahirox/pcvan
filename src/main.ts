@@ -10,6 +10,7 @@ import { activeHuman, forumPosts, replyReference } from './forums';
 import { mountComposer } from './composer';
 import { mountAiControls } from './ai/controls';
 import { postInput, validateGeneration } from './ai/generation';
+import { mountOfflineControls } from './offline/controls';
 import './style.css';
 
 const controller = new ConnectionController();
@@ -207,3 +208,4 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) void ai.openActivity().catch((error) => controls.reportError(error));
 });
+mountOfflineControls(root);
