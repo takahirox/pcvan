@@ -17,6 +17,12 @@ export interface ForumDestination { keyword: 'MITI' | 'DAISIZEN'; boardNo: numbe
 const allStores = [...stores, 'session'];
 const emptySession = (): Session => ({ lastLoginAt: null, lastLogoutAt: null, commandHistory: [] });
 
+/** An individual pause withdraws unsaved actions while preserving committed history. */
+function removePausedRuns(state: AiActivity, profiles: readonly ResidentProfile[]): void {
+  if (state.batch) state.batch.runs = state.batch.runs.filter((run) => run.status === 'committed' ||
+    profiles.some((profile) => profile.id === run.personaId && profile.frequency > 0));
+}
+
 export function createRecordId(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
@@ -333,12 +339,14 @@ export class LocalRepository {
       validateResidents({ version: 1, profiles });
       await request(settings.put({ id: RESIDENTS_SETTING, value: { version: 1, profiles } }));
     }
-    for (const profile of residentProfiles(await this.snapshot(tx))) {
+    const profiles = residentProfiles(await this.snapshot(tx));
+    for (const profile of profiles) {
       const id = personaMemberId(profile.id);
       if (!await request(tx.objectStore('members').get(id))) {
         await request(tx.objectStore('members').add({ id, handle: profile.handle, actor: 'ai' }));
       }
     }
+    removePausedRuns(migrated, profiles);
     return migrated;
   }
 
@@ -400,6 +408,7 @@ export class LocalRepository {
       await request(tx.objectStore('members').put({ id: personaMemberId(input.id), handle: input.handle, actor: 'ai' }));
       await request(tx.objectStore('settings').put({ id: RESIDENTS_SETTING, value: settings }));
       state.nextDue![input.id] = initialDue(now, state.seed!)[input.id]!;
+      removePausedRuns(state, settings.profiles);
       return this.writeActivity(tx, state);
     });
   }
@@ -429,6 +438,8 @@ export class LocalRepository {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       const state = await this.readActivity(tx, new Date().toISOString());
       const run = state.batch?.runs.find((row) => row.id === id);
+      // A settings change in another tab may have withdrawn this queued action.
+      if (!run && status === 'running') return this.writeActivity(tx, state);
       if (!run || !state.maxPosts) invalid('AI activity is disabled or the run is missing.');
       if (run.status !== 'committed') run.status = status;
       return this.writeActivity(tx, state);
@@ -447,7 +458,9 @@ export class LocalRepository {
         if (run) { run.status = 'committed'; await this.writeActivity(tx, state); }
         return existing;
       }
-      if (!run || !state.maxPosts) invalid('AI activity is disabled or the run is missing.');
+      // Pausing a resident can withdraw a run while its model output is in flight.
+      if (!run) { await this.writeActivity(tx, state); return undefined; }
+      if (!state.maxPosts) invalid('AI activity is disabled or the run is missing.');
       if (run.status === 'committed') return undefined; // A later explicit deletion stays deleted.
       if (run.status !== 'running') invalid('AI run is not running.');
       const target = { personaId: run.personaId, forumId: run.forumId,

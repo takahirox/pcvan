@@ -39,6 +39,148 @@ test('independent resident plans are deterministic, varied, bounded and require 
   expect(result.hardCap).toBeLessThanOrEqual(12); expect(result.hardCap).toBeGreaterThan(6);
 });
 
+test('reply-only residents stay silent without eligible parents instead of starting topics', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async ({ fixture, from, threeDays, modelId }) => {
+    const a = '/src/ai/activity.ts'; const p = '/src/ai/personas.ts';
+    const { emptyActivity, planActivity } = await import(a) as typeof import('../src/ai/activity');
+    const { personas } = await import(p) as typeof import('../src/ai/personas');
+    const profiles = personas.map((profile) => ({ ...profile, frequency: profile.id === 'hoshimori' ? 1 : 0,
+      participation: 1, weekdayHours: Array.from({ length: 24 }, (_, i) => i),
+      weekendHours: Array.from({ length: 24 }, (_, i) => i), reading: 0, inactivity: 0, newThread: 0, reply: 1 }));
+    const content = { ...fixture, forums: [fixture.forums[0]!], settings: [
+      { id: 'ai-residents', value: { version: 1, profiles } },
+    ] } as unknown as Backup;
+    const state = { ...emptyActivity(from, 'community'), consent: true };
+    const parent = fixture.posts[0]!;
+    const ineligible = [
+      [], [{ ...parent, origin: 'imported' }], [{ ...parent, authorId: 'fictional-ai:hoshimori' }],
+      [{ ...parent, createdAt: threeDays }], [{ ...parent, forumId: 'other' }],
+      [parent, { ...parent, id: 'answered', number: 2, authorId: 'fictional-ai:hoshimori',
+        origin: `local-ai:webllm:${modelId}`, replyToPostId: parent.id }],
+    ];
+    const silent = ineligible.map((posts) => planActivity({ ...content, posts }, state, threeDays));
+    const replies = planActivity({ ...content, posts: [parent] }, state, threeDays);
+    profiles[0]!.newThread = 1; profiles[0]!.reply = 0;
+    const topics = planActivity({ ...content, posts: [] }, state, threeDays);
+    return { silent, replies, topics };
+  }, { fixture: backupFixture(), from, threeDays, modelId });
+  expect(result.silent).toEqual(Array(6).fill(null));
+  expect(result.replies!.runs.length).toBeGreaterThan(0);
+  expect(result.replies!.runs.every((run) => run.replyToPostId === 'first')).toBe(true);
+  expect(result.topics!.runs.length).toBeGreaterThan(0);
+  expect(result.topics!.runs.every((run) => !run.replyToPostId)).toBe(true);
+});
+
+test('individual pause withdraws retained runs across reloads and retries without blocking other residents', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async ({ fixture, from, oneHour, modelId }) => {
+    const r = '/src/storage/repository.ts'; const a = '/src/ai/activity.ts';
+    const p = '/src/ai/personas.ts'; const runner = '/src/ai/activity-runner.ts';
+    const { openRepository } = await import(r) as typeof import('../src/storage/repository');
+    const { emptyActivity } = await import(a) as typeof import('../src/ai/activity');
+    const { residentProfiles } = await import(p) as typeof import('../src/ai/personas');
+    const { runActivityBatch } = await import(runner) as typeof import('../src/ai/activity-runner');
+    const results = [];
+    for (const status of ['pending', 'running', 'failed', 'cancelled'] as const) {
+      const name = `resident-pause-${status}`;
+      const repo = await openRepository(name);
+      await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+      const state = { ...emptyActivity(oneHour, 'community'), consent: true, batch: {
+        id: 'pause', from, to: oneHour, modelId, runs: ['hoshimori', 'kusabue'].map((personaId, i) => ({
+          id: `pause:${personaId}`, personaId, forumId: 'forum', simulatedAt: oneHour,
+          status: i === 0 ? status : 'pending' as const,
+        })),
+      } };
+      await repo.put('settings', { id: 'ai-activity', value: state as never });
+      await repo.openActivity(oneHour);
+      const profile = residentProfiles(await repo.exportBackup())[0]!;
+      const configured = await repo.configureResident({ ...profile, frequency: 0 }, oneHour);
+      // Also recover an older backup that still retains a paused resident's action.
+      await repo.put('settings', { id: 'ai-activity', value: state as never });
+      repo.close();
+      const reopened = await openRepository(name);
+      const paused = await reopened.openActivity(oneHour);
+      const calls: string[] = [];
+      const engine = { async load() {}, dispose() {}, async generate(prompt: { user: string }) {
+        const request = JSON.parse(prompt.user); calls.push(request.personaId);
+        return JSON.stringify({ personaId: request.personaId, forumId: request.forumId, title: '活動', body: '住人の話題' });
+      } };
+      const budget = { attempts: 0, committed: 0 };
+      for (let retry = 0; retry < 2; retry++) {
+        await runActivityBatch(reopened, () => reopened.exportBackup(), state, engine,
+          new AbortController().signal, budget, () => {});
+      }
+      const posts = (await reopened.exportBackup()).posts.filter((post) => post.simulation);
+      const finished = await reopened.openActivity(oneHour);
+      results.push({ configured, paused, calls, posts, finished, budget }); reopened.close();
+    }
+    return results;
+  }, { fixture: backupFixture(), from, oneHour, modelId });
+  for (const row of result) {
+    expect(row.configured.batch!.runs.map((run) => run.personaId)).toEqual(['kusabue']);
+    expect(row.paused.batch!.runs.map((run) => run.personaId)).toEqual(['kusabue']);
+    expect(row.calls).toEqual(['kusabue']);
+    expect(row.posts.map((post) => post.authorId)).toEqual(['fictional-ai:kusabue']);
+    expect(row.budget).toEqual({ attempts: 1, committed: 1 });
+    expect(row.finished.batch).toBeNull();
+  }
+});
+
+test('cross-tab pauses before inference and during generation skip stale actions and preserve other residents', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async ({ fixture, from, oneHour, modelId }) => {
+    const r = '/src/storage/repository.ts'; const a = '/src/ai/activity.ts';
+    const p = '/src/ai/personas.ts'; const runner = '/src/ai/activity-runner.ts';
+    const { openRepository } = await import(r) as typeof import('../src/storage/repository');
+    const { emptyActivity } = await import(a) as typeof import('../src/ai/activity');
+    const { residentProfiles } = await import(p) as typeof import('../src/ai/personas');
+    const { runActivityBatch } = await import(runner) as typeof import('../src/ai/activity-runner');
+    const repo = await openRepository('resident-pause-race');
+    const other = await openRepository('resident-pause-race');
+    await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+    const state = { ...emptyActivity(from, 'community'), consent: true, maxPosts: 1, batch: {
+      id: 'race', from, to: oneHour, modelId, runs: ['hoshimori', 'hankote', 'kusabue'].map((personaId) => ({
+        id: `race:${personaId}`, personaId, forumId: 'forum', simulatedAt: oneHour, status: 'pending' as const,
+      })),
+    } };
+    await repo.put('settings', { id: 'ai-activity', value: state as never });
+    await repo.openActivity(oneHour);
+    const pause = async (id: string) => {
+      const profile = residentProfiles(await other.exportBackup()).find((p) => p.id === id)!;
+      await other.configureResident({ ...profile, frequency: 0 }, oneHour);
+    };
+    const actions = {
+      openActivity: repo.openActivity.bind(repo), configureActivity: repo.configureActivity.bind(repo),
+      authorizeModel: repo.authorizeModel.bind(repo), configureResident: repo.configureResident.bind(repo),
+      commitAiRun: repo.commitAiRun.bind(repo),
+      async setAiRunStatus(...args: Parameters<typeof repo.setAiRunStatus>) {
+        if (args[0] === 'race:hoshimori' && args[1] === 'running') await pause('hoshimori');
+        return repo.setAiRunStatus(...args);
+      },
+    };
+    const calls: string[] = [];
+    const engine = { async load() {}, dispose() {}, async generate(prompt: { user: string }) {
+      const request = JSON.parse(prompt.user); calls.push(request.personaId);
+      if (request.personaId === 'hankote') await pause('hankote');
+      return JSON.stringify({ personaId: request.personaId, forumId: request.forumId, title: '活動', body: '住人の話題' });
+    } };
+    const budget = { attempts: 0, committed: 0 };
+    await runActivityBatch(actions, () => repo.exportBackup(), state, engine,
+      new AbortController().signal, budget, () => {});
+    // Pausing after commit preserves the already saved post and idempotent acknowledgement.
+    await pause('kusabue');
+    const duplicate = await repo.commitAiRun('race:kusabue', 'ignored');
+    const saved = await repo.exportBackup();
+    repo.close(); other.close();
+    return { calls, budget, saved, duplicate };
+  }, { fixture: backupFixture(), from, oneHour, modelId });
+  expect(result.calls).toEqual(['hankote', 'kusabue']);
+  expect(result.budget).toEqual({ attempts: 2, committed: 1 });
+  expect(result.saved.posts.filter((post) => post.simulation)).toEqual([result.duplicate]);
+  expect(result.duplicate!.authorId).toBe('fictional-ai:kusabue');
+});
+
 test('atomic result/status, concurrent commits, rollback, interrupted retry, caps and backup timestamps', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-24T01:00:00.000Z'));
   await page.goto('http://127.0.0.1:14374');

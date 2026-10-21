@@ -3,6 +3,7 @@ import type { AiActivity, AiRun, Backup } from '../storage/schema';
 import { ACTIVITY_SETTING, MAX_SESSION_POSTS } from './activity';
 import { buildPrompt } from './generation';
 import type { LocalLlmAdapter } from './generation';
+import { residentProfiles } from './personas';
 
 export type ActivityActions = Pick<LocalRepository, 'openActivity' | 'configureActivity' | 'authorizeModel' | 'configureResident' | 'setAiRunStatus' | 'commitAiRun'>;
 
@@ -24,7 +25,14 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
       if (budget.committed >= latest.maxPosts) break;
       current = latest.batch.runs.find((row) => row.id === planned.id);
       if (!current || current.status === 'committed') { current = undefined; continue; }
-      report(await actions.setAiRunStatus(current.id, 'running'));
+      if (!residentProfiles(snapshot).some((profile) => profile.id === current!.personaId && profile.frequency > 0)) {
+        current = undefined; continue;
+      }
+      const started = await actions.setAiRunStatus(current.id, 'running');
+      report(started);
+      if (!started.batch?.runs.some((run) => run.id === current!.id && run.status === 'running')) {
+        current = undefined; continue;
+      }
       signal.throwIfAborted();
       const request = { personaId: current.personaId, forumId: current.forumId,
         ...(current.replyToPostId === undefined ? {} : { replyToPostId: current.replyToPostId }) };
@@ -33,8 +41,8 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
       budget.attempts++;
       const raw = await engine.generate(buildPrompt(context, request), signal);
       signal.throwIfAborted();
-      await actions.commitAiRun(current.id, raw, signal);
-      budget.committed++;
+      const post = await actions.commitAiRun(current.id, raw, signal);
+      if (post) budget.committed++;
       current = undefined;
       const updated = await read();
       report(updated.settings.find((row) => row.id === ACTIVITY_SETTING)!.value as unknown as AiActivity);

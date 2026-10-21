@@ -63,7 +63,9 @@ function chooseAction(content: Backup, profile: ResidentProfile, at: number, see
     profile.interests.filter((interest) => `${p.title} ${p.body}`.includes(interest)).length * 2 +
     (memory.some((m) => m.id === p.replyToPostId) ? 3 : 0) + draw(p.id);
   parents.sort((a, b) => score(b) - score(a));
-  const parent = action >= profile.reading + profile.inactivity + profile.newThread ? parents[0] : undefined;
+  const isReply = action >= profile.reading + profile.inactivity + profile.newThread;
+  const parent = isReply ? parents[0] : undefined;
+  if (isReply && !parent) return null;
   return { personaId: profile.id, forumId: forum.id, ...(parent ? { replyToPostId: parent.id } : {}) };
 }
 
