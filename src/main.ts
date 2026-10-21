@@ -39,8 +39,9 @@ async function loadHistory(load: () => Promise<Session | null>): Promise<void> {
 }
 const startup = enqueue(async () => {
   await loadHistory(async () => (await repository).startSession());
+  const activity = await (await repository).openActivity();
   await refreshContent();
-  return (await repository).openActivity();
+  return activity;
 });
 let displayPreferencesLoaded = false;
 async function refreshContent(): Promise<Backup> {
@@ -183,6 +184,16 @@ const ai = mountAiControls(root, {
   activity: {
     openActivity: (now) => enqueue(async () => (await repository).openActivity(now)),
     configureActivity: (maxPosts, modelId, now) => enqueue(async () => (await repository).configureActivity(maxPosts, modelId, now)),
+    authorizeModel: (modelId, now) => enqueue(async () => {
+      const state = await (await repository).authorizeModel(modelId, now);
+      await refreshContent();
+      return state;
+    }),
+    configureResident: (profile, now) => enqueue(async () => {
+      const state = await (await repository).configureResident(profile, now);
+      await refreshContent();
+      return state;
+    }),
     setAiRunStatus: (id, status) => enqueue(async () => (await repository).setAiRunStatus(id, status)),
     commitAiRun: (id, raw, signal) => enqueue(async () => {
       signal?.throwIfAborted();
@@ -194,7 +205,7 @@ const ai = mountAiControls(root, {
   save: (request, raw, modelId) => enqueue(async () => {
     const repo = await repository;
     const generated = validateGeneration(raw, await repo.exportBackup(), request);
-    const input = postInput(generated, modelId);
+    const input = postInput(generated, modelId, await repo.exportBackup());
     await repo.createAiPost(input.member, input.post);
     // Report refresh failures separately after the committed send to avoid duplicates.
     try { await refreshContent(); } catch (error) { controls.reportError(error); }
@@ -216,9 +227,15 @@ const touchActivity = () => {
     void enqueue(async () => (await repository).touchActivity()).catch((error) => controls.reportError(error));
   }
 };
-setInterval(() => { if (document.visibilityState === 'visible') touchActivity(); }, 60_000);
+function tickResidents() {
+  if (controller.screen !== 'disconnected' && document.visibilityState === 'visible') {
+    void ai.tick().catch((error) => controls.reportError(error));
+  }
+}
+setInterval(() => { tickResidents(); }, 60_000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') touchActivity();
+  else tickResidents();
 });
 window.addEventListener('pagehide', () => {
   ai.invalidate();

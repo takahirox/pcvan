@@ -5,7 +5,7 @@ export async function openSettings(page: Page, panel: 'storage' | 'member' | 'di
   if (!await dialog.isVisible()) await page.locator('.open-settings').click();
   const section = page.locator(`.${panel}-controls`);
   const details = ['display', 'ai', 'about', 'help'].includes(panel) ? section : section.locator('details').first();
-  if (await details.getAttribute('open') === null) await details.locator('summary').click();
+  if (await details.getAttribute('open') === null) await details.locator(':scope > summary').click();
 }
 
 export async function closeSettings(page: Page) {

@@ -270,7 +270,9 @@ test('failed update preserves old release; successful update waits for all tabs,
     await page.goto(`${site.origin}/pcvan/`);
     await expect(page.locator('body')).toHaveAttribute('data-release', '4');
     const result = await backup(page);
-    for (const key of ['members', 'sigs', 'forums', 'posts', 'readStates', 'settings'] as const) expect(result[key]).toEqual(fixture[key]);
+    for (const key of ['sigs', 'forums', 'posts', 'readStates'] as const) expect(result[key]).toEqual(fixture[key]);
+    expect(result.members).toEqual(expect.arrayContaining(fixture.members));
+    expect(result.settings).toEqual(expect.arrayContaining(fixture.settings));
   } finally { await context.setOffline(false); await page.close(); await site.close(); }
 });
 

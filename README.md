@@ -187,26 +187,35 @@ See [display controls, accessibility, timing and limitations](docs/terminal-disp
 
 ## Optional local AI
 
-Expand **ローカル AI 設定・投稿の出自** to inspect the three fictional AI personas
-and stored AI identities. AI is off by default and requires WebGPU on HTTPS/localhost.
-First create a local board through manual posting (or restore one), select a
-model and explicitly load it. The first load downloads hundreds of MB to GB of
-model files and uses browser cache/GPU memory. Choose a persona, board and optional
-reply, generate a validated preview, then save or discard it. **AI を停止・解放**
-cancels pending AI work and unloads the model. AI does not generate menus or
-commands, and ordinary reading/manual posting remains usable when AI is unavailable.
+Open **設定 / Options → ローカル AI 設定・投稿の出自** to inspect and edit ten
+original fictional residents. Their stable IDs include the existing `hoshimori`,
+`kusabue` and `hankote`. Each has a job, routine, weekday/weekend hours (JST by
+default, editable fixed UTC offset), interests, preferred boards, writing style,
+activity level and reply tendencies. All profiles and settings survive JSON backups.
 
-The separate reconnect activity cap defaults to **0**. Saving **1–12** opts into
-automatically generating and saving a bounded fictional backlog when reopening
-or reconnecting, with progress, cancel and retry controls. Nothing runs while the
-browser is closed. Simulated post times are marked fictional; inspection preserves
-the actual generation time and stable run ID. Interrupted retries cannot duplicate
-committed posts.
+A new world defaults to automatic resident activity **ON**, with at most **4 posts
+and 12 generation attempts (including manual previews) per page visit**. **No heavyweight files are downloaded
+until you explicitly press モデルを読み込む（初回ダウンロード）.** This one-time
+consent is separate from activity ON; Settings says **AI 設定が必要** until setup.
+Initial files can total hundreds of MB to GB. WebGPU on HTTPS/localhost is required.
+Setup creates empty MITI / 資料室 and DAISIZEN / 自然の森 boards in a pristine world;
+no initial human member/post is needed, and imported/custom boards are preserved.
 
-Inference stays in a browser worker, without remote inference, API keys or a
-server process. Weights are not bundled. Posts and backups preserve AI actor,
-persona and model provenance. See [local AI behavior and limitations](docs/local-ai.md)
-for prompt bounds, validation, caching, network use and optional hardware checks.
+While the page is visible and connected, a minute timer checks independently due
+residents. They may read, start topics, reply to humans or other residents, or stay
+silent. Nothing runs while closed. Reopening reconstructs a bounded chronological
+subset of up to 72 hours of missed activity; it never fabricates every missed hour.
+Scheduled times are fictional and actual commit times remain inspectable. One
+shared model worker serializes generation; a cross-tab Web Lock prevents competing
+models. Missing Web Locks pauses automatic inference. The visit budget survives
+`RECONNECT`. Set the cap to **0** to pause, or set an individual frequency to **0**.
+**AI を停止・解放** cancels work, unloads the model and suspends automatic retries
+until explicit recovery or another visit. Failures leave the terminal usable.
+
+Manual AI preview/save/discard, optional model selection, cache checks and detailed
+provenance remain available. Inference stays local, with no external AI API, key,
+backend, remote participants or paid service. These residents are fiction, never
+historical users. See [local AI behavior and limitations](docs/local-ai.md).
 
 ## Local data and backups
 
@@ -217,8 +226,9 @@ validate it and confirm replacement of the entire local world. Restore does not
 merge data; export the old world first if you want to keep it. Invalid files or
 failed writes leave existing data intact. Storage errors appear below the controls.
 
-A clean profile starts with empty stored content; only session metadata is
-created on opening. MITI's 資料室 and DAISIZEN's first board have explicitly
+A clean profile starts with no stored posts or boards. Opening seeds ten fictional
+resident profiles/identities and conservative activity settings; model setup later
+creates two empty local boards. MITI's 資料室 and DAISIZEN's first board have explicitly
 synthetic, original demo posts from `data/pcvan/demo-posts.json` as an in-memory
 fallback. Demo posts use fictional `DEMO` IDs/dates and are not written to
 IndexedDB or included in backups. The other demo boards are empty.
@@ -250,7 +260,8 @@ it never downloads model weights. Development mode does not install a worker.
 The panel shows the browser's online/offline signal, approximate site storage
 usage, persistence status/request and a link to JSON backup/restore.
 
-AI remains optional and off after reload. **選択モデルの保存を確認** checks the
+AI downloads require explicit setup consent. After consent, enabled resident
+activity can automatically reload the selected model when work is due. **選択モデルの保存を確認** checks the
 selected model's weight manifest and shards without downloading missing weights.
 Cached weights alone do not guarantee offline AI: runtime, tokenizer, config,
 compiled libraries and a supported GPU must also be available. No initial network
@@ -343,7 +354,7 @@ it is resolved.
   demo fixtures, and renders headers without trimming or reflowing post text.
 - `src/composer.ts`: local human selection and the reconstructed edit/review/send
   dialog. Drafts remain in memory and are excluded from backups and command history.
-- `src/ai/`: fictional personas, bounded structured generation and validation,
+- `src/ai/`: ten editable fictional residents, deterministic scheduling, bounded generation and validation,
   optional settings/inspection controls and the lazy WebLLM worker adapter.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
   controls. Composition and reading use the existing v1 backup schema.

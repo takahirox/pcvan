@@ -5,7 +5,7 @@ import type { GenerationPrompt, LocalLlmAdapter } from './generation';
 // fetching missing files. This does not prove that config/tokenizer/WASM exist.
 export const modelWeightsCached = (modelId: string) => hasModelInCache(modelId);
 
-/** Loaded only by the user's model-load action. Termination cancels fetch and GPU work. */
+/** Loaded after explicit model setup consent. Termination cancels fetch and GPU work. */
 export function createWebLlmAdapter(): LocalLlmAdapter {
   const worker = new Worker(new URL('./webllm-worker.ts', import.meta.url), { type: 'module' });
   const engine = new WebWorkerMLCEngine(worker);

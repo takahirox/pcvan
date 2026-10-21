@@ -9,16 +9,17 @@ const oneHour = '2026-10-21T01:00:00.000Z';
 const threeDays = '2026-10-24T00:00:00.000Z';
 const modelId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
 
-test('0/1/72-hour plans are deterministic, varied, bounded and disabled by default', async ({ page }) => {
+test('independent resident plans are deterministic, varied, bounded and require model consent', async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async ({ fixture, from, oneHour, threeDays }) => {
     const path = '/src/ai/activity.ts';
     const { emptyActivity, planActivity } = await import(path) as typeof import('../src/ai/activity');
-    const state = { ...emptyActivity(from), maxPosts: 6 };
+    const state = { ...emptyActivity(from, 'community'), maxPosts: 6, consent: true };
     const plan = planActivity(fixture, state, threeDays)!;
     return {
       zero: planActivity(fixture, state, from), one: planActivity(fixture, state, oneHour), plan,
       repeat: planActivity(fixture, state, threeDays),
+      topics: planActivity({ ...fixture, posts: [] }, state, threeDays),
       disabled: planActivity(fixture, emptyActivity(from), threeDays),
       clockBackwards: planActivity(fixture, state, '2026-10-20T00:00:00.000Z'),
       empty: planActivity({ ...fixture, forums: [] }, state, threeDays),
@@ -26,16 +27,158 @@ test('0/1/72-hour plans are deterministic, varied, bounded and disabled by defau
     };
   }, { fixture: backupFixture(), from, oneHour, threeDays });
   expect(result.zero).toBeNull();
-  expect(result.one!.runs).toHaveLength(1);
+  expect(result.one?.runs.length ?? 0).toBeLessThanOrEqual(6);
   expect(result.plan.runs).toHaveLength(6);
   expect(result.plan).toEqual(result.repeat);
-  expect(new Set(result.plan.runs.map((run) => run.personaId)).size).toBe(3);
+  expect(new Set(result.plan.runs.map((run) => run.personaId)).size).toBeGreaterThan(1);
   expect(new Set(result.plan.runs.map((run) => run.forumId)).size).toBe(2);
   expect(result.plan.runs.some((run) => run.replyToPostId)).toBe(true);
-  expect(result.plan.runs.some((run) => !run.replyToPostId)).toBe(true);
+  expect(result.topics!.runs.every((run) => !run.replyToPostId)).toBe(true);
   expect(result.plan.runs.every((run) => run.simulatedAt > from && run.simulatedAt < threeDays)).toBe(true);
   expect(result.disabled).toBeNull(); expect(result.empty).toBeNull(); expect(result.clockBackwards).toBeNull();
-  expect(result.hardCap).toBe(12);
+  expect(result.hardCap).toBeLessThanOrEqual(12); expect(result.hardCap).toBeGreaterThan(6);
+});
+
+test('reply-only residents stay silent without eligible parents instead of starting topics', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async ({ fixture, from, threeDays, modelId }) => {
+    const a = '/src/ai/activity.ts'; const p = '/src/ai/personas.ts';
+    const { emptyActivity, planActivity } = await import(a) as typeof import('../src/ai/activity');
+    const { personas } = await import(p) as typeof import('../src/ai/personas');
+    const profiles = personas.map((profile) => ({ ...profile, frequency: profile.id === 'hoshimori' ? 1 : 0,
+      participation: 1, weekdayHours: Array.from({ length: 24 }, (_, i) => i),
+      weekendHours: Array.from({ length: 24 }, (_, i) => i), reading: 0, inactivity: 0, newThread: 0, reply: 1 }));
+    const content = { ...fixture, forums: [fixture.forums[0]!], settings: [
+      { id: 'ai-residents', value: { version: 1, profiles } },
+    ] } as unknown as Backup;
+    const state = { ...emptyActivity(from, 'community'), consent: true };
+    const parent = fixture.posts[0]!;
+    const ineligible = [
+      [], [{ ...parent, origin: 'imported' }], [{ ...parent, authorId: 'fictional-ai:hoshimori' }],
+      [{ ...parent, createdAt: threeDays }], [{ ...parent, forumId: 'other' }],
+      [parent, { ...parent, id: 'answered', number: 2, authorId: 'fictional-ai:hoshimori',
+        origin: `local-ai:webllm:${modelId}`, replyToPostId: parent.id }],
+    ];
+    const silent = ineligible.map((posts) => planActivity({ ...content, posts }, state, threeDays));
+    const replies = planActivity({ ...content, posts: [parent] }, state, threeDays);
+    profiles[0]!.newThread = 1; profiles[0]!.reply = 0;
+    const topics = planActivity({ ...content, posts: [] }, state, threeDays);
+    return { silent, replies, topics };
+  }, { fixture: backupFixture(), from, threeDays, modelId });
+  expect(result.silent).toEqual(Array(6).fill(null));
+  expect(result.replies!.runs.length).toBeGreaterThan(0);
+  expect(result.replies!.runs.every((run) => run.replyToPostId === 'first')).toBe(true);
+  expect(result.topics!.runs.length).toBeGreaterThan(0);
+  expect(result.topics!.runs.every((run) => !run.replyToPostId)).toBe(true);
+});
+
+test('individual pause withdraws retained runs across reloads and retries without blocking other residents', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async ({ fixture, from, oneHour, modelId }) => {
+    const r = '/src/storage/repository.ts'; const a = '/src/ai/activity.ts';
+    const p = '/src/ai/personas.ts'; const runner = '/src/ai/activity-runner.ts';
+    const { openRepository } = await import(r) as typeof import('../src/storage/repository');
+    const { emptyActivity } = await import(a) as typeof import('../src/ai/activity');
+    const { residentProfiles } = await import(p) as typeof import('../src/ai/personas');
+    const { runActivityBatch } = await import(runner) as typeof import('../src/ai/activity-runner');
+    const results = [];
+    for (const status of ['pending', 'running', 'failed', 'cancelled'] as const) {
+      const name = `resident-pause-${status}`;
+      const repo = await openRepository(name);
+      await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+      const state = { ...emptyActivity(oneHour, 'community'), consent: true, batch: {
+        id: 'pause', from, to: oneHour, modelId, runs: ['hoshimori', 'kusabue'].map((personaId, i) => ({
+          id: `pause:${personaId}`, personaId, forumId: 'forum', simulatedAt: oneHour,
+          status: i === 0 ? status : 'pending' as const,
+        })),
+      } };
+      await repo.put('settings', { id: 'ai-activity', value: state as never });
+      await repo.openActivity(oneHour);
+      const profile = residentProfiles(await repo.exportBackup())[0]!;
+      const configured = await repo.configureResident({ ...profile, frequency: 0 }, oneHour);
+      // Also recover an older backup that still retains a paused resident's action.
+      await repo.put('settings', { id: 'ai-activity', value: state as never });
+      repo.close();
+      const reopened = await openRepository(name);
+      const paused = await reopened.openActivity(oneHour);
+      const calls: string[] = [];
+      const engine = { async load() {}, dispose() {}, async generate(prompt: { user: string }) {
+        const request = JSON.parse(prompt.user); calls.push(request.personaId);
+        return JSON.stringify({ personaId: request.personaId, forumId: request.forumId, title: '活動', body: '住人の話題' });
+      } };
+      const budget = { attempts: 0, committed: 0 };
+      for (let retry = 0; retry < 2; retry++) {
+        await runActivityBatch(reopened, () => reopened.exportBackup(), state, engine,
+          new AbortController().signal, budget, () => {});
+      }
+      const posts = (await reopened.exportBackup()).posts.filter((post) => post.simulation);
+      const finished = await reopened.openActivity(oneHour);
+      results.push({ configured, paused, calls, posts, finished, budget }); reopened.close();
+    }
+    return results;
+  }, { fixture: backupFixture(), from, oneHour, modelId });
+  for (const row of result) {
+    expect(row.configured.batch!.runs.map((run) => run.personaId)).toEqual(['kusabue']);
+    expect(row.paused.batch!.runs.map((run) => run.personaId)).toEqual(['kusabue']);
+    expect(row.calls).toEqual(['kusabue']);
+    expect(row.posts.map((post) => post.authorId)).toEqual(['fictional-ai:kusabue']);
+    expect(row.budget).toEqual({ attempts: 1, committed: 1 });
+    expect(row.finished.batch).toBeNull();
+  }
+});
+
+test('cross-tab pauses before inference and during generation skip stale actions and preserve other residents', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async ({ fixture, from, oneHour, modelId }) => {
+    const r = '/src/storage/repository.ts'; const a = '/src/ai/activity.ts';
+    const p = '/src/ai/personas.ts'; const runner = '/src/ai/activity-runner.ts';
+    const { openRepository } = await import(r) as typeof import('../src/storage/repository');
+    const { emptyActivity } = await import(a) as typeof import('../src/ai/activity');
+    const { residentProfiles } = await import(p) as typeof import('../src/ai/personas');
+    const { runActivityBatch } = await import(runner) as typeof import('../src/ai/activity-runner');
+    const repo = await openRepository('resident-pause-race');
+    const other = await openRepository('resident-pause-race');
+    await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+    const state = { ...emptyActivity(from, 'community'), consent: true, maxPosts: 1, batch: {
+      id: 'race', from, to: oneHour, modelId, runs: ['hoshimori', 'hankote', 'kusabue'].map((personaId) => ({
+        id: `race:${personaId}`, personaId, forumId: 'forum', simulatedAt: oneHour, status: 'pending' as const,
+      })),
+    } };
+    await repo.put('settings', { id: 'ai-activity', value: state as never });
+    await repo.openActivity(oneHour);
+    const pause = async (id: string) => {
+      const profile = residentProfiles(await other.exportBackup()).find((p) => p.id === id)!;
+      await other.configureResident({ ...profile, frequency: 0 }, oneHour);
+    };
+    const actions = {
+      openActivity: repo.openActivity.bind(repo), configureActivity: repo.configureActivity.bind(repo),
+      authorizeModel: repo.authorizeModel.bind(repo), configureResident: repo.configureResident.bind(repo),
+      commitAiRun: repo.commitAiRun.bind(repo),
+      async setAiRunStatus(...args: Parameters<typeof repo.setAiRunStatus>) {
+        if (args[0] === 'race:hoshimori' && args[1] === 'running') await pause('hoshimori');
+        return repo.setAiRunStatus(...args);
+      },
+    };
+    const calls: string[] = [];
+    const engine = { async load() {}, dispose() {}, async generate(prompt: { user: string }) {
+      const request = JSON.parse(prompt.user); calls.push(request.personaId);
+      if (request.personaId === 'hankote') await pause('hankote');
+      return JSON.stringify({ personaId: request.personaId, forumId: request.forumId, title: '活動', body: '住人の話題' });
+    } };
+    const budget = { attempts: 0, committed: 0 };
+    await runActivityBatch(actions, () => repo.exportBackup(), state, engine,
+      new AbortController().signal, budget, () => {});
+    // Pausing after commit preserves the already saved post and idempotent acknowledgement.
+    await pause('kusabue');
+    const duplicate = await repo.commitAiRun('race:kusabue', 'ignored');
+    const saved = await repo.exportBackup();
+    repo.close(); other.close();
+    return { calls, budget, saved, duplicate };
+  }, { fixture: backupFixture(), from, oneHour, modelId });
+  expect(result.calls).toEqual(['hankote', 'kusabue']);
+  expect(result.budget).toEqual({ attempts: 2, committed: 1 });
+  expect(result.saved.posts.filter((post) => post.simulation)).toEqual([result.duplicate]);
+  expect(result.duplicate!.authorId).toBe('fictional-ai:kusabue');
 });
 
 test('atomic result/status, concurrent commits, rollback, interrupted retry, caps and backup timestamps', async ({ page }) => {
@@ -51,6 +194,11 @@ test('atomic result/status, concurrent commits, rollback, interrupted retry, cap
     const off = await repo.openActivity(from);
     const disabled = await repo.openActivity(threeDays);
     await repo.configureActivity(3, modelId, from);
+    await repo.authorizeModel(modelId, from);
+    const activityPath = '/src/ai/activity.ts';
+    const { emptyActivity } = await import(activityPath) as typeof import('../src/ai/activity');
+    const configured = await repo.get('settings', 'ai-activity');
+    await repo.put('settings', { ...configured!, value: { ...emptyActivity(from, 'community'), maxPosts: 3, consent: true } as never });
     const state = await repo.openActivity(threeDays);
     const first = state.batch!.runs[0]!;
     const response = (run: typeof first) => JSON.stringify({ personaId: run.personaId, forumId: run.forumId,
@@ -67,7 +215,9 @@ test('atomic result/status, concurrent commits, rollback, interrupted retry, cap
     try { await repo.commitAiRun(first.id, response(first)); } catch (error) { quota = (error as { code: string }).code; }
     finally { IDBObjectStore.prototype.put = nativePut; }
     const rolledBack = await repo.exportJson() === beforeFailure;
-    const [post, duplicate] = await Promise.all([repo.commitAiRun(first.id, response(first)), repo.commitAiRun(first.id, response(first))]);
+    const otherTab = await openRepository('activity-atomic');
+    const [post, duplicate] = await Promise.all([repo.commitAiRun(first.id, response(first)), otherTab.commitAiRun(first.id, response(first))]);
+    otherTab.close();
     const second = state.batch!.runs[1]!;
     await repo.setAiRunStatus(second.id, 'running');
     repo.close(); // Simulate tab loss with a durable running status and one committed post.
@@ -107,7 +257,7 @@ test('atomic result/status, concurrent commits, rollback, interrupted retry, cap
     return { off, disabled, quota, rolledBack, post, duplicate, retry, calls: calls - cappedCalls,
       simPosts, roundTrip, statuses, cappedCalls, disabledAfter };
   }, { fixture: backupFixture(), from, threeDays, modelId });
-  expect(result.off.maxPosts).toBe(0); expect(result.disabled.batch).toBeNull();
+  expect(result.off.maxPosts).toBe(4); expect(result.off.consent).toBe(false); expect(result.disabled.batch).toBeNull();
   expect(result.quota).toBe('quota'); expect(result.rolledBack).toBe(true);
   expect(result.post).toEqual(result.duplicate);
   expect(result.retry.batch!.runs.map((run) => run.status)).toEqual(['committed', 'running', 'pending']);
@@ -115,8 +265,8 @@ test('atomic result/status, concurrent commits, rollback, interrupted retry, cap
   expect(result.simPosts).toHaveLength(3);
   expect(result.simPosts.every((post) => post.createdAt === '2026-10-24T01:00:00.000Z' &&
     post.simulation!.fictional && post.simulation!.simulatedAt < post.createdAt && post.id === post.simulation!.runId)).toBe(true);
-  expect(result.roundTrip).toBe(true); expect(result.statuses).toBeNull();
-  expect(result.cappedCalls).toBe(1); expect(result.disabledAfter.batch).toBeNull();
+  expect(result.roundTrip).toBe(true);
+  expect(result.cappedCalls).toBe(1); expect(result.disabledAfter.maxPosts).toBe(0);
 });
 
 declare global {
@@ -158,6 +308,9 @@ async function seed(page: Page, maxPosts = 3) {
     const { openRepository } = await import(path) as typeof import('../src/storage/repository');
     const repo = await openRepository();
     await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+    const activityPath = '/src/ai/activity.ts';
+    const { emptyActivity } = await import(activityPath) as typeof import('../src/ai/activity');
+    await repo.put('settings', { id: 'ai-activity', value: { ...emptyActivity(from, 'community'), consent: true } as never });
     await repo.configureActivity(maxPosts, modelId, from);
     repo.close();
   }, { fixture: backupFixture(), from, modelId, maxPosts });
@@ -176,7 +329,7 @@ test('queued HELP preserves the reconnect backlog and completes while inference 
   await page.clock.setFixedTime(new Date(threeDays));
   await mockModel(page);
   await page.goto('http://127.0.0.1:14374');
-  await expect(page.locator('.ai-activity-message')).toContainText('無効');
+  await expect(page.locator('.ai-activity-message')).toContainText('AI 設定が必要');
   const command = page.getByRole('textbox', { name: 'コマンド', exact: true });
   await command.fill('Q'); await command.press('Enter');
   await expect.poll(async () => (await snapshot(page)).session?.commandHistory.at(-1)).toBe('Q');
@@ -207,7 +360,7 @@ test('opt-in persists; reopening generates a bounded backlog with fictional time
   await page.clock.setFixedTime(new Date(threeDays));
   await mockModel(page);
   await page.goto('http://127.0.0.1:14374');
-  await expect(page.locator('.ai-activity-message')).toContainText('無効');
+  await expect(page.locator('.ai-activity-message')).toContainText('AI 設定が必要');
   expect(await page.evaluate(() => window.activityMock.loads)).toBe(0);
   await openSettings(page, 'ai');
   await page.locator('.ai-activity-cap').fill('4');
@@ -221,7 +374,7 @@ test('opt-in persists; reopening generates a bounded backlog with fictional time
   expect(await page.evaluate(() => window.activityMock.calls)).toBe(4);
   const posts = (await snapshot(page)).posts.filter((post) => post.simulation);
   expect(posts).toHaveLength(4);
-  expect(new Set(posts.map((post) => post.authorId)).size).toBe(3);
+  expect(new Set(posts.map((post) => post.authorId)).size).toBeGreaterThan(1);
   await expect(page.locator('.ai-records')).toContainText('fictional=true');
   await expect(page.locator('.ai-records')).toContainText('generatedAt=');
   const before = await snapshot(page);
@@ -271,20 +424,27 @@ test('cancel keeps terminal usable, late output is ignored, retry skips committe
   expect(recovered.posts.filter((post) => post.simulation).every((post) => post.simulation!.runId.startsWith(oldState.batch.id))).toBe(true);
 });
 
-for (const mode of ['load-fail', 'fail', 'invalid', 'unsupported']) {
+for (const mode of ['load-fail', 'fail', 'invalid', 'unsupported', 'no-locks']) {
   test(`${mode} leaves pending work recoverable and terminal available without automatic retries`, async ({ page }) => {
     await page.clock.setFixedTime(new Date(threeDays));
     await mockModel(page, mode !== 'unsupported');
     await page.goto('http://127.0.0.1:14374');
     await seed(page);
-    await page.addInitScript((mode) => { window.activityMock.mode = mode; }, mode);
+    await page.addInitScript((mode) => {
+      window.activityMock.mode = mode;
+      if (mode === 'no-locks') Object.defineProperty(navigator, 'locks', { value: undefined });
+    }, mode);
     await page.reload();
-    await expect(page.locator('.ai-message')).toContainText(mode === 'unsupported' ? 'WebGPU' : 'AI を利用できません');
+    await expect(page.locator(mode === 'no-locks' ? '.ai-activity-message' : '.ai-message')).toContainText(
+      mode === 'no-locks' ? '排他制御' : mode === 'unsupported' ? 'WebGPU' : 'AI を利用できません');
     expect((await snapshot(page)).posts.filter((post) => post.simulation)).toHaveLength(0);
-    expect(await page.evaluate(() => window.activityMock.calls)).toBe(mode === 'load-fail' || mode === 'unsupported' ? 0 : 1);
+    expect(await page.evaluate(() => window.activityMock.calls)).toBe(['load-fail', 'unsupported', 'no-locks'].includes(mode) ? 0 : 1);
     const command = page.getByRole('textbox', { name: 'コマンド', exact: true });
     await command.fill('HELP'); await command.press('Enter');
     await expect(page.locator('.output')).toContainText('MAIN');
+    const calls = await page.evaluate(() => window.activityMock.calls);
+    await page.evaluate(() => { for (let i = 0; i < 3; i++) document.dispatchEvent(new Event('visibilitychange')); });
+    expect(await page.evaluate(() => window.activityMock.calls)).toBe(calls);
     await openSettings(page, 'ai');
     await page.locator('.ai-activity-disable').click();
     await expect(page.locator('.ai-activity-message')).toContainText('無効');

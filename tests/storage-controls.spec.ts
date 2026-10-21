@@ -22,7 +22,9 @@ test('visible backup downloads all local data, and command history survives relo
   await input.fill('echo  保存する ｶﾅ');
   await input.press('Enter');
   const backup = await downloadBackup(page);
-  expect(backup).toMatchObject({ format: 'pcvan-local', version: 1, members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [] });
+  expect(backup).toMatchObject({ format: 'pcvan-local', version: 1, sigs: [], forums: [], posts: [], readStates: [] });
+  expect(backup.members).toHaveLength(10);
+  expect(backup.settings.find((r: { id: string }) => r.id === 'ai-activity').value).toMatchObject({ version: 2, maxPosts: 4, consent: false });
   expect(backup.session.commandHistory).toEqual(['echo  保存する ｶﾅ']);
   expect(backup.session.lastLoginAt).toBeTruthy();
   expect(backup.session.lastLogoutAt).toBeNull();
@@ -59,7 +61,8 @@ test('restore requires confirmation; confirmed replace preserves every field and
   await page.reload();
   const reloaded = await downloadBackup(page);
   expect(reloaded.posts).toEqual(fixture.posts);
-  expect(reloaded.settings).toEqual(fixture.settings);
+  expect(reloaded.settings).toEqual(expect.arrayContaining(fixture.settings));
+  expect(reloaded.members).toEqual(expect.arrayContaining(fixture.members));
 });
 
 test('reload bounds a restored history and keeps recalled edits separate from persisted commands', async ({ page }) => {
