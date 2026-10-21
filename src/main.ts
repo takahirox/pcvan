@@ -155,11 +155,11 @@ const commands = new TerminalCommands({
     const post = await (await repository).createForumPost(target, { ...draft, origin: 'local-human' });
     try { await refreshContent(); } catch (error) { reportError(error); } return post;
   },
-  restore: async (text) => {
+  restore: async (text, expectedContext) => {
     ai.invalidate(); commands.invalidate(); revision++;
     await loadHistory(async () => {
       const repo = await repository;
-      await repo.replaceFromJson(text, { confirmReplace: true });
+      await repo.replaceFromJson(text, { confirmReplace: true, expectedContext });
       print('バックアップを復元しました。コマンド=');
       displayPreferencesLoaded = false;
       try { await refreshContent(); } catch (error) { reportError(error); }
@@ -167,9 +167,9 @@ const commands = new TerminalCommands({
     });
     terminal.focus();
   },
-  reset: async () => {
+  reset: async (expectedContext) => {
     ai.invalidate();
-    await (await repository).resetWorld({ confirmReset: true });
+    await (await repository).resetWorld({ confirmReset: true, expectedContext });
     try { sessionStorage.setItem(RESET_NOTICE, 'true'); } catch { /* Optional notice. */ }
     reloadWorld();
   },

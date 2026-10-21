@@ -16,6 +16,9 @@ export const DATABASE_NAME = 'pcvan-local';
 export const DATABASE_VERSION = 1;
 export const ACTIVE_MEMBER_SETTING = 'active-human-member';
 export interface ForumDestination { keyword: 'MITI' | 'DAISIZEN'; boardNo: number; name: string }
+// Command activity watermarks and session history advance without editing the world.
+export const worldContext = (data: Backup): string => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.readStates,
+  data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } } : row)]);
 const allStores = [...stores, 'session'];
 const emptySession = (): Session => ({ lastLoginAt: null, lastLogoutAt: null, commandHistory: [] });
 
@@ -563,11 +566,13 @@ export class LocalRepository {
   async exportJson(): Promise<string> { return JSON.stringify(await this.exportBackup(), null, 2); }
 
   /** Clear and bootstrap together: any failure restores the entire previous world. */
-  async resetWorld(options: { confirmReset: boolean }, now = new Date().toISOString()): Promise<void> {
+  async resetWorld(options: { confirmReset: boolean; expectedContext?: string }, now = new Date().toISOString()): Promise<void> {
     if (options?.confirmReset !== true) throw new RepositoryError('confirmation-required',
       'Returning to the initial state requires explicit confirmation.');
     const generation = createRecordId();
     await this.transaction(allStores, 'readwrite', async (tx) => {
+      if (options.expectedContext !== undefined && worldContext(await this.snapshot(tx)) !== options.expectedContext)
+        invalid('世界や設定が変わりました。現在の設定から確認し直してください。');
       for (const store of allStores) await request(tx.objectStore(store).clear());
       const state = await this.readActivity(tx, now);
       await this.writeActivity(tx, scheduleActivity(await this.snapshot(tx), state, now));
@@ -578,7 +583,7 @@ export class LocalRepository {
     this.notifySetupChanged('reset');
   }
 
-  async replaceFromJson(text: string, options: { confirmReplace: boolean }): Promise<void> {
+  async replaceFromJson(text: string, options: { confirmReplace: boolean; expectedContext?: string }): Promise<void> {
     if (options?.confirmReplace !== true) throw new RepositoryError('confirmation-required', 'Replacing all local data requires explicit confirmation.');
     let backup: unknown;
     try { backup = JSON.parse(text); } catch { invalid('Backup is not valid JSON.'); }
@@ -587,6 +592,8 @@ export class LocalRepository {
     // No writes until the entire document passes validation. Clear + insert is one
     // transaction, so any constraint, quota, or write error restores the old world.
     await this.transaction(allStores, 'readwrite', async (tx) => {
+      if (options.expectedContext !== undefined && worldContext(await this.snapshot(tx)) !== options.expectedContext)
+        invalid('世界や設定が変わりました。現在の設定から確認し直してください。');
       for (const store of allStores) await request(tx.objectStore(store).clear());
       for (const store of stores) {
         for (const row of backup[store]) {

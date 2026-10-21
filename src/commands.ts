@@ -1,7 +1,7 @@
 import type { Backup, Post, TerminalPreferences } from './storage/schema';
 import { TERMINAL_SETTING, validateBackup } from './storage/schema';
 import type { ForumDestination, LocalRepository } from './storage/repository';
-import { ACTIVE_MEMBER_SETTING } from './storage/repository';
+import { ACTIVE_MEMBER_SETTING, worldContext as context } from './storage/repository';
 import { activeHuman, forumPosts } from './forums';
 import { TerminalComposer } from './composer';
 import type { ComposeDraft } from './composer';
@@ -25,8 +25,8 @@ interface CommandActions {
   navigate(line: string): void;
   destination(): ForumDestination | null;
   save(target: ForumDestination, draft: ComposeDraft): Promise<Post>;
-  restore(text: string): Promise<void>;
-  reset(): Promise<void>;
+  restore(text: string, expectedContext: string): Promise<void>;
+  reset(expectedContext: string): Promise<void>;
   preferences(): TerminalPreferences;
   applyPreferences(value: TerminalPreferences): void;
   sessionTimes(): string;
@@ -34,9 +34,6 @@ interface CommandActions {
   ai: ReturnType<typeof createAiControls>;
 }
 const inviteSetting = 'terminal-handle-invited';
-// Activity watermarks advance after every command; they are not a world edit.
-const context = (data: Backup) => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.readStates,
-  data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } } : row)]);
 const profileFields: (keyof ResidentProfile)[] = ['handle', 'occupation', 'routine', 'profile', 'interests', 'preferredBoards',
   'weekdayHours', 'weekendHours', 'utcOffsetMinutes', 'frequency', 'participation', 'reading', 'newThread', 'reply', 'inactivity', 'affinities'];
 
@@ -53,7 +50,7 @@ export class TerminalCommands {
   private composer: TerminalComposer | undefined;
   private confirmation: Confirmation | undefined;
   private modelSelected = false;
-  private detailReturn: Menu | null = null;
+  private detailReturns: (Menu | null)[] = [];
   private selectedModel: string = models[0].id;
   private selectedResident = 0;
   private selectedForum = 0;
@@ -67,6 +64,7 @@ export class TerminalCommands {
     const active = this.composer?.active || this.registration || this.confirmation || this.profile;
     this.composer = undefined; this.registration = null; this.intent = undefined;
     this.confirmation = undefined; this.profile = undefined; this.field = undefined; this.menu = null;
+    this.detailReturns = [];
     if (active) this.actions.print('別の操作で世界が変更されました。入力を中止しました。現在のデータから操作し直してください。コマンド=');
   }
   async welcome() {
@@ -77,6 +75,7 @@ export class TerminalCommands {
     this.actions.print('PC-VANへようこそ', 'ハンドル名を登録しますか？ (Y/N/SKIP)=', 'HELP: 案内 / N・SKIP: 登録せず読む');
   }
   private async show(menu: Menu) {
+    if (menu !== 'about' && menu !== 'help') this.detailReturns = [];
     this.menu = menu;
     const data = await this.actions.read();
     const print = this.actions.print;
@@ -173,8 +172,8 @@ export class TerminalCommands {
       this.confirmation = undefined;
       if (pending.kind === 'model') void this.actions.ai.load(pending.modelId!, pending.expected);
       if (pending.kind === 'ai-save') void this.actions.ai.send();
-      if (pending.kind === 'import') await this.actions.restore(pending.text!);
-      if (pending.kind === 'reset') await this.actions.reset();
+      if (pending.kind === 'import') await this.actions.restore(pending.text!, pending.expected);
+      if (pending.kind === 'reset') await this.actions.reset(pending.expected);
       if (pending.kind === 'populate') { await (await this.actions.repository()).populateEmptyCommunity({ confirmPopulate: true }); await this.actions.read(); print('初期会話を準備しました。'); }
       print('コマンド='); return true;
     }
@@ -209,7 +208,7 @@ export class TerminalCommands {
     if (command === 'STOP') { this.actions.ai.stop(); return true; }
     if (['SETTINGS', 'CONFIG'].includes(command)) { await this.show('settings'); return true; }
     if (command === 'HANDLE') { await this.show('handles'); return true; }
-    if (command === 'ABOUT') { this.detailReturn = this.menu === 'about' ? this.detailReturn : this.menu; await this.show('about'); return true; }
+    if (command === 'ABOUT') { if (this.menu !== 'about') this.detailReturns.push(this.menu); await this.show('about'); return true; }
     if (command === 'LOG') { downloadText(this.actions.log(), 'terminal'); print('ログのダウンロードを開始しました。保存先を確認してください。'); return true; }
     if (command === 'BACKUP') {
       downloadText(await (await this.actions.repository()).exportJson(), 'backup'); print('バックアップのダウンロードを開始しました。保存先を確認してください。'); return true;
@@ -255,10 +254,11 @@ export class TerminalCommands {
       return false;
     }
     if (command === 'HELP') { await this.show(this.menu); return true; }
-    if (command === 'MAIN') { this.menu = null; this.actions.navigate('MAIN'); return true; }
+    if (command === 'MAIN') { this.menu = null; this.detailReturns = []; this.actions.navigate('MAIN'); return true; }
     if (['BACK', 'CANCEL', '.CANCEL'].includes(command)) {
       if (this.menu === 'about' || this.menu === 'help') {
-        if (this.detailReturn) await this.show(this.detailReturn);
+        const caller = this.detailReturns.pop();
+        if (caller) await this.show(caller);
         else { this.menu = null; this.actions.navigate('HELP'); }
       } else if (this.menu === 'settings') { this.menu = null; print('元の画面に戻りました。'); this.actions.navigate('HELP'); }
       else await this.show(this.menu === 'profiles' ? 'ai' : 'settings');
@@ -270,7 +270,7 @@ export class TerminalCommands {
       if (next[command]) { await this.show(next[command]!); return true; }
       else if (command === '6') print(this.actions.sessionTimes());
       else if (command === '7') { downloadText(this.actions.log(), 'terminal'); print('ログのダウンロードを開始しました。'); }
-      else if (command === '8' || command === '9') { this.detailReturn = 'settings'; await this.show(command === '8' ? 'help' : 'about'); return true; }
+      else if (command === '8' || command === '9') { this.detailReturns.push('settings'); await this.show(command === '8' ? 'help' : 'about'); return true; }
       else print(...settingsMenu);
     } else if (this.menu === 'handles') {
       if (/^RENAME /i.test(line)) {

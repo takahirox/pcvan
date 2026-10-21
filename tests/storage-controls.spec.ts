@@ -53,6 +53,46 @@ test('a world changed while a native file picker is pending cannot consume old a
   expect((await snapshot(page)).posts).toHaveLength(31);
 });
 
+for (const operation of ['RESET', 'IMPORT']) {
+  test(`${operation} rejects approval when another connection posts after the confirmation snapshot`, async ({ page }) => {
+    await start(page, '保管者');
+    if (operation === 'IMPORT') await importFile(page, backupFixture());
+    else await command(page, 'RESET', '初期状態に戻しますか');
+    const before = await snapshot(page);
+    const forum = before.forums[0]!;
+    const post = { id: 'racing-human-post', forumId: forum.id, number: forum.nextPostNumber,
+      authorId: before.members.find((row) => row.actor === 'human')!.id, title: '確認後の投稿', body: '削除しない',
+      createdAt: new Date().toISOString(), origin: 'local-human' };
+    await page.evaluate(async ({ forum, post }) => {
+      const other = await new Promise<IDBDatabase>((resolve, reject) => {
+        const opening = indexedDB.open('pcvan-local');
+        opening.onsuccess = () => resolve(opening.result); opening.onerror = () => reject(opening.error);
+      });
+      const native = IDBDatabase.prototype.transaction;
+      IDBDatabase.prototype.transaction = function (scope, mode, options) {
+        const names = typeof scope === 'string' ? [scope] : Array.from(scope);
+        if (this.name === 'pcvan-local' && mode === 'readwrite' && names.includes('posts') && names.includes('settings')) {
+          IDBDatabase.prototype.transaction = native;
+          // Queue a valid committed post on a second connection immediately before
+          // the destructive transaction, after the command's readonly precheck.
+          const write = other.transaction(['posts', 'forums', 'session'], 'readwrite');
+          write.objectStore('posts').add(post);
+          write.objectStore('forums').put({ ...forum, nextPostNumber: post.number + 1 });
+          write.oncomplete = () => other.close();
+        }
+        return native.call(this, scope, mode, options);
+      };
+    }, { forum, post });
+    await command(page, 'Y', '世界や設定が変わりました');
+    const after = await snapshot(page);
+    expect(after.posts).toEqual([...before.posts, post].sort((a, b) => a.id.localeCompare(b.id)));
+    expect(after.forums).toEqual(before.forums.map((row) => row.id === forum.id ? { ...row, nextPostNumber: post.number + 1 } : row));
+    for (const key of ['members', 'sigs', 'readStates', 'settings'] as const) expect(after[key]).toEqual(before[key]);
+    await command(page, 'Y', 'この画面では使えない');
+    await noOtherUi(page);
+  });
+}
+
 test('legacy empty world offers real populate confirmation and only adds the fixture after Y', async ({ page }) => {
   await start(page); const fixture = backupFixture(); fixture.posts = []; fixture.readStates = [];
   fixture.forums.forEach((f) => { f.nextPostNumber = 1; });
