@@ -4,12 +4,15 @@ import type { TerminalController } from './controller';
 import { emptyContent, forumName, forumPosts, renderPost, replyReference } from './forums';
 import type { ForumContent } from './forums';
 import type { ForumDestination } from './storage/repository';
+import { mainCollections, serviceCollections, mailboxes, renderCollection } from './sections';
+import type { CollectionKind, Mailbox } from './sections';
 
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
-  'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected';
+  'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
+  'index' | 'section' | 'mailbox';
 
 // Layout is reconstructed. The fixture's CJK labels occupy two terminal cells
 // per character; ASCII occupies one. Padding never changes the label itself.
@@ -41,7 +44,8 @@ function renderMain(): string[] {
   ];
 }
 
-const returnHelp = 'MAIN: MAIN に戻る / HELP: この画面を再表示';
+const returnHelp = 'BACK: 戻る / MAIN: MAIN に戻る / HELP: この画面を再表示';
+const indexEntries = mainMenu.entries.filter((entry) => !['2', 'Q'].includes(entry.selector));
 const demoPrompt = 'コマンド=';
 
 /** Each instance is one simulated connection; no browser routes or shared state. */
@@ -52,6 +56,9 @@ export class PcvanController implements TerminalController {
   private boardNo = 9;
   private memberId: string | undefined;
   private service = services[0]!;
+  private section = mainMenu.entries[0]!;
+  private mailbox: Mailbox = 'INBOX';
+  private readonly parents: Screen[] = [];
 
   /** Refreshed by the app from #6's repository before forum commands. */
   setContent(content: ForumContent): void { this.content = content; }
@@ -74,14 +81,25 @@ export class PcvanController implements TerminalController {
 
   submit(line: string): readonly string[] {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
+    if (this.currentScreen !== 'main' && this.currentScreen !== 'disconnected') {
+      if (command === 'MAIN') {
+        this.parents.length = 0;
+        this.currentScreen = 'main';
+        return this.render();
+      }
+      if (command === 'BACK') {
+        this.currentScreen = this.parents.pop() ?? 'main';
+        return this.render();
+      }
+      if (command === 'HELP') return this.render();
+    }
     switch (this.currentScreen) {
       case 'main': {
         if (command === 'HELP') return renderMain();
         if (command === miti.steps[0]!.input) return this.enter('miti');
         const entry = mainMenu.entries.find((item) => item.selector === command);
         if (entry?.selector === 'Q') return [entryText(entry), ...this.enter('disconnected')];
-        if (entry?.selector === '13') return [entryText(entry), ...this.enter('communication')];
-        if (entry) return [`${entryText(entry)}：未実装です。MAIN に留まります。`, mainMenu.prompt.text];
+        if (entry) return this.openSection(entry);
         return [
           command.startsWith('J ')
             ? '移動先が見つかりません。この画面で対応するジャンプは J MITI です。'
@@ -89,34 +107,48 @@ export class PcvanController implements TerminalController {
           mainMenu.prompt.text,
         ];
       }
+      case 'index': {
+        const entry = indexEntries.find((item) => item.selector === command);
+        if (entry) return this.openSection(entry);
+        if (command === miti.steps[0]!.input) return this.enter('miti');
+        return this.invalidCommand('表示された番号 / X / J MITI / BACK / MAIN / HELP');
+      }
+      case 'section':
+      case 'daisizen-service': {
+        if (this.collectionKind === 'mail' && Object.hasOwn(mailboxes, command)) {
+          this.mailbox = command as Mailbox;
+          return this.enter('mailbox');
+        }
+        if (command === 'LIST') return this.render();
+        return this.invalidCommand(this.collectionKind === 'mail'
+          ? 'INBOX / SENT / LIST / BACK / MAIN / HELP' : 'LIST / BACK / MAIN / HELP');
+      }
+      case 'mailbox':
+        if (command === 'LIST') return this.render();
+        return this.invalidCommand('LIST / BACK / MAIN / HELP');
       case 'communication':
         // Bridge selectors are documented in Settings, not historical data.
         if (command === '1') return this.enter('miti');
         if (command === '2') return this.enter('daisizen');
-        return this.handleMenu(command, '1 / 2 / MAIN / HELP');
+        return this.invalidCommand('1 / 2 / BACK / MAIN / HELP');
       case 'miti':
         if (command === miti.steps[1]!.input) return this.enter('miti-forums');
-        return this.handleMenu(command, `${miti.steps[1]!.input} / MAIN / HELP`);
+        return this.invalidCommand(`${miti.steps[1]!.input} / BACK / MAIN / HELP`);
       case 'miti-forums':
         if (command === miti.steps[2]!.input) return this.enter('miti-materials');
-        return this.handleMenu(command, `${miti.steps[2]!.input} / MAIN / HELP`);
+        return this.invalidCommand(`${miti.steps[2]!.input} / BACK / MAIN / HELP`);
       case 'miti-materials':
         return this.handleForum(command, 'MITI', 9);
       case 'daisizen': {
         if (command === 'FORUMS') return this.enter('daisizen-forums');
         const service = services.find((section) => section.demo_entry!.input === command);
         if (service) { this.service = service; return this.enter('daisizen-service'); }
-        if (command === 'BACK') return this.enter('communication');
-        return this.handleMenu(command, `FORUMS / ${services.map((section) => section.demo_entry!.input).join(' / ')} / BACK / MAIN / HELP`);
+        return this.invalidCommand(`FORUMS / ${services.map((section) => section.demo_entry!.input).join(' / ')} / BACK / MAIN / HELP`);
       }
-      case 'daisizen-service':
-        if (command === 'BACK') return this.enter('daisizen');
-        return this.handleMenu(command, 'BACK / MAIN / HELP');
       case 'daisizen-forums': {
         const forum = daisizen.forums.find((item) => String(item.number) === command);
         if (forum) { this.boardNo = forum.number; return this.enter('forum'); }
-        if (command === 'BACK') return this.enter('daisizen');
-        return this.handleMenu(command, '1–7 / BACK / MAIN / HELP');
+        return this.invalidCommand('1–7 / BACK / MAIN / HELP');
       }
       case 'forum':
         return this.handleForum(command, 'DAISIZEN', this.boardNo);
@@ -127,7 +159,6 @@ export class PcvanController implements TerminalController {
   }
 
   private handleForum(command: string, keyword: 'MITI' | 'DAISIZEN', boardNo: number): readonly string[] {
-    if (command === 'BACK') return this.enter(keyword === 'MITI' ? 'miti-forums' : 'daisizen-forums');
     if (command === 'LIST') return this.render();
     const read = /^READ ([1-9]\d*)$/.exec(command);
     if (read && Number.isSafeInteger(Number(read[1]))) {
@@ -137,11 +168,11 @@ export class PcvanController implements TerminalController {
       return post ? [
         ...renderPost(post, forumName(keyword, boardNo)),
         ...(parent ? [`返信先 RE#${parent.number} → READ ${parent.number}`] : []),
-        this.forumHelp,
+        this.forumHelp, returnHelp,
         demoPrompt,
-      ] : ['その番号の投稿はありません。画面は変わりません。', this.forumHelp, demoPrompt];
+      ] : ['その番号の投稿はありません。画面は変わりません。', this.forumHelp, returnHelp, demoPrompt];
     }
-    return this.handleMenu(command, 'LIST / READ 番号 / WRITE / REPLY 番号 / BACK / MAIN / HELP');
+    return this.invalidCommand('LIST / READ 番号 / WRITE / REPLY 番号 / BACK / MAIN / HELP');
   }
 
   private readonly forumHelp = 'LIST: 投稿一覧 / READ 番号: 本文 / WRITE: 新規投稿 / REPLY 番号: 返信 / BACK: フォーラム一覧';
@@ -162,13 +193,32 @@ export class PcvanController implements TerminalController {
     ];
   }
 
-  private handleMenu(command: string, allowed: string): readonly string[] {
-    if (command === 'MAIN') return this.enter('main');
-    if (command === 'HELP') return this.render();
+  private invalidCommand(allowed: string): readonly string[] {
     return [`この画面では使えないコマンドです。${allowed} を入力してください。`, demoPrompt];
   }
 
+  private openSection(entry: typeof mainMenu.entries[number]): readonly string[] {
+    this.section = entry;
+    return [entryText(entry), ...this.enter(entry.selector === '13' ? 'communication'
+      : entry.selector === '2' ? 'index' : 'section')];
+  }
+
+  private get collectionKind(): CollectionKind {
+    return this.currentScreen === 'daisizen-service' ||
+      (this.currentScreen === 'mailbox' && this.parents.at(-1) === 'daisizen-service')
+      ? serviceCollections[this.service.demo_entry!.input]!
+      : mainCollections[this.section.selector]!;
+  }
+
+  private get collectionTitle(): string {
+    return this.currentScreen === 'daisizen-service' ||
+      (this.currentScreen === 'mailbox' && this.parents.at(-1) === 'daisizen-service')
+      ? `${daisizen.name} / ${this.service.label}` : this.section.label;
+  }
+
   private enter(screen: Screen): readonly string[] {
+    if (screen === 'main' || screen === 'disconnected') this.parents.length = 0;
+    else this.parents.push(this.currentScreen);
     this.currentScreen = screen;
     return this.render();
   }
@@ -179,6 +229,21 @@ export class PcvanController implements TerminalController {
       case 'disconnected': return [
         '接続を終了しました。',
         'RECONNECT で MAIN から再接続できます。',
+      ];
+      case 'index': return [
+        '索引', ...indexEntries.map(entryText),
+        `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
+        returnHelp, demoPrompt,
+      ];
+      case 'section':
+      case 'daisizen-service': return [
+        ...renderCollection(this.collectionTitle, this.collectionKind),
+        'LIST: 一覧を再表示', returnHelp, demoPrompt,
+      ];
+      case 'mailbox': return [
+        `${this.collectionTitle} / ${mailboxes[this.mailbox]}`,
+        'メール一覧：0件', '現在、メールはありません。',
+        'LIST: 一覧を再表示', returnHelp, demoPrompt,
       ];
       case 'communication': return [
         'コミュニケーション',
@@ -191,13 +256,7 @@ export class PcvanController implements TerminalController {
         daisizen.name,
         ...daisizen.sections.map((section) => section.label),
         'FORUMS: フォーラム一覧 / BACK: コミュニケーション',
-        ...services.map((section) => `${section.demo_entry!.input}: ${section.label}（利用不可）`),
-        returnHelp, demoPrompt,
-      ];
-      case 'daisizen-service': return [
-        `${daisizen.name} / ${this.service.label}`,
-        'サービスの操作・送受信・ファイル転送は利用できません。',
-        'BACK: SIG に戻る',
+        ...services.map((section) => `${section.demo_entry!.input}: ${section.label}`),
         returnHelp, demoPrompt,
       ];
       case 'daisizen-forums': return [

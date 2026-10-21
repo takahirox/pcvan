@@ -106,12 +106,14 @@ test('journey: all MAIN mappings and concise screens through keyboard navigation
   for (const [selector, label] of mappings) {
     expect(greeting).toContain(`${selector!.padStart(2)} ${label}`);
     const result = await command(page, selector!, `${selector} ${label}`);
-    if (selector === '13') {
-      await command(page, 'MAIN', '番号またはコマンド=');
-    } else if (selector === 'Q') {
+    expect(result).not.toContain('未実装');
+    if (selector === 'Q') {
       await command(page, 'RECONNECT', 'PC-VAN 接続中');
       await command(page, 'HELP', '番号またはコマンド=');
-    } else expect(result).toContain('未実装');
+    } else {
+      if (!['2', '13'].includes(selector!)) expect(result).toContain('0件');
+      await command(page, 'BACK', '番号またはコマンド=');
+    }
   }
   await command(page, 'J UNKNOWN', '移動先が見つかりません');
   const input = page.getByRole('textbox', { name: 'コマンド', exact: true });
@@ -130,8 +132,11 @@ test('journey: all MAIN mappings and concise screens through keyboard navigation
   await command(page, 'MAIN', '番号またはコマンド=');
   await command(page, '13', '1 未知の世界');
   await command(page, '2', '大自然＆動植物');
-  for (const service of ['MAIL', 'LIBRARY', 'OLT', 'OSL', 'CONFERENCE']) {
-    await command(page, service, 'サービスの操作・送受信・ファイル転送は利用できません');
+  for (const [service, empty] of [
+    ['MAIL', '受信箱：0件'], ['LIBRARY', 'ファイル一覧：0件'],
+    ['OLT', '参加者：0人'], ['OSL', 'ファイル一覧：0件'], ['CONFERENCE', '参加者：0人'],
+  ]) {
+    await command(page, service!, empty!);
     await command(page, 'BACK', '大自然＆動植物');
   }
   // Verified route/header citations must never authenticate invented prompts.

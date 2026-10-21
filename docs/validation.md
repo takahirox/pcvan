@@ -633,3 +633,39 @@ Real GPU/model downloads, native IME, screen readers, other browser engines,
 physical devices and nostalgic feedback were not tested. No deployment, push,
 PR, merge or GitHub comment was performed. No post-merge verification is required
 for #31. See [terminal controls and limits](terminal-display.md).
+
+## Issue #33: navigable menus and empty collections
+
+Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+- `npm ci`: passed; 0 vulnerabilities reported.
+- `npm run build`: passed TypeScript checking and the production build. The
+  existing optional WebLLM chunk-size advisory remains.
+- Final `npm test -- --workers=2`: **151 tests passed** in 32.0 seconds, with no
+  retries or skipped tests. This command also builds and serves production assets.
+  The first run passed 150 tests and failed one journey assertion that still
+  expected the old unavailable-service notice; that assertion now checks the
+  corresponding empty mailbox/file/room view and the complete rerun passed.
+- Added 26 checks for destination-specific empty counts, every MAIN collection,
+  working index links, complete BACK paths (including indexed SIG routes),
+  HELP/LIST, scoped invalid/external-operation commands, three mailbox contexts,
+  Settings preserving the mailbox/input draft/transcript, and saved empty boards
+  staying empty after service exploration. Updated existing MAIN/service/journey
+  coverage to require useful destinations instead of implementation notices.
+- Browser request listeners observed no requests while exploring indexed
+  sections/mailboxes online or DAISIZEN services offline. Service exploration
+  preserves saved content and returns to saved post reading. No service adds a
+  network operation, credential, storage migration or automatic model download.
+- Existing checks passed for MITI and all seven DAISIZEN boards, saved posts,
+  human composition/replies/unread state, optional AI recovery, offline shell and
+  backup/restore, disconnect/reconnect, simulated IME, progressive output/skip,
+  Settings focus and responsive/monospace layout. Historical fixtures and storage
+  schema are unchanged.
+- Changed Markdown passed balanced-fence and local link/heading-anchor checks.
+  `git diff --check` and `git diff --cached --check` passed.
+
+Native IME, real GPU/model downloads, other browser engines, physical devices
+and optional nostalgic-flow feedback were not tested. No post-merge verification
+is required for #33. The new service collections are intentionally read-only and
+empty; real mail, commerce, file transfer, internet gateways and multi-user chat
+remain outside scope. See the [menu map and commands](../README.md#menu-destinations-and-empty-collections).
