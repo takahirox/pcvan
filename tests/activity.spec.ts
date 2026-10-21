@@ -9,6 +9,38 @@ const oneHour = '2026-10-21T01:00:00.000Z';
 const threeDays = '2026-10-24T00:00:00.000Z';
 const modelId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
 
+test('model authorization survives cap/pause edits but never transfers to another model or its pending batch', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const selected = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
+  const result = await page.evaluate(async ({ fixture, from, threeDays, modelId, selected }) => {
+    const path = '/src/storage/repository.ts'; const activityPath = '/src/ai/activity.ts';
+    const { openRepository } = await import(path) as typeof import('../src/storage/repository');
+    const { emptyActivity } = await import(activityPath) as typeof import('../src/ai/activity');
+    const repo = await openRepository('model-consent');
+    await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+    await repo.put('settings', { id: 'ai-activity', value: emptyActivity(from, 'community') as never });
+    await repo.authorizeModel(modelId, from);
+    const capped = await repo.configureActivity(3, modelId, from);
+    const paused = await repo.configureActivity(0, modelId, from);
+    const resumed = await repo.configureActivity(3, modelId, from);
+    const pending = await repo.openActivity(threeDays);
+    const changed = await repo.configureActivity(3, selected, threeDays);
+    const blocked = await repo.openActivity(threeDays);
+    const authorized = await repo.authorizeModel(selected, threeDays);
+    const switchedBack = await repo.configureActivity(3, modelId, threeDays);
+    repo.close();
+    return { capped, paused, resumed, pending, changed, blocked, authorized, switchedBack };
+  }, { fixture: backupFixture(), from, threeDays, modelId, selected });
+  for (const state of [result.capped, result.paused, result.resumed]) expect(state.consent).toBe(true);
+  expect(result.pending.batch!.runs).toHaveLength(3);
+  expect(result.changed).toMatchObject({ modelId: selected, consent: false });
+  expect(result.blocked.consent).toBe(false);
+  expect(result.blocked.batch).toEqual(result.pending.batch);
+  expect(result.authorized).toMatchObject({ modelId: selected, consent: true });
+  expect(result.authorized.batch).toEqual({ ...result.pending.batch, modelId: selected });
+  expect(result.switchedBack).toMatchObject({ modelId, consent: false });
+});
+
 test('independent resident plans are deterministic, varied, bounded and require model consent', async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async ({ fixture, from, oneHour, threeDays }) => {

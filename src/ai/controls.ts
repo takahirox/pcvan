@@ -313,6 +313,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
 
   async function simulate() {
     if (!supported || !actions.activity || !activity?.maxPosts || !activity.consent || !activity.batch || operation || saving || activityBusy || draft || autoBlocked) return;
+    if (activity.batch.modelId !== activity.modelId) return;
     if (!navigator.locks) { activityMessage.textContent = 'タブ間の排他制御が利用できないため自動活動を休止します。手動投稿は利用できます。'; return; }
     const state = activity;
     if (!state.batch!.runs.some((run) => run.status !== 'committed') ||

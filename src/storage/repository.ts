@@ -430,6 +430,7 @@ export class LocalRepository {
       if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
       const state = await this.readActivity(tx, now);
       return this.writeActivity(tx, { ...state, maxPosts, modelId, lastActivityAt: now,
+        consent: state.consent && state.modelId === modelId,
         nextDue: initialDue(now, state.seed!) });
     }).then((state) => { this.notifySetupChanged(); return state; });
   }
@@ -449,6 +450,8 @@ export class LocalRepository {
       const state = await this.readActivity(tx, now);
       if (expected !== undefined && setupContext(await this.snapshot(tx)) !== expected) invalid('世界や AI 設定が変わりました。現在の設定を確認して再試行してください。');
       state.consent = true; state.modelId = modelId;
+      // Keep queued actions, but run them only with the explicitly authorized model.
+      if (state.batch) state.batch.modelId = modelId;
       return this.writeActivity(tx, state);
     }).then((state) => { this.notifySetupChanged(); return state; });
   }

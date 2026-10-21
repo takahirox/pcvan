@@ -158,6 +158,36 @@ test('Settings uses the same model selector and consent flow, retaining selectio
   await expect(page.locator('.ai-setup-status')).toContainText('モデル準備済み');
 });
 
+test('saving a different model in Settings requires new consent before scheduled or manual loading', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-21T00:00:00.000Z'));
+  await mock(page); await page.goto(origin);
+  await page.locator('.ai-setup-start').click(); await page.locator('.ai-consent-confirm').click();
+  await expect(page.locator('.ai-setup-status')).toContainText('モデル準備済み');
+  const selected = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
+  await openSettings(page, 'ai');
+  await page.locator('.ai-model').selectOption(selected);
+  await page.locator('.ai-activity-save').click();
+  await expect(page.locator('.ai-activity-message')).toContainText('AI 設定が必要');
+  expect(activity(await snapshot(page))).toMatchObject({ modelId: selected, consent: false });
+  await closeSettings(page);
+  // Run the actual scheduled-activity check after enough time for resident work.
+  const later = '2026-10-24T00:00:00.000Z';
+  await page.clock.setFixedTime(new Date(later));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect.poll(async () => activity(await snapshot(page)).lastActivityAt).toBe(later);
+  expect(activity(await snapshot(page)).batch).toBeNull();
+  expect(await page.evaluate(() => window.aiMock.loads)).toEqual([modelId]);
+  await openSettings(page, 'ai'); await page.locator('.ai-load').click();
+  await expect(page.locator('.ai-consent .ai-model')).toHaveValue(selected);
+  await page.locator('.ai-consent-close').click();
+  expect(activity(await snapshot(page)).consent).toBe(false);
+  expect(await page.evaluate(() => window.aiMock.loads)).toEqual([modelId]);
+  await page.locator('.ai-load').click(); await page.locator('.ai-consent-confirm').click();
+  await expect(page.locator('.ai-message')).toContainText('準備ができました');
+  expect(activity(await snapshot(page))).toMatchObject({ modelId: selected, consent: true });
+  expect(await page.evaluate(() => window.aiMock.loads)).toEqual([modelId, selected]);
+});
+
 test('multiple tabs re-evaluate deferral, consent, pause and re-enable; stale confirmation cannot authorize', async ({ page, context }) => {
   await mock(page); await page.goto(origin);
   const other = await context.newPage(); await mock(other); await other.goto(origin);
