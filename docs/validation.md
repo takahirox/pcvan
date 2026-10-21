@@ -398,7 +398,7 @@ validation and transactional local post allocator.
   and worker. Tests use mocks and never download weights or require a real GPU.
 - Reviewed the Issue-specific diff, local documentation links and staged
   whitespace. No historical fixtures, backend or service-worker inference were
-  added. See [the reconnect activity contract](local-ai.md#fictional-activity-on-reconnect).
+  added. See [the reconnect activity contract](local-ai.md#scheduling-discussion-and-bounds).
 
 Optional real-model conversation/coherence checks over manual reconnect cycles
 were not performed. No deployment was performed; no post-merge verification is
@@ -669,3 +669,36 @@ and optional nostalgic-flow feedback were not tested. No post-merge verification
 is required for #33. The new service collections are intentionally read-only and
 empty; real mail, commerce, file transfer, internet gateways and multi-user chat
 remain outside scope. See the [menu map and commands](../README.md#menu-destinations-and-empty-collections).
+
+
+## Issue #35: independently scheduled local residents
+
+Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+- `npm ci`: passed, with 0 vulnerabilities reported.
+- `npm run build`: passed TypeScript checking and the static production build.
+  The existing optional WebLLM chunk-size advisory remains.
+- Final `npm test -- --workers=4`: **157 tests passed** in 22.4 seconds, without
+  retries or skips. This command also builds and serves production assets.
+- Fixed-clock/seed tests exercise all ten distinct profiles, weekday/weekend and
+  offset boundaries, active quiet hours, deterministic bounded catch-up, open-tab
+  visits, 20-minute-minimum response delays and both AI-to-AI and human replies.
+- Mocked model checks verify explicit first-use download consent, empty-board
+  setup without a human, one shared model, cross-tab model leases, page-visit
+  budgets shared with manual previews and surviving reconnect, pause/resume, cancellation, GPU/load/validation
+  failures and missing Web Locks without automatic retry loops.
+- Real IndexedDB checks cover legacy settings/backup migration, original resident
+  IDs and saved posts, edited profiles and handles, pending-run preservation,
+  atomic invalid restore/quota rollback, concurrent duplicate commits through
+  separate connections, interrupted generation and production tab-loss recovery.
+- Existing terminal, navigation, composition, provenance, responsive Settings,
+  offline shell, cache probes and JSON backup journeys pass with the new defaults.
+- Earlier runs exposed old empty/default-off assumptions, nested disclosure
+  selectors, fake-clock timer alignment, exploratory-board choices in a focused
+  reply scenario and insertion-order assumptions for IndexedDB exports. These
+  assertions now match the new behavior or use explicit deterministic fixtures.
+
+Real GPU/model downloads, subjective character consistency over real open/close
+cycles, other browser engines, physical devices and native IME were not tested.
+No deployment, push, PR, merge or comment was performed. No post-merge verification
+is required. See [resident behavior and limits](local-ai.md).

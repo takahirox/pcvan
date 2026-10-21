@@ -83,7 +83,7 @@ test('explicit lazy load, model/persona selection, validated preview and single 
   page.on('request', (request) => { if (request.url().includes('/webllm-adapter.ts')) imports++; });
   await setup(page);
   expect(imports).toBe(0);
-  expect((await snapshot(page)).members).toEqual([]);
+  expect((await snapshot(page)).members.filter((m) => m.id.startsWith('fictional-ai:'))).toHaveLength(10);
   await restore(page);
   await openSettings(page, 'ai');
   await page.locator('.ai-model').selectOption('Qwen2.5-1.5B-Instruct-q4f16_1-MLC');
@@ -91,8 +91,8 @@ test('explicit lazy load, model/persona selection, validated preview and single 
   await page.locator('.ai-persona').selectOption('kusabue');
   await openSettings(page, 'ai');
   await page.locator('.ai-reply').selectOption('first');
-  const before = await snapshot(page);
   await load(page);
+  const before = await snapshot(page);
   expect(imports).toBe(1);
   expect(await page.evaluate(() => window.aiMock.loads)).toEqual(['Qwen2.5-1.5B-Instruct-q4f16_1-MLC']);
   await openSettings(page, 'ai');
@@ -249,4 +249,18 @@ test('background model progress stays inspectable after Settings closes without 
   await page.locator('.ai-generate').click();
   await expect(page.locator('.ai-message')).toContainText('再試行はモデル読込から');
   await expect(page.locator('.ai-load')).toBeEnabled();
+});
+
+
+test('manual previews share the page visit generation attempt limit', async ({ page }) => {
+  await setup(page); await restore(page); await load(page);
+  for (let attempt = 0; attempt < 12; attempt++) {
+    await page.locator('.ai-generate').click();
+    await expect(page.locator('.ai-preview')).toBeVisible();
+    await page.locator('.ai-discard').click();
+  }
+  expect(await page.evaluate(() => window.aiMock.prompts.length)).toBe(12);
+  await expect(page.locator('.ai-generate')).toBeDisabled();
+  await expect(page.locator('.ai-activity-message')).toContainText('試行 12/12');
+  expect((await snapshot(page)).posts).toEqual(backupFixture().posts);
 });

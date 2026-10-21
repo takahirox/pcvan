@@ -3,8 +3,9 @@
 The application stores its local world in IndexedDB, database `pcvan-local`,
 database version **1**. The repository has no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. A clean browser profile starts
-with no members, SIGs, forums, posts, read states, or settings. Opening the terminal
-creates only local session metadata. Research fixtures are not automatically
+with no posts or boards. Opening the application seeds ten fictional AI resident
+profiles/identities, default activity settings and local session metadata. Initial
+model setup can create two empty local boards in a pristine, never-imported world. Research fixtures are not automatically
 seeded into storage; the reader has a separately labeled in-memory demo fallback.
 
 Storage belongs to the browser profile and origin (scheme, hostname, and port).
@@ -115,7 +116,9 @@ Additional repository methods (all resolve after transaction completion):
 | --- | --- |
 | `createHumanMember(handle)` | Save a human plus the active-member setting atomically; reject blank handles. |
 | `createForumPost({ keyword, boardNo, name }, draft)` | Resolve/create the local board and insert a nonblank human-authored draft with the same allocation path as `createPost`; the draft omits `forumId`, `id`, `number`, and `createdAt`. |
-| `openActivity(now?)` / `configureActivity(maxPosts, modelId, now?)` | Persist/resume a bounded deterministic reconnect plan or save explicit opt-in (0 disables it). |
+| `openActivity(now?)` / `configureActivity(maxPosts, modelId, now?)` | Persist/resume independent resident due times and a bounded chronological plan; save the visit cap/model (0 pauses, preserving pending work). |
+| `authorizeModel(modelId, now?)` | Persist explicit download consent and prepare empty local boards only for a pristine world. |
+| `configureResident(profile, now?)` | Validate and save a profile/AI handle, recalculate its future due time and preserve existing posts/runs. |
 | `touchActivity(now?)` | Advance an existing activity watermark monotonically without scheduling generation. |
 | `setAiRunStatus(id, status)` / `commitAiRun(id, raw, signal?)` | Persist pending-run progress; validate and atomically save a unique AI result with its completed status, member and number. Repeated commits return the existing result. |
 | `createAiPost(member, post)` | Register an AI member and allocate a post in an existing board atomically. Requires matching author ID, `actor: 'ai'` and `local-ai:webllm:` origin; rejects identity collisions. The AI caller validates generated content and selected IDs before this mutation. |
@@ -235,11 +238,14 @@ IDs, handles, keywords, names, SIG titles, and origins are nonblank strings; pos
 title/body and history entries may be empty strings. IDs are unique **within each
 entity collection**, not globally across types. Read states are unique by their
 member/forum pair. Settings values may be any finite JSON value, including nested
-arrays/objects. No settings are created by default. The reserved `ai-activity`
-setting is created when the user saves the reconnect activity configuration. Its
-validated value holds the opt-in/cap, activity watermark and at most one batch
-of 12 stable runs/statuses; it is included in backups. No IndexedDB version or
-store migration is needed. See [the reconnect activity contract](local-ai.md#fictional-activity-on-reconnect).
+arrays/objects. Opening the app seeds the strictly validated `ai-residents`
+version-1 setting (exactly ten profiles) and `ai-activity` version 2. Activity holds
+the visit cap, consent, seed, per-resident due times, watermark, bootstrap/truncation
+flags and at most one batch of 12 stable runs/statuses. The default cap is four;
+heavy model downloads still require explicit consent. Older version-1 activity
+settings migrate on use, retaining explicit opt-in/out, model and pending runs.
+These additive settings remain inside the version-1 backup envelope; no IndexedDB
+version/store upgrade is needed. See [the resident activity contract](local-ai.md#scheduling-discussion-and-bounds).
 
 A simulated AI post optionally includes `simulation: { runId, simulatedAt,
 fictional: true }`. `runId` equals its stable post ID and `simulatedAt` is a

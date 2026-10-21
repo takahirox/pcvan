@@ -188,7 +188,7 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
     const original = saved.posts.find((row) => row.number === 1)!;
     const reply = saved.posts.find((row) => row.number === 2)!;
     expect(reply.replyToPostId).toBe(original.id);
-    expect(saved.readStates).toEqual([{ memberId: saved.members[0]!.id, forumId: saved.forums[0]!.id, lastReadNumber: 2 }]);
+    expect(saved.readStates).toEqual([{ memberId: saved.members.find((m) => m.actor === 'human')!.id, forumId: saved.forums[0]!.id, lastReadNumber: 2 }]);
     await page.reload();
     await enterForum(page);
     const list = await command(page, 'LIST', `#2 RE#1 ${title} [既読]`);
@@ -204,9 +204,11 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
     await command(page, 'READ 2', '返信先 RE#1');
     await expect(page.getByRole('link', { name: '返信先 RE#1 を読む' })).toBeVisible();
     const reloaded = await backup(page);
-    for (const key of ['members', 'sigs', 'forums', 'posts', 'readStates', 'settings'] as const) {
+    for (const key of ['members', 'sigs', 'forums', 'posts', 'readStates'] as const) {
       expect(reloaded[key]).toEqual(saved[key]);
     }
+    expect(reloaded.settings.filter((r) => r.id !== 'ai-activity')).toEqual(saved.settings.filter((r) => r.id !== 'ai-activity'));
+    expect(reloaded.settings.find((r) => r.id === 'ai-activity')!.value).toMatchObject({ version: 2, maxPosts: 4, consent: false });
     expect(observed.unexpected).toEqual([]);
     expect(observed.aiAssets).toEqual([]);
     expect(observed.errors).toEqual([]);
@@ -255,7 +257,7 @@ async function workerStats(page: Page) {
 test('journey: production AI resumes a partially committed run after tab loss without duplicate posts', async ({ context, page, baseURL }) => {
   const observed = observe(context, baseURL!);
   const start = new Date('2026-10-21T00:00:00Z');
-  const reconnect = new Date('2026-10-21T03:00:00Z');
+  const reconnect = new Date('2026-10-24T00:00:00Z');
   await page.clock.setFixedTime(start);
   await mockWorker(page, 'interrupt');
   await page.goto('/');
@@ -263,11 +265,13 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   await enterForum(page);
   await post(page, '人間の話題', '自分で書いた最初の話題です。');
   await openSettings(page, 'ai');
+  await page.locator('.ai-load').click();
+  await expect(page.locator('.ai-message')).toContainText('準備ができました');
   await page.locator('.ai-activity-cap').fill('2');
   await openSettings(page, 'ai');
   await page.locator('.ai-activity-save').click();
   await expect(page.locator('.ai-message')).toContainText('有効');
-  expect(await workerStats(page)).toEqual({ generations: 0, loads: 0 });
+  expect(await workerStats(page)).toEqual({ generations: 0, loads: 1 });
   await command(page, 'MAIN', '番号またはコマンド=');
   await command(page, 'Q', '接続を終了しました');
   // Output precedes queued session writes. Finish logout at the old clock value
@@ -331,6 +335,7 @@ for (const mode of ['invalid', 'failure'] as const) {
     const saved = await backup(page);
     expect(saved.posts).toHaveLength(2);
     expect(saved.posts.every((row) => row.origin === 'local-human')).toBe(true);
-    expect(saved.members.every((row) => row.actor === 'human')).toBe(true);
+    expect(saved.members.filter((row) => row.actor === 'human')).toHaveLength(1);
+    expect(saved.members.filter((row) => row.id.startsWith('fictional-ai:'))).toHaveLength(10);
   });
 }

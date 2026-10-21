@@ -4,7 +4,7 @@ import { ACTIVITY_SETTING, MAX_SESSION_POSTS } from './activity';
 import { buildPrompt } from './generation';
 import type { LocalLlmAdapter } from './generation';
 
-export type ActivityActions = Pick<LocalRepository, 'openActivity' | 'configureActivity' | 'setAiRunStatus' | 'commitAiRun'>;
+export type ActivityActions = Pick<LocalRepository, 'openActivity' | 'configureActivity' | 'authorizeModel' | 'configureResident' | 'setAiRunStatus' | 'commitAiRun'>;
 
 /** One pass only. Failure stops the batch; an explicit retry or reopening can resume it. */
 export async function runActivityBatch(actions: ActivityActions, read: () => Promise<Backup>,

@@ -2,7 +2,8 @@ import type { AiActivity, Backup } from '../storage/schema';
 import { ACTIVITY_SETTING, MAX_SESSION_POSTS } from './activity';
 import { runActivityBatch } from './activity-runner';
 import type { ActivityActions } from './activity-runner';
-import { models, personas } from './personas';
+import { models, personas, residentProfiles } from './personas';
+import type { ResidentProfile } from './personas';
 import { buildPrompt, checkRequest, requireWebGpu, validateGeneration } from './generation';
 import type { AdapterFactory, GenerationRequest, LocalLlmAdapter } from './generation';
 
@@ -26,7 +27,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     <p>初回のモデル読込は数百 MB〜数 GB の通信・ブラウザー保存と GPU メモリを使います。
       モデルファイルは配布元 (Hugging Face / MLC) から取得します。推論と投稿データの処理はこの端末内です。
       外部推論・API キーは使いません。日本語の品質はモデルと機器により異なります。</p>
-    <p>まず手動投稿でローカル掲示板を作成してください。AI はそこにだけ投稿します。
+    <p>初回のモデル設定時に、小さな空のローカル掲示板を用意します。復元済みの世界は変更しません。
       文脈は同じ掲示板の直近最大 4 件のローカル創作投稿の抜粋です。</p>
     <div class="ai-fields">
       <label>AI モデル <select class="ai-model"></select></label>
@@ -37,6 +38,27 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       <label>モデル読込の進捗 <progress class="ai-progress" max="1" value="0"></progress></label>
       <label>架空の AI 人格 <select class="ai-persona"></select></label>
       <p class="ai-profile"></p>
+      <details class="ai-resident-editor"><summary>この住人を編集</summary>
+        <form class="ai-resident-form">
+          <label>住人のハンドル <input name="handle" maxlength="40" required></label>
+          <label>職業 <input name="occupation" maxlength="80" required></label>
+          <label>生活・仕事・睡眠の習慣 <input name="routine" maxlength="240" required></label>
+          <label>人物像・文体 <input name="profile" maxlength="300" required></label>
+          <label>興味（カンマ区切り） <input name="interests" required></label>
+          <label>好みの掲示板（MITI:9, DAISIZEN:1 または掲示板 ID） <input name="preferredBoards"></label>
+          <label>平日の接続時間（0〜23、カンマ区切り） <input name="weekdayHours"></label>
+          <label>休日の接続時間（0〜23、カンマ区切り） <input name="weekendHours"></label>
+          <label>UTC からの時差（分、日本は540、夏時間の自動切替なし） <input name="utcOffsetMinutes" type="number" min="-720" max="840" required></label>
+          <label>活動頻度（0で休止、標準1） <input name="frequency" type="number" min="0" max="3" step="0.05" required></label>
+          <label>訪問の確率（0〜1） <input name="participation" type="number" min="0" max="1" step="0.05" required></label>
+          <label>読む重み <input name="reading" type="number" min="0" max="1" step="0.05" required></label>
+          <label>新しい話題の重み <input name="newThread" type="number" min="0" max="1" step="0.05" required></label>
+          <label>返信の重み <input name="reply" type="number" min="0" max="1" step="0.05" required></label>
+          <label>何もしない重み <input name="inactivity" type="number" min="0" max="1" step="0.05" required></label>
+          <p>仕事・睡眠中は訪問が少なくなります。数日留守にすることもあります。重みは相対値です。</p>
+          <button class="ai-resident-save" type="submit">この住人の設定を保存</button>
+        </form>
+      </details>
       <label>AI 投稿先 <select class="ai-forum"></select></label>
       <label>AI 返信先 <select class="ai-reply"></select></label>
       <button type="button" class="ai-generate">AI 投稿案を生成</button>
@@ -45,12 +67,13 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     <pre class="ai-preview" hidden></pre>
     <button type="button" class="ai-send" hidden>この AI 投稿を保存</button>
     <button type="button" class="ai-discard" hidden>AI 投稿案を破棄</button>
-    <h2>再接続時の架空の活動</h2>
-    <p>ブラウザーを閉じている間は AI は動きません。再度開いた時に、経過時間に応じた架空の投稿を今生成し、自動保存します。
-      投稿時刻は創作です。初期値は 0（無効）。有効にすると、次回から選択モデルを自動読込します（通信・GPU 使用あり）。</p>
-    <label>1 回の接続で自動保存する上限 (0〜12)
-      <input class="ai-activity-cap" type="number" min="0" max="12" step="1" value="0"></label>
-    <button type="button" class="ai-activity-save">上限と選択モデルを保存（自動生成に同意）</button>
+    <h2>10人の住人の自動活動</h2>
+    <p>新しい世界では自動活動が有効です。AI 設定が必要：上のモデル読込ボタンで初回ダウンロードに同意してください。
+      ページを開いている間は約1分ごとに予定を確認します。閉じている間は動かず、再度開いた時に最大72時間の一部を時刻順に再現します。
+      投稿時刻は創作です。上限はこのページの滞在全体に適用され、再接続では増えません。生成の試行は手動の投稿案を含めて最大12回です。</p>
+    <label>1 回の滞在で自動保存する上限 (0〜12、0で休止)
+      <input class="ai-activity-cap" type="number" min="0" max="12" step="1" value="4"></label>
+    <button type="button" class="ai-activity-save">上限と選択モデルを保存</button>
     <button type="button" class="ai-activity-disable">架空の活動を無効にする</button>
     <button type="button" class="ai-activity-retry">未完了の架空の活動を再試行</button>
     <label>架空の活動の進捗 <progress class="ai-activity-progress" max="1" value="0"></progress></label>
@@ -100,6 +123,8 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   let draft: { raw: string; request: GenerationRequest; modelId: string } | undefined;
   let activity: AiActivity | undefined;
   let activityBusy = false;
+  let autoBlocked = false;
+  let releaseModelLock: (() => void) | undefined;
   let configuring = false;
   let revision = 0;
   const budget = { attempts: 0, committed: 0 };
@@ -107,7 +132,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   function buttons() {
     model.disabled = persona.disabled = forum.disabled = reply.disabled = saving || !!operation;
     load.disabled = !supported || saving || !!operation;
-    generate.disabled = !loadedModel || !forum.value || saving || !!operation;
+    generate.disabled = !loadedModel || !forum.value || saving || !!operation || budget.attempts >= MAX_SESSION_POSTS;
     stop.disabled = saving || (!adapter && !operation);
     send.disabled = discard.disabled = saving || !!operation;
     activitySave.disabled = cap.disabled = !actions.activity || saving || !!operation || configuring;
@@ -116,6 +141,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       !activity?.maxPosts || !activity.batch?.runs.some((run) => run.status !== 'committed') ||
       budget.attempts >= MAX_SESSION_POSTS || budget.committed >= activity.maxPosts;
     cacheCheck.disabled = checking || saving || !!operation;
+    get<HTMLButtonElement>('resident-save').disabled = !actions.activity || saving || !!operation || configuring;
   }
   function unknownCache() {
     cacheCheckId++; checking = false;
@@ -141,6 +167,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     revision++;
     operation?.abort(); operation = undefined;
     adapter?.dispose(); adapter = undefined; loadedModel = undefined;
+    releaseModelLock?.(); releaseModelLock = undefined;
     progress.value = 0;
     clearDraft(); buttons();
   }
@@ -159,7 +186,41 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     }
     if (Array.from(reply.options).some((option) => option.value === selected)) reply.value = selected;
   }
-  function profile() { get('profile').textContent = personas.find((row) => row.id === persona.value)!.profile; }
+  const residentForm = get<HTMLFormElement>('resident-form');
+  let profileSignature = '';
+  function profile() {
+    const row = (content ? residentProfiles(content) : personas).find((p) => p.id === persona.value)!;
+    get('profile').textContent = `${row.handle} / ${row.id} — ${row.occupation}。${row.routine} ${row.profile} 仲間: ${Object.keys(row.affinities).join(', ')}`;
+    const signature = JSON.stringify(row);
+    if (signature === profileSignature) return;
+    profileSignature = signature;
+    for (const [key, value] of Object.entries(row)) {
+      const input = residentForm.elements.namedItem(key);
+      if (input instanceof HTMLInputElement) input.value = Array.isArray(value) ? value.join(',') : String(value);
+    }
+  }
+  residentForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!actions.activity || !content || !residentForm.reportValidity() || operation || configuring) return;
+    const previous = residentProfiles(content).find((p) => p.id === persona.value)!;
+    const updated = structuredClone(previous);
+    const arrays = ['interests', 'preferredBoards', 'weekdayHours', 'weekendHours'];
+    for (const key of Object.keys(updated) as (keyof ResidentProfile)[]) {
+      const input = residentForm.elements.namedItem(key);
+      if (!(input instanceof HTMLInputElement)) continue;
+      const values = input.value.trim() ? input.value.split(',').map((s) => s.trim()) : [];
+      Object.assign(updated, { [key]: arrays.includes(key) ? (key.endsWith('Hours') ? values.map(Number) : values)
+        : input.type === 'number' ? Number(input.value) : input.value });
+    }
+    cancel(); configuring = true; buttons();
+    try {
+      showActivity(await actions.activity.configureResident(updated));
+      refresh(await actions.read());
+      autoBlocked = false;
+      message.textContent = '住人の設定を保存しました。次の予定から反映します。過去の投稿は保持します。';
+    } catch (error) { message.textContent = `住人の設定を保存できませんでした。${String(error)}`; }
+    finally { configuring = false; buttons(); }
+  });
   function showActivity(state: AiActivity | undefined) {
     activity = state;
     cap.value = String(state?.maxPosts ?? 0);
@@ -167,7 +228,8 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     const done = runs.filter((run) => run.status === 'committed').length;
     activityProgress.max = Math.max(1, runs.length); activityProgress.value = done;
     activityMessage.textContent = !state?.maxPosts ? '架空の活動は無効です。自動生成はありません。'
-      : `架空の活動 ${done}/${runs.length} 件保存済み / 接続ごとの上限 ${state.maxPosts} 件。閉じている間の実行ではありません。`;
+      : !state.consent ? 'AI 設定が必要：住人の自動活動は有効です。モデル読込で初回ダウンロードに同意してください。'
+      : `架空の活動 ${done}/${runs.length} 件保存済み / 滞在ごとの上限 ${state.maxPosts} 件、使用 ${budget.committed} 件・試行 ${budget.attempts}/${MAX_SESSION_POSTS} 回。${state.truncated ? '長い不在・上限のため一部の予定を省略しました。' : ''}閉じている間の実行ではありません。`;
     const list = get('runs'); list.replaceChildren();
     for (const run of runs) {
       const item = document.createElement('li');
@@ -178,7 +240,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   }
   profile(); unavailable(); unknownCache(); buttons();
   cacheCheck.addEventListener('click', () => { void checkCache(); });
-  stop.addEventListener('click', () => { cancel(); message.textContent = 'AI をキャンセルし、モデルを解放しました。端末・手動投稿は利用できます。'; });
+  stop.addEventListener('click', () => { autoBlocked = true; cancel(); message.textContent = 'AI をキャンセルし、モデルを解放しました。端末・手動投稿は利用できます。'; });
   model.addEventListener('change', () => { cancel(); unavailable(); unknownCache(); buttons(); });
   persona.addEventListener('change', () => { clearDraft(); profile(); });
   forum.addEventListener('change', () => { clearDraft(); reply.value = ''; updateReplies(); buttons(); });
@@ -188,6 +250,16 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   async function loadEngine(task: AbortController, modelId: string): Promise<LocalLlmAdapter> {
     if (adapter && loadedModel === modelId) return adapter;
     adapter?.dispose(); adapter = undefined; loadedModel = undefined;
+    // Hold a single cross-tab model lease until unload, including manual previews.
+    if (!releaseModelLock && navigator.locks) {
+      await new Promise<void>((resolve, reject) => {
+        void navigator.locks.request('pcvan-local-ai-model', { ifAvailable: true }, (lock) => {
+          if (!lock) { reject(new Error('別のタブで AI モデルを使用中です。そちらで停止・解放してください。')); return; }
+          return new Promise<void>((release) => { releaseModelLock = release; resolve(); });
+        }).catch(reject);
+      });
+    }
+    if (task.signal.aborted) { releaseModelLock?.(); releaseModelLock = undefined; task.signal.throwIfAborted(); }
     const created = await factory();
     if (task.signal.aborted) { created.dispose(); task.signal.throwIfAborted(); }
     adapter = created;
@@ -202,14 +274,14 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   }
 
   async function simulate() {
-    if (!supported || !actions.activity || !activity?.maxPosts || !activity.batch || operation || saving || activityBusy) return;
+    if (!supported || !actions.activity || !activity?.maxPosts || !activity.consent || !activity.batch || operation || saving || activityBusy || draft || autoBlocked) return;
+    if (!navigator.locks) { activityMessage.textContent = 'タブ間の排他制御が利用できないため自動活動を休止します。手動投稿は利用できます。'; return; }
     const state = activity;
     if (!state.batch!.runs.some((run) => run.status !== 'committed') ||
         budget.attempts >= MAX_SESSION_POSTS || budget.committed >= state.maxPosts) return;
     clearDraft();
-    section.open = true;
     const task = new AbortController(); operation = task; activityBusy = true; buttons();
-    message.textContent = '再接続用の架空の活動を今生成します。AI を停止・解放でキャンセルできます。';
+    message.textContent = '予定された住人の架空の活動を生成します。AI を停止・解放でキャンセルできます。';
     const run = async () => {
       task.signal.throwIfAborted();
       const engine = await loadEngine(task, state.batch!.modelId);
@@ -227,16 +299,17 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
         });
       } else await run();
       if (!task.signal.aborted) message.textContent = '架空の活動の処理を終了しました。未完了分は上限内で再試行できます。';
-    } catch (error) { if (!task.signal.aborted) { cancel(); failure(error); } }
+    } catch (error) { if (!task.signal.aborted) { autoBlocked = true; cancel(); failure(error); } }
     finally { if (operation === task) operation = undefined; activityBusy = false; buttons(); }
   }
-  retry.addEventListener('click', () => { void simulate(); });
+  retry.addEventListener('click', () => { autoBlocked = false; void simulate(); });
   async function configure(maxPosts: number) {
     if (!actions.activity || configuring) return;
     cancel(); configuring = true; buttons();
     try {
       showActivity(await actions.activity.configureActivity(maxPosts, model.value));
-      message.textContent = maxPosts ? '架空の活動を有効にしました。次回の接続から適用します。' : '架空の活動を無効にしました。';
+      autoBlocked = false;
+      message.textContent = maxPosts ? '架空の活動を有効にしました。これからの予定に適用します。モデル設定が未完了の場合はモデル読込が必要です。' : '架空の活動を無効にしました。';
     } catch (error) { failure(error); }
     finally { configuring = false; buttons(); }
   }
@@ -253,15 +326,17 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     const task = new AbortController(); operation = task; buttons();
     message.textContent = 'モデルを読み込んでいます。停止ボタンでキャンセルできます。';
     try {
+      if (actions.activity) showActivity(await actions.activity.authorizeModel(model.value));
+      autoBlocked = false;
       await loadEngine(task, model.value);
       message.textContent = 'AI の準備ができました。投稿案を生成して確認できます。';
       // Loaded into memory is distinct from persistent cache availability.
       void checkCache();
-    } catch (error) { if (!task.signal.aborted) { cancel(); failure(error); } }
+    } catch (error) { if (!task.signal.aborted) { autoBlocked = true; cancel(); failure(error); } }
     finally { if (operation === task) operation = undefined; buttons(); }
   });
   generate.addEventListener('click', async () => {
-    if (!adapter || !loadedModel || operation || saving) return;
+    if (!adapter || !loadedModel || operation || saving || budget.attempts >= MAX_SESSION_POSTS) return;
     const engine = adapter;
     const modelId = loadedModel;
     clearDraft();
@@ -272,14 +347,17 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     try {
       const snapshot = await actions.read();
       task.signal.throwIfAborted();
-      const raw = await engine.generate(buildPrompt(snapshot, request), task.signal);
+      const prompt = buildPrompt(snapshot, request);
+      budget.attempts++;
+      showActivity(activity);
+      const raw = await engine.generate(prompt, task.signal);
       if (task.signal.aborted) return;
       const result = validateGeneration(raw, snapshot, request);
       draft = { raw, request, modelId };
-      preview.textContent = `${personas.find((row) => row.id === request.personaId)!.handle} [架空の AI]\n${request.replyToPostId ? `返信先 ID: ${request.replyToPostId}\n` : ''}${result.title}\n\n${result.body}`;
+      preview.textContent = `${residentProfiles(snapshot).find((row) => row.id === request.personaId)!.handle} [架空の AI]\n${request.replyToPostId ? `返信先 ID: ${request.replyToPostId}\n` : ''}${result.title}\n\n${result.body}`;
       preview.hidden = send.hidden = discard.hidden = false;
       message.textContent = '検証済みの AI 投稿案です。内容を確認して保存してください。まだ投稿されていません。';
-    } catch (error) { if (!task.signal.aborted) { cancel(); failure(error); } }
+    } catch (error) { if (!task.signal.aborted) { autoBlocked = true; cancel(); failure(error); } }
     finally { if (operation === task) operation = undefined; buttons(); }
   });
   send.addEventListener('click', async () => {
@@ -293,10 +371,43 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     finally { saving = false; buttons(); }
   });
 
+  function refresh(snapshot: Backup) {
+    content = snapshot;
+    profile();
+    get('identities').replaceChildren();
+    for (const row of residentProfiles(snapshot)) {
+      const item = document.createElement('li');
+      item.textContent = `${row.handle} / fictional-ai:${row.id} / ${row.occupation}: ${row.routine} ${row.profile}`;
+      get('identities').append(item);
+      const option = [...persona.options].find((o) => o.value === row.id);
+      if (option) option.textContent = `${row.handle} — 架空の AI (${row.id})`;
+    }
+    showActivity(snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined);
+    const selected = forum.value;
+    forum.replaceChildren();
+    for (const row of snapshot.forums) {
+      const sig = snapshot.sigs.find((sig) => sig.id === row.sigId);
+      forum.add(new Option(`${sig?.keyword} / ${row.name} (${row.id})`, row.id));
+    }
+    if (Array.from(forum.options).some((option) => option.value === selected)) forum.value = selected;
+    updateReplies();
+    if (draft) {
+      try { checkRequest(snapshot, draft.request); }
+      catch { clearDraft(); }
+    }
+    const records = get('records'); records.replaceChildren();
+    for (const post of snapshot.posts.filter((row) => row.origin.startsWith('local-ai:') || snapshot.members.find((m) => m.id === row.authorId)?.actor === 'ai')) {
+      const member = snapshot.members.find((row) => row.id === post.authorId);
+      const item = document.createElement('li');
+      item.textContent = `${member?.handle} / ${post.authorId} / actor=${member?.actor} / origin=${post.origin} / ${post.forumId} #${post.number} / ${post.title}${post.simulation ? ` / fictional=true / runId=${post.simulation.runId} / simulatedAt=${post.simulation.simulatedAt} / generatedAt=${post.createdAt}` : ''}`;
+      records.append(item);
+    }
+    buttons();
+  }
   return {
     async openActivity(planned?: AiActivity) {
       if (!actions.activity || activityBusy || operation) return;
-      budget.attempts = budget.committed = 0;
+      autoBlocked = false;
       const before = revision;
       const state = planned ?? await actions.activity.openActivity();
       if (revision !== before) return;
@@ -306,31 +417,18 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       }
       await simulate();
     },
-    invalidate() { cancel(); unavailable(); },
-    refresh(snapshot: Backup) {
-      content = snapshot;
-      showActivity(snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined);
-      const selected = forum.value;
-      forum.replaceChildren();
-      for (const row of snapshot.forums) {
-        const sig = snapshot.sigs.find((sig) => sig.id === row.sigId);
-        forum.add(new Option(`${sig?.keyword} / ${row.name} (${row.id})`, row.id));
-      }
-      if (Array.from(forum.options).some((option) => option.value === selected)) forum.value = selected;
-      updateReplies();
-      if (draft) {
-        try { checkRequest(snapshot, draft.request); }
-        catch { clearDraft(); }
-      }
-      const records = get('records'); records.replaceChildren();
-      for (const post of snapshot.posts.filter((row) => row.origin.startsWith('local-ai:') || snapshot.members.some((member) => member.id === row.authorId && member.actor === 'ai'))) {
-        const member = snapshot.members.find((row) => row.id === post.authorId);
-        const item = document.createElement('li');
-        item.textContent = `${member?.handle} / ${post.authorId} / actor=${member?.actor} / origin=${post.origin} / forumId=${post.forumId} / #${post.number} / ${post.title} / generatedAt=${post.createdAt}`
-          + (post.simulation ? ` / runId=${post.simulation.runId} / simulatedAt=${post.simulation.simulatedAt} / fictional=true（架空の投稿時刻）` : '');
-        records.append(item);
-      }
-      buttons();
+    invalidate() { autoBlocked = true; cancel(); unavailable(); },
+    refresh,
+    async tick() {
+      if (!actions.activity || activityBusy || operation || configuring || autoBlocked || draft ||
+          budget.attempts >= MAX_SESSION_POSTS || (activity && budget.committed >= activity.maxPosts)) return;
+      // Failed/cancelled work waits for explicit retry or a later page visit.
+      if (activity?.batch?.runs.some((r) => ['failed', 'cancelled'].includes(r.status))) return;
+      const before = revision;
+      const state = await actions.activity.openActivity();
+      if (before !== revision) return;
+      showActivity(state);
+      await simulate();
     },
   };
 }

@@ -1,3 +1,5 @@
+import { personas, RESIDENTS_SETTING } from '../ai/personas';
+import type { ResidentSettings } from '../ai/personas';
 export interface Member { id: string; handle: string; actor: 'human' | 'ai' }
 export interface Sig { id: string; keyword: string; title: string }
 export interface Forum { id: string; sigId: string; boardNo: number; name: string; nextPostNumber: number }
@@ -21,7 +23,9 @@ export interface AiRun {
 }
 export interface AiBatch { id: string; from: string; to: string; modelId: string; runs: AiRun[] }
 export interface AiActivity {
-  version: 1; maxPosts: number; modelId: string; lastActivityAt: string; batch: AiBatch | null;
+  version: 1 | 2; maxPosts: number; modelId: string; lastActivityAt: string; batch: AiBatch | null;
+  consent?: boolean; seed?: string; nextDue?: Record<string, string>;
+  truncated?: boolean; bootstrap?: boolean;
 }
 export interface ReadState { memberId: string; forumId: string; lastReadNumber: number }
 export interface Session {
@@ -113,8 +117,18 @@ function json(value: unknown): void {
 }
 
 export function validateActivity(value: unknown): asserts value is AiActivity {
-  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch']);
-  if (value.version !== 1) invalid('Unknown AI activity version.');
+  object(value);
+  const extra = value.version === 2 ? ['consent', 'seed', 'nextDue', 'truncated', 'bootstrap'] : [];
+  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch', ...extra]);
+  if (value.version !== 1 && value.version !== 2) invalid('Unknown AI activity version.');
+  if (value.version === 2) {
+    if (typeof value.consent !== 'boolean' || typeof value.truncated !== 'boolean' ||
+        typeof value.bootstrap !== 'boolean') invalid('Invalid AI consent/state.');
+    string(value.seed);
+    if (value.seed.length > 128) invalid('AI seed is too long.');
+    fields(value.nextDue, personas.map((row) => row.id));
+    Object.values(value.nextDue).forEach(timestamp);
+  }
   integer(value.maxPosts, 0);
   if ((value.maxPosts as number) > 12) invalid('AI activity cap exceeds 12.');
   string(value.modelId); timestamp(value.lastActivityAt);
@@ -128,12 +142,50 @@ export function validateActivity(value: unknown): asserts value is AiActivity {
   for (const run of batch.runs as unknown[]) {
     fields(run, ['id', 'personaId', 'forumId', 'simulatedAt', 'status'], ['replyToPostId']);
     string(run.id); string(run.personaId); string(run.forumId); timestamp(run.simulatedAt);
+    if (!personas.some((p) => p.id === run.personaId)) invalid('Unknown AI resident.');
     if (Object.hasOwn(run, 'replyToPostId')) string(run.replyToPostId);
     if (ids.has(run.id) || !(run.id as string).startsWith(`${batch.id}:`) ||
         Date.parse(run.simulatedAt as string) < Date.parse(batch.from as string) ||
         Date.parse(run.simulatedAt as string) > Date.parse(batch.to as string) ||
         !['pending', 'running', 'committed', 'failed', 'cancelled'].includes(run.status as string)) invalid('Invalid AI run.');
     ids.add(run.id);
+  }
+}
+
+/** Reserved settings are validated before either direct writes or atomic restore. */
+export function validateResidents(value: unknown): asserts value is ResidentSettings {
+  fields(value, ['version', 'profiles']);
+  if (value.version !== 1 || !Array.isArray(value.profiles) || value.profiles.length !== 10) invalid('Expected ten residents.');
+  const ids = new Set<string>();
+  const boundedText = (text: unknown, max: number) => {
+    string(text);
+    if (text.length > max || /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/.test(text)) invalid('Invalid resident text.');
+  };
+  for (const row of value.profiles) {
+    fields(row, ['id', 'handle', 'occupation', 'routine', 'profile', 'interests', 'preferredBoards',
+      'utcOffsetMinutes', 'weekdayHours', 'weekendHours', 'frequency', 'participation',
+      'reading', 'newThread', 'reply', 'inactivity', 'affinities']);
+    string(row.id);
+    if (!personas.some((p) => p.id === row.id) || ids.has(row.id)) invalid('Unknown/duplicate resident.');
+    ids.add(row.id);
+    boundedText(row.handle, 40); boundedText(row.occupation, 80);
+    boundedText(row.routine, 240); boundedText(row.profile, 300);
+    if (!Array.isArray(row.interests) || row.interests.length > 8 || !row.interests.length) invalid('Invalid interests.');
+    row.interests.forEach((text) => boundedText(text, 40));
+    if (!Array.isArray(row.preferredBoards) || row.preferredBoards.length > 12) invalid('Invalid preferred boards.');
+    row.preferredBoards.forEach((text) => boundedText(text, 128));
+    integer(row.utcOffsetMinutes, -720);
+    if ((row.utcOffsetMinutes as number) > 840) invalid('Invalid time zone.');
+    for (const hours of [row.weekdayHours, row.weekendHours]) {
+      if (!Array.isArray(hours) || hours.length > 24 || new Set(hours).size !== hours.length) invalid('Invalid hours.');
+      hours.forEach((hour) => { integer(hour, 0); if (hour > 23) invalid('Invalid hour.'); });
+    }
+    for (const key of ['frequency', 'participation', 'reading', 'newThread', 'reply', 'inactivity']) {
+      if (typeof row[key] !== 'number' || !Number.isFinite(row[key]) || row[key] < 0 || row[key] > (key === 'frequency' ? 3 : 1)) invalid('Invalid resident activity weight.');
+    }
+    object(row.affinities);
+    if (Object.keys(row.affinities).some((id) => !personas.some((p) => p.id === id)) ||
+        Object.values(row.affinities).some((n) => typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 1)) invalid('Invalid affinity.');
   }
 }
 
@@ -190,6 +242,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
       if (value.id === 'ai-activity') validateActivity(value.value);
+      if (value.id === RESIDENTS_SETTING) validateResidents(value.value);
       if (value.id === TERMINAL_SETTING) validateTerminalPreferences(value.value);
       break;
   }

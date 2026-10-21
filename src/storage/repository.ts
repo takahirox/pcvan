@@ -1,10 +1,12 @@
 import {
-  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession,
+  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents,
 } from './schema';
 import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
-import { ACTIVITY_SETTING, emptyActivity, planActivity } from '../ai/activity';
-import { models } from '../ai/personas';
+import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity } from '../ai/activity';
+import { models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
+import type { ResidentProfile, ResidentSettings } from '../ai/personas';
+import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { postInput, validateGeneration } from '../ai/generation';
 
 export * from './schema';
@@ -317,10 +319,27 @@ export class LocalRepository {
   }
 
   private async readActivity(tx: IDBTransaction, now: string): Promise<AiActivity> {
-    const row: Records['settings'] | undefined = await request(tx.objectStore('settings').get(ACTIVITY_SETTING));
-    const state = row?.value ?? emptyActivity(now);
+    const settings = tx.objectStore('settings');
+    const row: Records['settings'] | undefined = await request(settings.get(ACTIVITY_SETTING));
+    const state = row?.value ?? emptyActivity(now, createRecordId());
     validateActivity(state);
-    return state;
+    const migrated = migrateActivity(state);
+    const content = await this.snapshot(tx);
+    if (!row) migrated.bootstrap = !content.sigs.length && !content.forums.length && !content.posts.length &&
+      !content.members.length && !await request(tx.objectStore('session').get('imported'));
+    if (!content.settings.some((r) => r.id === RESIDENTS_SETTING)) {
+      const profiles = structuredClone(personas).map((profile) => ({ ...profile,
+        handle: content.members.find((m) => m.id === personaMemberId(profile.id) && m.actor === 'ai')?.handle ?? profile.handle }));
+      validateResidents({ version: 1, profiles });
+      await request(settings.put({ id: RESIDENTS_SETTING, value: { version: 1, profiles } }));
+    }
+    for (const profile of residentProfiles(await this.snapshot(tx))) {
+      const id = personaMemberId(profile.id);
+      if (!await request(tx.objectStore('members').get(id))) {
+        await request(tx.objectStore('members').add({ id, handle: profile.handle, actor: 'ai' }));
+      }
+    }
+    return migrated;
   }
 
   private async writeActivity(tx: IDBTransaction, state: AiActivity): Promise<AiActivity> {
@@ -329,41 +348,85 @@ export class LocalRepository {
     return state;
   }
 
-  /** Opt-in applies from now, never accrues work while disabled. Zero also drops the pending batch. */
+  /** Only a pristine, never-imported world receives empty boards, on model setup. */
+  private async bootstrapForums(tx: IDBTransaction, state: AiActivity): Promise<void> {
+    if (!state.bootstrap || !state.consent) return;
+    state.bootstrap = false;
+    if (await request(tx.objectStore('session').get('imported')) ||
+        await request(tx.objectStore('sigs').count()) || await request(tx.objectStore('forums').count())) return;
+    for (const [keyword, boardNo, name] of [
+      ['MITI', 9, evidence.miti.steps[2]!.destination],
+      ['DAISIZEN', 1, evidence.daisizen.forums[0]!.label],
+    ] as const) {
+      const sigId = `resident-sig:${keyword}`;
+      await request(tx.objectStore('sigs').add({ id: sigId, keyword, title: keyword }));
+      await request(tx.objectStore('forums').add({ id: `resident-forum:${keyword}:${boardNo}`,
+        sigId, boardNo, name, nextPostNumber: 1 }));
+    }
+  }
+
+  /** Pause preserves pending work. Future visits restart now, without accruing a paused backlog. */
   configureActivity(maxPosts: number, modelId: string, now = new Date().toISOString()): Promise<AiActivity> {
-    return this.transaction(['settings'], 'readwrite', async (tx) => {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
       const state = await this.readActivity(tx, now);
       return this.writeActivity(tx, { ...state, maxPosts, modelId, lastActivityAt: now,
-        batch: maxPosts === 0 ? null : state.batch });
+        nextDue: initialDue(now, state.seed!) });
     });
   }
 
-  /** Advance the watermark and persist the entire bounded plan in one transaction. */
+  /** The explicit model-download button is the consent boundary, separate from activity ON. */
+  authorizeModel(modelId: string, now = new Date().toISOString()): Promise<AiActivity> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
+      const state = await this.readActivity(tx, now);
+      state.consent = true; state.modelId = modelId;
+      await this.bootstrapForums(tx, state);
+      return this.writeActivity(tx, state);
+    });
+  }
+
+  configureResident(profile: ResidentProfile, now = new Date().toISOString()): Promise<AiActivity> {
+    const input = structuredClone(profile);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const state = await this.readActivity(tx, now);
+      const content = await this.snapshot(tx);
+      const settings: ResidentSettings = { version: 1,
+        profiles: residentProfiles(content).map((p) => p.id === input.id ? input : p) };
+      if (!settings.profiles.some((p) => p.id === input.id)) invalid('Unknown resident.');
+      validateResidents(settings);
+      const member: Member | undefined = await request(tx.objectStore('members').get(personaMemberId(input.id)));
+      if (member?.actor === 'human') invalid('Resident identity collides with a human.');
+      await request(tx.objectStore('members').put({ id: personaMemberId(input.id), handle: input.handle, actor: 'ai' }));
+      await request(tx.objectStore('settings').put({ id: RESIDENTS_SETTING, value: settings }));
+      state.nextDue![input.id] = initialDue(now, state.seed!)[input.id]!;
+      return this.writeActivity(tx, state);
+    });
+  }
+
+  /** Plan and resident due times share a transaction, including across tabs. */
   openActivity(now = new Date().toISOString()): Promise<AiActivity> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
-      // Before opt-in the existing session timestamps suffice: no AI setting or work is created.
-      if (!await request(tx.objectStore('settings').count(ACTIVITY_SETTING))) return emptyActivity(now);
       const state = await this.readActivity(tx, now);
-      const timestamp = new Date(Math.max(Date.parse(now), Date.parse(state.lastActivityAt))).toISOString();
-      const unfinished = state.batch?.runs.some((run) => run.status !== 'committed');
-      const batch = !state.maxPosts ? null : unfinished ? state.batch
-        : planActivity(await this.snapshot(tx), state, timestamp);
-      return this.writeActivity(tx, { ...state, lastActivityAt: timestamp, batch });
+      await this.bootstrapForums(tx, state);
+      return this.writeActivity(tx, scheduleActivity(await this.snapshot(tx), state, now));
     });
   }
 
   touchActivity(now = new Date().toISOString()): Promise<AiActivity> {
-    return this.transaction(['settings'], 'readwrite', async (tx) => {
-      if (!await request(tx.objectStore('settings').count(ACTIVITY_SETTING))) return emptyActivity(now);
-      const state = await this.readActivity(tx, now);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const row: Records['settings'] | undefined = await request(tx.objectStore('settings').get(ACTIVITY_SETTING));
+      if (!row) return emptyActivity(now);
+      const state: unknown = row.value;
+      validateActivity(state);
+      if (!state.maxPosts || (state.version === 2 && !state.consent)) return state;
       return this.writeActivity(tx, { ...state,
         lastActivityAt: new Date(Math.max(Date.parse(now), Date.parse(state.lastActivityAt))).toISOString() });
     });
   }
 
   setAiRunStatus(id: string, status: Exclude<AiRunStatus, 'committed'>): Promise<AiActivity> {
-    return this.transaction(['settings'], 'readwrite', async (tx) => {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
       const state = await this.readActivity(tx, new Date().toISOString());
       const run = state.batch?.runs.find((row) => row.id === id);
       if (!run || !state.maxPosts) invalid('AI activity is disabled or the run is missing.');
@@ -390,7 +453,7 @@ export class LocalRepository {
       const target = { personaId: run.personaId, forumId: run.forumId,
         ...(run.replyToPostId === undefined ? {} : { replyToPostId: run.replyToPostId }) };
       const generated = validateGeneration(raw, await this.snapshot(tx), target);
-      const input = postInput(generated, state.batch!.modelId);
+      const input = postInput(generated, state.batch!.modelId, await this.snapshot(tx));
       input.post.simulation = { runId: id, simulatedAt: run.simulatedAt, fictional: true };
       await this.registerAi(tx, input.member, input.post);
       const post = await this.insertPost(tx, input.post, id);
@@ -429,6 +492,7 @@ export class LocalRepository {
         for (const row of backup[store]) await request(tx.objectStore(store).add(row));
       }
       if (backup.session !== null) await request(tx.objectStore('session').put(backup.session, 'current'));
+      await request(tx.objectStore('session').put(true, 'imported'));
     });
   }
 }

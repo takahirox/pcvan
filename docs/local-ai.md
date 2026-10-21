@@ -1,32 +1,66 @@
-# Optional browser-local AI (Issues #10 and #11)
+# Browser-local resident community (Issue #35)
 
-The ordinary terminal requires no model, GPU, external API key, or inference
-server. AI is off by default; automatic reconnect activity requires a saved opt-in. The separate **ローカル AI 設定・投稿の出自**
-settings panel is reconstructed product UI; it is not a historical PC-VAN menu.
-The model receives no menu definitions and can return only forum post fields.
-It cannot change navigation, command semantics, historical strings, or fixtures.
+The ordinary terminal requires no model, GPU, external API key or inference server.
+Ten original fictional residents inhabit the single-user local world. They never
+represent historical PC-VAN members or real connected users. Settings is modern
+product UI; the model cannot change historical fixtures, menus or command semantics.
 
-## Use and limitations
+## Setup and controls
 
-1. Create a human member and send a manual post to create a local board, or
-   restore a local-world backup. Demo boards are never copied into storage by AI.
-2. Expand the AI panel and select a model. Read the network/storage notice before
-   pressing **モデルを読み込む（初回ダウンロード）**. This explicit action imports
-   the WebLLM runtime and starts its worker. A saved reconnect opt-in can also
-   load it when there is a pending batch. **選択モデルの保存を確認** can import
-   the runtime for a cache-only check; it never starts inference or downloads
-   missing weights.
-3. Choose a fictional persona, local board and optional local reply target. All
-   three profiles are original fiction: 星守 (careful astronomy enthusiast),
-   草笛 (gentle nature observer), and 半田ごて (practical hobbyist with dry humor).
-   Their complete profiles are visible in settings.
-4. Generate a post, inspect the validated preview, then explicitly save or discard
-   it. Manual generation alone writes nothing, including no AI member.
-   Automatic fictional activity is a separate opt-in described below.
-5. **AI を停止・解放** cancels a download or inference and terminates the worker,
-   releasing its model. Changing models also unloads it. Restore cancels pending
-   AI work and discards its preview. Reload loads a model only when saved reconnect
-   activity is enabled and has pending work.
+New worlds have automatic activity ON with a conservative four-post limit. Until
+**モデルを読み込む（初回ダウンロード）** is explicitly pressed, **AI 設定が必要**
+accurately reports that setup is missing: no model import, download or inference
+starts automatically. Saving the activity cap alone does not authorize downloads.
+The explicit button persists consent even if that load fails; errors then suspend
+automatic retries for the current visit. After consent, later visits may load the
+selected model automatically when due work exists, including fetching evicted files.
+The network/storage notice appears immediately above this button.
+
+On first model setup, a pristine world receives two empty writable local boards:
+MITI board 9 (資料室) and DAISIZEN board 1 (自然の森／ＦＲＥＥ). No human member or
+post is necessary. Imported worlds, existing/custom SIGs, and intentionally empty
+boards are preserved. No demo or historical posts are copied into IndexedDB.
+
+Select a resident and expand **この住人を編集** to edit handle, occupation, routine,
+voice, interests, preferred boards, local time offset, weekday/weekend hours,
+frequency and visit/read/topic/reply/silence weights. Comma-separated hours are
+0–23 in the resident's local time. Default offset is UTC+09:00 (JST); offsets are
+fixed, without automatic daylight saving. Frequency 0 pauses that individual.
+Preferred boards accept `MITI:9`, `DAISIZEN:1` or a stored forum ID. Residents
+occasionally explore other available boards. Changes recalculate that resident's
+future due time; past posts and pending runs retain their IDs and timestamps.
+
+The global cap accepts 0–12 posts per page visit; 0 pauses everyone. Pause retains
+unfinished work for inspection/resume and does not accrue new work. Reconnecting
+never replenishes the visit budget. **AI を停止・解放** cancels inference/downloads,
+unloads the shared model and suspends timer retries. Explicit model load or retry
+can recover within the remaining allowance. Restore cancels current work and
+previews; automatic work resumes on a subsequent connection or page visit.
+Manual generation still produces a validated preview that requires explicit save
+or discard. All ten residents are available for manual previews, including paused
+residents. **選択モデルの保存を確認** probes cached weights without downloading them.
+
+## Fictional regulars
+
+| Stable ID | Default handle | Occupation and connection habit |
+| --- | --- | --- |
+| hoshimori | 星守 | Print proofreader; careful astronomy observer after work |
+| kusabue | 草笛 | Garden shop clerk; early mornings and early evenings |
+| hankote | 半田ごて | Repair technician; practical late-night tinkering |
+| soroban | そろばん | Office worker; lunch break and evenings |
+| shiori | しおり | Used-book shop clerk; reading before/after store hours |
+| mizutama | 水玉 | Student with a part-time job; late questions and follow-ups |
+| tsumugi | つむぎ | Shift care worker; brief morning and afternoon visits |
+| chalk | 白墨 | Teacher; evening preparation and weekend nature walks |
+| tabstop | タブストップ | Junior programmer; late nights and weekend afternoons |
+| komadori | こまどり | Delivery worker/amateur photographer; early birds, early sleep |
+
+Profiles include distinct Japanese voices, interests, participation probabilities
+and small affinity maps. Work/sleep hours strongly reduce participation, with rare
+exceptions. Deterministic three-day absences, reading and silence decisions allow
+quiet periods. These are lightweight characters, not verified historical routines.
+
+## Runtime and cache
 
 WebGPU in a secure context (HTTPS or localhost) is required. Actual GPU features,
 VRAM and Japanese output quality vary. The selected models are the pinned
@@ -62,145 +96,99 @@ required to use the simulator or run tests.
 See [offline caching and retention](offline.md) for shell installation, safe
 updates and persistence/backup controls.
 
-## Prompt and validation boundary
+## Scheduling, discussion and bounds
 
-`src/ai/generation.ts` constructs a bounded system/user prompt from:
+`activity.ts` uses seeded random draws keyed by resident and opportunity time.
+Each resident has a durable `nextDue`; visits are spaced by seeded gaps of 1–6
+hours divided by frequency (at least one hour). Availability is evaluated in that
+resident's local date/hour, including weekday/weekend transitions. A visit can
+stay silent, read, start a topic or choose a reply. The LLM only writes an action
+whose author, board, parent and simulated time have already been selected.
 
-- One of the three fixed fictional profiles and the exact selected IDs.
-- SIG keyword/title (80/160 UTF-16 units) and board name (160 units).
-- The last four same-board posts with `local-human` or `local-ai:webllm:` origin,
-  ordered by post number; each contains at most 128 ID, 80 title and 300 body
-  UTF-16 units. Imported/historical origins and the demonstration fixture are
-  excluded. Context text is explicitly untrusted data, never instructions.
+Visible connected pages check every minute and on becoming visible. Human posts
+become discussion triggers at residents' own next visits, with at least a
+20-minute reply delay; no immediate response to every message is promised. Hidden
+pages do not poll; there is no service-worker or closed-browser inference. On
+reopening, at most the last 72 hours are examined, with at most 74 opportunities
+per resident and 12 selected actions. Long absences and excess opportunities are
+truncated with a Settings status. Selected runs execute in chronological order.
+The default visit allowance is four automatically saved posts and at most 12
+generation attempts shared with manual previews and explicit retries; inference failure stops automatic retries for that visit.
 
-No preserved historical corpus, training or bulk copying is part of this feature.
-Manual local posts should be original material; origin fields cannot establish
-that a user-supplied backup is truthful. Reply IDs may point to any stored post in
-the same board, but imported/historical text is not included in the prompt.
+Candidates use at most eight recent same-forum local human/AI posts, exclude the
+resident's own posts, future posts and recently answered targets, and prefer shared
+interests, affinity and continuing replies. AI-to-AI replies are ordinary valid
+same-forum references. Generation context contains the last four same-forum local
+posts (128 ID, 80 title, 300 body UTF-16 units each), the selected target excerpt
+(80 title/240 body), and two of the resident's own local posts (120 body each).
+Author handles, bounded profile fields and affinity influence tone. This derived
+local memory survives reload/backup without maintaining a second transcript;
+imported/historical origins and demo fixtures are excluded from memory/prompts.
+Discussion data and profiles are untrusted data, never system instructions.
 
-WebLLM uses JSON mode with an explicit schema and a 1,024-token output cap, a
-4,096-token context window and reset chat per request. Tokenization varies; an
-oversized context/incomplete completion fails without posting. The application
-rejects raw responses over 8,000 UTF-16 units, invalid JSON, extra/missing fields,
-wrong types, mismatched persona/forum/reply IDs, missing references, and replies
-outside the selected board. There is no JSON repair or Markdown-fence stripping.
-The exact allowed fields are `personaId`, `forumId`, optional `replyToPostId`
-(required when replying), `title`, and `body`. Titles must be nonblank, one line,
-and at most 120 UTF-16 units; bodies must be nonblank and at most 1,200 units.
-Control characters, invisible direction/format controls and HTML-like tags are
-rejected. An exact copy of a recent context body is rejected. These checks bound
-and screen content; they cannot prove originality, truthfulness or literary
-quality. Manual posts receive a plain-text preview; the separate reconnect opt-in
-authorizes automatic saving of validated fictional posts.
+One worker/model is shared across all residents and manual previews. A Web Lock
+holds a cross-tab model lease until unload/page close, and another lock serializes
+automatic batch execution. Another tab reports contention without loading another
+GPU model. Automatic inference pauses if Web Locks are unavailable; manual use
+remains possible. Model work stays outside the storage/terminal command queue.
+Unsupported WebGPU, offline/cache failures, invalid output, cancellation and GPU
+loss leave terminal navigation, human posting and backups usable.
 
-The selected identities/references and text are validated again against fresh
-storage on save. `LocalRepository.createAiPost(member, post)` registers the
-fictional member and calls the existing transactional post allocator together,
-checking the forum and reply relationship atomically. Failure rolls back member
-creation, post creation and numbering. Existing human identities cannot be
-replaced by the AI identity. No local board is created by generation.
+## Validation and provenance
 
-## Provenance and inspection
+WebLLM JSON mode uses an explicit response schema, a 1,024-token output limit,
+4,096-token context and reset chat per request. Oversized/incomplete requests fail
+without posting. Raw results over 8,000 UTF-16 units, malformed/extra/missing fields,
+wrong IDs/types, missing or cross-forum references, HTML and control/direction
+characters are rejected. Titles are 1–120 units on one line; bodies 1–1,200 units.
+Exact copies of recent bodies are rejected. There is no automatic JSON repair.
+These bounds do not guarantee originality, correctness or character consistency.
+Rendered model/profile text uses `textContent`.
 
-The v1 backup envelope and IndexedDB stores remain in use, with an additive
-optional `simulation` post field and a reserved activity setting. Persona members have `actor: 'ai'`, stable
-IDs such as `fictional-ai:hoshimori`, and their fictional period-style handles.
-Posts have `origin: 'local-ai:webllm:<modelId>'`; the stable author ID identifies
-the persona even after an export/restore. Time and post number come from the
-repository, never the model. Active human selection and read markers are not
-changed by AI posting.
+The IndexedDB database and backup envelope remain version 1. Additive reserved
+settings are strictly validated before writes or atomic restore: `ai-residents`
+version 1 stores exactly ten editable profiles; `ai-activity` version 2 stores
+consent, seed, per-resident next-due times, truncation/bootstrap state, the existing
+cap/model/watermark and one bounded batch. Version-1 activity settings migrate on
+use, preserving model, explicit zero/nonzero cap and every pending run. The older
+nonzero opt-in already authorized downloads, so it retains consent. Old backups
+without activity settings receive the new defaults on next open, without changing
+existing posts or boards. An import marker prevents bootstrapping imported empty
+worlds; it is transactionally replaced along with the session. Profiles seed
+missing stable members but never overwrite an existing human identity.
 
-The accessible settings panel lists persona biographies and all AI-origin or
-AI-authored stored posts, with handle, author ID, actor, origin/model, forum ID,
-number and title. Historical-style reading may show just the member ID, while
-settings and JSON backups retain explicit inspectable AI attribution. Rendering
-uses `textContent`, so model text cannot become DOM markup or terminal commands.
+Planning, due-time advancement and run persistence share one transaction.
+Unfinished batches resume before new plans. Run status is `pending`, `running`,
+`committed`, `failed` or `cancelled`. Run IDs are stable post primary keys;
+`commitAiRun` atomically validates identity/parent, allocates a forum number,
+saves output and marks completion. Concurrent duplicate commits and uncertain
+acknowledgements return the existing result. Quota failures roll everything back.
+Deliberately deleted committed posts are not recreated. Profiles/handles update
+only through validated resident settings; original `fictional-ai:hoshimori`,
+`fictional-ai:kusabue`, `fictional-ai:hankote` IDs and saved posts remain intact.
 
-## Fictional activity on reconnect
+Posts retain `actor: ai`, `origin: local-ai:webllm:<modelId>` and optional
+`simulation: { runId, simulatedAt, fictional: true }`. `createdAt` is actual commit
+time; the reading header labels simulated time **架空の投稿時刻**. Settings lists
+profiles, identities, run states and generated/fictional timestamps on demand.
+No actual background activity or historically verified timeline is claimed.
 
-The browser runs no inference while closed. In the AI panel, set the connection
-cap to **1–12** and save it with the selected model to opt in. **0** is the default.
-Enabling starts the clock now, so time spent with AI disabled never becomes a
-backlog. A saved opt-in authorizes automatic model loading (including downloads
-when artifacts are missing), generation and saving when reopening or using
-`RECONNECT`. Manual AI previews retain their explicit save step.
+## Checks and limitations
 
-`src/ai/activity.ts` plans one fictional post per complete elapsed hour, capped
-by the configured maximum and a hard limit of 12. Zero elapsed hours generates
-nothing; one hour schedules one post; 72 hours schedules at most the cap. The
-clock is local and deliberately approximate. The saved `lastActivityAt` watermark
-advances on open, terminal commands, explicit logout, every visible minute and
-best-effort visibility/close events. Before any activity setting is saved, the
-ordinary session timestamps remain the only activity metadata. A clock moving
-backwards cannot create negative work or move an existing watermark backwards.
-Abrupt closure may lose the latest minute of activity, but cannot repeat a
-committed run. No service worker, backend, timer-driven inference or queue of
-missed hourly jobs is added.
+`npm test` builds production assets and runs mocked-model Chromium checks. The
+resident/activity suites inject clocks and fixed seeds to cover all ten profiles,
+routines/time offsets, quiet periods, delayed human/AI replies, open-tab timers,
+consent, empty-world boards, caps, pause/resume, profile persistence, legacy backup
+migration, invalid restore rollback, concurrent commits, cross-tab model leases,
+interrupted work and GPU/load/output failures. Existing manual preview/save,
+human composition, navigation, offline shell and provenance checks remain in use.
+`npm run build` separately checks TypeScript and the static production build.
+No automated check downloads real model data or requires a GPU.
 
-The deterministic plan rotates the three fictional personas and sorted existing
-local boards. It alternates new posts and replies when eligible local parents
-exist; imported/historical origins and future-dated parents are excluded. Planned
-fictional times fall strictly within the elapsed interval. Prompts use the same
-four-post/excerpt bounds described above and exclude posts later than the planned
-fictional time. No board, menu or historical content is generated.
-
-The reserved `settings` row `ai-activity` contains version 1, `maxPosts`, `modelId`,
-`lastActivityAt` and at most one `batch`. The batch records `id`, `from`, `to`,
-`modelId` and at most 12 runs. Each run stores `id`, `personaId`, `forumId`, optional
-`replyToPostId`, `simulatedAt` and one status: `pending`, `running`, `committed`,
-`failed`, or `cancelled`. The plan and advanced watermark are written together.
-An unfinished batch is resumed in preference to creating a new one; missed time
-is discarded rather than accumulating an unbounded queue. Each connection makes
-at most 12 model attempts and saves at most its configured post cap, including
-explicit retries. A lower cap also applies to a resumed larger batch.
-
-Run IDs combine the interval endpoints and slot index, and also serve as post
-primary keys. `commitAiRun` revalidates model output against current storage and
-atomically commits run status, AI identity, post and number allocation. A quota
-error rolls the entire result back. Duplicate commits, uncertain acknowledgements
-and retries return an existing committed post without allocating another number.
-Committed runs stay complete even if their post is later deliberately deleted.
-A Web Lock prevents simultaneous automatic generation in tabs that support it;
-IndexedDB still prevents duplicate results without Web Locks.
-
-The panel opens during automatic work, shows model and batch progress plus stable
-run IDs/status, and keeps **AI を停止・解放** available. Terminal commands and manual
-posting remain responsive because inference is outside the command/storage queue.
-Cancel terminates the model; validated results committed before cancellation stay
-saved. **未完了の架空の活動を再試行** resumes within the connection budget. Unsupported
-WebGPU, missing offline weights, invalid output and model failure leave pending
-work inspectable; there is no automatic retry loop. Reopening retries incomplete
-runs, including ones left `running` by tab loss. **架空の活動を無効にする** cancels
-inference, sets the cap to zero and drops the pending batch. Restore cancels work
-and refreshes state; restored settings are acted on only at the next connection.
-
-For simulated posts, `createdAt` is the actual generation/commit time. The
-optional metadata is `{ runId, simulatedAt, fictional: true }`; `runId` must equal
-the stable post ID. The reading header uses `simulatedAt` with an explicit
-**架空の投稿時刻** label. AI inspection and JSON backups preserve both timestamps,
-run ID and the fictional marker. Ordinary manual posts retain their actual time.
-
-## Validation
-
-`npm test` includes deterministic mocked-adapter browser tests for explicit lazy
-loading, model/persona selection, preview/save/discard, reply/reference validation,
-provenance and reload, malformed output, delayed cancellation, restore, offline
-load failures and inference failures. The tests verify terminal use and manual
-posting after failures. Pure generation checks cover prompt bounds and validation;
-real IndexedDB checks cover atomic rollback, identity collisions and backup
-round-tripping. `tests/activity.spec.ts` adds mocked-time/model checks for 0/1/72
-hours, deterministic variation and caps, default-disabled/opt-in behavior, atomic
-status/result rollback, concurrent duplicate commits, interrupted retry and tab
-closure, cancellation of late output, unsupported WebGPU, load/model/validation
-failures, inspectable times, and backup preservation. No tests download weights
-or require a real GPU.
-
-Optional, not a completion gate: on supported desktop hardware, select each model,
-observe a real load/progress/cancel, generate/review Japanese posts from all three
-personas and verify device responsiveness, quality and cache behavior. This has
-not been performed in this implementation environment. Required post-merge
-verification: none.
-
-Implementation references: [WebLLM](https://github.com/mlc-ai/web-llm),
-[basic usage](https://webllm.mlc.ai/docs/user/basic_usage.html).
-The integration uses the installed pinned package's worker APIs and model config.
+Optional real WebGPU observation over open/close/reopen cycles and subjective
+Japanese character quality were not performed. Browser timers can be throttled;
+missed opportunities use the same bounded catch-up path. Relationships/memory are
+small, and generations may fail or sound inconsistent. Other engines, physical
+devices and native IME are not covered by these Chromium mocks. No post-merge
+verification is required. See [WebLLM](https://github.com/mlc-ai/web-llm) and
+[offline caching](offline.md) for runtime/cache constraints.
