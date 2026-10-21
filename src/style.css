@@ -122,3 +122,12 @@ dialog h2 { font-size: 1rem; }
 .settings-dialog .ai-activity-cap { width: 5rem; min-width: 0; }
 .settings-dialog ul { padding-left: 1.25rem; }
 .session-controls:has(> button[hidden]:only-child) { display: none; }
+
+.ai-setup { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; padding: 0.4rem 1rem; border-top: 1px solid var(--edge); font-size: 0.75rem; }
+.ai-setup[hidden], .ai-setup [hidden] { display: none; }
+.ai-setup-status { flex: 1 1 20rem; overflow-wrap: anywhere; }
+.ai-setup-progress { max-width: 8rem; }
+.ai-consent { width: min(34rem, 95vw); overflow-wrap: anywhere; }
+.ai-consent select { max-width: 100%; }
+.ai-consent button { margin-block: 0.25rem; }
+@media (max-width: 600px) { .ai-setup { padding: 0.35rem 0.5rem; } }

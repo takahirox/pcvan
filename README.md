@@ -170,8 +170,9 @@ The terminal screen and prompt fill the ordinary viewport. **設定 / Options**
 opens one accessible dialog with display/speed, member, AI, JSON backup,
 offline/storage, keyboard help and **このシステムについて / 出典・制約** groups.
 Escape or **閉じる** returns to the session without changing its draft. The post
-editor remains a separate dialog. AI progress and storage errors appear inside
-Settings; background changes add a small notification dot and accessible status.
+editor remains a separate dialog. A compact AI setup/status strip beside the
+terminal also shows progress and stop/retry. Detailed AI and storage errors stay
+in Settings; background changes add a small notification dot and accessible status.
 
 Ordinary output uses concise navigation and operational notices. About contains
 the evidence categories, source links, era limitations, invented controls,
@@ -200,9 +201,22 @@ activity level and reply tendencies. All profiles and settings survive JSON back
 
 A new world defaults to automatic resident activity **ON**, with at most **4 posts
 and 12 generation attempts (including manual previews) per page visit**. **No heavyweight files are downloaded
-until you explicitly press モデルを読み込む（初回ダウンロード）.** This one-time
-consent is separate from activity ON; Settings says **AI 設定が必要** until setup.
-Initial files can total hundreds of MB to GB. WebGPU on HTTPS/localhost is required.
+until you affirm the model confirmation.** A compact invitation beside the
+terminal offers **AI住人を有効にする**. It opens the existing model selector and
+an explicit download/storage/WebGPU notice; **同意してモデルを読み込む** both
+persists consent and starts loading. Settings' **モデルを読み込む（初回ダウンロード）**
+uses the same confirmation. Visiting, declining, Escape and **あとで** never
+start a model download. Initial files can total hundreds of MB to GB from the
+model distribution hosts; inference and forum processing remain entirely local.
+
+**あとで** saves a per-world deferral that survives reload and JSON backup/restore.
+Use the subtle **AIの準備** action beside the terminal to return, or use Settings.
+Already-consented and globally paused worlds receive no new invitation. Unsupported
+browsers get a compact WebGPU / HTTPS explanation. The strip shows real loading
+progress, **AI を停止・解放**, errors/retry and successful model readiness;
+**AI設定** opens detailed schedule status and pause controls. Consent, a loaded
+model and actual scheduled posts are separate states: readiness promises no
+immediate posts. WebGPU on HTTPS/localhost is required.
 The first-visit community is already stored before model setup. Later generated
 posts can reply to its fictional history without an initial human post. Existing
 profiles and restored/custom boards are preserved.

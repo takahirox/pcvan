@@ -1,6 +1,8 @@
+import { WORLD_SETTING } from '../storage/schema';
 import type { AiActivity, Backup } from '../storage/schema';
-import { ACTIVITY_SETTING, MAX_SESSION_POSTS } from './activity';
+import { ACTIVITY_SETTING, MAX_SESSION_POSTS, setupContext, migrateActivity } from './activity';
 import { runActivityBatch } from './activity-runner';
+import { mountAiSetup } from './setup';
 import type { ActivityActions } from './activity-runner';
 import { models, personas, residentProfiles } from './personas';
 import type { ResidentProfile } from './personas';
@@ -11,6 +13,8 @@ interface AiActions {
   read(): Promise<Backup>;
   save(request: GenerationRequest, raw: string, modelId: string): Promise<void>;
   activity?: ActivityActions;
+  deferSetup?(expected: string): Promise<void>;
+  inspect?(): void;
 }
 
 /** Kept outside the historical terminal. Dependencies are injectable for GPU-free tests. */
@@ -128,6 +132,37 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   let configuring = false;
   let revision = 0;
   const budget = { attempts: 0, committed: 0 };
+  let authorizingContext: string | undefined;
+  const setup = mountAiSetup(root, model, supported, {
+    read: async () => {
+      const before = revision;
+      try {
+        let snapshot = await actions.read();
+        if (revision !== before) return false;
+        const saved = snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined;
+        if (!saved || saved.version === 1) {
+          await actions.activity?.openActivity();
+          snapshot = await actions.read();
+          if (revision !== before) return false;
+        }
+        refresh(snapshot);
+        return true;
+      } catch (error) { failure(error); return false; }
+    },
+    load: loadModel,
+    defer: async (expected) => {
+      try { await actions.deferSetup?.(expected); refresh(await actions.read()); }
+      catch (error) { failure(error); }
+    },
+    inspect: () => actions.inspect?.(),
+    stop: () => stop.click(),
+  });
+  // Status is shared with the existing controls, including asynchronous failures.
+  new MutationObserver(() => showSetup()).observe(section, { childList: true, characterData: true, subtree: true });
+  function showSetup() {
+    setup.show(!!loadedModel, !!operation, !stop.disabled, progress.value,
+      message.textContent ?? '');
+  }
 
   function buttons() {
     model.disabled = persona.disabled = forum.disabled = reply.disabled = saving || !!operation;
@@ -142,6 +177,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       budget.attempts >= MAX_SESSION_POSTS || budget.committed >= activity.maxPosts;
     cacheCheck.disabled = checking || saving || !!operation;
     get<HTMLButtonElement>('resident-save').disabled = !actions.activity || saving || !!operation || configuring;
+    showSetup();
   }
   function unknownCache() {
     cacheCheckId++; checking = false;
@@ -165,6 +201,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   function clearDraft() { draft = undefined; preview.hidden = send.hidden = discard.hidden = true; preview.textContent = ''; }
   function cancel() {
     revision++;
+    authorizingContext = undefined;
     operation?.abort(); operation = undefined;
     adapter?.dispose(); adapter = undefined; loadedModel = undefined;
     releaseModelLock?.(); releaseModelLock = undefined;
@@ -222,6 +259,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     finally { configuring = false; buttons(); }
   });
   function showActivity(state: AiActivity | undefined) {
+    state = state && migrateActivity(state);
     activity = state;
     cap.value = String(state?.maxPosts ?? 0);
     const runs = state?.batch?.runs ?? [];
@@ -275,6 +313,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
 
   async function simulate() {
     if (!supported || !actions.activity || !activity?.maxPosts || !activity.consent || !activity.batch || operation || saving || activityBusy || draft || autoBlocked) return;
+    if (activity.batch.modelId !== activity.modelId) return;
     if (!navigator.locks) { activityMessage.textContent = 'タブ間の排他制御が利用できないため自動活動を休止します。手動投稿は利用できます。'; return; }
     const state = activity;
     if (!state.batch!.runs.some((run) => run.status !== 'committed') ||
@@ -285,6 +324,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     const run = async () => {
       task.signal.throwIfAborted();
       const engine = await loadEngine(task, state.batch!.modelId);
+      message.textContent = '住人の架空の活動を生成しています。投稿は予定に従います。停止ボタンでキャンセルできます。';
       await runActivityBatch(actions.activity!, actions.read, state, engine, task.signal, budget,
         (updated) => {
           if (!task.signal.aborted || activity?.batch?.id === updated.batch?.id) showActivity(updated);
@@ -319,22 +359,33 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   });
   activityDisable.addEventListener('click', () => { void configure(0); });
 
-  load.addEventListener('click', async () => {
-    if (!supported || operation || saving) return;
+  load.addEventListener('click', () => { void setup.request(); });
+  async function loadModel(modelId: string, expected: string) {
+    if (!supported || operation || saving || !content || setupContext(content) !== expected) return;
     cancel();
     unknownCache();
     const task = new AbortController(); operation = task; buttons();
     message.textContent = 'モデルを読み込んでいます。停止ボタンでキャンセルできます。';
     try {
-      if (actions.activity) showActivity(await actions.activity.authorizeModel(model.value));
+      const authorized = structuredClone(content);
+      const row = authorized.settings.find((row) => row.id === ACTIVITY_SETTING);
+      if (row) row.value = { ...(row.value as object), consent: true, modelId } as typeof row.value;
+      authorizingContext = setupContext(authorized);
+      if (actions.activity) showActivity(await actions.activity.authorizeModel(modelId, undefined, expected));
+      task.signal.throwIfAborted();
+      const latest = await actions.read();
+      task.signal.throwIfAborted();
+      if (setupContext(latest) !== authorizingContext) throw new Error('世界や AI 設定が変わりました。現在の設定から再試行してください。');
+      refresh(latest);
+      authorizingContext = undefined;
       autoBlocked = false;
-      await loadEngine(task, model.value);
+      await loadEngine(task, modelId);
       message.textContent = 'AI の準備ができました。投稿案を生成して確認できます。';
       // Loaded into memory is distinct from persistent cache availability.
       void checkCache();
     } catch (error) { if (!task.signal.aborted) { autoBlocked = true; cancel(); failure(error); } }
-    finally { if (operation === task) operation = undefined; buttons(); }
-  });
+    finally { if (operation === task) { authorizingContext = undefined; operation = undefined; } buttons(); }
+  }
   generate.addEventListener('click', async () => {
     if (!adapter || !loadedModel || operation || saving || budget.attempts >= MAX_SESSION_POSTS) return;
     const engine = adapter;
@@ -372,7 +423,20 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   });
 
   function refresh(snapshot: Backup) {
+    const changed = !content || setupContext(content) !== setupContext(snapshot);
+    if (changed && setupContext(snapshot) !== authorizingContext) {
+      const next = snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined;
+      const worldChanged = JSON.stringify(content?.settings.find((row) => row.id === WORLD_SETTING)?.value) !==
+        JSON.stringify(snapshot.settings.find((row) => row.id === WORLD_SETTING)?.value);
+      if (operation || worldChanged || (loadedModel && (!next?.consent || !next.maxPosts || next.modelId !== loadedModel))) {
+        if (operation) autoBlocked = true;
+        cancel(); unavailable();
+      }
+    }
     content = snapshot;
+    setup.refresh(snapshot);
+    const current = snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined;
+    if (changed && !operation && !draft) model.value = current && models.some((row) => row.id === current.modelId) ? current.modelId : models[0].id;
     profile();
     get('identities').replaceChildren();
     for (const row of residentProfiles(snapshot)) {
@@ -409,15 +473,18 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       if (!actions.activity || activityBusy || operation) return;
       autoBlocked = false;
       const before = revision;
-      const state = planned ?? await actions.activity.openActivity();
+      if (!planned) await actions.activity.openActivity();
+      const snapshot = await actions.read();
       if (revision !== before) return;
-      showActivity(state);
-      if (state.maxPosts && models.some((row) => row.id === (state.batch?.modelId ?? state.modelId))) {
+      refresh(snapshot);
+      if (revision !== before) return;
+      const state = activity;
+      if (state?.maxPosts && models.some((row) => row.id === (state.batch?.modelId ?? state.modelId))) {
         model.value = state.batch?.modelId ?? state.modelId;
       }
       await simulate();
     },
-    invalidate() { autoBlocked = true; cancel(); unavailable(); },
+    invalidate() { setup.invalidate(); autoBlocked = true; cancel(); unavailable(); },
     refresh,
     async tick() {
       if (!actions.activity || activityBusy || operation || configuring || autoBlocked || draft ||
@@ -425,9 +492,11 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       // Failed/cancelled work waits for explicit retry or a later page visit.
       if (activity?.batch?.runs.some((r) => ['failed', 'cancelled'].includes(r.status))) return;
       const before = revision;
-      const state = await actions.activity.openActivity();
+      await actions.activity.openActivity();
+      const snapshot = await actions.read();
       if (before !== revision) return;
-      showActivity(state);
+      refresh(snapshot);
+      if (before !== revision) return;
       await simulate();
     },
   };

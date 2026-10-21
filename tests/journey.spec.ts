@@ -1,4 +1,4 @@
-import { openSettings, closeSettings } from './settings-helpers';
+import { openSettings, closeSettings, loadModel } from './settings-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
@@ -265,7 +265,7 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   await enterForum(page);
   await post(page, '人間の話題', '自分で書いた最初の話題です。');
   await openSettings(page, 'ai');
-  await page.locator('.ai-load').click();
+  await loadModel(page);
   await expect(page.locator('.ai-message')).toContainText('準備ができました');
   await page.locator('.ai-activity-cap').fill('2');
   await openSettings(page, 'ai');
@@ -330,7 +330,7 @@ for (const mode of ['invalid', 'failure'] as const) {
     await openSettings(page, 'ai');
     await page.locator('.ai-forum').selectOption({ index: 0 });
     await openSettings(page, 'ai');
-    await page.locator('.ai-load').click();
+    await loadModel(page);
     await expect(page.locator('.ai-message')).toContainText('準備ができました');
     await openSettings(page, 'ai');
     await page.locator('.ai-generate').click();

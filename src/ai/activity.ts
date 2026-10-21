@@ -1,4 +1,5 @@
 import type { AiActivity, AiBatch, AiRun, Backup, Post } from '../storage/schema';
+import { WORLD_SETTING } from '../storage/schema';
 import { models, personas, personaMemberId, residentProfiles } from './personas';
 import { localConversation } from '../storage/community';
 import type { ResidentProfile } from './personas';
@@ -109,4 +110,11 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
 }
 export function planActivity(content: Backup, state: AiActivity, now: string): AiBatch | null {
   return scheduleActivity(content, state, now).batch;
+}
+
+/** Configuration identity for stale setup actions; scheduling watermarks may advance. */
+export function setupContext(content: Backup): string {
+  const state = content.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined;
+  return JSON.stringify([content.settings.find((row) => row.id === WORLD_SETTING)?.value,
+    state?.seed, state?.maxPosts, state?.modelId, state?.consent]);
 }
