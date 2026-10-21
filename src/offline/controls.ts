@@ -1,4 +1,4 @@
-/** Optional app-shell storage; no registration before the first typed CACHE action. */
+/** Optional app-shell storage; no registration before the first explicit shell-save action. */
 export function createOfflineControls(print: (...text: string[]) => void) {
   let status = '端末は未保存です。CACHE で保存できます。';
   function cached(worker: ServiceWorker, action = 'SHELL_STATUS'): Promise<boolean> {

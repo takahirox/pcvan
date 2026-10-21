@@ -854,3 +854,46 @@ above passed afterward. Physical desktop/mobile keyboards, native Japanese IME
 candidate windows, screen-reader speech quality and real WebGPU model execution
 were not manually tested. These are optional observations, not pre-merge gates.
 No post-merge verification is required.
+
+## Terminal participation and application Settings (#47)
+
+This section supersedes #45's removal of application dialogs. PC-VAN handle
+registration/selection, navigation, reading and human composition remain entirely
+in the terminal. Modern display, AI/activity/resident, data, offline/storage and
+About controls are available through the header's **設定 / Options** dialog.
+Legacy typed application menus use the same persisted actions and consent loader.
+
+Validation performed in the assigned worktree:
+
+- Read GitHub Issue #47 and the repository development/review guidance.
+- `npm ci`: passed; 24 packages audited, no vulnerabilities.
+- `npm test -- --workers=4`: **168 passed** in Chromium (47.4 s), including
+  15 new Settings browser tests and the existing terminal/controller/repository,
+  production worker, scheduler, renderer and offline suites.
+- `npm run build`: passed TypeScript and production bundling. The existing large
+  lazy WebLLM bundle warning remains.
+- `git diff --check`: passed; changed documentation's local file links resolve.
+- Inspected desktop (1280 × 800) and mobile-width (320 × 640) screenshots of the
+  production Settings dialog. Browser tests check width, focus entry/trapping,
+  Escape, IME guards, draft preservation and restoration to the terminal input.
+
+Settings tests execute display persistence, model selection, explicit informed
+consent/refusal, deferral, progress/cancel/failure, cache inspection, generation/
+preview/save and all ten profile/routine/frequency editors. They cover native JSON
+export/import, refusal, invalid files, quota rollback, backup-before-reset, reload,
+stale consent/file callbacks, atomic cross-tab profile conflicts, live display
+refresh, reset during a pending model load and real service-worker offline use.
+A failed import preserves a human draft; successful replacement clears it and
+unsubmitted input. Generated preview text is cleared when its draft is invalidated.
+
+Development runs identified test locator mismatches, an incorrectly injected
+quota failure, native popup automation limitations and a pre-existing command
+history assertion that ran before the queue accepted its command. Tests now use
+accessible combobox roles, inject the actual replacement write, drive native
+selection with Playwright and await the command response before recalling it.
+Keyboard events exercise modal navigation, checkbox changes, applying settings
+and close/focus behavior. The final complete run above passed.
+
+No real model weights were downloaded. Real WebGPU quality, physical-device/native
+IME and screen-reader speech testing were not performed; they remain optional.
+No post-merge verification is required. No push, PR, merge or comment was made.

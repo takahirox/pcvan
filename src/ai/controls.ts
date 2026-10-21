@@ -44,11 +44,12 @@ export function createAiControls(actions: AiActions,
     report(`AI を利用できません。通信・保存領域・GPU を確認し、LOAD で再試行してください。端末・閲覧・手動投稿は利用できます。 ${String(error)}`);
   }
   function refresh(snapshot: Backup) {
-    if (content && setupContext(content) !== setupContext(snapshot) && setupContext(snapshot) !== authorizingContext) {
+    const residentsChanged = content && JSON.stringify(residentProfiles(content)) !== JSON.stringify(residentProfiles(snapshot));
+    if (content && ((setupContext(content) !== setupContext(snapshot) && setupContext(snapshot) !== authorizingContext) || residentsChanged)) {
       const next = snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined;
       const worldChanged = JSON.stringify(content.settings.find((row) => row.id === WORLD_SETTING)?.value) !==
         JSON.stringify(snapshot.settings.find((row) => row.id === WORLD_SETTING)?.value);
-      if (operation || worldChanged || (loadedModel && (!next?.consent || !next.maxPosts || next.modelId !== loadedModel))) {
+      if (operation || worldChanged || residentsChanged || (loadedModel && (!next?.consent || !next.maxPosts || next.modelId !== loadedModel))) {
         if (operation) autoBlocked = true;
         cancel(); message = '設定変更のため処理を中止しました。';
       }

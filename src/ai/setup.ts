@@ -1,6 +1,6 @@
 import { models } from './personas';
 
-/** Reconstructed consent prompt. Only the active confirmation accepts Y. */
+/** Shared download disclosure for the dialog and optional typed confirmation. */
 export function modelDisclosure(modelId: string): string[] {
   return [models.find((model) => model.id === modelId)?.label ?? modelId,
     '初回読込は数百 MB〜数 GB を配布元（Hugging Face / MLC / GitHub）からダウンロードします。',

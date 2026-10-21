@@ -5,10 +5,13 @@ and serves them at port 14373, with a Vite source server at 14374 for repository
 and injectable-adapter checks. `npm run test:e2e` selects the production journeys.
 No backend, credentials, real GPU or model download is required.
 
-`terminal-helpers.ts` submits every application operation through `#command` and
-Enter. Native file choosers/downloads are exercised only after typed commands.
-`noOtherUi` asserts the absence of buttons, selects, dialogs, anchors, summaries,
-textareas and floating panels, with one visible input and keyboard focus.
+`terminal-helpers.ts` exercises service participation through `#command` and
+Enter. Optional legacy application shortcuts retain their coverage. `noOtherUi`
+asserts a closed Settings dialog, one visible command input with focus and no
+in-world buttons, selectors, dialogs, links or floating controls. Header Settings
+and the neutral AI cue are intentionally permitted outside the transcript.
+`settings-dialog.spec.ts` exercises application configuration with real controls,
+native file pickers/downloads, confirmations, keyboard focus and mocked models.
 
 | Coverage | Tests |
 | --- | --- |
@@ -24,6 +27,7 @@ textareas and floating panels, with one visible input and keyboard focus.
 | MAIN 1–21/X/Q, index/services, verified MITI route, empty views | `navigation.spec.ts`, `sections.spec.ts`, `services.spec.ts`, `forums.spec.ts`, `journey.spec.ts` |
 | Progressive UTF-8 output, graphemes, bounded queues, themes, speed, motion, logs | `progressive-output.spec.ts`, `connection.spec.ts` |
 | Keyboard history/focus/scroll, literal text and narrow layout | `terminal.spec.ts`, `immersive.spec.ts` |
+| Modern Settings: display, models, consent/cancel/progress/failure, all ten profiles, JSON import/export/reset, stale callbacks, focus/IME/mobile and offline storage | `settings-dialog.spec.ts` |
 | Real offline shell and storage request statuses | `offline.spec.ts` |
 | Repository integrity, deterministic ten-resident scheduling and concurrent commits | `repository.spec.ts`, `activity.spec.ts`, `residents.spec.ts`, `community.spec.ts` |
 

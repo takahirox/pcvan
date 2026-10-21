@@ -19,6 +19,11 @@ export interface ForumDestination { keyword: 'MITI' | 'DAISIZEN'; boardNo: numbe
 // Command activity watermarks and session history advance without editing the world.
 export const worldContext = (data: Backup): string => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.readStates,
   data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } } : row)]);
+/** Fence open profile editors across world replacement and concurrent edits. */
+export function residentContext(content: Pick<Backup, 'settings'>): string {
+  return JSON.stringify([content.settings.find((row) => row.id === WORLD_SETTING)?.value, residentProfiles(content)]);
+}
+
 const allStores = [...stores, 'session'];
 const emptySession = (): Session => ({ lastLoginAt: null, lastLogoutAt: null, commandHistory: [] });
 
@@ -179,7 +184,7 @@ export class LocalRepository {
       }
       await request(tx.objectStore(store).put(row));
       return row;
-    });
+    }).then((saved) => { if (store === 'settings') this.notifySetupChanged(); return saved; });
   }
 
   createPost(value: NewPost): Promise<Post> {
@@ -455,7 +460,7 @@ export class LocalRepository {
     }).then((state) => { this.notifySetupChanged(); return state; });
   }
 
-  /** The explicit typed model-download confirmation is the consent boundary, separate from activity ON. */
+  /** The explicit application model-download confirmation is the consent boundary, separate from activity ON. */
   authorizeModel(modelId: string, now = new Date().toISOString(), expected?: string): Promise<AiActivity> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
@@ -468,11 +473,12 @@ export class LocalRepository {
     }).then((state) => { this.notifySetupChanged(); return state; });
   }
 
-  configureResident(profile: ResidentProfile, now = new Date().toISOString()): Promise<AiActivity> {
+  configureResident(profile: ResidentProfile, now = new Date().toISOString(), expected?: string): Promise<AiActivity> {
     const input = structuredClone(profile);
     return this.transaction(allStores, 'readwrite', async (tx) => {
       const state = await this.readActivity(tx, now);
       const content = await this.snapshot(tx);
+      if (expected !== undefined && residentContext(content) !== expected) invalid('世界や住人設定が変わりました。変更を破棄してから編集し直してください。');
       const settings: ResidentSettings = { version: 1,
         profiles: residentProfiles(content).map((p) => p.id === input.id ? input : p) };
       if (!settings.profiles.some((p) => p.id === input.id)) invalid('Unknown resident.');
@@ -484,7 +490,7 @@ export class LocalRepository {
       state.nextDue![input.id] = initialDue(now, state.seed!)[input.id]!;
       removePausedRuns(state, settings.profiles);
       return this.writeActivity(tx, state);
-    });
+    }).then((state) => { this.notifySetupChanged(); return state; });
   }
 
   /** Plan and resident due times share a transaction, including across tabs. */

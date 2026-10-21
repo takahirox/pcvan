@@ -13,7 +13,9 @@ interface TerminalActions {
 export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   root.innerHTML = `
     <section class="terminal" aria-label="テキスト端末" data-theme="white">
-      <header class="terminal-header"><h1>PC-VAN</h1></header>
+      <header class="terminal-header"><h1>PC-VAN</h1>
+        <div class="application-options"><button type="button" class="prepare-model" hidden>AIモデルの準備</button>
+          <button type="button" class="open-settings">設定 / Options</button></div></header>
       <div class="terminal-screen">
         <div class="transcript" role="log" aria-label="出力履歴" aria-live="off" tabindex="0"><pre class="output"></pre></div>
         <form class="command-form">
@@ -98,6 +100,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   let times = 'セッション時刻を読み込み中…';
   input.focus({ preventScroll: true });
   return {
+    get composing() { return composing; },
     get preferences() { return { ...preferences }; },
     setPreferences(value: TerminalPreferences) {
       validateTerminalPreferences(value);
@@ -106,6 +109,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
     },
     logText: () => renderer.text,
     get sessionTimes() { return times; },
+    clearInput: () => { input.value = ''; },
     focus: () => input.focus({ preventScroll: true }),
     reveal: () => renderer.reveal(),
     restorePreferences(settings: Setting[]) {

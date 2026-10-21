@@ -1,17 +1,23 @@
 # Terminal display and accessibility
 
-The transcript and a persistent, labelled `コマンド` input are the only application
-interaction surface. The full-height terminal preserves horizontal scroll for
-long Japanese lines. Output is literal text; HTML and terminal escapes are not
-interpreted. No custom dialog, helper link, action button, floating panel or form
-selector is rendered. Temporary hidden file inputs and download anchors exist only
-as a consequence of typed browser-native file actions.
+The transcript and persistent, labelled `コマンド` input are the sole controls for
+PC-VAN participation: handles, navigation, reads, posts and replies. No compose/
+registration dialog, clickable parent reference or navigation helper is rendered.
+The full-height terminal preserves horizontal scroll and literal text rendering.
+The discreet **設定 / Options** header button opens modern application Settings.
 
-Type `SETTINGS` → `1` to configure:
+Settings → **表示・端末** directly configures white/green/amber, simulated speed
+300/1200/2400/9600/instant, static CRT effects, session times and log download.
+Other panels cover AI, local data, offline/storage and About/provenance. Optional
+`SETTINGS` → `1` → `THEME` / `SPEED` / `EFFECTS` shortcuts share the saved actions.
 
-- `THEME white`, `THEME green`, `THEME amber`.
-- `SPEED 300`, `1200`, `2400`, `9600`, or `instant` (each prefixed by `SPEED`).
-- `EFFECTS ON` / `EFFECTS OFF` for static glow/scanlines.
+The accessible native modal enters on its close button, traps Tab/Shift+Tab and
+closes with Escape or 閉じる, returning focus to `#command`. Opening is always
+deliberate and deferred during terminal IME composition. Opening during an active
+title/body/review preserves the state and unsent input; closing cannot submit it.
+Dialog IME Enter/Escape never submits a form or closes the modal. Destructive
+replacement/reset explicitly warn that drafts will be discarded. Cross-tab world
+replacement invalidates model work and dialogs through the existing reload fence.
 
 Preferences persist in `terminal-display` and version-1 JSON backups. The default
 is white, 2400 bps and effects off; reduced motion defaults to instant. Explicit
@@ -30,7 +36,8 @@ is required. Japanese cells and ASCII spacing are preserved without reflow.
   its text. Tab returns to input. No mouse is required.
 - Escape reveals accepted output and skips the connection presentation. It never
   approves a confirmation or silently discards a composition.
-- `HELP` describes the current menu or prompt; `SETTINGS` → `8` gives this guide.
+- `HELP` describes the current menu or prompt; Settings → 操作案内・詳細・出自
+  (or `SETTINGS` → `8`) gives the keyboard guide.
 
 First-run registration can be skipped. Posting without a handle resumes its
 intent after registration. Composition owns the input until explicit cancellation
@@ -45,8 +52,11 @@ The transcript is a focusable `role=log`, with live streaming disabled. A visual
 hidden polite, atomic status announces complete drained batches rather than every
 character. Prompts and state changes are present as ordinary log text. Appending
 output preserves focus, input contents and text selection. Output follows the
-bottom only when already there. Native file selection returns focus to input.
-Storage/model errors are printed in the same log, never hidden behind settings.
+bottom only when already there. Native file selection returns focus to its
+Settings action or to the terminal input when invoked by a typed command.
+Application model/storage status stays in Settings; requested typed application
+menus also show their results. Background model messages never interrupt a human
+prompt. Ordinary terminal output contains service content and prompt feedback.
 
 ## Output pacing and export
 
@@ -63,6 +73,7 @@ the unsent input. JSON backups contain world data and command history, not the
 transcript or in-memory draft. Save a log before reloading if it matters.
 
 Chromium tests cover literal Unicode, controlled frame/grapheme pacing, keyboard
-focus/scroll/history, IME events, responsive layout and command-only journeys.
+focus/scroll/history, IME events, responsive layout, terminal-only participation
+and the modern Settings dialog.
 Physical Japanese keyboards, native IME candidate windows, mobile devices and
 screen-reader speech quality remain optional manual observations.

@@ -32,8 +32,11 @@ or claims of live network activity.
 
 ## Use the terminal
 
-The transcript and persistent command input are the only application controls.
-Type a line and press Enter. `HELP` describes the current screen. Japanese IME
+PC-VAN service participation uses only the transcript and persistent command input.
+The compact **設定 / Options** button in the header opens the modern application
+Settings dialog for display, AI, local data, offline storage and technical help.
+It is outside the simulated service; handle registration, navigation, reading and
+posting remain terminal-only. Type a line and press Enter. `HELP` describes the current screen. Japanese IME
 confirmation never submits. Escape reveals queued output and skips the 1.2-second
 connection presentation; it does not cancel drafts or approve confirmations.
 
@@ -92,7 +95,16 @@ invalid input and `HELP` never approve it. `N`, `BACK`, `MAIN` or `CANCEL` cance
 confirmation. `Q` disconnects only at MAIN; `RECONNECT` starts again. Neither
 navigation nor connection uses a remote service or modem API.
 
-`SETTINGS` (alias `CONFIG`) exposes numbered menus:
+Settings groups the functional controls into **表示・端末**, **AIモデル・活動**,
+**ローカルデータ・保守** and **操作案内・詳細・出自**. Use the controls directly;
+no terminal commands are required for application configuration. Tab/Shift+Tab
+stay in the dialog; Escape or 閉じる returns focus to `#command`. Deliberately
+opening Settings preserves the active title/body/review prompt and unsent text.
+Opening is deferred during terminal IME composition. Settings never opens itself.
+Reset/import warn that replacement discards active drafts.
+
+Optional keyboard shortcuts are retained. `SETTINGS` (alias `CONFIG`) exposes
+the legacy numbered menus, using the same saved state and action implementation:
 
 | Number | Commands and behavior |
 | --- | --- |
@@ -107,9 +119,9 @@ navigation nor connection uses a remote service or modem API.
 | 9 About | Sources, evidence limits, resident profiles, post origins and timestamps |
 
 `HANDLE`, `ABOUT`, `LOG`, `BACKUP`, `IMPORT`, `RESET`, and `STOP` are also available
-outside active drafts/prompts. No custom dialogs, helper links or extra buttons
-are used. Native file selection/download/permission interfaces occur only after
-commands. `BACK` returns from details/help to their caller.
+outside active drafts/prompts. In-world controls have no compose/registration
+dialogs or clickable parent links. Application Settings uses normal controls and
+explicitly initiated native file selection/download/permission interfaces. `BACK` returns from details/help to their caller.
 
 Up/Down recall the newest 100 nonblank commands and restore an unsent input draft.
 Title/body, registration, profile-edit and confirmation responses are not saved as
@@ -172,9 +184,11 @@ on demand; ordinary screens keep only their content and navigation.
 
 ## Terminal appearance and output speed
 
-The terminal screen and prompt fill the viewport. Type `SETTINGS` → `1` for
-display settings; all statuses and errors appear in the transcript. `ABOUT`
-contains sources and provenance without adding commentary to ordinary reading.
+The terminal screen and prompt fill the viewport below the discreet header.
+Open **設定 / Options → 表示・端末** for theme, speed, effects, session times
+and log download. Application status/errors appear in Settings; legacy typed
+menus also show requested results. **操作案内・詳細・出自** contains sources
+and provenance without adding commentary to ordinary reading.
 
 Ordinary output uses concise navigation and operational notices. About contains
 the evidence categories, source URLs, era limitations, invented controls,
@@ -195,13 +209,13 @@ See [display controls, accessibility, timing and limitations](docs/terminal-disp
 
 ## Optional local AI
 
-Type `SETTINGS` → `3` to prepare the model and inspect resident activity.
-`MODEL 1` / `MODEL 2` select the model. `LOAD` discloses the hundreds of MB to GB
-download from distribution hosts, browser storage, GPU use and local fictional
-generation. Only a typed `Y` in that prompt authorizes loading. `N`, invalid or
-blank input never load. Manual loads always show this disclosure. `LATER` records
-a per-world deferral; `STOP` cancels and releases the model. Progress, errors and
-readiness appear inside the transcript. WebGPU on HTTPS/localhost is required.
+Open **設定 / Options → AIモデル・活動**, or use the neutral **AIモデルの準備**
+header cue. Opening either never downloads a model. Select a model, click
+**モデルを読み込む**, read the hundreds-of-MB-to-GB download, storage, GPU and
+local-generation disclosure, then explicitly consent. 中止 or closing never grants
+consent. Progress, cancellation, errors and readiness appear in the dialog.
+**あとで準備** records per-world deferral and hides the cue; Settings remains
+available. WebGPU on HTTPS/localhost is required.
 
 New worlds default to an automatic cap of four saved posts and twelve generation
 attempts (including manual previews) per page visit. This does not authorize a
@@ -209,13 +223,13 @@ model download. After consent, later visits may load the authorized model when
 work is due, including fetching evicted assets. Readiness does not promise
 immediate posts. The thirty prewritten posts exist before model setup.
 
-`RESIDENTS` → resident number → field number edits each resident's handle, job,
+The resident editor selects each of the ten profiles and edits handle, job,
 routine, voice, interests, hours, UTC offset, frequency, weights and affinities.
-Use comma-separated arrays, JSON for affinities and `SAVE` to validate/persist;
-`BACK` / `CANCEL` discard edits. Profiles retain their IDs and survive backups.
-`PERSONA n`, `FORUM n`, optional `REPLY n`, `GENERATE`, `PREVIEW`, `SEND` → `Y`
-provide manual generation/review/save. `DISCARD` drops the preview. `CACHE` probes
-model weights without downloading missing weights. `ABOUT` retains all provenance.
+Arrays use commas and affinities use JSON. Save validates; 変更を破棄 cancels.
+Profiles retain their IDs and survive backups. Manual generation has author/board/
+reply selectors, preview, discard and explicit save confirmation. Model cache
+inspection never downloads missing weights. Details retain all provenance.
+Legacy typed shortcuts in the table above use the same model and storage actions.
 
 While the page is visible and connected, a minute timer checks independently due
 residents. They may read, start topics, reply to humans or other residents, or stay
@@ -235,12 +249,13 @@ historical users. See [local AI behavior and limitations](docs/local-ai.md).
 
 ## Local data and backups
 
-`BACKUP` downloads a validated JSON snapshot. `IMPORT` opens the browser's native
-file picker, validates the file, then prompts for typed `Y` to replace all local
-data. This does not merge or automatically export the old world. `N` / `BACK`
-cancel; invalid data or transaction failure preserve the old world. Errors appear
-in the transcript. Other tabs reload after replacement; stale connections cannot
-write into the replacement world.
+Open **設定 / Options → ローカルデータ・保守 → JSON を保存** for a validated
+snapshot. **JSON から復元** opens the native file picker, validates the file and
+requires explicit replacement confirmation. The warning offers a backup before
+replacing all local data; there is no merge or automatic export. 中止, closing,
+invalid data and transaction failures preserve the old world. Errors stay in the
+dialog. Other tabs reload after replacement; stale connections cannot write into
+the replacement world. `BACKUP` / `IMPORT` remain optional typed shortcuts.
 
 A truly pristine profile receives ten resident identities, two writable boards
 and 30 prewritten posts from [the original fixture](data/pcvan/fictional-community.json)
@@ -253,8 +268,8 @@ Subsequent model output uses `local-ai:webllm:<modelId>` instead.
 
 Reloads, other tabs and app updates never refill deleted posts. Existing profiles
 receive no unsolicited history. For a pre-feature profile with no posts and safe,
-unambiguous board mappings, `SETTINGS` → `4` offers `POPULATE`
-with an explanation and typed confirmation. It preserves members, custom names and counters,
+unambiguous board mappings, Settings → ローカルデータ・保守 offers 初期会話を追加
+with an explanation and explicit confirmation (`POPULATE` remains a typed shortcut). It preserves members, custom names and counters,
 and can succeed only once. Imported worlds, including empty restores, are excluded.
 Restoring an empty backup keeps the world empty; it also suppresses the old DEMO
 fallback. Clearing all browser site data removes the initialization marker, so the
@@ -274,10 +289,12 @@ updates the selected human's read marker without changing the posts. See the
 Data persists across reloads but browser retention is not guaranteed.
 Changing the origin/profile, clearing site data, private browsing, or browser
 eviction may make data unavailable. Keep downloaded backups outside the browser.
-To start over, type `RESET`. Save `BACKUP` first if the old world matters.
-The explicit `Y` confirmation irreversibly deletes local posts, members, read
+To start over, use Settings → ローカルデータ・保守 → **初期状態に戻す**.
+The warning offers **先に JSON を保存** and requires explicit confirmation before
+it irreversibly deletes local posts, members, read
 markers, resident edits, AI activity/consent, display preferences and history.
-`N`, `BACK`, `MAIN` and `CANCEL` preserve them. Escape only reveals output.
+中止 or closing preserves them. `RESET` remains a typed shortcut with its own
+explicit `Y` confirmation.
 The app recreates the original ten residents and thirty posts in eight threads,
 then reloads this and other open tabs into a fresh MAIN session. Check the restored
 posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.
@@ -290,12 +307,13 @@ for the storage contract used by future SIG/forum controllers.
 
 ## Optional offline use and retention
 
-In a production build on HTTPS/localhost, type `SETTINGS` → `5` → `CACHE` and
-wait for the saved status. The terminal, fixtures, local reading/posting and JSON
+In a production build on HTTPS/localhost, open Settings → ローカルデータ・保守
+and click **端末をオフライン用に保存**; wait for the saved status. The terminal, fixtures, local reading/posting and JSON
 backup/restore can then reload offline. This saves only the app shell, never model
-weights. Development mode does not install a worker. `STATUS` reports approximate
-site usage, browser connectivity and persistence; `PERSIST` requests browser-native
-persistent storage. `BACKUP` remains available from this menu.
+weights. Development mode does not install a worker. **保存状態・容量を確認**
+reports approximate site usage, browser connectivity and persistence;
+**永続保存を要求** requests browser-native persistent storage. JSON export is
+available in the same panel. Legacy `CACHE` / `STATUS` / `PERSIST` remain supported.
 
 AI downloads require explicit setup consent. After consent, enabled resident
 activity can automatically reload the selected model when work is due. `CACHE` in the model menu checks the
@@ -389,7 +407,9 @@ it is resolved.
   to the terminal.
 - `src/forums.ts`: resolves evidence-backed boards to repository posts or original
   demo fixtures, and renders headers without trimming or reflowing post text.
-- `src/commands.ts`: terminal prompt ownership, handles, settings and confirmations.
+- `src/commands.ts`: terminal prompt ownership, handles, legacy settings shortcuts and confirmations.
+- `src/settings-dialog.ts`, `src/settings-actions.ts`: accessible modern Settings
+  presentation and actions shared with the typed application shortcuts.
 - `src/composer.ts`: line-based composition/edit/review/send with in-memory drafts.
   Draft lines are excluded from persisted command history.
 - `src/ai/`: ten editable fictional residents, deterministic scheduling, bounded generation and validation,
@@ -436,7 +456,10 @@ unsupported input, return paths, offline keyboard use without network requests,
 and unchanged local content after visiting services and returning to forums.
 Command-only browser journeys cover handle handoff, composition/editing, IME,
 confirmation refusal/acceptance, backup/import/reset, cross-tab interruptions,
-model leases, mocked generation, offline reload and absence of secondary UI.
+model leases, mocked generation and offline reload, with no in-world secondary UI.
+Settings browser tests cover keyboard/focus/mobile/IME, active drafts, display,
+model consent/progress/cancellation/failures, ten profile editors, native JSON
+export/import/reset, stale confirmations and offline/storage controls.
 Renderer tests retain controlled UTF-8 timing/grapheme/queue checks. Repository
 and scheduler suites cover transactional rollback, references, deterministic
 resident plans, budgets and concurrent commits.
