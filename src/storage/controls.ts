@@ -23,7 +23,7 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     <p>データはこのブラウザー内に保存されます。容量制限やブラウザーの操作で消えることがあります。
       大切なデータは JSON バックアップを保存してください。</p>
     </details>
-    <p class="community-provenance"></p>
+    <details><summary>初期状態・来歴</summary><p class="community-provenance"></p></details>
     <div class="community-population" hidden>
       <p>空のコミュニティに、10人の住人による30件・8つの話題を追加できます。
         MITI 資料室と DAISIZEN 自然の森／ＦＲＥＥに、最近約2週間の架空の会話を保存します。

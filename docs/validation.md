@@ -776,3 +776,38 @@ retries. Prebundling neither downloads model weights nor imports AI into a page.
 Optional real WebGPU download/stop/resume, physical-device/native IME and
 screen-reader observation were not performed. No post-merge verification is
 required by Issue #39.
+
+## Issue #41: unobtrusive model setup and deliberate provenance inspection
+
+Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+- Inspected Issue #41 and current `main` (`d34ecb4`), matching the application
+  beneath this Run's upstream checkpoints. No source Issue comments were present.
+- `npm ci`: passed; 0 vulnerabilities. `npx playwright install chromium`: passed.
+- `npm run build`: passed TypeScript checking and production asset generation.
+  Vite retains the existing optional WebLLM chunk-size advisory.
+- Final `npm test -- --workers=4`: **181 passed (22.0s)**, without retries or
+  skips, including a fresh production build and the connected production journeys.
+- Setup checks exercise neutral accessible names, first-use consent disclosures,
+  no imports/downloads on visit/decline/Escape/deferral, focus/IME behavior,
+  progress/cancel/failure/retry, compact readiness, paused/unsupported states,
+  fresh consent for another model, cross-tab invalidation and restore/reload.
+- Renderer and browser checks cover human, prewritten, generated, legacy and demo
+  authors, missing/empty authors, profile renames, literal markup, reply integrity
+  and simulated display times. Ordinary MAIN/SIG/list/read output excludes the
+  intrusive generation labels and internal author keys.
+- Expanded Details / provenance retains artificial authorship, all ten profiles,
+  local-only/no-multiuser explanations, download sources, model origins and both
+  stored generation/post times and simulated display times. Production JSON
+  download after restore/reload retains the original posts, IDs and provenance.
+- `git diff --check` and `git diff --cached --check`: passed. Local Markdown
+  file links in the updated documentation resolve.
+- The initial focused run passed 28/29; the remaining assertion sampled before
+  READ completed after its old technical-ID wait was removed. The initial full
+  run passed 172/181; failures were stale copy/selector expectations and a new
+  assertion assuming input ordering in IndexedDB exports. These test assertions
+  were corrected; the final full run passed.
+
+No real GPU/model download, physical-device/native IME, screen-reader observation
+or optional subjective visual review was performed. No post-merge verification is
+required by Issue #41. No push, PR, merge or comment was performed.

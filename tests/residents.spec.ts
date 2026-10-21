@@ -103,7 +103,7 @@ test('first-use history precedes consent; always-open visits produce delayed hum
   expect(await page.evaluate(() => (window as any).residentMock.loads)).toBe(0);
   await openSettings(page, 'ai');
   await loadModel(page);
-  await expect(page.locator('.ai-message')).toContainText('準備ができました');
+  await expect(page.locator('.ai-message')).toContainText('モデル準備完了');
   saved = await snapshot(page);
   expect(saved.forums).toHaveLength(2); expect(saved.posts).toHaveLength(30);
   expect(saved.members.every((m) => m.actor === 'ai')).toBe(true);
@@ -263,5 +263,15 @@ test('resident editor persists the selected profile through reload without chang
   await page.locator('.ai-resident-editor > summary').click();
   await expect(page.getByLabel('住人のハンドル')).toHaveValue('つむぎ便り');
   await expect(page.getByLabel('活動頻度')).toHaveValue('0.5');
-  expect((await snapshot(page)).members.find((m) => m.id === 'fictional-ai:tsumugi')!.handle).toBe('つむぎ便り');
+  const saved = await snapshot(page);
+  expect(saved.members.find((m) => m.id === 'fictional-ai:tsumugi')!.handle).toBe('つむぎ便り');
+  const post = saved.posts.find((p) => p.authorId === 'fictional-ai:tsumugi')!;
+  const forum = saved.forums.find((f) => f.id === post.forumId)!;
+  await closeSettings(page);
+  const lines = forum.id.includes('MITI') ? ['J MITI', '3', '9'] : ['13', '2', 'FORUMS', '1'];
+  for (const line of [...lines, `READ ${post.number}`]) {
+    await page.locator('#command').fill(line); await page.locator('#command').press('Enter');
+  }
+  await expect(page.locator('.output')).toContainText('★タイトル (つむぎ便り)');
+  await expect(page.locator('.output')).not.toContainText('fictional-ai:');
 });

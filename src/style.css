@@ -126,6 +126,8 @@ dialog h2 { font-size: 1rem; }
 .ai-setup { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; padding: 0.4rem 1rem; border-top: 1px solid var(--edge); font-size: 0.75rem; }
 .ai-setup[hidden], .ai-setup [hidden] { display: none; }
 .ai-setup-status { flex: 1 1 20rem; overflow-wrap: anywhere; }
+.ai-setup.compact { padding-block: 0.2rem; }
+.ai-setup.compact .ai-setup-status { flex-basis: auto; }
 .ai-setup-progress { max-width: 8rem; }
 .ai-consent { width: min(34rem, 95vw); overflow-wrap: anywhere; }
 .ai-consent select { max-width: 100%; }

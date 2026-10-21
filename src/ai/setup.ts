@@ -13,24 +13,25 @@ interface SetupActions {
 export function mountAiSetup(root: HTMLElement, model: HTMLSelectElement, supported: boolean, actions: SetupActions) {
   const notice = document.createElement('aside');
   notice.className = 'ai-setup';
-  notice.setAttribute('aria-label', 'AI住人の準備');
+  notice.setAttribute('aria-label', 'AIモデルの準備');
   notice.hidden = true;
   notice.innerHTML = `<span class="ai-setup-status" role="status"></span>
     <progress class="ai-setup-progress" aria-label="モデル読込の進捗" max="1" value="0" hidden></progress>
-    <button type="button" class="ai-setup-start">AI住人を有効にする</button>
+    <button type="button" class="ai-setup-start">モデルを読み込む</button>
     <button type="button" class="ai-setup-later">あとで</button>
     <button type="button" class="ai-setup-stop" hidden>AI を停止・解放</button>
-    <button type="button" class="ai-setup-options">AI設定</button>`;
+    <button type="button" class="ai-setup-options">AIモデルの設定</button>`;
   root.querySelector('.terminal-header')?.after(notice);
   const get = <T extends HTMLElement>(name: string) => notice.querySelector<T>(`.ai-setup-${name}`)!;
   const dialog = document.createElement('dialog');
   dialog.className = 'ai-consent';
   dialog.setAttribute('aria-labelledby', 'ai-consent-heading');
   dialog.setAttribute('aria-describedby', 'ai-consent-description');
-  dialog.innerHTML = `<h2 id="ai-consent-heading">AI住人のモデルを準備</h2>
+  dialog.innerHTML = `<h2 id="ai-consent-heading">AIモデルを読み込む</h2>
     <div class="ai-consent-model"></div>
     <p id="ai-consent-description">選択モデルの初回読込は数百 MB〜数 GB を配布元（Hugging Face / MLC / GitHub）からダウンロードします。
-    ブラウザーの保存領域と WebGPU / GPU メモリを使います。推論と投稿データの処理はすべてこの端末内で行い、外部の推論サービスには送りません。</p>
+    ブラウザーの保存領域と WebGPU / GPU メモリを使います。推論と投稿データの処理はすべてこの端末内で行い、外部の推論サービスには送りません。
+    AI が架空の掲示板投稿を生成します。詳細・出自は設定で確認できます。</p>
     <button type="button" class="ai-consent-confirm">同意してモデルを読み込む</button>
     <button type="button" class="ai-consent-close" autofocus>今は読み込まない</button>`;
   root.append(dialog);
@@ -120,17 +121,18 @@ export function mountAiSetup(root: HTMLElement, model: HTMLSelectElement, suppor
       notice.hidden = !snapshot;
       const enabled = !state || state.maxPosts > 0;
       const invitation = supported && enabled && !state?.consent && !state?.setupDeferred;
-      const text = !supported ? 'AIは WebGPU 対応ブラウザーの HTTPS / localhost で利用できます。閲覧・手動投稿は利用できます。'
+      notice.classList.toggle('compact', !invitation && !busy);
+      const text = !supported ? 'AIモデル：WebGPU 対応ブラウザーの HTTPS / localhost が必要です。'
         : busy ? message
-        : ready ? `10人の住人：モデル準備済み。${state?.maxPosts ? '投稿は予定に従います。' : '自動活動は休止中です。'}`
-        : message.includes('利用できません') ? 'AI を利用できません。通信・保存領域・GPUを確認して再試行してください。'
-        : message.includes('キャンセル') ? 'AIをキャンセルし、モデルを解放しました。'
-        : !enabled ? 'AI住人の自動活動は休止中です。'
-        : invitation ? '10人の常連たちの会話を続けられます。AIの準備をしますか？'
-        : state?.consent ? 'AI住人：モデル読込の同意済み。予定が来ると準備・生成します。' : 'AI住人は未設定です。AIの準備はいつでもできます。';
+        : ready ? 'モデル準備完了'
+        : message.includes('利用できません') ? '読み込み失敗。通信・保存領域・GPUを確認して再試行してください。'
+        : message.includes('キャンセル') ? '読み込み・処理をキャンセルしました。モデル解放済み。'
+        : !enabled ? '自動投稿は休止中です。'
+        : invitation ? 'AIモデルの準備：ローカルAI機能を利用するにはモデルの読み込みが必要です。'
+        : state?.consent ? 'AIモデル：読込の同意済み・未読込' : 'AIモデルの準備';
       if (get('status').textContent !== text) get('status').textContent = text;
       get('start').hidden = !supported || busy || ready || (!enabled && !state?.consent);
-      get('start').textContent = invitation ? 'AI住人を有効にする' : state?.consent ? 'モデルを読み込む・再試行' : 'AIの準備';
+      get('start').textContent = message.includes('利用できません') ? '読み込みを再試行' : 'モデルを読み込む';
       get('later').hidden = !invitation || busy;
       get('stop').hidden = !stoppable;
       const progress = get<HTMLProgressElement>('progress');

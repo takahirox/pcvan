@@ -479,7 +479,7 @@ for (const mode of ['load-fail', 'fail', 'invalid', 'unsupported', 'no-locks']) 
     expect(await page.evaluate(() => window.activityMock.calls)).toBe(calls);
     await openSettings(page, 'ai');
     await page.locator('.ai-activity-disable').click();
-    await expect(page.locator('.ai-activity-message')).toContainText('無効');
+    await expect(page.locator('.ai-activity-message')).toContainText('休止中');
     await page.reload();
     expect(await page.evaluate(() => window.activityMock.loads)).toBe(0);
   });
