@@ -7,7 +7,8 @@ import { residentProfiles } from './ai/personas';
 export const settingsMenu = ['設定 / SETTINGS', '1 表示・速度', '2 ハンドル', '3 モデル・活動・住人',
   '4 JSON バックアップ・復元・初期化', '5 オフライン・容量', '6 セッション時刻', '7 ログ保存', '8 操作案内', '9 詳細・出自',
   '番号 / BACK: 元の画面 / MAIN: MAIN / HELP: この案内'];
-export const keyboardHelp = ['Enter: 送信 / 日本語変換中の Enter は送信しません。',
+export const keyboardHelp = ['PC-VAN 内の閲覧・利用者登録・投稿は端末入力で操作します。',
+  '表示・AIモデル・データ保守はヘッダーの「設定 / Options」で操作できます。', 'Enter: 送信 / 日本語変換中の Enter は送信しません。',
   '↑ / ↓: 入力履歴 / PageUp・PageDown: 出力スクロール / Tab: 出力と入力を移動',
   '出力にフォーカスして ← / →: 横スクロール / Esc: 全文表示・接続演出をスキップ',
   'SETTINGS / CONFIG: 設定 / HANDLE: 利用者 / ABOUT: 詳細・出自 / LOG: ログ保存',

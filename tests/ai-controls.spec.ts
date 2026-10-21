@@ -1,37 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { command, start, settings, snapshot, noOtherUi, enterForum, post } from './terminal-helpers';
-import { mockWorker } from './ai-helpers';
+import { mockWorker, mockModel } from './ai-helpers';
 
-export async function mockModel(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'gpu', { value: {}, configurable: true });
-    Object.assign(window, { aiMock: { mode: 'ok', loads: [] as string[], prompts: [] as unknown[], disposed: 0 } });
-  });
-  await page.route('**/src/ai/webllm-adapter.ts', (route) => route.fulfill({ contentType: 'text/javascript', body: `
-    export async function modelWeightsCached() { return true; }
-    export function createWebLlmAdapter() {
-      const mock = window.aiMock;
-      return {
-        async load(id, progress, signal) {
-          mock.loads.push(id); progress(.42);
-          if (mock.mode === 'load-fail') throw new Error('offline weights unavailable');
-          if (mock.mode === 'load-wait') await new Promise((resolve) => { mock.complete = resolve; });
-          progress(1);
-        },
-        async generate(prompt, signal) {
-          mock.prompts.push(prompt);
-          if (mock.mode === 'fail') throw new Error('GPU lost');
-          if (mock.mode === 'malformed') return '{}';
-          if (mock.mode === 'wait') await new Promise((resolve) => { mock.complete = resolve; });
-          const data = JSON.parse(prompt.user);
-          return JSON.stringify({ personaId: data.personaId, forumId: data.forumId,
-            ...(data.replyToPostId ? { replyToPostId: data.replyToPostId } : {}), title: '星の話題', body: '日本語の本文。\\n次の行。' });
-        }, dispose() { mock.disposed++; }
-      };
-    }
-  ` }));
-}
 async function mockState(page: Page) {
   return page.evaluate(() => (window as unknown as { aiMock: { mode: string; loads: string[]; prompts: unknown[]; disposed: number } }).aiMock);
 }

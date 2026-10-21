@@ -8,6 +8,7 @@ import { activeHuman, forumPosts } from './forums';
 import { TerminalCommands } from './commands';
 import { createAiControls } from './ai/controls';
 import { postInput, validateGeneration } from './ai/generation';
+import { mountSettings } from './settings-dialog';
 import './style.css';
 
 const controller = new ConnectionController();
@@ -17,7 +18,7 @@ const root = document.querySelector<HTMLElement>('#app')!;
 let pending: Promise<unknown> = Promise.resolve();
 let resetting = false;
 let revision = 0;
-let displayPreferencesLoaded = false;
+let settingsDialog: ReturnType<typeof mountSettings> | undefined;
 let connectionTimer: ReturnType<typeof setTimeout> | undefined;
 let commandsDuringHistoryLoad: string[] | null = null;
 const RESET_NOTICE = 'pcvan-reset-notice';
@@ -51,8 +52,10 @@ async function loadHistory(load: () => Promise<Session | null>) {
 }
 async function refreshContent(): Promise<Backup> {
   const content = await (await repository).exportBackup();
-  if (!displayPreferencesLoaded) { terminal.restorePreferences(content.settings); displayPreferencesLoaded = true; }
+  terminal.restorePreferences(content.settings);
   controller.setContent(content); controller.setMemberId(activeHuman(content)); ai.refresh(content);
+  try { settingsDialog?.refresh(content); }
+  catch (error) { settingsDialog?.showError(error); }
   return content;
 }
 function completeConnection() {
@@ -116,8 +119,14 @@ const terminal = mountTerminal(root, {
   next: (current) => session.history.next(current),
   completeConnection,
 });
+function applicationReport(kind: 'ai' | 'offline', ...lines: string[]) {
+  settingsDialog?.report(kind, ...lines);
+  // Typed legacy application menus remain optional shortcuts. Background model
+  // work never interrupts a human prompt or prints setup chatter in SIG output.
+  if (!settingsDialog?.open && commands.applicationOutput(kind)) print(...lines);
+}
 const ai = createAiControls({
-  print,
+  print: (...lines) => applicationReport('ai', ...lines),
   read: () => enqueue(async () => (await repository).exportBackup()),
   activity: {
     openActivity: (now) => enqueue(async () => (await repository).openActivity(now)),
@@ -146,8 +155,9 @@ const ai = createAiControls({
     try { await refreshContent(); } catch (error) { reportError(error); }
   }),
 });
-const commands = new TerminalCommands({
+const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
+  applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   destination: () => controller.forum, ai,
   preferences: () => terminal.preferences, applyPreferences: terminal.setPreferences,
   sessionTimes: () => terminal.sessionTimes, log: terminal.logText,
@@ -156,16 +166,16 @@ const commands = new TerminalCommands({
     try { await refreshContent(); } catch (error) { reportError(error); } return post;
   },
   restore: async (text, expectedContext) => {
-    ai.invalidate(); commands.invalidate(); revision++;
+    ai.invalidate();
     await loadHistory(async () => {
       const repo = await repository;
       await repo.replaceFromJson(text, { confirmReplace: true, expectedContext });
-      print('バックアップを復元しました。コマンド=');
-      displayPreferencesLoaded = false;
+      commands.invalidate(); terminal.clearInput(); revision++;
+      if (!settingsDialog?.open) print('バックアップを復元しました。コマンド=');
       try { await refreshContent(); } catch (error) { reportError(error); }
       return repo.getSession();
     });
-    terminal.focus();
+    if (!settingsDialog?.open) terminal.focus();
   },
   reset: async (expectedContext) => {
     ai.invalidate();
@@ -173,6 +183,12 @@ const commands = new TerminalCommands({
     try { sessionStorage.setItem(RESET_NOTICE, 'true'); } catch { /* Optional notice. */ }
     reloadWorld();
   },
+} satisfies import('./commands').CommandActions;
+const commands = new TerminalCommands(commandActions);
+settingsDialog = mountSettings(root, {
+  ...commandActions, read: () => enqueue(refreshContent), run: enqueue,
+  settings: commands.settings, offline: commands.offline,
+  focus: terminal.focus, composing: () => terminal.composing,
 });
 terminal.append(...session.transcript);
 const startup = enqueue(async () => {
@@ -181,7 +197,7 @@ const startup = enqueue(async () => {
   await loadHistory(() => repo.startSession());
   await refreshContent();
   try {
-    if (sessionStorage.getItem(RESET_NOTICE)) { sessionStorage.removeItem(RESET_NOTICE); print('初期状態に戻しました。10人・30件の投稿を準備しました。AI には再同意が必要です。'); }
+    if (sessionStorage.getItem(RESET_NOTICE)) { sessionStorage.removeItem(RESET_NOTICE); print('初期状態に戻しました。'); }
   } catch { /* Optional notice. */ }
   return activity;
 });

@@ -14,31 +14,34 @@ Changing the development port or moving hosts opens a different local world.
 Reloading preserves committed data. Browser settings, private browsing, storage
 pressure, and eviction can remove it; browser retention is not guaranteed. See
 [MDN's storage quotas and eviction guide](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria).
-The application does not request persistent-storage permission or promise unlimited
-space. Keep downloaded backups outside browser storage.
+Settings can request persistent-storage permission on explicit user action; it
+does not promise unlimited space. Keep downloaded backups outside browser storage.
 
 ## User backup and restore
 
-Type `BACKUP` to download a UTF-8 JSON snapshot, including all content, settings
-and command history. Confirm that the download was saved outside browser storage.
-It contains personal data and is not uploaded anywhere. The same action is listed
-in `SETTINGS` → `4`.
+Use **設定 / Options → ローカルデータ・保守 → JSON を保存** to download a
+UTF-8 snapshot of content, settings, provenance and command history. Keep it
+outside browser storage. It contains personal data and is not uploaded anywhere.
+**JSON から復元** opens a browser-native file picker. Validation precedes an
+explicit, irreversible replacement confirmation. The warning offers a backup;
+there is no merge or automatic backup. 中止, closing, picker cancellation, invalid
+files and failed writes preserve the old world. Settings reports errors without
+blocking terminal reading/posting. Successful replacement discards live drafts,
+cancels model work and reloads other tabs. No localStorage fallback is used.
 
-`IMPORT` opens a browser-native file picker. After validation, the terminal explains
-that the entire local world will be replaced. Only a subsequent typed `Y` in that
-active confirmation executes replacement. `N`, `BACK`, `MAIN`, `CANCEL`, blank and
-invalid responses never replace data. Escape only reveals output. Cancelling the
-picker, invalid files and failed writes preserve the old world. There is no merge
-or automatic backup. Other tabs reload after replacement. Transcript errors report
-opening, validation, quota and write failures. No localStorage fallback is used.
+The optional `BACKUP` and `IMPORT` shortcuts retain their typed confirmation
+behavior. They use the same export, validation and atomic replacement methods.
+PC-VAN participation (handles, reads, posts and replies) remains terminal-only;
+these application data controls are outside the historical service.
 
 ## Factory reset
 
-`RESET` (also listed in `SETTINGS` → `4`) explains the irreversible deletion of
-members, posts, read markers, resident edits, preferences, AI consent/deferral and
-history, then requires typed `Y`. Export `BACKUP` first if recovery matters.
-`N`, `BACK`, `MAIN` and `CANCEL` preserve the world; Escape only reveals text and
-never approves or cancels. Status and failures appear in the transcript.
+Settings → ローカルデータ・保守 → **初期状態に戻す** explains irreversible
+deletion of members, posts, read markers, resident edits, preferences, AI consent/
+deferral, history and live drafts. **先に JSON を保存** exports before approval.
+Only the explicit reset confirmation executes deletion; 中止 or closing preserves
+the world. Errors remain in Settings. `RESET` / typed `Y` remains an optional
+shortcut to the same reset method.
 
 Reset clears and recreates the normal first-visit world in one IndexedDB
 transaction, using the same bootstrap as `openActivity()`: ten default residents,
@@ -158,7 +161,7 @@ Additional repository methods (all resolve after transaction completion):
 | `openActivity(now?)` / `configureActivity(maxPosts, modelId, now?)` | Persist/resume independent resident due times and a bounded chronological plan; save the visit cap/model (0 pauses, preserving pending work). |
 | `populateEmptyCommunity({confirmPopulate}, now?)` | Require literal `true`; atomically add starter posts only to an eligible empty legacy world. Preserve directories/counters and return false after completion or when ineligible. Imported worlds cannot opt in. |
 | `authorizeModel(modelId, now?)` | Persist explicit download consent; community initialization is independent of consent. |
-| `configureResident(profile, now?)` | Validate and save a profile/AI handle, recalculate its future due time and preserve existing posts/runs. |
+| `configureResident(profile, now?, expected?)` | Atomically reject a stale editor context, validate and save a profile/AI handle, recalculate its future due time and preserve existing posts/runs. |
 | `touchActivity(now?)` | Advance an existing activity watermark monotonically without scheduling generation. |
 | `setAiRunStatus(id, status)` / `commitAiRun(id, raw, signal?)` | Persist pending-run progress; validate and atomically save a unique AI result with its completed status, member and number. Repeated commits return the existing result. |
 | `createAiPost(member, post)` | Register an AI member and allocate a post in an existing board atomically. Requires matching author ID, `actor: 'ai'` and `local-ai:webllm:` origin; rejects identity collisions. The AI caller validates generated content and selected IDs before this mutation. |
@@ -235,8 +238,8 @@ is not downgraded or deleted. No automatic retry or destructive recovery occurs.
 
 The shell calls `startSession()` on opening/reloading and on `RECONNECT`, calls
 `endSession()` for an explicit MAIN `Q` logout, and persists submitted nonblank
-commands. The latest timestamps appear in `SETTINGS` → `6` in UTC. A browser tab
-close is not recorded as a reliable logout event. Imported session records remain
+commands. The latest timestamps appear in Settings → 表示・端末
+(or `SETTINGS` → `6`) in UTC. A browser tab close is not recorded as a reliable logout event. Imported session records remain
 exact until a subsequent start or command append applies the history bound;
 in-memory recall is always limited to 100 nonblank entries.
 The transcript, input draft and edits to recalled input remain in memory. The

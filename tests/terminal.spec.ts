@@ -38,6 +38,8 @@ test('recalls commands, restores the draft, and does not submit during IME compo
   await expect.poll(() => page.locator('.output').textContent()).toContain('> help\nMAIN\n');
   await input.fill('echo ｶﾅ');
   await input.press('Enter');
+  // History is accepted by the serialized command queue, before its response.
+  await expect(page.locator('.output')).toContainText('> echo ｶﾅ\nこの画面では使えないコマンドです。');
   await input.fill('書きかけ');
   await input.press('ArrowDown');
   await expect(input).toHaveValue('書きかけ');

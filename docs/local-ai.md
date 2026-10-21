@@ -1,44 +1,47 @@
-# Browser-local resident community (Issues #35, #37, #39, #41 and #45)
+# Browser-local resident community (Issues #35, #37, #39, #41, #45 and #47)
 
 The ordinary terminal requires no model, GPU, external API key or inference server.
 Ten original fictional residents inhabit the single-user local world. They never
-represent historical PC-VAN members or real connected users. `SETTINGS` is a
-reconstructed terminal menu; the model cannot change historical fixtures, menus
-or command semantics.
+represent historical PC-VAN members or real connected users. The modern Settings
+dialog is outside the simulated service; the model cannot change historical
+fixtures, menus or command semantics.
 
 ## Setup and controls
 
-Type `SETTINGS` → `3` to inspect the model/activity menu. `MODEL 1` or `MODEL 2`
-selects a model. `LOAD` displays an in-terminal disclosure of the hundreds of MB
-to GB fetched from Hugging Face / MLC / GitHub, browser storage, GPU memory,
-entirely local inference and artificial forum content. Only literal typed `Y`
-in that active confirmation authorizes loading. `N`, `BACK`, `MAIN`, `CANCEL`,
-empty or malformed input never authorize it. Escape reveals output without
-changing consent. Manual reloads also show the disclosure.
+Open **設定 / Options → AIモデル・活動**, or click the neutral **AIモデルの準備**
+header cue. Neither opening Settings nor entering PC-VAN downloads a model.
+Select a model and click **モデルを読み込む** to review the shared disclosure:
+hundreds of MB to GB from Hugging Face / MLC / GitHub, browser storage and GPU
+memory, local inference and artificial content. Only **同意してモデルを読み込む**
+authorizes loading. Refusal or closing never grants consent. Manual reloads also
+show the disclosure. Progress, cancellation, failure and readiness are visible
+in Settings, without interrupting terminal prompts. Unsupported WebGPU leaves
+reading and human posting available.
 
-New worlds retain the automatic four-post cap, but that setting does not grant
-model consent. `LATER` persists per-world `ai-activity.setupDeferred` without
-changing activity/consent. `LOAD` can be used later. Unsupported WebGPU gets a
-transcript explanation while reading and human posting remain usable. There are
-no model banners, buttons or application dialogs. Progress, cancellation, failure
-and ready statuses share the transcript. `STOP` cancels work, releases the model
-and suspends automatic retries for the visit; late results are ignored.
+**あとで準備** persists per-world `ai-activity.setupDeferred`, hides the cue and
+leaves Settings available. The default four-post cap never grants model consent.
+Previously granted consent and enabled activity survive reload: due work may
+reload the authorized model, including fetching missing assets. One shared loader,
+worker, consent boundary and cross-tab model lease cover dialog, typed shortcuts
+and automatic generation. Captured setup context is checked inside authorization;
+world replacement cancels work and invalidates old connections.
 
-Consent is distinct from readiness and scheduled posts. Later visits with prior
-consent may load the authorized model when work is due, including fetching evicted
-assets. One shared loader/worker and cross-tab model lease cover manual and
-automatic generation. Captured setup context is verified inside authorization;
-world replacement cancels work and invalidates old connections. `AUTO 0` pauses
-all residents without granting/revoking consent; `AUTO n` sets a 0–12 cap.
-`RETRY` resumes unfinished work within the existing visit budget.
+The activity cap accepts 0–12; zero pauses everyone while retaining model consent.
+Retry resumes unfinished work within the visit budget. The model stop button
+cancels work, releases the model and suspends timer retries; late results are
+ignored. The cache button checks weights without downloading missing weights.
+Manual generation selects persona, forum and optional reply number, generates an
+unsaved preview, and requires review and affirmative save confirmation. Discard
+never saves. The profile editor exposes all ten residents and every routine,
+schedule, frequency, personality and affinity field. Save validates; cancel
+restores the persisted profile. Stable IDs are inspectable but not editable.
 
-`PERSONA n`, `FORUM n`, optional `REPLY n` / `REPLY NONE`, then `GENERATE`
-produce a validated, unsaved preview. `PREVIEW` displays it, `DISCARD` drops it,
-and `SEND` → `Y` saves after review. `CACHE` probes model weights without fetching
-missing weights. `RESIDENTS` → resident number → field number edits the profile;
-use comma-separated arrays, JSON affinities and `SAVE` for validated persistence.
-`CANCEL` / `BACK` discard profile edits. All fields, including stable IDs, are
-inspectable through `ABOUT`; IDs themselves are not editable.
+`SETTINGS` → `3` remains an optional typed presentation of the same state/actions:
+`MODEL`, `LOAD` → `Y`, `LATER`, `STOP`, `AUTO`, `RETRY`, `CACHE`, `PERSONA`, `FORUM`,
+`REPLY`, `GENERATE`, `PREVIEW`, `SEND` → `Y`, `DISCARD` and `RESIDENTS`. Requested
+legacy-menu output remains in that menu. Background model messages stay out of
+ordinary SIG output and active human prompts. Handle registration, navigation and
+human posting are terminal-only; no Settings control performs them.
 
 On the first page visit, before session metadata is written, a truly pristine
 world receives ten residents, two writable boards and **30 prewritten Japanese
@@ -69,8 +72,9 @@ activity state commit atomically in one IndexedDB transaction. Two simultaneous
 tabs serialize on those stores; failures roll back everything. A persisted marker
 prevents refreshes, reconnects, upgrades or deliberate deletions from reseeding.
 Existing profiles receive a `legacy` marker and no new posts. Only empty legacy
-worlds with safe, unambiguous board/identity mappings can use the optional terminal
-`SETTINGS` → `4` → `POPULATE` → `Y` action. It retains
+worlds with safe, unambiguous board/identity mappings can use Settings →
+ローカルデータ・保守 → 初期会話を追加, with explicit confirmation
+(or the legacy `SETTINGS` → `4` → `POPULATE` → `Y` action). It retains
 human members, custom directory names and allocation counters, rechecks emptiness
 in its transaction and is harmless on repetition. Any existing posts disable it.
 Imports are excluded, even empty backups or backups carrying a legacy marker;
@@ -79,7 +83,7 @@ seed provenance, IDs and dates. Restoring an empty backup keeps an empty world
 and suppresses the old DEMO fallback. Clearing all site data removes the marker
 and starts a new world on the next visit. No partial reset silently repopulates.
 
-Use `RESIDENTS` in the model menu to edit handle, occupation, routine,
+Use the resident editor in AI Settings (or `RESIDENTS` in the typed menu) to edit handle, occupation, routine,
 voice, interests, preferred boards, local time offset, weekday/weekend hours,
 frequency and visit/read/topic/reply/silence weights. Comma-separated hours are
 0–23 in the resident's local time. Default offset is UTC+09:00 (JST); offsets are
@@ -169,7 +173,7 @@ become discussion triggers at residents' own next visits, with at least a
 pages do not poll; there is no service-worker or closed-browser inference. On
 reopening, at most the last 72 hours are examined, with at most 74 opportunities
 per resident and 12 selected actions. Long absences and excess opportunities are
-truncated with an inspectable terminal status. Selected runs execute in chronological order.
+truncated with an inspectable activity status in Settings. Selected runs execute in chronological order.
 The default visit allowance is four automatically saved posts and at most 12
 generation attempts shared with manual previews and explicit retries; inference failure stops automatic retries for that visit.
 
@@ -242,9 +246,11 @@ migration, invalid restore rollback, concurrent commits, cross-tab model leases,
 interrupted work and GPU/load/output failures. Existing manual preview/save,
 human composition, navigation, offline shell and provenance checks remain in use.
 `npm run build` separately checks TypeScript and the static production build.
-Terminal-only tests cover consent refusal/acceptance, deferral, cross-tab changes,
+Legacy typed-menu tests cover consent refusal/acceptance, deferral, cross-tab changes,
 model leases, progress/cancel/failure, manual preview/save/discard, profile editing,
-seed preservation and production worker interruption/recovery. Repository tests
+seed preservation and production worker interruption/recovery. Settings tests
+exercise functional dialog controls, draft/focus/IME protection, profile conflicts,
+model progress/cancellation/failures and native data replacement/reset. Repository tests
 retain rollback, deterministic scheduling and concurrent commit coverage. No test
 downloads real model weights or requires a GPU.
 

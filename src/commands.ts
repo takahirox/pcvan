@@ -1,7 +1,7 @@
 import type { Backup, Post, TerminalPreferences } from './storage/schema';
-import { TERMINAL_SETTING, validateBackup } from './storage/schema';
+import { validateBackup } from './storage/schema';
 import type { ForumDestination, LocalRepository } from './storage/repository';
-import { ACTIVE_MEMBER_SETTING, worldContext as context } from './storage/repository';
+import { ACTIVE_MEMBER_SETTING, residentContext, worldContext as context } from './storage/repository';
 import { activeHuman, forumPosts } from './forums';
 import { TerminalComposer } from './composer';
 import type { ComposeDraft } from './composer';
@@ -14,11 +14,13 @@ import type { ResidentProfile } from './ai/personas';
 import type { createAiControls } from './ai/controls';
 import { setupContext } from './ai/activity';
 import { modelDisclosure } from './ai/setup';
+import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
 type Intent = { target: ForumDestination; parent?: Post };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate' | 'ai-save'; expected: string; text?: string; modelId?: string };
-interface CommandActions {
+export interface CommandActions {
+  applicationPrint?(...lines: string[]): void;
   repository(): Promise<LocalRepository>;
   read(): Promise<Backup>;
   print(...lines: string[]): void;
@@ -34,10 +36,10 @@ interface CommandActions {
   ai: ReturnType<typeof createAiControls>;
 }
 const inviteSetting = 'terminal-handle-invited';
-const profileFields: (keyof ResidentProfile)[] = ['handle', 'occupation', 'routine', 'profile', 'interests', 'preferredBoards',
+export const profileFields: (keyof ResidentProfile)[] = ['handle', 'occupation', 'routine', 'profile', 'interests', 'preferredBoards',
   'weekdayHours', 'weekendHours', 'utcOffsetMinutes', 'frequency', 'participation', 'reading', 'newThread', 'reply', 'inactivity', 'affinities'];
 
-const profileLabels = ['ハンドル', '職業', '生活・仕事・睡眠の習慣', '人物像・文体', '興味（カンマ区切り）',
+export const profileLabels = ['ハンドル', '職業', '生活・仕事・睡眠の習慣', '人物像・文体', '興味（カンマ区切り）',
   '好みの掲示板（MITI:9, DAISIZEN:1 またはID）', '平日の接続時間（0〜23）', '休日の接続時間（0〜23）',
   'UTCからの時差（分 -720〜840、日本は540）', '活動頻度（0〜3、0で休止）', '訪問の確率（0〜1）',
   '読む重み（0〜1）', '新しい話題の重み（0〜1）', '返信の重み（0〜1）', '何もしない重み（0〜1）', '住人との親しさ（IDと0〜1のJSON）'];
@@ -49,16 +51,23 @@ export class TerminalCommands {
   private intent: Intent | undefined;
   private composer: TerminalComposer | undefined;
   private confirmation: Confirmation | undefined;
-  private modelSelected = false;
   private detailReturns: (Menu | null)[] = [];
   private selectedModel: string = models[0].id;
   private selectedResident = 0;
   private selectedForum = 0;
   private selectedReply: number | undefined;
   private profile: ResidentProfile | undefined;
+  private profileContext: string | undefined;
   private field: keyof ResidentProfile | undefined;
-  private offline;
-  constructor(private actions: CommandActions) { this.offline = createOfflineControls(actions.print); }
+  readonly offline;
+  readonly settings;
+  constructor(private actions: CommandActions) {
+    this.offline = createOfflineControls(actions.applicationPrint ?? actions.print);
+    this.settings = createSettingsActions(actions);
+  }
+  applicationOutput(kind: 'ai' | 'offline') {
+    return !this.composer?.active && !this.registration && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
+  }
   get recordsHistory() { return !this.composer?.active && !this.registration && !this.confirmation && !this.profile; }
   invalidate() {
     const active = this.composer?.active || this.registration || this.confirmation || this.profile;
@@ -92,11 +101,8 @@ export class TerminalCommands {
         'THEME white / green / amber', 'SPEED 300 / 1200 / 2400 / 9600 / instant', 'EFFECTS ON / OFF');
     }
     if (menu === 'ai') {
-      if (!this.modelSelected) {
-        const saved = data.settings.find((row) => row.id === 'ai-activity')?.value as { modelId?: string } | undefined;
-        if (models.some((row) => row.id === saved?.modelId)) this.selectedModel = saved!.modelId!;
-        this.modelSelected = true;
-      }
+      const saved = data.settings.find((row) => row.id === 'ai-activity')?.value as { modelId?: string } | undefined;
+      this.selectedModel = models.find((row) => row.id === saved?.modelId)?.id ?? models[0].id;
       print('モデル・活動・住人', ...this.actions.ai.status(), ...models.map((row, i) => `MODEL ${i + 1}: ${row.label}`),
         `選択モデル: ${this.selectedModel}`, 'LOAD: 説明・読込確認 / LATER: 準備を延期 / STOP: 中止・モデル解放 / CACHE: 重み確認',
         'AUTO 0〜12: 自動保存上限（0で休止）/ RETRY: 未完了を再試行 / RESIDENTS: 住人編集',
@@ -194,9 +200,7 @@ export class TerminalCommands {
         } catch { print('値を解釈できません。再入力してください。'); }
       } else if (command === 'SAVE') {
         try {
-          this.actions.ai.invalidate();
-          await (await this.actions.repository()).configureResident(this.profile);
-          await this.actions.read(); this.actions.ai.resume(); this.profile = undefined; print('住人の設定を保存しました。次の予定から反映します。'); await this.show('profiles');
+          await this.settings.resident(this.profile, this.profileContext); this.profile = undefined; print('住人の設定を保存しました。次の予定から反映します。'); await this.show('profiles');
         } catch (error) { print(`保存できませんでした。編集内容は保持しています。${String(error)}`); }
       } else if (/^\d+$/.test(command) && profileFields[Number(command) - 1]) {
         this.field = profileFields[Number(command) - 1];
@@ -205,7 +209,7 @@ export class TerminalCommands {
       return true;
     }
     if (!command) return !!this.menu;
-    if (command === 'STOP') { this.actions.ai.stop(); return true; }
+    if (command === 'STOP') { this.actions.ai.stop(); if (!this.applicationOutput('ai')) print('処理をキャンセルし、モデルを解放しました。'); return true; }
     if (['SETTINGS', 'CONFIG'].includes(command)) { await this.show('settings'); return true; }
     if (command === 'HANDLE') { await this.show('handles'); return true; }
     if (command === 'ABOUT') { if (this.menu !== 'about') this.detailReturns.push(this.menu); await this.show('about'); return true; }
@@ -289,7 +293,7 @@ export class TerminalCommands {
       else if (key === 'SPEED' && ['300', '1200', '2400', '9600', 'INSTANT'].includes(setting ?? '')) value.speed = setting!.toLowerCase() as TerminalPreferences['speed'];
       else if (key === 'EFFECTS' && ['ON', 'OFF'].includes(setting ?? '')) value.effects = setting === 'ON';
       else { print('THEME white/green/amber / SPEED 300/1200/2400/9600/instant / EFFECTS ON/OFF'); return true; }
-      await repo.put('settings', { id: TERMINAL_SETTING, value: { ...value } }); this.actions.applyPreferences(value); print('表示設定を保存しました。');
+      await this.settings.display(value); print('表示設定を保存しました。');
     } else if (this.menu === 'offline') {
       if (command === 'CACHE') void this.offline.cache();
       else if (command === 'PERSIST') void this.offline.persist();
@@ -297,20 +301,22 @@ export class TerminalCommands {
       else print('CACHE / STATUS / PERSIST / BACK');
     } else if (this.menu === 'profiles') {
       const row = /^\d+$/.test(command) ? residentProfiles(data)[Number(command) - 1] : undefined;
-      if (row) { this.profile = structuredClone(row); this.profileHelp(); return true; }
+      if (row) { this.profile = structuredClone(row); this.profileContext = residentContext(data); this.profileHelp(); return true; }
       else print('表示された住人の番号 / BACK');
     } else if (this.menu === 'storage') {
       if (command === 'POPULATE' && canPopulateCommunity(data)) { this.confirm({ kind: 'populate', expected: context(data) }, '空の掲示板に30件・8話題の創作を追加します。モデルのダウンロードはありません。追加しますか？ (Y/N)='); return true; }
       else print('BACKUP / IMPORT / RESET / HELP / BACK');
     } else if (this.menu === 'ai') {
+      const savedModel = (data.settings.find((row) => row.id === 'ai-activity')?.value as { modelId?: string } | undefined)?.modelId;
+      this.selectedModel = models.find((row) => row.id === savedModel)?.id ?? models[0].id;
       const [key, arg] = command.split(' ');
       const index = Number(arg) - 1;
-      if (key === 'MODEL' && models[index]) { this.actions.ai.stop(); this.selectedModel = models[index]!.id; this.modelSelected = true; print(`モデルを選択しました: ${this.selectedModel}`); }
+      if (key === 'MODEL' && models[index]) { this.selectedModel = models[index]!.id; await this.settings.activity((data.settings.find((row) => row.id === 'ai-activity')?.value as { maxPosts?: number })?.maxPosts ?? 0, this.selectedModel); print(`モデルを選択しました: ${this.selectedModel}`); }
       else if (command === 'LOAD') { this.confirm({ kind: 'model', expected: setupContext(data), modelId: this.selectedModel }, ...modelDisclosure(this.selectedModel)); return true; }
-      else if (command === 'LATER') { await repo.deferAiSetup(setupContext(data)); await this.actions.read(); print('モデル準備を延期しました。LOAD で再開。'); }
+      else if (command === 'LATER') { await this.settings.defer(setupContext(data)); print('モデル準備を延期しました。LOAD で再開。'); }
       else if (command === 'CACHE') void this.actions.ai.checkCache(this.selectedModel);
       else if (key === 'AUTO' && /^\d+$/.test(arg ?? '') && Number(arg) <= 12) {
-        this.actions.ai.invalidate(); await repo.configureActivity(Number(arg), this.selectedModel); await this.actions.read(); if (Number(arg)) this.actions.ai.resume(); print(Number(arg) ? '自動投稿を有効にしました。モデル読込への同意は別に必要です。' : '自動投稿を休止しました。');
+        await this.settings.activity(Number(arg), this.selectedModel); print(Number(arg) ? '自動投稿を有効にしました。モデル読込への同意は別に必要です。' : '自動投稿を休止しました。');
       } else if (command === 'RETRY') void this.actions.ai.retry();
       else if (command === 'RESIDENTS') { await this.show('profiles'); return true; }
       else if (key === 'PERSONA' && residentProfiles(data)[index]) { this.actions.ai.discard(); this.selectedResident = index; print('投稿者を選択しました。'); }

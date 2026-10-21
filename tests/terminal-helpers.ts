@@ -53,7 +53,9 @@ export async function restore(page: Page, data: unknown) {
   await command(page, 'Y', 'バックアップを復元しました');
 }
 export async function noOtherUi(page: Page) {
-  await expect(page.locator('dialog, button, select, textarea, a, summary, aside')).toHaveCount(0);
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(page.locator('.terminal-screen button, .terminal-screen select, .terminal-screen textarea, .terminal-screen a, .terminal-screen summary, .terminal-screen aside')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '設定 / Options', exact: true })).toBeVisible();
   await expect(page.locator('input:visible')).toHaveCount(1);
   await expect(page.locator('#command')).toBeFocused();
 }
