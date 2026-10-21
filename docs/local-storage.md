@@ -19,7 +19,7 @@ space. Keep downloaded backups outside browser storage.
 
 ## User backup and restore
 
-Below the terminal, **JSON バックアップを保存** downloads a UTF-8 JSON snapshot.
+In **設定 / Options → JSON バックアップ・復元**, **JSON バックアップを保存** downloads a UTF-8 JSON snapshot.
 Check that the download was saved. The file contains all local content, settings,
 and command history; treat it as personal data. It is not uploaded anywhere.
 
@@ -37,6 +37,41 @@ errors. When storage is unavailable, the terminal still works in memory and
 reports persistence failures. A quota failure leaves export available if the
 database can still be read. There is no localStorage fallback that could silently
 split the world across storage systems.
+
+## Factory reset
+
+Use **設定 / Options → JSON バックアップ・復元 → 初期状態に戻す** to start over.
+Save a JSON backup first if the old world matters; no backup is downloaded
+automatically or required. The separate **すべて削除して初期状態に戻す** confirmation
+irreversibly deletes all local members, posts (human and generated), read markers,
+forum and resident edits, settings, AI consent/deferral and session/command history.
+Cancel, Escape and clicking outside the confirmation do not mutate the world or
+displayed session. Success and storage errors are reported in Settings.
+
+Reset clears and recreates the normal first-visit world in one IndexedDB
+transaction, using the same bootstrap as `openActivity()`: ten default residents,
+two writable forums, thirty original posts/eight threads and `community-world`
+provenance. The default auto-activity cap is four, with no model consent or setup
+deferral. No model, WebGPU or network is needed. Failure rolls back both clears
+and inserts, preserving the previous world. Repeated explicit resets recreate the
+fixture; ordinary reloads do not duplicate it. Reset does not restore an empty
+backup: imported-empty worlds retain their intentional empty-post semantics.
+
+The current tab cancels AI work before the queued reset and intentionally reloads
+into a clean MAIN session, discarding transcript, drafts, composer/reply state,
+loaded model and pending consent dialogs. Other tabs receive a reset notification
+and reload. A private `session/world-generation` token also fences every repository
+transaction: a suspended tab or one missing notifications gets a `stale` error
+before it can write old data, then the app reloads. Focus checks cover missed
+notifications; no cross-tab lock or database deletion is needed. The token is
+internal metadata, excluded from JSON exports and preserved by restore.
+
+Downloaded WebLLM weights and optional service-worker/app-shell caches are
+separate browser storage and remain intact, as does unrelated origin data.
+A cached model still requires fresh processing/download consent. Browser-wide
+site-data deletion is a separate operation and can remove these caches too.
+After reset, check `J MITI` → `3` → `9` → `LIST` / `READ 1`. To recover the old
+world, select its saved JSON file and use the existing confirmed restore action.
 
 ## Forum reading
 
@@ -177,10 +212,11 @@ repo.close();
 | `recordCommand(line)` | Atomically appends nonblank input and retains the newest 100 nonblank entries; concurrent appends do not overwrite each other. Returns the session. |
 | `exportBackup()` / `exportJson()` | Returns a document / formatted JSON string, from one consistent readonly transaction. |
 | `replaceFromJson(text, {confirmReplace})` | Requires literal `true`; validates before writing, then clears and inserts every store in one atomic transaction. |
+| `resetWorld({confirmReset}, now?)` | Requires literal `true`; atomically clears all world stores, runs the first-visit bootstrap and rotates the private generation token. Invalidates older repository connections. |
 | `close()` | Releases the connection. Old connections also close on `versionchange`; reload before further use. |
 
 Stores are `members`, `sigs`, `forums`, `posts`, `readStates`, `settings`, and a
-singleton `session` store (out-of-line key `current`). The generic methods exclude
+`session` store (out-of-line key `current` plus private import/generation markers). The generic methods exclude
 session; generic `put` also excludes posts so it cannot bypass allocation.
 Indexes cover forums by SIG, posts by `[forumId, number]` (unique), author and
 reply parent, and read states by member and forum. Relationship-sensitive writes
@@ -190,7 +226,7 @@ across independent connections/tabs without a JavaScript lock. Exhausted safe
 integer counters are rejected; numbers are not wrapped.
 
 `RepositoryError.code` distinguishes `validation`, `confirmation-required`,
-`quota`, `blocked`, `unavailable`, and `storage`; native errors are retained as
+`quota`, `blocked`, `unavailable`, `stale`, and `storage`; native errors are retained as
 `cause`. A blocked open asks the user to close other tabs. A newer database version
 is not downgraded or deleted. No automatic retry or destructive recovery occurs.
 

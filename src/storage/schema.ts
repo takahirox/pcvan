@@ -73,7 +73,7 @@ export interface Backup {
 
 export class RepositoryError extends Error {
   constructor(
-    public readonly code: 'validation' | 'confirmation-required' | 'quota' | 'blocked' | 'unavailable' | 'storage',
+    public readonly code: 'validation' | 'confirmation-required' | 'quota' | 'blocked' | 'unavailable' | 'storage' | 'stale',
     message: string,
     options?: ErrorOptions,
   ) {

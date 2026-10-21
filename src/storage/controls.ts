@@ -6,7 +6,7 @@ import type { LocalRepository } from './repository';
 
 export function mountStorageControls(root: HTMLElement, repository: Promise<LocalRepository>,
   enqueue: (action: () => Promise<void>) => Promise<void>, restoreJson: (text: string) => Promise<void>,
-  populate: () => Promise<void>) {
+  populate: () => Promise<void>, resetWorld: () => Promise<void>) {
   const section = document.createElement('section');
   section.className = 'storage-controls';
   section.id = 'local-backup';
@@ -22,6 +22,11 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     </div>
     <p>データはこのブラウザー内に保存されます。容量制限やブラウザーの操作で消えることがあります。
       大切なデータは JSON バックアップを保存してください。</p>
+    <h2>初期状態に戻す</h2>
+    <p id="reset-description">このブラウザーに保存した投稿・会員・既読・AIの活動設定・表示設定・履歴を削除し、最初の30件の投稿がある状態に戻します。この操作は取り消せません。</p>
+    <p>AI住人のプロフィール・モデル読込への同意も初期化します。保存済みのモデルと端末のオフライン用キャッシュは削除しません。
+      必要なら先に「JSON バックアップを保存」を選んでください。</p>
+    <button type="button" class="reset-world" aria-haspopup="dialog" disabled>初期状態に戻す</button>
     </details>
     <details><summary>初期状態・来歴</summary><p class="community-provenance"></p></details>
     <div class="community-population" hidden>
@@ -33,6 +38,16 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     <p class="storage-status" role="status" aria-label="ローカル保存の状態" aria-live="polite">ローカル保存を準備しています…</p>
   `;
   root.append(section);
+  const confirmation = document.createElement('dialog');
+  confirmation.className = 'reset-confirmation';
+  confirmation.setAttribute('aria-labelledby', 'reset-heading');
+  confirmation.setAttribute('aria-describedby', 'reset-warning');
+  confirmation.innerHTML = `<h2 id="reset-heading">初期状態に戻しますか？</h2>
+    <p id="reset-warning">保存した投稿・会員・既読・AI住人のプロフィール・活動設定・モデル読込への同意・表示設定・履歴をすべて削除します。この操作は取り消せません。
+      最初の10人・30件の投稿がある状態に戻し、開いている他のタブも再読み込みします。JSON バックアップで以前の状態を復元できます。</p>
+    <button type="button" class="reset-cancel" autofocus>キャンセル</button>
+    <button type="button" class="reset-confirm">すべて削除して初期状態に戻す</button>`;
+  root.append(confirmation);
   root.addEventListener('click', (event) => {
     if ((event.target as HTMLElement).closest('a[href="#local-backup"]')) {
       section.querySelector('details')!.open = true;
@@ -41,6 +56,7 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
   const backup = section.querySelector<HTMLButtonElement>('.backup')!;
   const file = section.querySelector<HTMLInputElement>('.backup-file')!;
   const restore = section.querySelector<HTMLButtonElement>('.restore')!;
+  const reset = section.querySelector<HTMLButtonElement>('.reset-world')!;
   const status = section.querySelector<HTMLElement>('.storage-status')!;
   let busy = false;
   const reportError = (error: unknown) => {
@@ -55,6 +71,7 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     backup.disabled = busy;
     file.disabled = busy;
     restore.disabled = busy || !file.files?.length;
+    reset.disabled = busy;
   };
   file.addEventListener('change', enable);
   void repository.then(() => { status.textContent = 'ローカル保存を利用できます。'; enable(); }).catch(reportError);
@@ -101,6 +118,28 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     } catch (error) { reportError(error); }
     finally { busy = false; enable(); }
   });
+  function dismiss() { confirmation.close(); reset.focus({ preventScroll: true }); }
+  reset.addEventListener('click', () => { if (!busy) confirmation.showModal(); });
+  confirmation.querySelector('.reset-cancel')!.addEventListener('click', dismiss);
+  confirmation.addEventListener('cancel', (event) => { event.preventDefault(); dismiss(); });
+  confirmation.addEventListener('click', (event) => {
+    const box = confirmation.getBoundingClientRect();
+    if (event.target === confirmation && (event.clientX < box.left || event.clientX > box.right ||
+        event.clientY < box.top || event.clientY > box.bottom)) dismiss();
+  });
+  confirmation.querySelector('.reset-confirm')!.addEventListener('click', async () => {
+    if (busy) return;
+    dismiss(); busy = true; enable();
+    try {
+      // The caller invalidates AI immediately, before waiting for queued storage.
+      await resetWorld();
+      reportReset();
+    } catch (error) { reportError(error); }
+    finally { busy = false; enable(); }
+  });
+  function reportReset() {
+    status.textContent = '初期状態に戻しました。10人の住人と30件の投稿を準備しました。AI の利用には改めて同意が必要です。';
+  }
   function refresh(content: Backup) {
     population.hidden = !canPopulateCommunity(content);
     const row = content.settings.find((s) => s.id === WORLD_SETTING);
@@ -108,5 +147,5 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
       ? `初期状態・来歴 / ${JSON.stringify(row.value)} / local-seed:fictional はアプリ同梱の創作原文です。local-ai:webllm: は後からモデルで生成した投稿です。`
       : '';
   }
-  return { reportError, refresh };
+  return { reportError, reportReset, refresh };
 }

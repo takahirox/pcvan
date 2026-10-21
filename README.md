@@ -280,6 +280,18 @@ updates the selected human's read marker without changing the posts. See the
 Data persists across reloads but browser retention is not guaranteed.
 Changing the origin/profile, clearing site data, private browsing, or browser
 eviction may make data unavailable. Keep downloaded backups outside the browser.
+To start over, open **設定 / Options → JSON バックアップ・復元 → 初期状態に戻す**.
+Save **JSON バックアップを保存** first if you want to recover the current world.
+The separate confirmation **すべて削除して初期状態に戻す** irreversibly deletes local
+posts, members, read markers, resident edits, AI activity/consent, display settings
+and history. Cancel, Escape or clicking outside the confirmation leaves them intact.
+The app recreates the original ten residents and thirty posts in eight threads,
+then reloads this and other open tabs into a fresh MAIN session. Check the restored
+posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.
+Reset needs no model, WebGPU or download. It preserves downloaded model weights,
+the optional offline app-shell cache and unrelated origin data; AI still needs
+fresh consent. Clearing browser site data is a separate browser operation that
+can also delete those caches. An earlier JSON backup can restore the old world.
 See [the local repository API and versioned backup format](docs/local-storage.md)
 for the storage contract used by future SIG/forum controllers.
 
