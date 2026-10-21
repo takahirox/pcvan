@@ -39,8 +39,9 @@ for (const entry of mainMenu.entries) {
       expect(controller.screen).toBe('disconnected');
       expect(result).toContain('RECONNECT');
     } else {
-      expect(controller.screen).toBe('main');
-      expect(result).toContain('未実装');
+      expect(controller.screen).toBe(entry.selector === '2' ? 'index' : 'section');
+      expect(result).not.toContain('未実装');
+      if (entry.selector !== '2') expect(result).toContain('0件');
     }
   });
 }
@@ -48,7 +49,8 @@ for (const entry of mainMenu.entries) {
 test('the documented MITI sequence uses each screen’s own numeric mapping', () => {
   const controller = new PcvanController();
   expect(controller.submit('3').join('\n')).toContain('ニュース');
-  expect(controller.screen).toBe('main');
+  expect(controller.screen).toBe('section');
+  controller.submit('BACK');
   for (const [index, step] of miti.steps.entries()) {
     const output = controller.submit(step.input).join('\n');
     expect(controller.screen).toBe(['miti', 'miti-forums', 'miti-materials'][index]);
@@ -61,7 +63,8 @@ test('the documented MITI sequence uses each screen’s own numeric mapping', ()
 test('Communication bridge and MAIN return helper preserve routing', () => {
   const controller = new PcvanController();
   expect(controller.submit('1').join('\n')).toContain('電子メール');
-  expect(controller.screen).toBe('main');
+  expect(controller.screen).toBe('section');
+  controller.submit('MAIN');
   controller.submit('13');
   expect(controller.submit('HELP').join('\n')).toContain('1 未知の世界');
   controller.submit('1');

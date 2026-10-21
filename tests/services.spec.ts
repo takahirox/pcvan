@@ -6,11 +6,11 @@ import { PcvanController } from '../src/navigation';
 import { backupFixture } from './backup-fixture';
 
 const entries = [
-  ['MAIL', '電子メール'],
-  ['LIBRARY', 'ライブラリィ'],
-  ['CONFERENCE', '電子会議室'],
-  ['OLT', 'ＯＬＴ（＊）'],
-  ['OSL', 'ＯＳＬ'],
+  ['MAIL', '電子メール', '受信箱：0件'],
+  ['LIBRARY', 'ライブラリィ', 'ファイル一覧：0件'],
+  ['CONFERENCE', '電子会議室', '参加者：0人'],
+  ['OLT', 'ＯＬＴ（＊）', '参加者：0人'],
+  ['OSL', 'ＯＳＬ', 'ファイル一覧：0件'],
 ] as const;
 
 function daisizen() {
@@ -29,20 +29,22 @@ test('service helpers preserve provisional metadata and show concise operational
     expect(section.status).toBe('provisional');
     expect(section.demo_entry).toEqual({ input, evidence_category: 'D', status: 'reconstructed' });
     expect(output).toContain(`${label}`);
-    expect(output).toContain(`${input}: ${label}（利用不可）`);
+    expect(output).toContain(`${input}: ${label}`);
   }
 });
 
-for (const [input, label] of entries) {
-  test(`${input} opens its own unavailable notice with stable HELP, BACK and MAIN`, () => {
+for (const [input, label, empty] of entries) {
+  test(`${input} opens its own empty collection with stable HELP, BACK and MAIN`, () => {
     const controller = daisizen();
     const directory = controller.submit('HELP');
     const output = controller.submit(`  ${input.toLowerCase()}  `);
     expect(controller.screen).toBe('daisizen-service');
     expect(controller.needsContent).toBe(false);
     expect(output.join('\n')).toContain(`大自然＆動植物（DAISIZEN） / ${label}`);
-    expect(output.join('\n')).toContain('サービスの操作・送受信・ファイル転送は利用できません');
-    for (const command of ['1', '2', 'Q', 'E', 'H', 'RB1', 'TL1', 'DL1', 'KW', 'LIST', 'READ 1', 'SEND hello', 'UPLOAD file', 'hello', '<b>発言</b>', 'FORUMS', ...entries.map(([helper]) => helper)]) {
+    expect(output.join('\n')).toContain(empty);
+    expect(output.join('\n')).not.toMatch(/未実装|利用不可/);
+    expect(controller.submit('LIST')).toEqual(output);
+    for (const command of ['1', '2', 'Q', 'E', 'H', 'RB1', 'TL1', 'DL1', 'KW', 'READ 1', 'SEND hello', 'UPLOAD file', 'hello', '<b>発言</b>', 'FORUMS', ...entries.map(([helper]) => helper)]) {
       expect(controller.submit(command).join('\n')).toContain('この画面では使えない');
       expect(controller.screen).toBe('daisizen-service');
       expect(controller.submit('HELP')).toEqual(output);
@@ -71,7 +73,7 @@ test('service helpers stay scoped to the SIG; forum reading and MITI navigation 
   }
 });
 
-test('keyboard placeholders work offline without service requests or changing local content', async ({ page }) => {
+test('keyboard collections work offline without service requests or changing local content', async ({ page }) => {
   await page.goto('/');
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'DAISIZEN';
@@ -101,9 +103,17 @@ test('keyboard placeholders work offline without service requests or changing lo
   };
   await send('13', 'コミュニケーション');
   await send('2', 'MAIL: 電子メール');
-  for (const [helper, label] of entries) {
+  for (const [helper, label, empty] of entries) {
     await send(helper, `大自然＆動植物（DAISIZEN） / ${label}`);
-    await send('HELP', 'サービスの操作・送受信・ファイル転送は利用できません');
+    await send('HELP', empty);
+    await send('LIST', empty);
+    if (helper === 'MAIL') {
+      for (const [box, name] of [['INBOX', '受信箱'], ['SENT', '送信済み']]) {
+        await send(box!, `電子メール / ${name}`);
+        await send('HELP', 'メール一覧：0件');
+        await send('BACK', 'INBOX: 受信箱');
+      }
+    }
     await send('SEND <b>発言</b>', 'この画面では使えない');
     await send('BACK', 'FORUMS: フォーラム一覧');
   }
@@ -125,7 +135,7 @@ test('keyboard placeholders work offline without service requests or changing lo
   await page.getByRole('button', { name: 'JSON バックアップを保存' }).click();
   const download = await downloadPromise;
   const saved = JSON.parse(await readFile((await download.path())!, 'utf8'));
-  // Commands update history only; placeholders never modify any content store.
+  // Commands update history only; collections never modify any content store.
   for (const key of ['members', 'sigs', 'forums', 'posts', 'readStates', 'settings'] as const) {
     expect(saved[key]).toEqual(fixture[key]);
   }

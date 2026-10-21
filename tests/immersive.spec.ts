@@ -3,7 +3,7 @@ import { openSettings, closeSettings } from './settings-helpers';
 
 const meta = /創作|再構成|暫定|未確認|reconstructed|https?:\/\/|\[[ABCD] \/ /;
 
-test('startup, every ordinary directory, articles, help, unavailable services and reconnect stay clean', async ({ page }) => {
+test('startup, every ordinary directory, articles, help, empty services and reconnect stay clean', async ({ page }) => {
   await page.goto('/');
   const output = page.locator('.output');
   await expect(output).toContainText('番号またはコマンド=');
@@ -19,7 +19,8 @@ test('startup, every ordinary directory, articles, help, unavailable services an
     }).toBeGreaterThan(0);
     expect(await output.textContent()).not.toMatch(meta);
   }
-  await expect(output).toContainText('サービスの操作・送受信・ファイル転送は利用できません');
+  await expect(output).toContainText('参加者：0人');
+  await expect(output).not.toContainText('未実装');
   await expect(output).toContainText('★タイトル (DEMO0001)');
   await expect(output).toContainText('接続を終了しました');
 });
@@ -44,7 +45,7 @@ test('Settings hides all secondary UI, traps keyboard focus, exposes sources and
   await expect(page.locator('.close-settings')).toBeFocused();
   await openSettings(page, 'about');
   for (const phrase of ['ブラウザー内だけ', '1996年頃', '1997年全期間', '1992年', 'J MITI → 3 → 9',
-    'MAIN / BACK / HELP / RECONNECT', 'DEMO0001〜DEMO0003', '架空', 'fictional-ai:', 'UTC', '専用フォントではありません']) {
+    'MAIN / BACK / HELP / RECONNECT', '読み取り専用', '史実の件数ではありません', 'INBOX / SENT', 'DEMO0001〜DEMO0003', '架空', 'fictional-ai:', 'UTC', '専用フォントではありません']) {
     await expect(page.locator('.about-controls')).toContainText(phrase);
   }
   await expect(page.getByRole('link', { name: '史料・年代・不確実性の調査記録' })).toHaveAttribute('href', /docs\/research\/pcvan-1996-1997.md$/);

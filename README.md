@@ -35,8 +35,8 @@ draft remain in memory.
   against submission. MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`.
 - MAIN `13` opens a Communication bridge: its convenience
   selectors `1` and `2` lead to MITI and DAISIZEN; neither is a historical submenu
-  number. Other MAIN entries except `Q` remain safe, unimplemented selections
-  that report their fixture labels without changing screens.
+  number. Every other numbered selection and `X` opens the corresponding
+  collection or index described in the menu map below.
 - From MAIN, `J MITI` → `3` → `9` follows the documented 1996 route to 未知の世界,
   フォーラム, and 資料室. Only these route steps are verified; the displayed
   screens/prompts are reconstructed, not complete SIG menus. 資料室 lists posts.
@@ -48,13 +48,13 @@ draft remain in memory.
   guide names the jump code DAISIZEN but does not show the exact `J DAISIZEN`
   input/context; that command remains unsupported.
 - At the DAISIZEN directory, `MAIL`, `LIBRARY`, `OLT`, `OSL`, and `CONFERENCE`
-  open service-specific unavailable notices for 電子メール, ライブラリィ,
-  ＯＬＴ（＊）, ＯＳＬ, and 電子会議室. These helpers and notice screens are
-  explicitly reconstructed (D); the historical names remain provisional (B).
-  `HELP` repeats the notice, `BACK` returns to the SIG, and `MAIN` returns to
-  MAIN. No reliable service command sequence was found, so no mail/chat/transfer
-  subsystem is implemented. Unsupported input preserves the notice and local
-  content. See the [service evidence and decision](docs/research/pcvan-1996-1997.md#olt-mail-library-and-related-services-issue-13).
+  open a mailbox directory, file lists, or empty rooms (see the map below).
+  These helpers and screens are reconstructed conveniences (D); the historical
+  names remain provisional (B). No reliable historical service command sequence
+  was found, so these views do not claim to reproduce one. `BACK` returns to the
+  SIG, `MAIN` returns to MAIN, and `HELP` repeats the current view. Unsupported
+  input preserves the screen and local content. See the
+  [service evidence and decision](docs/research/pcvan-1996-1997.md#olt-mail-library-and-related-services-issue-13).
 - Within a forum, `LIST` shows posts in ascending post-number order and
   `READ number` shows a header and the exact stored local Japanese title/body.
   `BACK` returns to the forum directory. These reading/back commands are original
@@ -79,9 +79,10 @@ draft remain in memory.
   considered read, including when reading out of order. Reading an older post
   never moves the marker backwards. Selection and markers survive reload and
   JSON backup/restore. Demo reading does not create read markers.
-- `HELP` redisplays the active screen; `MAIN` returns from all connected submenus
-  and forums. These helpers, case-insensitive input, and whitespace tolerance are
-  explicitly reconstructed conveniences. No ECOM or generic BBS shortcuts are
+- `HELP` redisplays the active screen; `BACK` returns to the previous menu,
+  including the index when entered through it; `MAIN` returns from all connected
+  submenus and forums. These helpers, case-insensitive input, and whitespace
+  tolerance are explicitly reconstructed conveniences. No ECOM or generic BBS shortcuts are
   assigned global meanings.
 - `Q` ends the simulated connection only at MAIN. `RECONNECT` starts again at
   MAIN after disconnecting; it is a reconstructed convenience. Commands never
@@ -104,6 +105,58 @@ draft remain in memory.
   scrollback, reconnects and queued text awaiting display) as UTF-8 plain text
   with exact line breaks. The unsubmitted input draft is excluded. Download before reloading to keep the log;
   JSON backups contain local data/history but do not contain the transcript.
+
+## Menu destinations and empty collections
+
+| MAIN selector | Destination | Initial view |
+| --- | --- | --- |
+| `1` | 電子メール | Mailbox directory: inbox and sent, each 0 messages |
+| `2` | 索引 | Working links to every other MAIN section and `J MITI` |
+| `3` | ニュース | Article list, 0 articles |
+| `4` | データベース | Database list, 0 entries |
+| `5` | 公共情報と政治 | Article list, 0 articles |
+| `6` | ビジネス | Article list, 0 articles |
+| `7` | インターネット | Information article list, 0 articles |
+| `8` | コンピュータ | Article list, 0 articles |
+| `9` | ショッピングモール | Product catalog, 0 products |
+| `10` | 電子出版 | Publication list, 0 publications |
+| `11` | 趣味 | Article list, 0 articles |
+| `12` | 生活 | Article list, 0 articles |
+| `13` | コミュニケーション | Existing MITI / DAISIZEN bridge |
+| `14` | ＰＣ－ＶＡＮ利用情報（無料） | Article list, 0 articles |
+| `15` | ☆★☆ おすすめ ☆★☆ | Article list, 0 articles |
+| `16` | ☆★☆ わかばマーク ☆★☆ | Article list, 0 articles |
+| `17` | ＢＩＧＬＯＢＥガイド | Article list, 0 articles |
+| `18` | インターサイト | Information article list, 0 articles |
+| `19` | ＢＩＧＬＯＢＥイベント（無料） | Article list, 0 articles |
+| `20` | ＢＩＧＬＯＢＥ情報誌ご案内 | Publication list, 0 publications |
+| `21` | オリンピック特設コーナー | Article list, 0 articles |
+| `X` | 旧電子メール | Separate legacy mailbox directory, 0 messages |
+| `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
+
+At DAISIZEN (`13` → `2`), `MAIL` opens its own mailbox directory,
+`LIBRARY` and `OSL` each open a named file list (0 files), and `OLT` and
+`CONFERENCE` each open a named room (0 other participants). `FORUMS` retains
+boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
+posting, reply and unread behavior. A saved empty board stays empty.
+
+All new collections are read-only and empty: counts describe this browser's
+simulated collection, **not historical service activity**. Lists state what is
+missing and accept `LIST` to redisplay. Mail directories accept `INBOX` and
+`SENT`; inside either mailbox, `LIST` shows its empty message list and `BACK`
+returns to that mailbox directory. `HELP`, `BACK` and `MAIN` work throughout the
+hierarchy. The index uses the MAIN selectors except `2` (itself) and `Q`; `BACK`
+from an indexed section returns to the index. `Q` remains scoped to MAIN.
+There are no single-letter `B`/`M` aliases. These commands and collection layouts
+are UI conveniences, not verified historic menu sequences.
+
+There is no mail delivery, shopping transaction, file upload/download, internet
+gateway or multi-user chat connection, and no fake remote content or participants.
+Opening these screens makes no network calls, changes no stored content and
+loads no model. Existing local forum posts/settings, JSON backup/restore and
+explicitly enabled local AI remain available. Settings → **このシステムについて /
+出典・制約** explains these limits, the empty counts and historical uncertainty
+on demand; ordinary screens keep only their content and navigation.
 
 ## Terminal appearance and output speed
 
@@ -328,7 +381,8 @@ fields, whitespace, gaps, empty/missing/ambiguous forums, and live restore reads
 Composition checks cover edit/review/cancel/send, blank drafts, Japanese multiline
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.
-Service checks cover all five placeholder routes, preserved fixture evidence, scoped helpers,
+Section/service checks cover every MAIN and index destination, all five service views,
+mailbox browsing, empty collections/rooms, preserved fixture evidence, scoped helpers,
 unsupported input, return paths, offline keyboard use without network requests,
 and unchanged local content after visiting services and returning to forums.
 Immersion checks cover clean ordinary output, hidden settings, About/source discovery,
