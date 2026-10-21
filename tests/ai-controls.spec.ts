@@ -1,4 +1,4 @@
-import { openSettings, closeSettings } from './settings-helpers';
+import { openSettings, closeSettings, loadModel } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { backupFixture } from './backup-fixture';
@@ -66,7 +66,7 @@ async function snapshot(page: Page): Promise<Backup> {
 
 async function load(page: Page) {
   await openSettings(page, 'ai');
-  await page.locator('.ai-load').click();
+  await loadModel(page);
   await expect(page.locator('.ai-message')).toContainText('準備ができました');
 }
 
@@ -158,7 +158,7 @@ test('cancel load or generation ignores late results; restore invalidates pendin
   const before = await snapshot(page);
   await page.evaluate(() => { window.aiMock.mode = 'load-wait'; });
   await openSettings(page, 'ai');
-  await page.locator('.ai-load').click();
+  await loadModel(page);
   await expect(page.locator('.ai-progress')).toHaveAttribute('value', '0.42');
   await openSettings(page, 'ai');
   await page.locator('.ai-stop').click();
@@ -194,7 +194,8 @@ for (const mode of ['load-fail', 'inference-fail']) {
     await setup(page); await restore(page);
     if (mode === 'inference-fail') await load(page);
     await page.evaluate((value) => { window.aiMock.mode = value; }, mode);
-    await page.locator(mode === 'load-fail' ? '.ai-load' : '.ai-generate').click();
+    if (mode === 'load-fail') await loadModel(page);
+    else await page.locator('.ai-generate').click();
     await expect(page.locator('.ai-message')).toContainText('端末・閲覧・手動投稿は利用できます');
     await command(page, 'J MITI', 'MITI / 未知の世界');
     await command(page, '3', 'MITI / フォーラム');
@@ -234,7 +235,7 @@ test('background model progress stays inspectable after Settings closes without 
   await setup(page);
   await restore(page);
   await page.evaluate(() => { window.aiMock.mode = 'load-wait'; });
-  await page.locator('.ai-load').click();
+  await loadModel(page);
   await expect(page.locator('.ai-progress')).toHaveAttribute('value', '0.42');
   await expect(page.locator('.ai-message')).toBeVisible();
   await closeSettings(page);

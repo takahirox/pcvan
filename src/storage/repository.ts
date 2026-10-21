@@ -3,7 +3,7 @@ import {
 } from './schema';
 import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
-import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity } from '../ai/activity';
+import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
 import { models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -87,6 +87,15 @@ export class LocalRepository {
   constructor(private readonly db: IDBDatabase) {}
 
   close(): void { this.db.close(); }
+
+  private notifySetupChanged(replaced = false): void {
+    if (typeof BroadcastChannel === 'undefined') return;
+    try {
+      const channel = new BroadcastChannel(`pcvan-ai-setup:${this.db.name}`);
+      channel.postMessage(replaced ? 'replace' : 'settings');
+      channel.close();
+    } catch { /* Optional notifications must not turn a committed write into a failure. */ }
+  }
 
   private async transaction<T>(scope: string[], mode: IDBTransactionMode,
     action: (tx: IDBTransaction) => Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -422,17 +431,26 @@ export class LocalRepository {
       const state = await this.readActivity(tx, now);
       return this.writeActivity(tx, { ...state, maxPosts, modelId, lastActivityAt: now,
         nextDue: initialDue(now, state.seed!) });
-    });
+    }).then((state) => { this.notifySetupChanged(); return state; });
+  }
+
+  deferAiSetup(expected: string): Promise<AiActivity> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (setupContext(await this.snapshot(tx)) !== expected) invalid('世界や AI 設定が変わりました。現在の設定を確認してください。');
+      const state = await this.readActivity(tx, new Date().toISOString());
+      return this.writeActivity(tx, { ...state, setupDeferred: true });
+    }).then((state) => { this.notifySetupChanged(); return state; });
   }
 
   /** The explicit model-download button is the consent boundary, separate from activity ON. */
-  authorizeModel(modelId: string, now = new Date().toISOString()): Promise<AiActivity> {
+  authorizeModel(modelId: string, now = new Date().toISOString(), expected?: string): Promise<AiActivity> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
       const state = await this.readActivity(tx, now);
+      if (expected !== undefined && setupContext(await this.snapshot(tx)) !== expected) invalid('世界や AI 設定が変わりました。現在の設定を確認して再試行してください。');
       state.consent = true; state.modelId = modelId;
       return this.writeActivity(tx, state);
-    });
+    }).then((state) => { this.notifySetupChanged(); return state; });
   }
 
   configureResident(profile: ResidentProfile, now = new Date().toISOString()): Promise<AiActivity> {
@@ -553,5 +571,6 @@ export class LocalRepository {
       if (backup.session !== null) await request(tx.objectStore('session').put(backup.session, 'current'));
       await request(tx.objectStore('session').put(true, 'imported'));
     });
+    this.notifySetupChanged(true);
   }
 }

@@ -1,4 +1,4 @@
-# Browser-local resident community (Issues #35 and #37)
+# Browser-local resident community (Issues #35, #37 and #39)
 
 The ordinary terminal requires no model, GPU, external API key or inference server.
 Ten original fictional residents inhabit the single-user local world. They never
@@ -7,14 +7,39 @@ product UI; the model cannot change historical fixtures, menus or command semant
 
 ## Setup and controls
 
-New worlds have automatic activity ON with a conservative four-post limit. Until
-**モデルを読み込む（初回ダウンロード）** is explicitly pressed, **AI 設定が必要**
-accurately reports that setup is missing: no model import, download or inference
-starts automatically. Saving the activity cap alone does not authorize downloads.
-The explicit button persists consent even if that load fails; errors then suspend
-automatic retries for the current visit. After consent, later visits may load the
-selected model automatically when due work exists, including fetching evicted files.
-The network/storage notice appears immediately above this button.
+New worlds have automatic activity ON with a conservative four-post limit. A
+small Japanese invitation beside the terminal offers **AI住人を有効にする**,
+without changing the historical transcript or taking keyboard focus. It opens a
+compact confirmation with the existing model selector. The notice explains the
+hundreds of MB to GB fetched from Hugging Face / MLC / GitHub distribution hosts,
+browser storage, WebGPU/GPU memory and entirely local inference/forum processing.
+Only **同意してモデルを読み込む** authorizes and starts the existing loader.
+Settings' **モデルを読み込む（初回ダウンロード）** opens the same confirmation;
+an already-authorized selected model can be loaded again without another prompt.
+Saving an activity cap, visiting, declining, Escape or **あとで** never authorizes
+or starts a download. Selecting a different model requires fresh confirmation.
+
+**あとで** persists the optional boolean `ai-activity.setupDeferred` in that world
+and its JSON backups. It changes neither consent nor activity configuration and
+does not expire on reload or reconnect. **AIの準備** remains beside the terminal
+for deliberate re-entry; **AI設定** opens the expanded AI panel for model controls,
+detailed scheduled-activity status and global pause. Prior consent and explicit
+global disable suppress invitations. Unsupported WebGPU/secure contexts get an
+explanation and usable terminal/reading/manual posting instead of an enable CTA.
+Restores and configuration changes re-evaluate persisted state. Cross-tab setup
+notifications and window focus refresh this status; confirmation and deferral
+recheck the captured world/configuration inside their write transaction, rejecting
+stale actions. Restore cancels pending/loaded work, including in other tabs.
+
+The terminal-side strip shares the real loader's progress and stop action, and
+provides concise errors/retry. Detailed errors remain in AI Settings. Consent is
+not readiness: **モデル準備済み** only appears after a successful load, and posts
+still follow simulated resident schedules, with details one click away. Cancel
+ignores late results and suspends automatic retries for the current visit. Consent
+persists even if loading fails or is cancelled; explicit retry reuses that consent.
+After consent, later visits may load the selected model automatically when due
+work exists, including fetching evicted files. There is one shared loader/worker,
+not a separate onboarding engine.
 
 On the first page visit, before session metadata is written, a truly pristine
 world receives ten residents, two writable boards and **30 prewritten Japanese
@@ -178,8 +203,8 @@ The IndexedDB database and backup envelope remain version 1. Additive reserved
 settings are strictly validated before writes or atomic restore: `ai-residents`
 version 1 stores exactly ten editable profiles; `ai-activity` version 2 stores
 consent, seed, per-resident next-due times, truncation/bootstrap state, the existing
-cap/model/watermark and one bounded batch. Version-1 activity settings migrate on
-use, preserving model, explicit zero/nonzero cap and every pending run. The older
+cap/model/watermark, optional boolean setup deferral and one bounded batch.
+Version-1 activity settings migrate on use, preserving model, explicit zero/nonzero cap and every pending run. The older
 nonzero opt-in already authorized downloads, so it retains consent. Old backups
 without activity settings receive the new defaults on next open, without changing
 existing posts or boards. An import marker prevents bootstrapping imported empty
@@ -212,6 +237,10 @@ migration, invalid restore rollback, concurrent commits, cross-tab model leases,
 interrupted work and GPU/load/output failures. Existing manual preview/save,
 human composition, navigation, offline shell and provenance checks remain in use.
 `npm run build` separately checks TypeScript and the static production build.
+`ai-setup.spec.ts` covers fresh invitations, no-download decline/Escape/IME,
+persistent deferral/re-entry, explicit consent, progress/cancel/failure/retry/ready,
+unsupported/consented/paused profiles, shared Settings selection, cross-tab changes,
+restore/stale transaction guards, seed preservation and narrow viewport layout.
 `community.spec.ts` adds fixed-clock first-visit visibility, ten authors/eight
 threads, dates/numbering/replies, atomic seed rollback, two-connection initialization,
 reload/two-tab stability, legacy opt-in and confirmation, preserved custom directories,

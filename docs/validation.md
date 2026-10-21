@@ -741,3 +741,38 @@ Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
 Optional subjective first-use review of the published app, real GPU/model output,
 other browser engines, physical devices and native IME were not tested. No
 post-merge verification is required for #37.
+
+# Issue #39 implementation validation
+
+Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+- `npm ci`: passed; npm reported no vulnerabilities.
+- `npm test -- --workers=4`: **177 tests passed (26.7s)**, including the
+  production TypeScript/static build and existing AI, activity, community,
+  navigation, posting, backups and offline checks. Twelve new mocked-browser
+  checks cover first-use invitation, no-load visit/decline/Escape/IME, persisted
+  deferral and re-entry, explicit confirmation, shared model selection, real
+  adapter-start counts, progress/cancel/late results/failure/retry/readiness,
+  unsupported/consented/paused/legacy profiles, cross-tab changes, stale
+  transactions, restores during download and narrow viewport layout. No real
+  model files were downloaded.
+- `npm run build`: passed separately. Vite retains the existing large optional
+  WebLLM runtime/worker chunk advisory; the app entry remains separate.
+- Inspected production Chromium screenshots at 1280×720 and 360×640, including
+  the mobile confirmation. The invitation and command input remain visible;
+  terminal text keeps its existing horizontal scrolling and is not overlaid.
+- `git diff --cached --check`: passed. README/local-AI instructions describe the
+  confirmation boundary, persisted deferral, re-entry, progress and pause controls.
+
+Development checks caught and corrected a setup read advancing the schedule.
+A full run also exposed an existing scheduling fixture that fixed its seed but
+left initial due times random; that fixture now initializes both consistently.
+Later runs observed dev-page reload timeouts, an adapter execution context lost
+on navigation, and one transient scrollback assertion. The affected 30-check
+subset passed in isolation. Explicitly prebundling the installed WebLLM JS in
+Vite prevents late dependency-optimizer reloads; the final full run passed without
+retries. Prebundling neither downloads model weights nor imports AI into a page.
+
+Optional real WebGPU download/stop/resume, physical-device/native IME and
+screen-reader observation were not performed. No post-merge verification is
+required by Issue #39.

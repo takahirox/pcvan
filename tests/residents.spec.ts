@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { Backup } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
-import { openSettings, closeSettings } from './settings-helpers';
+import { openSettings, closeSettings, loadModel } from './settings-helpers';
 
 const start = '2026-10-21T00:00:00.000Z';
 const modelId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
@@ -102,7 +102,7 @@ test('first-use history precedes consent; always-open visits produce delayed hum
   await page.clock.runFor(120_000);
   expect(await page.evaluate(() => (window as any).residentMock.loads)).toBe(0);
   await openSettings(page, 'ai');
-  await page.locator('.ai-load').click();
+  await loadModel(page);
   await expect(page.locator('.ai-message')).toContainText('準備ができました');
   saved = await snapshot(page);
   expect(saved.forums).toHaveLength(2); expect(saved.posts).toHaveLength(30);
@@ -171,7 +171,7 @@ test('first-use history precedes consent; always-open visits produce delayed hum
   // An already-loaded model holds one cross-tab lease until explicitly unloaded.
   const other = await context.newPage(); await mockModel(other);
   await other.goto('http://127.0.0.1:14374');
-  await openSettings(other, 'ai'); await other.locator('.ai-load').click();
+  await openSettings(other, 'ai'); await loadModel(other);
   await expect(other.locator('.ai-message')).toContainText('別のタブ');
   expect(await other.evaluate(() => (window as any).residentMock.loads)).toBe(0);
   await other.close();

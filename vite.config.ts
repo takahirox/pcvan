@@ -6,6 +6,10 @@ import { defineConfig } from 'vite';
 // Generate from the final bundle so every release has an exact, base-relative
 // allowlist. Optional AI chunks/workers are cached only when explicitly used.
 export default defineConfig({
+  // Discover the optional runtime before browser tests import it, avoiding a
+  // dependency-optimizer page reload during active mocked sessions. Local JS
+  // prebundling does not fetch model files or load the runtime into a page.
+  optimizeDeps: { include: ['@mlc-ai/web-llm'] },
   plugins: [{
     name: 'offline-shell',
     writeBundle(options, bundle) {

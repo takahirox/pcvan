@@ -4,7 +4,7 @@ import { mountTerminal } from './terminal';
 import { openRepository } from './storage/repository';
 import type { Session } from './storage/repository';
 import { mountStorageControls } from './storage/controls';
-import { ACTIVE_MEMBER_SETTING } from './storage/repository';
+import { ACTIVE_MEMBER_SETTING, DATABASE_NAME } from './storage/repository';
 import { TERMINAL_SETTING } from './storage/schema';
 import type { AiActivity, Backup, JsonValue } from './storage/schema';
 import { activeHuman, forumPosts, replyReference } from './forums';
@@ -185,11 +185,17 @@ const composer = mountComposer(root, {
 });
 const ai = mountAiControls(root, {
   read: () => enqueue(async () => (await repository).exportBackup()),
+  inspect: () => settings.open('ai'),
+  deferSetup: (expected) => enqueue(async () => { await (await repository).deferAiSetup(expected); }),
   activity: {
     openActivity: (now) => enqueue(async () => (await repository).openActivity(now)),
-    configureActivity: (maxPosts, modelId, now) => enqueue(async () => (await repository).configureActivity(maxPosts, modelId, now)),
-    authorizeModel: (modelId, now) => enqueue(async () => {
-      const state = await (await repository).authorizeModel(modelId, now);
+    configureActivity: (maxPosts, modelId, now) => enqueue(async () => {
+      const state = await (await repository).configureActivity(maxPosts, modelId, now);
+      await refreshContent();
+      return state;
+    }),
+    authorizeModel: (modelId, now, expected) => enqueue(async () => {
+      const state = await (await repository).authorizeModel(modelId, now, expected);
       await refreshContent();
       return state;
     }),
@@ -253,3 +259,17 @@ window.addEventListener('pageshow', (event) => {
 });
 mountOfflineControls(root);
 settings.collect();
+
+// Other tabs may pause activity, record consent, defer setup or replace the world.
+if (typeof BroadcastChannel !== 'undefined') {
+  try {
+    const changes = new BroadcastChannel(`pcvan-ai-setup:${DATABASE_NAME}`);
+    changes.addEventListener('message', (event) => {
+      if (event.data === 'replace') ai.invalidate();
+      void enqueue(refreshContent).catch((error) => controls.reportError(error));
+    });
+  } catch { /* Storage policy may deny notifications; focus still refreshes state. */ }
+}
+window.addEventListener('focus', () => {
+  void enqueue(refreshContent).catch((error) => controls.reportError(error));
+});

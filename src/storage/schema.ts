@@ -25,7 +25,7 @@ export interface AiBatch { id: string; from: string; to: string; modelId: string
 export interface AiActivity {
   version: 1 | 2; maxPosts: number; modelId: string; lastActivityAt: string; batch: AiBatch | null;
   consent?: boolean; seed?: string; nextDue?: Record<string, string>;
-  truncated?: boolean; bootstrap?: boolean;
+  truncated?: boolean; bootstrap?: boolean; setupDeferred?: boolean;
 }
 export interface ReadState { memberId: string; forumId: string; lastReadNumber: number }
 export interface Session {
@@ -124,7 +124,8 @@ function json(value: unknown): void {
 export function validateActivity(value: unknown): asserts value is AiActivity {
   object(value);
   const extra = value.version === 2 ? ['consent', 'seed', 'nextDue', 'truncated', 'bootstrap'] : [];
-  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch', ...extra]);
+  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch', ...extra], value.version === 2 ? ['setupDeferred'] : []);
+  if (value.setupDeferred !== undefined && typeof value.setupDeferred !== 'boolean') invalid('Invalid AI setup deferral.');
   if (value.version !== 1 && value.version !== 2) invalid('Unknown AI activity version.');
   if (value.version === 2) {
     if (typeof value.consent !== 'boolean' || typeof value.truncated !== 'boolean' ||

@@ -1,4 +1,4 @@
-import { openSettings, closeSettings } from './settings-helpers';
+import { openSettings, closeSettings, loadModel } from './settings-helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createServer } from 'node:http';
@@ -173,7 +173,7 @@ test('opt-in minimal shell reloads offline on a subpath; missing AI leaves local
     await page.reload();
     await expect(page.locator('.shell-status')).toContainText('オフライン用に保存済み');
     await openSettings(page, 'ai');
-    await page.locator('.ai-load').click();
+    await loadModel(page);
     await expect(page.locator('.ai-message')).toContainText('端末・閲覧・手動投稿は利用できます');
     await command(page, 'J MITI', 'MITI / 未知の世界');
     await command(page, '3', 'MITI / フォーラム');

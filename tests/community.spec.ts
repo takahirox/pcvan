@@ -241,14 +241,14 @@ test('later autonomous AI selects seed parents, remembers its own seed posts and
   const result = await page.evaluate(async (anchor) => {
     const r = '/src/storage/repository.ts'; const a = '/src/ai/activity.ts'; const g = '/src/ai/generation.ts'; const b = '/src/ai/activity-runner.ts';
     const { openRepository } = await import(r) as typeof import('../src/storage/repository');
-    const { scheduleActivity } = await import(a) as typeof import('../src/ai/activity');
+    const { scheduleActivity, initialDue } = await import(a) as typeof import('../src/ai/activity');
     const { buildPrompt } = await import(g) as typeof import('../src/ai/generation');
     const { runActivityBatch } = await import(b) as typeof import('../src/ai/activity-runner');
     const repo = await openRepository('seed-ai-continuity');
     await repo.openActivity(anchor);
     const seeded = await repo.exportBackup();
     const consent = await repo.authorizeModel('Qwen2.5-0.5B-Instruct-q4f16_1-MLC', anchor);
-    const state = scheduleActivity(seeded, { ...consent, seed: 'community', maxPosts: 12 }, '2026-10-24T00:00:00.000Z');
+    const state = scheduleActivity(seeded, { ...consent, seed: 'community', nextDue: initialDue(anchor, 'community'), maxPosts: 12 }, '2026-10-24T00:00:00.000Z');
     // Every possible target in this world is a seed. No human or generated post is needed.
     const replies = state.batch!.runs.filter((r) => r.replyToPostId);
     const topics = state.batch!.runs.filter((r) => !r.replyToPostId);
