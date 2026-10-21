@@ -1,7 +1,7 @@
 import { ConnectionController } from './connection';
 import { TerminalSession } from './session';
 import { mountTerminal } from './terminal';
-import { openRepository } from './storage/repository';
+import { openRepository, RepositoryError } from './storage/repository';
 import type { Session } from './storage/repository';
 import { mountStorageControls } from './storage/controls';
 import { ACTIVE_MEMBER_SETTING, DATABASE_NAME } from './storage/repository';
@@ -22,9 +22,21 @@ const repository = openRepository();
 // Serialize startup, command persistence and backups/restores. The controller stays
 // usable when storage is denied; the status reports failed persistence operations.
 let pending: Promise<unknown> = Promise.resolve();
+let resetting = false;
+const RESET_NOTICE = 'pcvan-reset-notice';
+function reloadWorld() {
+  resetting = true;
+  ai.invalidate();
+  clearTimeout(connectionTimer);
+  window.location.reload();
+}
 let commandsDuringHistoryLoad: string[] | null = null;
 function enqueue<T>(action: () => Promise<T>): Promise<T> {
-  const task = pending.catch(() => {}).then(action);
+  if (resetting) return Promise.reject(new Error('初期状態への切り替え中です。'));
+  const task = pending.catch(() => {}).then(action).catch((error) => {
+    if (error instanceof RepositoryError && error.code === 'stale') reloadWorld();
+    throw error;
+  });
   pending = task;
   return task;
 }
@@ -74,7 +86,7 @@ function updateConnection(): void {
 }
 const terminal = mountTerminal(root, {
   submit: (line) => {
-    if (!line.trim()) return;
+    if (resetting || !line.trim()) return;
     completeConnection();
     // Echo and history stay immediate even while IndexedDB is loading. Responses
     // are serialized with restores so rapid commands use the correct screen/data.
@@ -232,16 +244,35 @@ const controls = mountStorageControls(root, repository, enqueue, (text) => loadH
 }), async () => {
   await (await repository).populateEmptyCommunity({ confirmPopulate: true });
   await refreshContent();
+}, async () => {
+  ai.invalidate();
+  const task = enqueue(async () => {
+    await (await repository).resetWorld({ confirmReset: true });
+    // This tab-only message survives the intentional reload; it is not world data.
+    try { sessionStorage.setItem(RESET_NOTICE, 'true'); } catch { /* Optional status persistence. */ }
+    reloadWorld();
+  });
+  resetting = true;
+  try { await task; }
+  catch (error) { resetting = false; throw error; }
 });
 // Model work runs outside the storage/command queue so the terminal stays usable.
-void startup.then((activity) => ai.openActivity(activity)).catch((error) => controls.reportError(error));
+void startup.then((activity) => {
+  try {
+    if (sessionStorage.getItem(RESET_NOTICE)) {
+      sessionStorage.removeItem(RESET_NOTICE);
+      controls.reportReset();
+    }
+  } catch { /* The world remains usable when sessionStorage is denied. */ }
+  if (!resetting) return ai.openActivity(activity);
+}).catch((error) => controls.reportError(error));
 const touchActivity = () => {
-  if (controller.screen !== 'disconnected') {
+  if (!resetting && controller.screen !== 'disconnected') {
     void enqueue(async () => (await repository).touchActivity()).catch((error) => controls.reportError(error));
   }
 };
 function tickResidents() {
-  if (controller.screen !== 'disconnected' && document.visibilityState === 'visible') {
+  if (!resetting && controller.screen !== 'disconnected' && document.visibilityState === 'visible') {
     void ai.tick().catch((error) => controls.reportError(error));
   }
 }
@@ -265,6 +296,7 @@ if (typeof BroadcastChannel !== 'undefined') {
   try {
     const changes = new BroadcastChannel(`pcvan-ai-setup:${DATABASE_NAME}`);
     changes.addEventListener('message', (event) => {
+      if (event.data === 'reset') { reloadWorld(); return; }
       if (event.data === 'replace') ai.invalidate();
       void enqueue(refreshContent).catch((error) => controls.reportError(error));
     });

@@ -78,21 +78,23 @@ export function openRepository(name = DATABASE_NAME): Promise<LocalRepository> {
       // A blocked open cannot be cancelled; close it if it eventually succeeds.
       if (blocked) { db.close(); return; }
       db.onversionchange = () => db.close();
-      resolve(new LocalRepository(db));
+      const epoch = db.transaction('session', 'readonly').objectStore('session').get('world-generation');
+      epoch.onerror = () => { db.close(); reject(storageError(epoch.error)); };
+      epoch.onsuccess = () => resolve(new LocalRepository(db, epoch.result ?? null));
     };
   });
 }
 
 export class LocalRepository {
-  constructor(private readonly db: IDBDatabase) {}
+  constructor(private readonly db: IDBDatabase, private generation: string | null = null) {}
 
   close(): void { this.db.close(); }
 
-  private notifySetupChanged(replaced = false): void {
+  private notifySetupChanged(replaced: boolean | 'reset' = false): void {
     if (typeof BroadcastChannel === 'undefined') return;
     try {
       const channel = new BroadcastChannel(`pcvan-ai-setup:${this.db.name}`);
-      channel.postMessage(replaced ? 'replace' : 'settings');
+      channel.postMessage(replaced === 'reset' ? 'reset' : replaced ? 'replace' : 'settings');
       channel.close();
     } catch { /* Optional notifications must not turn a committed write into a failure. */ }
   }
@@ -101,7 +103,11 @@ export class LocalRepository {
     action: (tx: IDBTransaction) => Promise<T>, signal?: AbortSignal): Promise<T> {
     try {
       signal?.throwIfAborted();
-      const tx = this.db.transaction(scope, mode);
+      // The private epoch is outside JSON backups. Every operation checks it in
+      // its own transaction, so even suspended tabs or missed notifications
+      // cannot write pre-reset drafts/settings back into the new world.
+      const expected = this.generation;
+      const tx = this.db.transaction([...new Set([...scope, 'session'])], mode);
       const abort = () => { try { tx.abort(); } catch { /* Already settled. */ } };
       signal?.addEventListener('abort', abort, { once: true });
       const done = new Promise<void>((resolve, reject) => {
@@ -111,6 +117,8 @@ export class LocalRepository {
       // Requests can fail before action() returns; always observe transaction failure.
       void done.catch(() => {});
       try {
+        const current = (await request(tx.objectStore('session').get('world-generation'))) ?? null;
+        if (current !== expected) throw new RepositoryError('stale', '初期状態に戻されたため、このタブを再読み込みしてください。');
         const result = await action(tx);
         await done;
         return result;
@@ -553,6 +561,22 @@ export class LocalRepository {
 
   async exportJson(): Promise<string> { return JSON.stringify(await this.exportBackup(), null, 2); }
 
+  /** Clear and bootstrap together: any failure restores the entire previous world. */
+  async resetWorld(options: { confirmReset: boolean }, now = new Date().toISOString()): Promise<void> {
+    if (options?.confirmReset !== true) throw new RepositoryError('confirmation-required',
+      'Returning to the initial state requires explicit confirmation.');
+    const generation = createRecordId();
+    await this.transaction(allStores, 'readwrite', async (tx) => {
+      for (const store of allStores) await request(tx.objectStore(store).clear());
+      const state = await this.readActivity(tx, now);
+      await this.writeActivity(tx, scheduleActivity(await this.snapshot(tx), state, now));
+      validateBackup(await this.snapshot(tx));
+      await request(tx.objectStore('session').put(generation, 'world-generation'));
+    });
+    this.generation = generation;
+    this.notifySetupChanged('reset');
+  }
+
   async replaceFromJson(text: string, options: { confirmReplace: boolean }): Promise<void> {
     if (options?.confirmReplace !== true) throw new RepositoryError('confirmation-required', 'Replacing all local data requires explicit confirmation.');
     let backup: unknown;
@@ -573,6 +597,7 @@ export class LocalRepository {
       }
       if (backup.session !== null) await request(tx.objectStore('session').put(backup.session, 'current'));
       await request(tx.objectStore('session').put(true, 'imported'));
+      if (this.generation !== null) await request(tx.objectStore('session').put(this.generation, 'world-generation'));
     });
     this.notifySetupChanged(true);
   }
