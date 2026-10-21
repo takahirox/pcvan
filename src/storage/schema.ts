@@ -35,6 +35,11 @@ export interface Session {
 }
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export interface Setting { id: string; value: JsonValue }
+export const WORLD_SETTING = 'community-world';
+export interface CommunityWorld {
+  version: 1; createdAt: string; status: 'seeded' | 'legacy' | 'imported';
+  fixture?: 'fictional-community-v1';
+}
 export const TERMINAL_SETTING = 'terminal-display';
 export type TerminalSpeed = '300' | '1200' | '2400' | '9600' | 'instant';
 export interface TerminalPreferences {
@@ -244,6 +249,15 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       if (value.id === 'ai-activity') validateActivity(value.value);
       if (value.id === RESIDENTS_SETTING) validateResidents(value.value);
       if (value.id === TERMINAL_SETTING) validateTerminalPreferences(value.value);
+      if (value.id === WORLD_SETTING) {
+        fields(value.value, ['version', 'createdAt', 'status'], ['fixture']);
+        const world = value.value;
+        timestamp(world.createdAt);
+        if (world.version !== 1 || !['seeded', 'legacy', 'imported'].includes(world.status as string) ||
+            (world.status === 'seeded' ? world.fixture !== 'fictional-community-v1' : Object.hasOwn(world, 'fixture'))) {
+          invalid('Invalid fictional community provenance.');
+        }
+      }
       break;
   }
 }

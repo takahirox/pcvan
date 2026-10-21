@@ -702,3 +702,42 @@ Real GPU/model downloads, subjective character consistency over real open/close
 cycles, other browser engines, physical devices and native IME were not tested.
 No deployment, push, PR, merge or comment was performed. No post-merge verification
 is required. See [resident behavior and limits](local-ai.md).
+
+## Issue #37: first-visit fictional community history
+
+Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+- `npm ci`: passed; 0 vulnerabilities reported.
+- `npm run build`: passed TypeScript checking and the production build. The
+  existing optional WebLLM chunk-size advisory remains.
+- Final `npm test`: **165 tests passed** in 15.4 seconds, without retries or
+  skips. This command also builds and serves the production assets.
+- Focused `npm test -- tests/community.spec.ts`: **5 passed** in 5.8 seconds
+  after keeping the author-distribution assertion compatible with Node 20.
+- Fixed-clock Chromium checks cover 30 original Japanese posts, ten authors,
+  eight threads, both boards, chronological numbering, ordered reply references,
+  varied JST hours, a quiet day, recent dates and the persisted world anchor.
+- Fresh simultaneous tabs, independent concurrent connections, reloads, deleted
+  posts and seeded backup/restore retain one history. A simulated quota failure
+  after seven inserts rolls back posts, residents, boards, settings and anchor;
+  invalid provenance settings also leave backups unchanged.
+- Existing populated profiles receive no seed posts. Empty legacy opt-in requires
+  confirmation, preserves human members/custom directories/counters, is harmless
+  when repeated, rejects ambiguous/identity collisions and rechecks eligibility
+  after a human post arrives. Settings preview/cancel/confirm is exercised.
+- Empty and legacy-marker imports never seed, including after consent, another
+  restore or reopening. Their missing boards remain empty instead of showing DEMO
+  fallback posts. Human replies/read markers and mocked autonomous AI selection,
+  target context and own-message memory work with distinct seed origins.
+- Production offline posting/backup/restore, model-consent boundaries, scheduler
+  limits, cancellation, two-tab model leases, tab-loss recovery and the existing
+  terminal/Settings/service-worker update suites pass. No model, GPU or backend
+  is used. Earlier runs exposed obsolete DEMO/count assumptions and transcript
+  checks that sampled before queued responses; those checks now await responses.
+- `git diff --check` and `git diff --cached --check`: passed. Local Markdown
+  file links were checked; the fixture contains no archived user text or real
+  historical identities.
+
+Optional subjective first-use review of the published app, real GPU/model output,
+other browser engines, physical devices and native IME were not tested. No
+post-merge verification is required for #37.

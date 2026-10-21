@@ -105,7 +105,7 @@ test('log download matches every displayed UTF-8 byte, including Japanese and li
   await input.fill(line);
   await input.press('Enter');
   await expect(page.getByRole('button', { name: '接続演出をスキップ' })).toBeHidden();
-  await expect(page.locator('.output')).toContainText('MAIN');
+  await expect(page.locator('.output')).toContainText('この画面では使えない');
   const visible = (await page.locator('.output').textContent())!;
   expect(visible).toContain(`> ${line}\n`);
   expect(visible).toContain('\n 1 電子メール');
@@ -147,9 +147,9 @@ test('queued forum reading survives logout and reconnect with one history entry 
   await expect(page.locator('.session-times')).toContainText(saved.lastLogoutAt!);
   await expect(page.getByRole('button', { name: '接続演出をスキップ' })).toBeHidden();
   const visible = (await page.locator('.output').textContent())!;
-  expect(visible).toContain('★タイトル (DEMO0001)');
+  expect(visible).toContain('★タイトル (fictional-ai:hankote)');
   expect(visible).toContain('接続を終了しました。');
-  expect(visible).toContain('★タイトル (DEMO0002)');
+  expect(visible).toContain('★タイトル (fictional-ai:hoshimori)');
   expect(visible.match(/> READ 1\n/g)).toHaveLength(1);
   const downloading = page.waitForEvent('download');
   await openSettings(page, 'display');

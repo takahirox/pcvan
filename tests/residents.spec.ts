@@ -29,7 +29,7 @@ async function mockModel(page: Page) {
           mock.calls++; mock.prompts.push(JSON.parse(prompt.user));
           const { personaId, forumId, replyToPostId } = JSON.parse(prompt.user);
           return JSON.stringify({ personaId, forumId, ...(replyToPostId ? { replyToPostId } : {}),
-            title: '住人の話題', body: '今日の観察 ' + personaId + ' ' + mock.calls });
+            title: '住人の話題', body: '今日の星 天文 観察 パソコン 工作 道具 ' + personaId + ' ' + mock.calls });
         }
       };
     }
@@ -91,21 +91,21 @@ test('all ten seeded profiles are distinct; routines obey local dates and seeded
   expect(Object.values(result.long.nextDue!).every((t) => t > '2030-10-24T00:00:00.000Z')).toBe(true);
 });
 
-test('first-use consent bootstraps empty boards; always-open visits produce delayed human and AI replies with one model and a visit budget', async ({ page, context }) => {
+test('first-use history precedes consent; always-open visits produce delayed human and AI replies with one model and a visit budget', async ({ page, context }) => {
   await page.clock.install({ time: new Date(start) });
   await page.clock.pauseAt(new Date(Date.parse(start) + 1000));
   await mockModel(page);
   await page.goto('http://127.0.0.1:14374');
   await expect(page.locator('.ai-activity-message')).toContainText('AI 設定が必要');
   let saved = await snapshot(page);
-  expect(saved.members).toHaveLength(10); expect(saved.posts).toEqual([]); expect(saved.forums).toEqual([]);
+  expect(saved.members).toHaveLength(10); expect(saved.posts).toHaveLength(30); expect(saved.forums).toHaveLength(2);
   await page.clock.runFor(120_000);
   expect(await page.evaluate(() => (window as any).residentMock.loads)).toBe(0);
   await openSettings(page, 'ai');
   await page.locator('.ai-load').click();
   await expect(page.locator('.ai-message')).toContainText('準備ができました');
   saved = await snapshot(page);
-  expect(saved.forums).toHaveLength(2); expect(saved.posts).toEqual([]);
+  expect(saved.forums).toHaveLength(2); expect(saved.posts).toHaveLength(30);
   expect(saved.members.every((m) => m.actor === 'ai')).toBe(true);
   // Set independent due times. Keep all unrelated residents silent in this scenario.
   await page.evaluate(async ({ modelId }) => {
@@ -124,6 +124,7 @@ test('first-use consent bootstraps empty boards; always-open visits produce dela
     const profiles = personas.map((p) => ({ ...p, frequency: ['hoshimori', 'hankote', 'kusabue'].includes(p.id) ? .2 : 0,
       participation: 1, weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i),
       reading: 0, inactivity: 0, newThread: p.id === 'hoshimori' ? 1 : 0, reply: p.id === 'hoshimori' ? 0 : 1,
+      affinities: p.id === 'kusabue' ? {} : p.affinities,
       preferredBoards: [p.id === 'kusabue' ? 'DAISIZEN:1' : 'MITI:9'] }));
     await repo.put('settings', { id: 'ai-residents', value: { version: 1, profiles } as never });
     const state = { ...emptyActivity(new Date(now).toISOString(), seed), modelId, consent: true, maxPosts: 3 };
@@ -136,13 +137,13 @@ test('first-use consent bootstraps empty boards; always-open visits produce dela
   }, { modelId });
   await closeSettings(page);
   await page.clock.runFor(60_000);
-  await expect.poll(async () => (await snapshot(page)).posts.length).toBe(1);
-  const first = (await snapshot(page)).posts[0]!;
+  await expect.poll(async () => (await snapshot(page)).posts.filter((p) => p.simulation).length).toBe(1);
+  const first = (await snapshot(page)).posts.find((p) => p.simulation)!;
   expect(first.authorId).toBe('fictional-ai:hoshimori'); expect(first.replyToPostId).toBeUndefined();
   await page.clock.runFor(29 * 60_000);
-  expect((await snapshot(page)).posts).toHaveLength(1);
+  expect((await snapshot(page)).posts).toHaveLength(31);
   await page.clock.runFor(60_000);
-  await expect.poll(async () => (await snapshot(page)).posts.length).toBe(2);
+  await expect.poll(async () => (await snapshot(page)).posts.filter((p) => p.simulation).length).toBe(2);
   const second = (await snapshot(page)).posts.find((p) => p.replyToPostId === first.id)!;
   expect(second.authorId).toBe('fictional-ai:hankote');
   // A human arrives later on the other board. The third resident responds on her own visit.
@@ -152,16 +153,16 @@ test('first-use consent bootstraps empty boards; always-open visits produce dela
     const repo = await openRepository(); const world = await repo.exportBackup();
     const human = await repo.createHumanMember('訪問者');
     const forum = world.forums.find((f) => f.sigId.endsWith('DAISIZEN'))!;
-    await repo.createPost({ forumId: forum.id, authorId: human.id, title: '草木の話', body: '庭の草木を観察しています。', origin: 'local-human' });
+    await repo.createPost({ forumId: forum.id, authorId: human.id, title: '草木の話', body: '庭の草木と鳥を観察しています。', origin: 'local-human' });
     repo.close();
   });
   await page.clock.runFor(29 * 60_000);
-  expect((await snapshot(page)).posts).toHaveLength(3);
+  expect((await snapshot(page)).posts).toHaveLength(33);
   await page.clock.runFor(60_000);
-  await expect.poll(async () => (await snapshot(page)).posts.length).toBe(4);
+  await expect.poll(async () => (await snapshot(page)).posts.length).toBe(34);
   saved = await snapshot(page);
   const human = saved.posts.find((p) => p.origin === 'local-human')!;
-  expect(saved.posts.find((p) => p.authorId === 'fictional-ai:kusabue')!.replyToPostId).toBe(human.id);
+  expect(saved.posts.find((p) => p.authorId === 'fictional-ai:kusabue' && p.simulation)!.replyToPostId).toBe(human.id);
   expect(saved.posts.filter((p) => p.simulation).every((p) => Date.parse(p.createdAt) >= Date.parse(p.simulation!.simulatedAt))).toBe(true);
   expect(await page.evaluate(() => (window as any).residentMock.loads)).toBe(1);
   expect(await page.evaluate(() => (window as any).residentMock.calls)).toBe(3);

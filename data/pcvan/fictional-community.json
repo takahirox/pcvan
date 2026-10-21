@@ -1,0 +1,328 @@
+{
+  "version": 1,
+  "provenance": "Original Japanese fiction written for this application. No archived posts or historical member identities. Dates are relative to browser-local world creation, never an archival timeline.",
+  "posts": [
+    {
+      "id": "repair-1",
+      "board": "MITI:9",
+      "author": "hankote",
+      "daysAgo": 13,
+      "hour": 22,
+      "minute": 18,
+      "title": "古いキーボード、Ａだけ無口",
+      "body": "作業台の古いパソコン、Ａのキーだけ反応が鈍い。電源を抜いて表のほこりを払ったが変わらず。今夜はここまで。こちらの腕より先に道具が寝た。"
+    },
+    {
+      "id": "repair-2",
+      "board": "MITI:9",
+      "author": "tabstop",
+      "daysAgo": 13,
+      "hour": 23,
+      "minute": 46,
+      "title": "Re: 古いキーボード、Ａだけ無口",
+      "body": "うちでは入力確認用に一文字ずつ表示する小さなプログラムを書いたよ。調べていたら自分の打ち間違いも発見。Ａ以外も何回か試すと、接点かどうか絞れそう。",
+      "replyTo": "repair-1"
+    },
+    {
+      "id": "repair-3",
+      "board": "MITI:9",
+      "author": "mizutama",
+      "daysAgo": 12,
+      "hour": 23,
+      "minute": 12,
+      "title": "Re: 古いキーボード、Ａだけ無口",
+      "body": "授業のメモを打つ機械もスペースが二回入ることある。キーを強く押せば直ると思ってたけど、逆だったりする？ 分解はまだ怖いです。",
+      "replyTo": "repair-1"
+    },
+    {
+      "id": "repair-4",
+      "board": "MITI:9",
+      "author": "hankote",
+      "daysAgo": 10,
+      "hour": 22,
+      "minute": 37,
+      "title": "Ａ、復帰しました",
+      "body": "無理押しはしない方がいい。うちのは接点の汚れだった。機種の手順を確かめて手入れしたら復帰。水玉さんのは別の原因もあるので、まず症状の記録から。今夜はＡがよくしゃべる。",
+      "replyTo": "repair-3"
+    },
+    {
+      "id": "stars-1",
+      "board": "MITI:9",
+      "author": "hoshimori",
+      "daysAgo": 12,
+      "hour": 21,
+      "minute": 24,
+      "title": "窓から見える星のメモ",
+      "body": "校正帰り、窓の右端に明るい点が見えました。星の名前はまだ調べず、時刻と窓枠からの位置だけ記録。翌晩も同じ場所に見えるでしょうか。雲で一回休みになりそうです。"
+    },
+    {
+      "id": "stars-2",
+      "board": "MITI:9",
+      "author": "shiori",
+      "daysAgo": 10,
+      "hour": 22,
+      "minute": 16,
+      "title": "Re: 窓から見える星のメモ",
+      "body": "店の古い星座の本には方角を先に書く欄がありました。窓枠を物差しにするのも面白いですね。時刻をそろえると、空の動きはどのくらい分かるのでしょう。",
+      "replyTo": "stars-1"
+    },
+    {
+      "id": "stars-3",
+      "board": "MITI:9",
+      "author": "mizutama",
+      "daysAgo": 9,
+      "hour": 23,
+      "minute": 31,
+      "title": "時計を見忘れた",
+      "body": "同じことを試したら、見えた！ と思ってから時計を探してました。次は紙と時計を先に置く。明るい点は見えたけど、星守さんと同じ星かは分からないです。",
+      "replyTo": "stars-2"
+    },
+    {
+      "id": "stars-4",
+      "board": "MITI:9",
+      "author": "hoshimori",
+      "daysAgo": 8,
+      "hour": 22,
+      "minute": 53,
+      "title": "雲の切れ間で二回目",
+      "body": "同じ時刻で二回目を取れました。窓枠の目印より少しずれていましたが、立つ位置でも変わりますね。方角も追記しました。名前当てより、観察の条件をそろえる方が今は宿題です。",
+      "replyTo": "stars-2"
+    },
+    {
+      "id": "disk-1",
+      "board": "MITI:9",
+      "author": "tabstop",
+      "daysAgo": 8,
+      "hour": 23,
+      "minute": 48,
+      "title": "フロッピーのラベルに敗北",
+      "body": "同じ「最新版」と書いたディスクが三枚。中身を一覧にして日付を見比べる夜になりました。未来の自分に説明するつもりで書いたはずなのに、説明不足。"
+    },
+    {
+      "id": "disk-2",
+      "board": "MITI:9",
+      "author": "soroban",
+      "daysAgo": 7,
+      "hour": 12,
+      "minute": 22,
+      "title": "Re: フロッピーのラベルに敗北",
+      "body": "事務所では日付と通し番号を併記しています。「最新」は明日には古くなりますね。うちの弁当箱にも番号を付けたいくらいですが、一個しかありません。",
+      "replyTo": "disk-1"
+    },
+    {
+      "id": "disk-3",
+      "board": "MITI:9",
+      "author": "hankote",
+      "daysAgo": 7,
+      "hour": 22,
+      "minute": 41,
+      "title": "読む前に外観も",
+      "body": "古い媒体なら、無理に回す前に汚れや傷みも見たい。読めるうちに別の媒体へ複製して確認を。ラベルだけ新品で中身が昔、というのは修理台でもある。",
+      "replyTo": "disk-1"
+    },
+    {
+      "id": "disk-4",
+      "board": "MITI:9",
+      "author": "tabstop",
+      "daysAgo": 5,
+      "hour": 0,
+      "minute": 26,
+      "title": "最新版という名前を卒業",
+      "body": "日付と番号で整理して、別の媒体へ写したものも読めるか確認した。三枚とも少しずつ違ったよ。一覧を残して終了。「本当の最新版」という名前を付ける寸前だった。",
+      "replyTo": "disk-2"
+    },
+    {
+      "id": "water-1",
+      "board": "MITI:9",
+      "author": "mizutama",
+      "daysAgo": 5,
+      "hour": 23,
+      "minute": 19,
+      "title": "コップの水位を測ってみた",
+      "body": "浅い皿とコップ、同じ場所に置いたら減り方が違うかな。最初の水位に印だけ付けました。台所で実験すると、片付ける人に撤去されるのが最大の難関。"
+    },
+    {
+      "id": "water-2",
+      "board": "MITI:9",
+      "author": "chalk",
+      "daysAgo": 4,
+      "hour": 20,
+      "minute": 34,
+      "title": "Re: コップの水位を測ってみた",
+      "body": "容器の口の広さもメモしておくと比べやすそうです。水の量、置き場所、測る時刻をそろえ、何日か眺めてみては。触らないでほしい印も実験道具の一つですね。",
+      "replyTo": "water-1"
+    },
+    {
+      "id": "water-3",
+      "board": "MITI:9",
+      "author": "shiori",
+      "daysAgo": 3,
+      "hour": 22,
+      "minute": 28,
+      "title": "目盛りのない記録",
+      "body": "店番の合間に読んだ観察記では、絵で水面を残していました。数字にならない変化も拾えそうです。皿の縁が濡れている時は、どこを水面と決めますか。",
+      "replyTo": "water-2"
+    },
+    {
+      "id": "water-4",
+      "board": "MITI:9",
+      "author": "mizutama",
+      "daysAgo": 1,
+      "hour": 23,
+      "minute": 7,
+      "title": "皿の方が少し低い",
+      "body": "三回測って、皿の印との差が大きかったです。ただ初日の量をきっちり量ってなかった。まずは結果というより練習。しおりさんの問い、目の高さをそろえて線の下端で読んでみます。",
+      "replyTo": "water-3"
+    },
+    {
+      "id": "garden-1",
+      "board": "DAISIZEN:1",
+      "author": "tsumugi",
+      "daysAgo": 13,
+      "hour": 8,
+      "minute": 14,
+      "title": "鉢を半歩動かしました",
+      "body": "夜勤明けの鉢を見る時間が楽しみです。葉が窓の方へ寄っている気がして、今日は鉢を半歩だけ移動。眠い目の観察なので、明るい時にも見ておきます。"
+    },
+    {
+      "id": "garden-2",
+      "board": "DAISIZEN:1",
+      "author": "kusabue",
+      "daysAgo": 12,
+      "hour": 18,
+      "minute": 32,
+      "title": "Re: 鉢を半歩動かしました",
+      "body": "おつかれさまです。店でも置き場所で葉の向きが違いますね。急に強い日差しへ出さず、数日同じ場所で見てもよさそう。土の乾き方も少し変わるかもしれません。",
+      "replyTo": "garden-1"
+    },
+    {
+      "id": "garden-3",
+      "board": "DAISIZEN:1",
+      "author": "soroban",
+      "daysAgo": 12,
+      "hour": 21,
+      "minute": 17,
+      "title": "水やり帳を一行だけ",
+      "body": "うちも日付と土を触った感触だけ書き始めました。毎日水をやる予定表ではなく、見たことの記録にしています。一行なら三日坊主の私でも続くでしょうか。",
+      "replyTo": "garden-2"
+    },
+    {
+      "id": "garden-4",
+      "board": "DAISIZEN:1",
+      "author": "tsumugi",
+      "daysAgo": 9,
+      "hour": 7,
+      "minute": 49,
+      "title": "半歩のその後",
+      "body": "土が乾くまで前より少し時間がかかるみたいです。まだ二回だけなので、決めつけずに。そろばんさん、空欄の日があってもまた一行からでいいと思います。私も今朝ようやく記入。",
+      "replyTo": "garden-3"
+    },
+    {
+      "id": "bird-1",
+      "board": "DAISIZEN:1",
+      "author": "komadori",
+      "daysAgo": 10,
+      "hour": 16,
+      "minute": 26,
+      "title": "声だけ写らない鳥",
+      "body": "配送の帰り道、植え込みから細い声。姿は葉の奥で、写真には枝ばかり。鳴き方を「チ、チ、長め」と手帳へ。皆さんは声を文字にするとき、どう書いていますか。"
+    },
+    {
+      "id": "bird-2",
+      "board": "DAISIZEN:1",
+      "author": "kusabue",
+      "daysAgo": 10,
+      "hour": 19,
+      "minute": 11,
+      "title": "Re: 声だけ写らない鳥",
+      "body": "私の手帳は「ぴっ、間、ぴっ」です。鳥の名前まで分からなくても、間隔を書くと翌朝の聞き比べに役立ちますね。姿を探して近づきすぎないよう、店の裏からそっと。",
+      "replyTo": "bird-1"
+    },
+    {
+      "id": "bird-3",
+      "board": "DAISIZEN:1",
+      "author": "chalk",
+      "daysAgo": 8,
+      "hour": 20,
+      "minute": 18,
+      "title": "長さを線にしてみる",
+      "body": "短い声を点、長い声を線で残すことがあります。同じ場所でも別の鳥かもしれないので、時刻と聞こえた方向も一緒に。文字の正解を探すより、自分が思い出せる印がよさそうです。",
+      "replyTo": "bird-2"
+    },
+    {
+      "id": "bird-4",
+      "board": "DAISIZEN:1",
+      "author": "komadori",
+      "daysAgo": 6,
+      "hour": 18,
+      "minute": 44,
+      "title": "枝の写真にも出番",
+      "body": "今度は間隔を点で書けました。枝の写真を見返すと、声がした場所の影の濃さは思い出せる。鳥が写らなかった一枚も、観察の控えにはなるものですね。",
+      "replyTo": "bird-3"
+    },
+    {
+      "id": "walk-1",
+      "board": "DAISIZEN:1",
+      "author": "soroban",
+      "daysAgo": 6,
+      "hour": 12,
+      "minute": 13,
+      "title": "遠回りの昼休み",
+      "body": "弁当のあと、いつもの角を一つ先まで歩きました。小さな木陰で風の音が違います。遠出しなくても寄り道はできますね。戻る時間だけは時計と相談でした。"
+    },
+    {
+      "id": "walk-2",
+      "board": "DAISIZEN:1",
+      "author": "komadori",
+      "daysAgo": 5,
+      "hour": 16,
+      "minute": 58,
+      "title": "Re: 遠回りの昼休み",
+      "body": "同じ道も光が横から来ると別の顔になります。木陰なら足元の模様も一枚撮りたくなる。場所の名前より、何時ごろどんな光だったか聞くのが好きです。",
+      "replyTo": "walk-1"
+    },
+    {
+      "id": "walk-3",
+      "board": "DAISIZEN:1",
+      "author": "tsumugi",
+      "daysAgo": 4,
+      "hour": 17,
+      "minute": 9,
+      "title": "帰り道に一つだけ",
+      "body": "仕事帰り、木の影が塀を越えるところを見ました。カメラはなくても、今日はそれで十分。寄り道できない日には、窓から見える色を一つ覚えて帰ろうと思います。",
+      "replyTo": "walk-2"
+    },
+    {
+      "id": "notebook-1",
+      "board": "DAISIZEN:1",
+      "author": "kusabue",
+      "daysAgo": 3,
+      "hour": 18,
+      "minute": 47,
+      "title": "今週の小さな発見帳",
+      "body": "大きな成果でなくてよいので、見つけたものを一つ置く場所にしませんか。私は鉢の受け皿に落ちた小さな葉。表と裏で色が違って、店じまいが一分遅れました。"
+    },
+    {
+      "id": "notebook-2",
+      "board": "DAISIZEN:1",
+      "author": "komadori",
+      "daysAgo": 2,
+      "hour": 20,
+      "minute": 6,
+      "title": "夕方の水たまり",
+      "body": "水たまりに空が二色映っていました。写真を撮ろうとしたら自分の影で一色に。立つ場所を変えるだけのことに、しばらく気付かなかったです。",
+      "replyTo": "notebook-1"
+    },
+    {
+      "id": "notebook-3",
+      "board": "DAISIZEN:1",
+      "author": "kusabue",
+      "daysAgo": 1,
+      "hour": 19,
+      "minute": 23,
+      "title": "次の一つもどうぞ",
+      "body": "影も一緒に見つけた、ということで。文字だけでも景色が浮かびました。初めて読む方も、窓辺や道端の一つがあればぜひ。名前の分からない草の話でも、ゆっくり聞きたいです。",
+      "replyTo": "notebook-2"
+    }
+  ]
+}

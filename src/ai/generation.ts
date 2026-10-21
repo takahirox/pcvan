@@ -1,4 +1,5 @@
 import type { Backup, Member, NewPost } from '../storage/schema';
+import { localConversation } from '../storage/community';
 import { aiOrigin, models, personaMemberId, personas, residentProfiles } from './personas';
 
 export interface GenerationRequest { personaId: string; forumId: string; replyToPostId?: string }
@@ -25,7 +26,7 @@ export function checkRequest(content: Backup, request: GenerationRequest) {
 
 function recentPosts(content: Backup, forumId: string) {
   return content.posts.filter((post) => post.forumId === forumId &&
-    (post.origin === 'local-human' || post.origin.startsWith('local-ai:webllm:')))
+    localConversation(post))
     .sort((a, b) => b.number - a.number).slice(0, 4).reverse();
 }
 
@@ -50,11 +51,11 @@ export function buildPrompt(content: Backup, request: GenerationRequest): Genera
       affinities: persona.affinities,
       // Derived, bounded local memory survives reload/backup without a second transcript.
       memory: content.posts.filter((p) => p.forumId === forum.id && p.authorId === personaMemberId(persona.id) &&
-        p.origin.startsWith('local-ai:webllm:')).sort((a, b) => b.number - a.number).slice(0, 2).map((p) => ({
+        localConversation(p)).sort((a, b) => b.number - a.number).slice(0, 2).map((p) => ({
           id: p.id.slice(0, 128), replyToPostId: p.replyToPostId?.slice(0, 128), body: p.body.slice(0, 120),
         })),
       replyTarget: request.replyToPostId ? content.posts.filter((p) => p.id === request.replyToPostId &&
-        (p.origin === 'local-human' || p.origin.startsWith('local-ai:webllm:'))).map((p) => ({
+        localConversation(p)).map((p) => ({
           author: content.members.find((m) => m.id === p.authorId)?.handle.slice(0, 40),
           title: p.title.slice(0, 80), body: p.body.slice(0, 240),
         }))[0] : undefined,

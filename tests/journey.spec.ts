@@ -153,7 +153,7 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
   try {
     const page = await context.newPage();
     await page.goto(baseURL!);
-    expect((await backup(page)).posts).toEqual([]);
+    await expect.poll(async () => (await backup(page)).posts.length).toBe(30);
     await openSettings(page, 'ai');
     await expect(page.locator('.ai-message')).toContainText('WebGPU が利用できない');
     await expect(page.locator('.ai-load')).toBeDisabled();
@@ -166,43 +166,43 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
     await page.reload();
     await expect(page.locator('.network-status')).toContainText('オフライン');
     await enterForum(page);
-    await command(page, 'READ 1', '★タイトル (DEMO0001)');
+    await command(page, 'READ 1', '★タイトル (fictional-ai:hankote)');
     await createHuman(page);
     const title = '旅の記録　ｶﾅ';
     const body = '一行目\n\n  二行目 <b>文字のまま</b>  \n';
     await post(page, title, body);
-    await command(page, 'LIST', `#1 ${title} [未読]`);
-    await command(page, 'READ 1', body);
+    await command(page, 'LIST', `#17 ${title} [未読]`);
+    await command(page, 'READ 17', body);
     await expect(page.locator('.output b')).toHaveCount(0);
-    await command(page, 'LIST', `#1 ${title} [既読]`);
-    await post(page, `RE#1 ${title}`, '返信です。\nオフラインから。', 'REPLY 1');
-    await command(page, 'LIST', `#2 RE#1 ${title} [未読]`);
-    await command(page, 'READ 2', '返信先 RE#1');
+    await command(page, 'LIST', `#17 ${title} [既読]`);
+    await post(page, `RE#17 ${title}`, '返信です。\nオフラインから。', 'REPLY 17');
+    await command(page, 'LIST', `#18 RE#17 ${title} [未読]`);
+    await command(page, 'READ 18', '返信先 RE#17');
     const beforeReference = (await page.locator('.output').textContent())!.length;
-    await page.getByRole('link', { name: '返信先 RE#1 を読む' }).click();
+    await page.getByRole('link', { name: '返信先 RE#17 を読む' }).click();
     await expect.poll(async () => (await page.locator('.output').textContent())!.slice(beforeReference)).toContain(body);
     const saved = await backup(page);
-    expect(saved.posts).toHaveLength(2);
-    expect(saved.posts.map((row) => row.origin)).toEqual(['local-human', 'local-human']);
+    expect(saved.posts).toHaveLength(32);
+    expect(saved.posts.filter((p) => p.origin === 'local-human').map((row) => row.origin)).toEqual(['local-human', 'local-human']);
     // Backups follow IndexedDB primary-key order, not random-ID creation order.
-    const original = saved.posts.find((row) => row.number === 1)!;
-    const reply = saved.posts.find((row) => row.number === 2)!;
+    const original = saved.posts.find((row) => row.number === 17)!;
+    const reply = saved.posts.find((row) => row.number === 18)!;
     expect(reply.replyToPostId).toBe(original.id);
-    expect(saved.readStates).toEqual([{ memberId: saved.members.find((m) => m.actor === 'human')!.id, forumId: saved.forums[0]!.id, lastReadNumber: 2 }]);
+    expect(saved.readStates).toEqual([{ memberId: saved.members.find((m) => m.actor === 'human')!.id, forumId: original.forumId, lastReadNumber: 18 }]);
     await page.reload();
     await enterForum(page);
-    const list = await command(page, 'LIST', `#2 RE#1 ${title} [既読]`);
-    expect(list).toContain(`#1 ${title} [既読]`);
+    const list = await command(page, 'LIST', `#18 RE#17 ${title} [既読]`);
+    expect(list).toContain(`#17 ${title} [既読]`);
     expect((await backup(page)).posts).toEqual(saved.posts);
     // Change the live world before restore so an inert import cannot pass.
     await post(page, '復元で消える投稿', '三件目');
-    expect((await backup(page)).posts).toHaveLength(3);
+    expect((await backup(page)).posts).toHaveLength(33);
     await restore(page, saved);
     expect(await backup(page)).toEqual(saved);
     await page.reload();
     await enterForum(page);
-    await command(page, 'READ 2', '返信先 RE#1');
-    await expect(page.getByRole('link', { name: '返信先 RE#1 を読む' })).toBeVisible();
+    await command(page, 'READ 18', '返信先 RE#17');
+    await expect(page.getByRole('link', { name: '返信先 RE#17 を読む' })).toBeVisible();
     const reloaded = await backup(page);
     for (const key of ['members', 'sigs', 'forums', 'posts', 'readStates'] as const) {
       expect(reloaded[key]).toEqual(saved[key]);
@@ -285,7 +285,7 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   const activity = interrupted.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity;
   expect(activity.batch!.runs.map((run) => run.status)).toEqual(['committed', 'running']);
   const committed = interrupted.posts.find((row) => row.simulation)!;
-  expect(interrupted.posts).toHaveLength(2);
+  expect(interrupted.posts).toHaveLength(32);
   await page.close();
   const resumed = await context.newPage();
   await resumed.clock.setFixedTime(reconnect);
@@ -294,16 +294,22 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   await expect(resumed.locator('.ai-activity-message')).toContainText('2/2');
   expect(await workerStats(resumed)).toEqual({ generations: 1, loads: 1 });
   const recovered = await backup(resumed);
-  expect(recovered.posts).toHaveLength(3);
+  expect(recovered.posts).toHaveLength(33);
   expect(recovered.posts.find((row) => row.id === committed.id)).toEqual(committed);
   const generated = recovered.posts.filter((row) => row.simulation);
   expect(generated.map((row) => row.id).sort()).toEqual(activity.batch!.runs.map((run) => run.id).sort());
-  expect(recovered.forums[0]!.nextPostNumber).toBe(4);
+  for (const f of recovered.forums) expect(f.nextPostNumber).toBe(Math.max(...recovered.posts.filter((p) => p.forumId === f.id).map((p) => p.number)) + 1);
   expect(generated.every((row) => row.origin.startsWith('local-ai:webllm:') && row.simulation!.fictional &&
     row.createdAt === reconnect.toISOString() && row.simulation!.simulatedAt < row.createdAt)).toBe(true);
   await expect(resumed.locator('.ai-records')).toContainText('actor=ai');
-  await enterForum(resumed);
-  await command(resumed, 'READ 3', '[架空の投稿時刻]');
+  const generatedMiti = generated.find((p) => p.forumId === 'resident-forum:MITI:9');
+  if (generatedMiti) {
+    await enterForum(resumed);
+    await command(resumed, `READ ${generatedMiti.number}`, '[架空の投稿時刻]');
+  } else {
+    for (const [line, response] of [['13', 'コミュニケーション'], ['2', '大自然＆動植物'], ['FORUMS', 'フォーラム（電子掲示板）'], ['1', '投稿一覧']]) await command(resumed, line!, response!);
+    await command(resumed, `READ ${generated[0]!.number}`, '[架空の投稿時刻]');
+  }
   await command(resumed, 'MAIN', '番号またはコマンド=');
   await command(resumed, 'Q', '接続を終了しました');
   await command(resumed, 'RECONNECT', 'PC-VAN 接続中');
@@ -330,11 +336,11 @@ for (const mode of ['invalid', 'failure'] as const) {
     await page.locator('.ai-generate').click();
     await expect(page.locator('.ai-message')).toContainText('端末・閲覧・手動投稿は利用できます');
     await expect(page.locator('.ai-send')).toBeHidden();
-    await command(page, 'READ 1', 'AI がなくても使えます。');
-    await post(page, '失敗後の返信', '手動の返信を保存できます。', 'REPLY 1');
+    await command(page, 'READ 17', 'AI がなくても使えます。');
+    await post(page, '失敗後の返信', '手動の返信を保存できます。', 'REPLY 17');
     const saved = await backup(page);
-    expect(saved.posts).toHaveLength(2);
-    expect(saved.posts.every((row) => row.origin === 'local-human')).toBe(true);
+    expect(saved.posts).toHaveLength(32);
+    expect(saved.posts.filter((row) => row.origin === 'local-human')).toHaveLength(2);
     expect(saved.members.filter((row) => row.actor === 'human')).toHaveLength(1);
     expect(saved.members.filter((row) => row.id.startsWith('fictional-ai:'))).toHaveLength(10);
   });

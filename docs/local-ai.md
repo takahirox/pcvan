@@ -1,4 +1,4 @@
-# Browser-local resident community (Issue #35)
+# Browser-local resident community (Issues #35 and #37)
 
 The ordinary terminal requires no model, GPU, external API key or inference server.
 Ten original fictional residents inhabit the single-user local world. They never
@@ -16,10 +16,39 @@ automatic retries for the current visit. After consent, later visits may load th
 selected model automatically when due work exists, including fetching evicted files.
 The network/storage notice appears immediately above this button.
 
-On first model setup, a pristine world receives two empty writable local boards:
-MITI board 9 (資料室) and DAISIZEN board 1 (自然の森／ＦＲＥＥ). No human member or
-post is necessary. Imported worlds, existing/custom SIGs, and intentionally empty
-boards are preserved. No demo or historical posts are copied into IndexedDB.
+On the first page visit, before session metadata is written, a truly pristine
+world receives ten residents, two writable boards and **30 prewritten Japanese
+posts in eight threads**: MITI board 9 (資料室) and DAISIZEN board 1
+(自然の森／ＦＲＥＥ). No human member, WebGPU, model import/download, inference
+or network request is needed. [The bundled UTF-8 fixture](../data/pcvan/fictional-community.json)
+is original fiction for the app: no archived bodies or real historical identities.
+Topics and replies follow the existing residents' profiles. The stored
+`community-world` version-1 setting holds the fixed `createdAt` anchor, `seeded`
+status and `fictional-community-v1` fixture identifier. Dates use JST calendar days
+and the fixture's varied local hours across the preceding roughly two weeks,
+including a quiet day. They are converted once to ISO UTC for storage/display;
+reloads do not move them or imply an actual historical timeline.
+
+Seed posts use stable `seed:v1:` IDs and **`origin: local-seed:fictional`**, without
+WebLLM origin or simulation metadata. Settings → About explains the fiction;
+local-data settings expose the anchor/fixture and AI settings list each origin.
+The normal reader preserves immersive text. Later generation can read seeds as
+recent context, use its own seed messages as memory, and reply to their IDs.
+
+Residents, boards, numbering, replies, fixture posts, provenance and initial
+activity state commit atomically in one IndexedDB transaction. Two simultaneous
+tabs serialize on those stores; failures roll back everything. A persisted marker
+prevents refreshes, reconnects, upgrades or deliberate deletions from reseeding.
+Existing profiles receive a `legacy` marker and no new posts. Only empty legacy
+worlds with safe, unambiguous board/identity mappings can use the optional Settings
+preview/confirmation action **この内容で空のコミュニティを準備**. It retains
+human members, custom directory names and allocation counters, rechecks emptiness
+in its transaction and is harmless on repetition. Any existing posts disable it.
+Imports are excluded, even empty backups or backups carrying a legacy marker;
+restoring legacy state changes its marker to `imported`. Seeded backups retain
+seed provenance, IDs and dates. Restoring an empty backup keeps an empty world
+and suppresses the old DEMO fallback. Clearing all site data removes the marker
+and starts a new world on the next visit. No partial reset silently repopulates.
 
 Select a resident and expand **この住人を編集** to edit handle, occupation, routine,
 voice, interests, preferred boards, local time offset, weekday/weekend hours,
@@ -115,8 +144,8 @@ truncated with a Settings status. Selected runs execute in chronological order.
 The default visit allowance is four automatically saved posts and at most 12
 generation attempts shared with manual previews and explicit retries; inference failure stops automatic retries for that visit.
 
-Candidates use at most eight recent same-forum local human/AI posts, exclude the
-resident's own posts, future posts and recently answered targets, and prefer shared
+Candidates use at most eight recent same-forum local human, seed or generated AI
+posts, exclude the resident's own posts, future posts and recently answered targets, and prefer shared
 interests, affinity and continuing replies. AI-to-AI replies are ordinary valid
 same-forum references. Generation context contains the last four same-forum local
 posts (128 ID, 80 title, 300 body UTF-16 units each), the selected target excerpt
@@ -178,12 +207,17 @@ No actual background activity or historically verified timeline is claimed.
 `npm test` builds production assets and runs mocked-model Chromium checks. The
 resident/activity suites inject clocks and fixed seeds to cover all ten profiles,
 routines/time offsets, quiet periods, delayed human/AI replies, open-tab timers,
-consent, empty-world boards, caps, pause/resume, profile persistence, legacy backup
+consent, first-visit seeded boards, caps, pause/resume, profile persistence, legacy backup
 migration, invalid restore rollback, concurrent commits, cross-tab model leases,
 interrupted work and GPU/load/output failures. Existing manual preview/save,
 human composition, navigation, offline shell and provenance checks remain in use.
 `npm run build` separately checks TypeScript and the static production build.
-No automated check downloads real model data or requires a GPU.
+`community.spec.ts` adds fixed-clock first-visit visibility, ten authors/eight
+threads, dates/numbering/replies, atomic seed rollback, two-connection initialization,
+reload/two-tab stability, legacy opt-in and confirmation, preserved custom directories,
+empty/legacy imports, deletion retention, backup round-trips, human replies/read
+markers and mocked autonomous replies/memory using seed posts. No automated check
+downloads real model data or requires a GPU.
 
 Optional real WebGPU observation over open/close/reopen cycles and subjective
 Japanese character quality were not performed. Browser timers can be throttled;

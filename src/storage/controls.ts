@@ -1,8 +1,12 @@
 import { RepositoryError, validateBackup } from './repository';
+import { canPopulateCommunity } from './community';
+import { WORLD_SETTING } from './schema';
+import type { Backup } from './schema';
 import type { LocalRepository } from './repository';
 
 export function mountStorageControls(root: HTMLElement, repository: Promise<LocalRepository>,
-  enqueue: (action: () => Promise<void>) => Promise<void>, restoreJson: (text: string) => Promise<void>) {
+  enqueue: (action: () => Promise<void>) => Promise<void>, restoreJson: (text: string) => Promise<void>,
+  populate: () => Promise<void>) {
   const section = document.createElement('section');
   section.className = 'storage-controls';
   section.id = 'local-backup';
@@ -19,6 +23,13 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     <p>データはこのブラウザー内に保存されます。容量制限やブラウザーの操作で消えることがあります。
       大切なデータは JSON バックアップを保存してください。</p>
     </details>
+    <p class="community-provenance"></p>
+    <div class="community-population" hidden>
+      <p>空のコミュニティに、10人の住人による30件・8つの話題を追加できます。
+        MITI 資料室と DAISIZEN 自然の森／ＦＲＥＥに、最近約2週間の架空の会話を保存します。
+        アプリ用に書いた原文で、史料やモデル生成ではありません。既存の会員・掲示板設定を保持します。</p>
+      <button type="button" class="populate-community">この内容で空のコミュニティを準備</button>
+    </div>
     <p class="storage-status" role="status" aria-label="ローカル保存の状態" aria-live="polite">ローカル保存を準備しています…</p>
   `;
   root.append(section);
@@ -37,7 +48,10 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
       ? '保存容量が足りません。JSON バックアップを保存し、ブラウザーの空き容量を確認してください。'
       : `ローカル保存エラー: ${error instanceof Error ? error.message : String(error)}`;
   };
+  const population = section.querySelector<HTMLElement>('.community-population')!;
+  const populateButton = section.querySelector<HTMLButtonElement>('.populate-community')!;
   const enable = () => {
+    populateButton.disabled = busy;
     backup.disabled = busy;
     file.disabled = busy;
     restore.disabled = busy || !file.files?.length;
@@ -78,5 +92,21 @@ export function mountStorageControls(root: HTMLElement, repository: Promise<Loca
     } catch (error) { reportError(error); }
     finally { busy = false; enable(); }
   });
-  return { reportError };
+  populateButton.addEventListener('click', async () => {
+    if (busy || !window.confirm('30件の架空の会話を2つの掲示板へ追加します。モデルのダウンロードはありません。続けますか？')) return;
+    busy = true; enable();
+    try {
+      await enqueue(populate);
+      status.textContent = 'コミュニティの状態を確認しました。投稿は LIST / READ で読めます。他のタブは再読み込みしてください。';
+    } catch (error) { reportError(error); }
+    finally { busy = false; enable(); }
+  });
+  function refresh(content: Backup) {
+    population.hidden = !canPopulateCommunity(content);
+    const row = content.settings.find((s) => s.id === WORLD_SETTING);
+    section.querySelector('.community-provenance')!.textContent = row
+      ? `初期状態・来歴 / ${JSON.stringify(row.value)} / local-seed:fictional はアプリ同梱の創作原文です。local-ai:webllm: は後からモデルで生成した投稿です。`
+      : '';
+  }
+  return { reportError, refresh };
 }

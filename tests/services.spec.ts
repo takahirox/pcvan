@@ -125,7 +125,7 @@ test('keyboard collections work offline without service requests or changing loc
   await send('J MITI', 'MITI / 未知の世界');
   await send('3', 'MITI / フォーラム');
   await send('9', 'MITI / 資料室');
-  await send('READ 1', '★タイトル (DEMO0001)');
+  await send('READ 1', 'その番号の投稿はありません');
   expect(page.url()).toBe(initialUrl);
   expect(requests).toEqual([]);
   expect(navigations).toEqual([]);
