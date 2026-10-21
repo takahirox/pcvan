@@ -32,92 +32,99 @@ or claims of live network activity.
 
 ## Use the terminal
 
-- Opening the app or using `RECONNECT` shows a reconstructed connection greeting
-  for 1.2 seconds, then returns to MAIN. **接続演出をスキップ** or submitting a
-  command ends the wait immediately; that command is processed normally. Input
-  echo and history remain immediate. This uses no modem, device, or network API, and
-  does not claim to reproduce the unknown 1996 login greeting.
-- Enter submits the command; Japanese IME composition confirmation is guarded
-  against submission. MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`.
-- MAIN `13` opens a Communication bridge: its convenience
-  selectors `1` and `2` lead to MITI and DAISIZEN; neither is a historical submenu
-  number. Every other numbered selection and `X` opens the corresponding
-  collection or index described in the menu map below.
-- From MAIN, `J MITI` → `3` → `9` follows the documented 1996 route to 未知の世界,
-  フォーラム, and 資料室. Only these route steps are verified; the displayed
-  screens/prompts are reconstructed, not complete SIG menus. 資料室 lists posts.
-  Numbers apply only to the current screen. Unknown commands preserve state.
-- Reach DAISIZEN with `13` → `2` → `FORUMS`, then select `1`–`7`.
-  Its archived section names and seven numbered boards retain provisional
-  evidence metadata in Settings and fixtures: their applicability to 1996–1997 is unresolved. The bridge,
-  `FORUMS`, number selection behavior, and prompts are reconstructed. The archive
-  guide names the jump code DAISIZEN but does not show the exact `J DAISIZEN`
-  input/context; that command remains unsupported.
-- At the DAISIZEN directory, `MAIL`, `LIBRARY`, `OLT`, `OSL`, and `CONFERENCE`
-  open a mailbox directory, file lists, or empty rooms (see the map below).
-  These helpers and screens are reconstructed conveniences (D); the historical
-  names remain provisional (B). No reliable historical service command sequence
-  was found, so these views do not claim to reproduce one. `BACK` returns to the
-  SIG, `MAIN` returns to MAIN, and `HELP` repeats the current view. Unsupported
-  input preserves the screen and local content. See the
-  [service evidence and decision](docs/research/pcvan-1996-1997.md#olt-mail-library-and-related-services-issue-13).
-- Within a forum, `LIST` shows posts in ascending post-number order and
-  `READ number` shows a header and the exact stored local Japanese title/body.
-  `BACK` returns to the forum directory. These reading/back commands are original
-  demo controls, not verified PC-VAN commands. Missing numbers leave the screen
-  unchanged. Headers use UTC dates; secondary display numbers have no assigned
-  meaning, and the uncertain historical line-count field is omitted.
-- Create a local human with **新しいハンドル** → **人間の利用者を作成**, or select
-  an existing human under **ローカル利用者**, inside **利用者設定・新規登録**.
-  In a forum, `WRITE` opens a title and multiline body editor; `REPLY number` prefills `RE#number` and retains the
-  referenced post ID. **内容を確認** reviews the exact text; **編集に戻る** edits it,
-  **この内容で投稿する** sends it, and **投稿をキャンセル** or Escape discards it.
-  Enter in the title or Japanese IME confirmation never sends a post. Blank
-  titles/bodies are rejected. Failed sends keep the draft for an explicit retry.
-  The About section documents compose/confirmation/reply controls as
-  reconstructions: the 1996–97 interactions remain unverified.
-- Confirmed first send creates the local SIG/board if needed, with no demo-copy
-  step. Local post numbers are allocated transactionally per forum. Demo posts
-  cannot receive replies. Replies show `RE#number`; when reading a reply, the
-  **返信先 RE#number を読む** link reads the referenced local post.
-- Local lists show **未読** / **既読** for the selected human. Reading advances
-  that member/forum's saved highest read number; lower-numbered posts are then
-  considered read, including when reading out of order. Reading an older post
-  never moves the marker backwards. Selection and markers survive reload and
-  JSON backup/restore. Demo reading does not create read markers.
-- `HELP` redisplays the active screen; `BACK` returns to the previous menu,
-  including the index when entered through it; `MAIN` returns from all connected
-  submenus and forums. These helpers, case-insensitive input, and whitespace
-  tolerance are explicitly reconstructed conveniences. No ECOM or generic BBS shortcuts are
-  assigned global meanings.
-- `Q` ends the simulated connection only at MAIN. `RECONNECT` starts again at
-  MAIN after disconnecting; it is a reconstructed convenience. Commands never
-  navigate the browser or connect to an external service.
-- The latest login and explicit `Q` logout times appear in
-  **設定 / Options → 表示・速度** in UTC
-  and persist locally. Opening/reloading and `RECONNECT` update login time;
-  closing a tab is not recorded as a reliable logout.
-- Up/Down recall the newest 100 nonblank commands, restored after reload, and
-  restore the draft when returning past the newest. Edits to recalled commands
-  survive moving away and back within that browsing pass; only submitted text
-  is added to saved history.
-- PageUp/PageDown scroll the transcript while the command input keeps focus.
-- Shift+Tab from the input focuses the output. Use the browser's scroll keys
-  (including Left/Right for long lines), then Tab to return to the input.
-- Output preserves spaces and newlines. Long output scrolls horizontally;
-  the single-line input scrolls to its caret. Text is selectable and copied as
-  plain text, without interpreting HTML or escape sequences.
-- **端末ログを保存 (.txt)** downloads the entire current transcript (including
-  scrollback, reconnects and queued text awaiting display) as UTF-8 plain text
-  with exact line breaks. The unsubmitted input draft is excluded. Download before reloading to keep the log;
-  JSON backups contain local data/history but do not contain the transcript.
+The transcript and persistent command input are the only application controls.
+Type a line and press Enter. `HELP` describes the current screen. Japanese IME
+confirmation never submits. Escape reveals queued output and skips the 1.2-second
+connection presentation; it does not cancel drafts or approve confirmations.
+
+On first use, answer the optional handle invitation with `Y`, enter a Japanese
+handle, or use `N` / `SKIP` to read without registering. `HANDLE` lists only human
+accounts: type a number to select, `NEW` to register, or `RENAME new name` to change
+the selected handle. Selection and each human's read markers survive reloads.
+Unregistered `WRITE` / `REPLY` requests resume after inline registration.
+
+MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`. The verified route remains
+`J MITI` → `3` → `9`. Numbers apply to the current screen. From MAIN,
+`13` → `2` → `FORUMS` reaches DAISIZEN's seven boards. Its directory also accepts
+`MAIL`, `LIBRARY`, `OLT`, `OSL`, and `CONFERENCE`. These bridge/service commands,
+`FORUMS`, reading, settings, handles and composition are reconstructed conveniences;
+they are not claims of verified 1996–97 PC-VAN commands. `J DAISIZEN` remains
+unsupported. `ABOUT` provides evidence, source URLs and local fiction provenance
+on demand. Historical fixture labels and MAIN mappings are preserved.
+
+In a forum, `LIST` lists numbers and unread/read markers. `READ n` displays the
+exact stored title/body; `返信先：#m` is plain text, followed by typing `READ m`
+or `REPLY n`. Reading advances the selected human's per-forum high-water mark.
+It never changes posts or moves the mark backwards. Missing numbers preserve state.
+Dates are UTC; secondary header numbers have no assigned meaning and the uncertain
+historical line-count field is omitted.
+
+Compose entirely through the same input:
+
+```text
+WRITE                  (or REPLY 1)
+昔のパソコン通信        (title: 1–200 characters)
+  日本語の一行目        (body: one line per Enter; whitespace is preserved)
+二行目
+.END
+EDIT
+TITLE 編集した題名
+LINE 2 変更した二行目
+REVIEW
+Y
+```
+
+Body input accepts blank lines; `.END` requires a nonblank body of at most 20000
+UTF-16 units. Review shows numbered lines and accepts `Y` (save), `N` (discard),
+or `EDIT`. Editing accepts `TITLE text`, `LINE n text`, `DELETE n`, `APPEND`
+(add more body lines) and `REVIEW`. `LINE n` replaces a line with an empty line.
+`.TEXT text` in body input inserts reserved command text literally, such as
+`.TEXT MAIN` or `.TEXT .END`. Validation errors keep the existing draft.
+`CANCEL` / `.CANCEL` explicitly discard from every composing stage. `BACK`, `MAIN`
+and `HELP` keep the draft and show its help. No draft line can navigate or send.
+Sends use transactional numbering and parent validation; failures permit retry,
+and a committed draft cannot be sent twice. Missing boards are created only on
+successful send, never by cancelling.
+
+Outside prompts, `BACK` returns one menu and `MAIN` returns to MAIN. Inside a
+confirmation, only the advertised literal `Y` executes that operation; blank,
+invalid input and `HELP` never approve it. `N`, `BACK`, `MAIN` or `CANCEL` cancel
+confirmation. `Q` disconnects only at MAIN; `RECONNECT` starts again. Neither
+navigation nor connection uses a remote service or modem API.
+
+`SETTINGS` (alias `CONFIG`) exposes numbered menus:
+
+| Number | Commands and behavior |
+| --- | --- |
+| 1 Display | `THEME white/green/amber`, `SPEED 300/1200/2400/9600/instant`, `EFFECTS ON/OFF` |
+| 2 Handles | Account number, `NEW`, `RENAME name` |
+| 3 Models/activity | `MODEL 1/2`, `LOAD`, `LATER`, `STOP`, `CACHE`, `AUTO 0–12`, `RETRY`, `RESIDENTS`, `PERSONA n`, `FORUM n`, `REPLY n/NONE`, `GENERATE`, `PREVIEW`, `SEND`, `DISCARD` |
+| 4 Data | `BACKUP`, `IMPORT`, `RESET`; eligible legacy empty worlds also offer `POPULATE` |
+| 5 Offline/storage | `CACHE` (app shell), `STATUS`, `PERSIST` |
+| 6 Session | Latest login and explicit logout in UTC; closing a tab is not a reliable logout |
+| 7 Log | Download current UTF-8 terminal log |
+| 8 Help | Keyboard and prompt guide |
+| 9 About | Sources, evidence limits, resident profiles, post origins and timestamps |
+
+`HANDLE`, `ABOUT`, `LOG`, `BACKUP`, `IMPORT`, `RESET`, and `STOP` are also available
+outside active drafts/prompts. No custom dialogs, helper links or extra buttons
+are used. Native file selection/download/permission interfaces occur only after
+commands. `BACK` returns from details/help to their caller.
+
+Up/Down recall the newest 100 nonblank commands and restore an unsent input draft.
+Title/body, registration, profile-edit and confirmation responses are not saved as
+commands. Submitted draft text does appear in the session transcript and `LOG`.
+PageUp/PageDown scroll output; Shift+Tab focuses it, Left/Right scroll long lines,
+and Tab returns to input. Literal HTML is never interpreted. `LOG` includes
+accepted text still awaiting display, but excludes the unsent input. Export before
+reloading; JSON backups contain world data/history, not the transcript or live drafts.
 
 ## Menu destinations and empty collections
 
 | MAIN selector | Destination | Initial view |
 | --- | --- | --- |
 | `1` | 電子メール | Mailbox directory: inbox and sent, each 0 messages |
-| `2` | 索引 | Working links to every other MAIN section and `J MITI` |
+| `2` | 索引 | Numbered routes to every other MAIN section and `J MITI` |
 | `3` | ニュース | Article list, 0 articles |
 | `4` | データベース | Database list, 0 entries |
 | `5` | 公共情報と政治 | Article list, 0 articles |
@@ -160,31 +167,26 @@ There is no mail delivery, shopping transaction, file upload/download, internet
 gateway or multi-user chat connection, and no fake remote content or participants.
 Opening these screens makes no network calls, changes no stored content and
 loads no model. Existing local forum posts/settings, JSON backup/restore and
-explicitly enabled local AI remain available. Settings → **このシステムについて /
-出典・制約** explains these limits, the empty counts and historical uncertainty
+explicitly enabled local AI remain available. `ABOUT` explains these limits, the empty counts and historical uncertainty
 on demand; ordinary screens keep only their content and navigation.
 
 ## Terminal appearance and output speed
 
-The terminal screen and prompt fill the ordinary viewport. **設定 / Options**
-opens one accessible dialog with display/speed, member, AI, JSON backup,
-offline/storage, keyboard help and **このシステムについて / 出典・制約** groups.
-Escape or **閉じる** returns to the session without changing its draft. The post
-editor remains a separate dialog. A compact AI setup/status strip beside the
-terminal also shows progress and stop/retry. Detailed AI and storage errors stay
-in Settings; background changes add a small notification dot and accessible status.
+The terminal screen and prompt fill the viewport. Type `SETTINGS` → `1` for
+display settings; all statuses and errors appear in the transcript. `ABOUT`
+contains sources and provenance without adding commentary to ordinary reading.
 
 Ordinary output uses concise navigation and operational notices. About contains
-the evidence categories, source links, era limitations, invented controls,
+the evidence categories, source URLs, era limitations, invented controls,
 fictional identities and seed/AI provenance. Original fixtures and research are
 preserved; local posts retain their exact text. Display offers white, green and
 amber themes with optional static glow and scanlines, plus a compact local Japanese monospace stack. No font downloads are
 required. These are reconstructed aesthetics, not authenticated PC-VAN screens.
 
-**表示速度（シミュレーション）** offers 300/1200/2400/9600 bps and **Instant**.
+`SPEED` offers 300/1200/2400/9600 bps and **Instant**.
 The default is 2400 bps, or Instant with reduced motion. Effects default off.
-**全文表示 (Esc)** reveals queued text; a submitted command also reveals earlier
-text before its immediate echo. Changing speed reveals the current backlog.
+Escape reveals queued text; a submitted command also reveals earlier
+text before the queued command response. Changing speed reveals the current backlog.
 Theme, speed and effects persist locally and travel with JSON backups; an explicit
 choice overrides the motion-aware defaults. The animation uses UTF-8 byte costs
 at nominal bps / 10 bytes per second, preserving whole Unicode graphemes. This is
@@ -193,35 +195,27 @@ See [display controls, accessibility, timing and limitations](docs/terminal-disp
 
 ## Optional local AI
 
-Open **設定 / Options → AIモデル・動作設定** to inspect and edit ten
-original fictional residents. Their stable IDs include the existing `hoshimori`,
-`kusabue` and `hankote`. Each has a job, routine, weekday/weekend hours (JST by
-default, editable fixed UTC offset), interests, preferred boards, writing style,
-activity level and reply tendencies. All profiles and settings survive JSON backups.
+Type `SETTINGS` → `3` to prepare the model and inspect resident activity.
+`MODEL 1` / `MODEL 2` select the model. `LOAD` discloses the hundreds of MB to GB
+download from distribution hosts, browser storage, GPU use and local fictional
+generation. Only a typed `Y` in that prompt authorizes loading. `N`, invalid or
+blank input never load. Manual loads always show this disclosure. `LATER` records
+a per-world deferral; `STOP` cancels and releases the model. Progress, errors and
+readiness appear inside the transcript. WebGPU on HTTPS/localhost is required.
 
-A new world defaults to automatic resident activity **ON**, with at most **4 posts
-and 12 generation attempts (including manual previews) per page visit**. **No heavyweight files are downloaded
-until you affirm the model confirmation.** A compact invitation beside the
-terminal offers **AIモデルの準備** with **モデルを読み込む** and **あとで**.
-The load action opens the existing model selector and an explicit
-download/storage/WebGPU notice; **同意してモデルを読み込む** both
-persists consent and starts loading. Settings' **モデルを読み込む（初回ダウンロード）**
-uses the same confirmation. Visiting, declining, Escape and **あとで** never
-start a model download. Initial files can total hundreds of MB to GB from the
-model distribution hosts; inference and forum processing remain entirely local.
+New worlds default to an automatic cap of four saved posts and twelve generation
+attempts (including manual previews) per page visit. This does not authorize a
+model download. After consent, later visits may load the authorized model when
+work is due, including fetching evicted assets. Readiness does not promise
+immediate posts. The thirty prewritten posts exist before model setup.
 
-**あとで** saves a per-world deferral that survives reload and JSON backup/restore.
-Use the subtle **モデルを読み込む** action beside the terminal to return, or use Settings.
-Already-consented and globally paused worlds receive no new invitation. Unsupported
-browsers get a compact WebGPU / HTTPS explanation. The strip shows real loading
-progress, **AI を停止・解放**, errors/retry and successful model readiness;
-**AIモデルの設定** opens schedule status and pause controls. The strip shrinks
-when idle or ready. Expand **詳細・出自** for authorship, model origins and
-timestamps. Consent, a loaded model and actual scheduled posts are separate states: readiness promises no
-immediate posts. WebGPU on HTTPS/localhost is required.
-The first-visit community is already stored before model setup. Later generated
-posts can reply to its fictional history without an initial human post. Existing
-profiles and restored/custom boards are preserved.
+`RESIDENTS` → resident number → field number edits each resident's handle, job,
+routine, voice, interests, hours, UTC offset, frequency, weights and affinities.
+Use comma-separated arrays, JSON for affinities and `SAVE` to validate/persist;
+`BACK` / `CANCEL` discard edits. Profiles retain their IDs and survive backups.
+`PERSONA n`, `FORUM n`, optional `REPLY n`, `GENERATE`, `PREVIEW`, `SEND` → `Y`
+provide manual generation/review/save. `DISCARD` drops the preview. `CACHE` probes
+model weights without downloading missing weights. `ABOUT` retains all provenance.
 
 While the page is visible and connected, a minute timer checks independently due
 residents. They may read, start topics, reply to humans or other residents, or stay
@@ -231,7 +225,7 @@ Scheduled times are fictional and actual commit times remain inspectable. One
 shared model worker serializes generation; a cross-tab Web Lock prevents competing
 models. Missing Web Locks pauses automatic inference. The visit budget survives
 `RECONNECT`. Set the cap to **0** to pause, or set an individual frequency to **0**.
-**AI を停止・解放** cancels work, unloads the model and suspends automatic retries
+`STOP` cancels work, unloads the model and suspends automatic retries
 until explicit recovery or another visit. Failures leave the terminal usable.
 
 Manual AI preview/save/discard, optional model selection, cache checks and detailed
@@ -241,12 +235,12 @@ historical users. See [local AI behavior and limitations](docs/local-ai.md).
 
 ## Local data and backups
 
-Open **設定 / Options → JSON バックアップ・復元** and use
-**JSON バックアップを保存** to download all local data.
-Select a JSON file with **復元ファイル**, then **全データを置き換えて復元** to
-validate it and confirm replacement of the entire local world. Restore does not
-merge data; export the old world first if you want to keep it. Invalid files or
-failed writes leave existing data intact. Storage errors appear below the controls.
+`BACKUP` downloads a validated JSON snapshot. `IMPORT` opens the browser's native
+file picker, validates the file, then prompts for typed `Y` to replace all local
+data. This does not merge or automatically export the old world. `N` / `BACK`
+cancel; invalid data or transaction failure preserve the old world. Errors appear
+in the transcript. Other tabs reload after replacement; stale connections cannot
+write into the replacement world.
 
 A truly pristine profile receives ten resident identities, two writable boards
 and 30 prewritten posts from [the original fixture](data/pcvan/fictional-community.json)
@@ -254,13 +248,13 @@ in one transaction. The eight threads cover repairs, old PCs, stargazing,
 experiments, gardening, birds and walks. Their dates are fixed once relative to
 world creation, over the preceding roughly two weeks, with a quiet day and recent
 activity; they are not dated as genuine 1996 material. `origin: local-seed:fictional`
-and the `community-world` setting preserve provenance in Settings and JSON backups.
+and the `community-world` setting preserve provenance in `ABOUT` and JSON backups.
 Subsequent model output uses `local-ai:webllm:<modelId>` instead.
 
 Reloads, other tabs and app updates never refill deleted posts. Existing profiles
 receive no unsolicited history. For a pre-feature profile with no posts and safe,
-unambiguous board mappings, Settings offers **この内容で空のコミュニティを準備**
-with a preview and confirmation. It preserves members, custom names and counters,
+unambiguous board mappings, `SETTINGS` → `4` offers `POPULATE`
+with an explanation and typed confirmation. It preserves members, custom names and counters,
 and can succeed only once. Imported worlds, including empty restores, are excluded.
 Restoring an empty backup keeps the world empty; it also suppresses the old DEMO
 fallback. Clearing all browser site data removes the initialization marker, so the
@@ -280,11 +274,10 @@ updates the selected human's read marker without changing the posts. See the
 Data persists across reloads but browser retention is not guaranteed.
 Changing the origin/profile, clearing site data, private browsing, or browser
 eviction may make data unavailable. Keep downloaded backups outside the browser.
-To start over, open **設定 / Options → JSON バックアップ・復元 → 初期状態に戻す**.
-Save **JSON バックアップを保存** first if you want to recover the current world.
-The separate confirmation **すべて削除して初期状態に戻す** irreversibly deletes local
-posts, members, read markers, resident edits, AI activity/consent, display settings
-and history. Cancel, Escape or clicking outside the confirmation leaves them intact.
+To start over, type `RESET`. Save `BACKUP` first if the old world matters.
+The explicit `Y` confirmation irreversibly deletes local posts, members, read
+markers, resident edits, AI activity/consent, display preferences and history.
+`N`, `BACK`, `MAIN` and `CANCEL` preserve them. Escape only reveals output.
 The app recreates the original ten residents and thirty posts in eight threads,
 then reloads this and other open tabs into a fresh MAIN session. Check the restored
 posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.
@@ -297,17 +290,15 @@ for the storage contract used by future SIG/forum controllers.
 
 ## Optional offline use and retention
 
-On an initial online visit to a production build on HTTPS or localhost, expand
-**オフライン保存・容量・バックアップ**, press **端末をオフライン用に保存**
-and wait for **保存済み** before going offline.
-The terminal, fixtures, local reading/posting and JSON backup/restore can then
-reload without a backend or login. This opt-in saves only the small app shell;
-it never downloads model weights. Development mode does not install a worker.
-The panel shows the browser's online/offline signal, approximate site storage
-usage, persistence status/request and a link to JSON backup/restore.
+In a production build on HTTPS/localhost, type `SETTINGS` → `5` → `CACHE` and
+wait for the saved status. The terminal, fixtures, local reading/posting and JSON
+backup/restore can then reload offline. This saves only the app shell, never model
+weights. Development mode does not install a worker. `STATUS` reports approximate
+site usage, browser connectivity and persistence; `PERSIST` requests browser-native
+persistent storage. `BACKUP` remains available from this menu.
 
 AI downloads require explicit setup consent. After consent, enabled resident
-activity can automatically reload the selected model when work is due. **選択モデルの保存を確認** checks the
+activity can automatically reload the selected model when work is due. `CACHE` in the model menu checks the
 selected model's weight manifest and shards without downloading missing weights.
 Cached weights alone do not guarantee offline AI: runtime, tokenizer, config,
 compiled libraries and a supported GPU must also be available. No initial network
@@ -398,8 +389,9 @@ it is resolved.
   to the terminal.
 - `src/forums.ts`: resolves evidence-backed boards to repository posts or original
   demo fixtures, and renders headers without trimming or reflowing post text.
-- `src/composer.ts`: local human selection and the reconstructed edit/review/send
-  dialog. Drafts remain in memory and are excluded from backups and command history.
+- `src/commands.ts`: terminal prompt ownership, handles, settings and confirmations.
+- `src/composer.ts`: line-based composition/edit/review/send with in-memory drafts.
+  Draft lines are excluded from persisted command history.
 - `src/ai/`: ten editable fictional residents, deterministic scheduling, bounded generation and validation,
   optional settings/inspection controls and the lazy WebLLM worker adapter.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
@@ -442,15 +434,12 @@ Section/service checks cover every MAIN and index destination, all five service 
 mailbox browsing, empty collections/rooms, preserved fixture evidence, scoped helpers,
 unsupported input, return paths, offline keyboard use without network requests,
 and unchanged local content after visiting services and returning to forums.
-Immersion checks cover clean ordinary output, hidden settings, About/source discovery,
-modal focus/Escape/IME, missing-member handoff, Japanese cell widths and menu
-alignment with fallback fonts, mobile layout and text scaling.
-Connection checks cover skip/automatic completion, command cancellation, timestamp
-persistence, no network/modem API calls, bounded history with recalled edits, and
-byte-for-byte UTF-8 transcript download.
-Offline checks cover a real service worker under a deployment subpath, offline
-reload/post/backup/restore, missing AI assets, failed installs and updates,
-cache eviction/repair, multi-tab update waiting and IndexedDB retention.
+Command-only browser journeys cover handle handoff, composition/editing, IME,
+confirmation refusal/acceptance, backup/import/reset, cross-tab interruptions,
+model leases, mocked generation, offline reload and absence of secondary UI.
+Renderer tests retain controlled UTF-8 timing/grapheme/queue checks. Repository
+and scheduler suites cover transactional rollback, references, deterministic
+resident plans, budgets and concurrent commits.
 See [the implementation validation record](docs/validation.md) for commands
 actually run and browser checks not performed.
 

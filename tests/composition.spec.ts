@@ -1,276 +1,179 @@
-import { openSettings, closeSettings } from './settings-helpers';
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
-import type { Backup } from '../src/storage/schema';
-import { backupFixture } from './backup-fixture';
+import { command, start, enterForum, post, snapshot, noOtherUi, backup } from './terminal-helpers';
 
-async function send(page: Page, line: string, expected: string) {
-  const start = (await page.locator('.output').textContent())!.length;
-  const input = page.getByRole('textbox', { name: 'コマンド' });
-  await closeSettings(page);
-  await input.fill(line);
-  await input.press('Enter');
-  await expect.poll(async () => {
-    const text = (await page.locator('.output').textContent())!;
-    return text.slice(start);
-  }).toContain(expected);
-}
-
-async function command(page: Page, line: string) {
-  const input = page.getByRole('textbox', { name: 'コマンド' });
-  await closeSettings(page);
-  await input.fill(line);
-  await input.press('Enter');
-}
-
-async function enterForum(page: Page) {
-  await send(page, 'J MITI', 'MITI / 未知の世界');
-  await send(page, '3', 'MITI / フォーラム');
-  await send(page, '9', '投稿一覧');
-}
-
-async function createMember(page: Page, handle: string) {
-  await openSettings(page, 'member');
-  await page.getByLabel('新しいハンドル').fill(handle);
-  await page.getByRole('button', { name: '人間の利用者を作成' }).click();
-  await expect(page.getByLabel('ローカル利用者', { exact: true })).toContainText(handle);
-}
-
-async function snapshot(page: Page) {
-  return page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const opening = indexedDB.open('pcvan-local');
-      opening.onsuccess = () => resolve(opening.result);
-      opening.onerror = () => reject(opening.error);
-    });
-    const stores = ['members', 'sigs', 'forums', 'posts', 'readStates', 'settings'] as const;
-    const tx = db.transaction(stores, 'readonly');
-    const entries = await Promise.all(stores.map(async (store) => [store, await new Promise((resolve, reject) => {
-      const reading = tx.objectStore(store).getAll();
-      reading.onsuccess = () => resolve(reading.result);
-      reading.onerror = () => reject(reading.error);
-    })]));
-    db.close();
-    return Object.fromEntries(entries) as Pick<Backup, typeof stores[number]>;
-  });
-}
-
-async function restore(page: Page, fixture: Backup) {
-  await openSettings(page, 'storage');
-  await page.getByLabel('復元ファイル').setInputFiles({ name: 'local.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
-}
-
-async function fillDraft(page: Page, title: string, body: string) {
-  await page.getByLabel('投稿タイトル', { exact: true }).fill(title);
-  await page.getByLabel('投稿本文', { exact: true }).fill(body);
-}
-
-test('create, review, edit and cancel preserve Japanese text without accidental sends; reload preserves posts and reads', async ({ page }) => {
-  await page.goto('/');
-  await enterForum(page);
-  await command(page, 'WRITE');
-  await expect(page.locator('.member-message')).toContainText('ローカル利用者を作成');
-  await expect(page.getByRole('dialog', { name: '設定 / Options', exact: true })).toBeVisible();
-  await createMember(page, '日本語の人');
+test('first run → handle → seeded read → reply/edit/save → list/read → reload uses only commands', async ({ page }) => {
+  await start(page, 'たか'); await noOtherUi(page);
+  await enterForum(page); await command(page, 'READ 1', '★内容');
   const before = await snapshot(page);
-  await command(page, 'WRITE');
-  const title = '  日本語　ｶﾅ <b>題</b>  ';
-  const body = '  一行目\n\n日本語の複数行　。\n<b>文字</b>\n末尾  \n';
-  await fillDraft(page, title, body);
-  const titleInput = page.getByLabel('投稿タイトル', { exact: true });
-  await titleInput.dispatchEvent('compositionstart');
-  await titleInput.press('Enter');
-  await titleInput.dispatchEvent('compositionend');
-  await titleInput.press('Enter');
-  expect(await snapshot(page)).toEqual(before);
-  await page.getByRole('button', { name: '内容を確認' }).click();
-  expect(await page.locator('.post-preview').textContent()).toBe(`${title}\n\n${body}`);
-  await page.getByRole('button', { name: '編集に戻る' }).click();
-  await expect(titleInput).toHaveValue(title);
-  await expect(page.getByLabel('投稿本文', { exact: true })).toHaveValue(body);
-  await page.getByRole('button', { name: '投稿をキャンセル' }).click();
-  expect(await snapshot(page)).toEqual(before);
-  await command(page, 'WRITE');
-  await fillDraft(page, title, body);
-  await page.getByRole('button', { name: '内容を確認' }).click();
-  await page.getByRole('button', { name: '編集に戻る' }).press('Escape');
-  expect(await snapshot(page)).toEqual(before);
-  await command(page, 'WRITE');
-  await fillDraft(page, title, body);
-  await page.getByRole('button', { name: '内容を確認' }).click();
-  expect(await snapshot(page)).toEqual(before);
-  await page.getByRole('button', { name: 'この内容で投稿する' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
-  const saved = await snapshot(page);
+  expect(before.posts).toHaveLength(30);
+  expect(before.readStates[0]!.lastReadNumber).toBe(1);
+  await command(page, 'REPLY 1', '返信先：#1');
+  await command(page, '昔のパソコン通信', '本文');
+  for (const line of ['  日本語　ｶﾅ <b>文字</b>  ', '', '夜更かししていました。']) await command(page, line, '本文=');
+  await command(page, '.END', '本文：3行');
+  await command(page, 'MAIN', '下書きは保持');
+  await command(page, '', 'Y / N / EDIT');
+  await command(page, 'EDIT', 'LINE 番号');
+  await command(page, 'TITLE 返信を編集', 'タイトルを変更');
+  await command(page, 'LINE 3  変更した本文  ', '本文を変更');
+  await command(page, 'DELETE 99', 'その行はありません');
+  await command(page, 'REVIEW', '投稿しますか');
+  await command(page, 'Y', '発言 #17 を登録しました');
+  await command(page, 'Y', 'この画面では使えない');
+  await command(page, 'LIST', '#17 返信を編集');
+  await command(page, 'READ 17', '返信先：#1');
+  const saved = await snapshot(page), reply = saved.posts.find((p) => p.number === 17)!;
   expect(saved.posts).toHaveLength(31);
-  const human = saved.members.find((m) => m.actor === 'human')!;
-  const written = saved.posts.find((p) => p.origin === 'local-human')!;
-  expect(written).toMatchObject({ number: 17, authorId: human.id, title, body, origin: 'local-human' });
-  expect(new Date(written.createdAt).toISOString()).toBe(written.createdAt);
-  expect(saved.forums.find((f) => f.id === written.forumId)!.nextPostNumber).toBe(18);
-  await send(page, 'LIST', '[未読]');
-  await send(page, 'READ 17', '★内容');
-  expect((await page.locator('.output').textContent())!).toContain(body);
+  expect(reply).toMatchObject({ title: '返信を編集', body: '  日本語　ｶﾅ <b>文字</b>  \n\n 変更した本文  ', origin: 'local-human', replyToPostId: before.posts.find((p) => p.number === 1 && p.forumId === reply.forumId)!.id });
   await expect(page.locator('.output b')).toHaveCount(0);
-  await page.reload();
-  await enterForum(page);
-  await send(page, 'LIST', '[既読]');
-  expect((await snapshot(page)).posts).toEqual(saved.posts);
-  expect((await snapshot(page)).readStates).toEqual([{ memberId: human.id, forumId: written.forumId, lastReadNumber: 17 }]);
+  await page.reload(); await expect(page.locator('.output')).toContainText('番号またはコマンド=');
+  await expect(page.locator('.output')).not.toContainText('ハンドル名を登録しますか');
+  await enterForum(page); await command(page, 'LIST', '#17 返信を編集 RE#1 [既読]');
+  await command(page, 'READ 17', reply.body); await noOtherUi(page);
 });
 
-test('empty fields never send; replies use allocated numbers and navigable references', async ({ page }) => {
-  await page.goto('/');
-  await enterForum(page);
-  await command(page, 'REPLY 1');
-  await expect(page.locator('.member-message')).toContainText('ローカル利用者を作成');
-  const fixture = backupFixture();
-  fixture.sigs[0]!.keyword = 'MITI';
-  fixture.forums[0]!.boardNo = 9;
-  fixture.readStates = [];
-  await restore(page, fixture);
-  const before = await snapshot(page);
-  await send(page, 'REPLY 999', '返信先のローカル投稿がありません');
-  expect(await snapshot(page)).toEqual(before);
-  await command(page, 'WRITE');
-  for (const [title, body] of [['', 'body'], ['title', ''], ['　 ', '\n　 ']]) {
-    await fillDraft(page, title!, body!);
-    await page.getByRole('button', { name: '内容を確認' }).click();
-    await expect(page.locator('.compose-error')).toContainText('タイトルと本文を入力');
-    await expect(page.getByRole('button', { name: 'この内容で投稿する' })).not.toBeVisible();
+test('skipped handle resumes pending WRITE; blank, long, command-shaped body and cancel preserve data', async ({ page }) => {
+  await start(page); await enterForum(page);
+  await command(page, 'REPLY 999', '返信先のローカル投稿がありません');
+  await command(page, 'WRITE', '登録しますか');
+  await command(page, 'nope', 'Y / N / SKIP');
+  await command(page, 'Y', 'ハンドル名=');
+  await command(page, '', '80文字以内');
+  await command(page, '旅人', 'タイトル=');
+  await command(page, '', '200文字以内');
+  await command(page, 'a'.repeat(201), '200文字以内');
+  await command(page, '題名', '本文');
+  await command(page, '.END', '本文は空白だけ');
+  await command(page, ' ', '本文=');
+  await command(page, '.END', '本文は空白だけ');
+  await command(page, 'BACK', '下書きは保持');
+  await command(page, '.TEXT MAIN', '本文=');
+  await command(page, '.TEXT .END', '本文=');
+  await command(page, 'x'.repeat(20001), 'この行は追加していません');
+  await command(page, '.END', '本文：3行');
+  await command(page, 'EDIT', 'APPEND');
+  await command(page, 'DELETE 1', '本文を変更');
+  await command(page, 'APPEND', '本文を1行ずつ');
+  await command(page, '追記', '本文=');
+  await command(page, '.END', '本文：3行');
+  await command(page, 'Y', '発言 #17');
+  expect((await snapshot(page)).posts.find((p) => p.number === 17)!.body).toBe('MAIN\n.END\n追記');
+  for (const stage of ['title', 'body', 'review', 'edit']) {
+    await command(page, 'WRITE', 'タイトル=');
+    if (stage !== 'title') await command(page, '中止する投稿', '本文');
+    if (['review', 'edit'].includes(stage)) { await command(page, '中止', '本文='); await command(page, '.END', '投稿しますか'); }
+    if (stage === 'edit') await command(page, 'EDIT', 'LINE 番号');
+    await command(page, '.CANCEL', '投稿を中止');
   }
-  await page.getByRole('button', { name: '投稿をキャンセル' }).click();
-  expect(await snapshot(page)).toEqual(before);
-  await command(page, 'REPLY 1');
-  await expect(page.getByLabel('投稿タイトル', { exact: true })).toHaveValue('RE#1 こんにちは');
-  await page.getByLabel('投稿本文', { exact: true }).fill('返信本文\n二行目');
-  await page.getByRole('button', { name: '内容を確認' }).click();
-  await page.getByRole('button', { name: 'この内容で投稿する' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
-  const saved = await snapshot(page);
-  expect(saved.posts.find((post) => post.number === 8)).toMatchObject({ replyToPostId: 'first', authorId: 'human', title: 'RE#1 こんにちは', body: '返信本文\n二行目' });
-  expect(saved.forums.find((forum) => forum.id === 'forum')!.nextPostNumber).toBe(9);
-  await send(page, 'READ 8', '返信先 RE#1');
-  await page.getByRole('link', { name: '返信先 RE#1 を読む' }).click();
-  await expect(page.locator('.output')).toContainText('> READ 1');
-  await send(page, 'LIST', '#8 RE#1 こんにちは [既読]');
-  expect((await snapshot(page)).readStates).toEqual([{ memberId: 'human', forumId: 'forum', lastReadNumber: 8 }]);
-  await page.reload();
-  await enterForum(page);
-  await send(page, 'READ 8', '返信先 RE#1');
-  await expect(page.getByRole('link', { name: '返信先 RE#1 を読む' })).toBeVisible();
+  expect((await snapshot(page)).posts).toHaveLength(31);
 });
 
-test('read markers are separate by human member and forum, monotonic and persistent', async ({ page }) => {
-  await page.goto('/');
-  const fixture = backupFixture();
-  fixture.sigs[0]!.keyword = 'DAISIZEN';
-  fixture.readStates = [];
-  await restore(page, fixture);
-  await send(page, '13', 'コミュニケーション');
-  await send(page, '2', '大自然＆動植物');
-  await send(page, 'FORUMS', '7 伝言板／企画室');
-  await send(page, '1', '#4 返事 RE#1 [未読]');
-  await send(page, 'READ 4', '★内容');
-  await send(page, 'READ 1', '★内容');
-  await createMember(page, '別の人');
-  const second = (await snapshot(page)).members.find((member) => member.handle === '別の人')!;
-  await send(page, 'LIST', '#4 返事 RE#1 [未読]');
-  await send(page, 'READ 1', '★内容');
-  await send(page, 'LIST', '#1 こんにちは [既読]');
-  await send(page, 'BACK', '7 伝言板／企画室');
-  await send(page, '2', '#1  [未読]');
-  await send(page, 'READ 1', '★内容');
-  expect((await snapshot(page)).readStates).toEqual(expect.arrayContaining([
-    { memberId: 'human', forumId: 'forum', lastReadNumber: 4 },
-    { memberId: second.id, forumId: 'forum', lastReadNumber: 1 },
-    { memberId: second.id, forumId: 'other', lastReadNumber: 1 },
-  ]));
-  await openSettings(page, 'member');
-  await page.getByLabel('ローカル利用者', { exact: true }).selectOption('human');
-  await expect.poll(async () => (await snapshot(page)).settings.find((setting) => setting.id === 'active-human-member')?.value).toBe('human');
-  await page.reload();
-  await openSettings(page, 'member');
-  await expect(page.getByLabel('ローカル利用者', { exact: true })).toHaveValue('human');
-  await send(page, '13', 'コミュニケーション');
-  await send(page, '2', '大自然＆動植物');
-  await send(page, 'FORUMS', '7 伝言板／企画室');
-  await send(page, '2', '#1  [未読]');
-  await send(page, 'BACK', '7 伝言板／企画室');
-  await send(page, '1', '#4 返事 RE#1 [既読]');
+test('human handle selection retains independent read states and never selects residents', async ({ page }) => {
+  await start(page, '一人目'); await enterForum(page); await command(page, 'READ 2', '★内容');
+  await command(page, 'HANDLE', '1 一人目 [選択中]');
+  await command(page, '2', '番号 / NEW');
+  await command(page, 'NEW', 'ハンドル名='); await command(page, '二人目', '登録しました');
+  await command(page, 'MAIN', 'MAIN'); await enterForum(page); await command(page, 'LIST', '[未読]');
+  await command(page, 'READ   1', '★内容');
+  await command(page, 'HANDLE', '二人目 [選択中]');
+  const humans = (await snapshot(page)).members.filter((m) => m.actor === 'human');
+  await command(page, String(humans.findIndex((m) => m.handle === '一人目') + 1), '一人目 を選択');
+  await command(page, 'RENAME 一人目改', 'ハンドル名を変更しました');
+  await command(page, 'MAIN', 'MAIN'); await enterForum(page); await command(page, 'LIST', '#2');
+  const data = await snapshot(page);
+  expect(data.readStates.map((r) => r.lastReadNumber).sort()).toEqual([1, 2]);
+  expect(data.members.filter((m) => m.actor === 'human')).toHaveLength(2);
 });
 
-test('failed sends roll back board creation and numbering, retain the draft and allow one explicit retry', async ({ page }) => {
-  await page.goto('/');
-  await restore(page, { ...backupFixture(), members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [], session: null });
-  await createMember(page, '人');
-  await enterForum(page);
-  const before = await snapshot(page);
-  await command(page, 'WRITE');
-  await fillDraft(page, '保存失敗の試験', '日本語\n残る本文');
-  await page.getByRole('button', { name: '内容を確認' }).click();
+test('IME confirmation cannot submit title/body/review; storage failure retains a retryable draft without duplicate saves', async ({ page }) => {
+  await start(page, '入力者'); await enterForum(page); await command(page, 'WRITE', 'タイトル=');
+  const input = page.locator('#command');
+  await input.fill('変換中'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+  await expect(input).toHaveValue('変換中');
+  expect((await snapshot(page)).posts).toHaveLength(30);
+  await input.dispatchEvent('compositionend'); await input.press('Enter');
+  await expect(page.locator('.output')).toContainText('本文を1行ずつ');
+  await command(page, '日本語', '本文='); await command(page, '.END', '投稿しますか');
+  await input.fill('Y'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+  await expect(input).toHaveValue('Y'); await input.dispatchEvent('compositionend');
   await page.evaluate(() => {
-    const nativePut = IDBObjectStore.prototype.put;
+    const native = IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put = function (value, key) {
-      if (this.name === 'forums') throw new DOMException('Simulated quota', 'QuotaExceededError');
-      return key === undefined ? nativePut.call(this, value) : nativePut.call(this, value, key);
+      if (this.name === 'forums') throw new DOMException('test quota', 'QuotaExceededError');
+      return key === undefined ? native.call(this, value) : native.call(this, value, key);
     };
-    Object.assign(window, { restorePut: () => { IDBObjectStore.prototype.put = nativePut; } });
+    Object.assign(window, { restorePut: () => { IDBObjectStore.prototype.put = native; } });
   });
-  await page.getByRole('button', { name: 'この内容で投稿する' }).click();
-  await expect(page.locator('.compose-error')).toContainText('入力は残っています');
-  expect(await snapshot(page)).toEqual(before);
-  await page.getByRole('button', { name: '編集に戻る' }).click();
-  await expect(page.getByLabel('投稿本文', { exact: true })).toHaveValue('日本語\n残る本文');
+  await command(page, 'Y', '入力は残っています');
+  expect((await snapshot(page)).posts).toHaveLength(30);
   await page.evaluate(() => (window as unknown as { restorePut(): void }).restorePut());
-  await page.getByRole('button', { name: '内容を確認' }).click();
-  await page.getByRole('button', { name: 'この内容で投稿する' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
-  expect((await snapshot(page)).posts.map((post) => post.number)).toEqual([1]);
+  await command(page, 'Y', '発言 #17'); await command(page, 'LIST', '#17 変換中');
+  expect((await snapshot(page)).posts).toHaveLength(31);
 });
 
-test('a reply target removed during composition cannot be sent; a failed read marker does not display the post', async ({ page }) => {
-  await page.goto('/');
-  const fixture = backupFixture();
-  fixture.sigs[0]!.keyword = 'MITI';
-  fixture.forums[0]!.boardNo = 9;
-  fixture.readStates = [];
-  await restore(page, fixture);
-  await enterForum(page);
-  await command(page, 'REPLY 4');
-  await page.getByLabel('投稿本文', { exact: true }).fill('削除された投稿への返信');
-  await page.getByRole('button', { name: '内容を確認' }).click();
+test('deleted reply parent fails safely and a failed read marker never reveals stale post content', async ({ page }) => {
+  await start(page, '読む人'); await enterForum(page); await command(page, 'REPLY 1', 'タイトル=');
+  await command(page, '返信', '本文'); await command(page, '保持する本文', '本文='); await command(page, '.END', '投稿しますか');
+  // Repository API enforces parent relationships, including external deletion.
   await page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve) => {
-      const opening = indexedDB.open('pcvan-local');
-      opening.onsuccess = () => resolve(opening.result);
-    });
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction('posts', 'readwrite');
-      tx.objectStore('posts').delete('reply');
-      tx.oncomplete = () => resolve();
-      tx.onabort = () => reject(tx.error);
-    });
-    db.close();
+    const db = await new Promise<IDBDatabase>((resolve) => { const req = indexedDB.open('pcvan-local'); req.onsuccess = () => resolve(req.result); });
+    await new Promise<void>((resolve) => { const tx = db.transaction('posts', 'readwrite'); const store = tx.objectStore('posts');
+      const req = store.getAll(); req.onsuccess = () => { const row = req.result.find((p) => p.forumId === 'resident-forum:MITI:9' && p.number === 1); store.delete(row.id); }; tx.oncomplete = () => resolve(); }); db.close();
   });
-  const before = await snapshot(page);
-  await page.getByRole('button', { name: 'この内容で投稿する' }).click();
-  await expect(page.locator('.compose-error')).toContainText('入力は残っています');
-  expect(await snapshot(page)).toEqual(before);
-  await page.getByRole('button', { name: '投稿をキャンセル' }).click();
+  await command(page, 'Y', '入力は残っています'); await command(page, 'CANCEL', '投稿を中止');
   await page.evaluate(() => {
-    const nativePut = IDBObjectStore.prototype.put;
-    IDBObjectStore.prototype.put = function (value, key) {
-      if (this.name === 'readStates') throw new DOMException('Simulated quota', 'QuotaExceededError');
-      return key === undefined ? nativePut.call(this, value) : nativePut.call(this, value, key);
-    };
+    const native = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, key) { if (this.name === 'readStates') throw new DOMException('test', 'QuotaExceededError'); return key === undefined ? native.call(this, value) : native.call(this, value, key); };
   });
-  await send(page, 'READ 1', '既読の保存に失敗しました');
-  expect((await snapshot(page)).readStates).toEqual([]);
-  const text = (await page.locator('.output').textContent())!;
-  expect(text.slice(text.lastIndexOf('> READ 1'))).not.toContain('★内容');
-  await send(page, 'BACK', 'MITI / フォーラム');
+  const response = await command(page, 'READ 2', '既読の保存に失敗');
+  expect(response).not.toContain('★内容');
+  await command(page, 'MAIN', 'MAIN');
+});
+
+test('composer state machine isolates navigation, non-destructive edit validation and consumed sends', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async () => {
+    const path = '/src/composer.ts'; const { TerminalComposer } = await import(path);
+    const outputs: string[] = [], saves: unknown[] = [];
+    const composer = new TerminalComposer({ keyword: 'MITI', boardNo: 9, name: '資料室' }, 'human', undefined, {
+      print: (...lines: string[]) => outputs.push(...lines),
+      save: async (_target: unknown, draft: unknown) => { saves.push(draft); return { number: 1 }; },
+    });
+    for (const line of ['題名', '一行目', '', '.END', 'MAIN', 'EDIT', 'DELETE 1', 'REVIEW', 'APPEND', '二行目', '.END', 'Y', 'Y']) await composer.submit(line);
+    return { outputs, saves, active: composer.active };
+  });
+  expect(result.saves).toEqual([{ authorId: 'human', title: '題名', body: '\n二行目' }]);
+  expect(result.active).toBe(false);
+  expect(result.outputs.join('\n')).toContain('本文が空白だけです');
+  expect(result.outputs.join('\n')).toContain('下書きは保持');
+});
+
+test('rapid queued lines preserve prompt order, exact text and a single transactional send', async ({ page }) => {
+  await start(page, '連続入力'); await enterForum(page);
+  await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('#command')!, form = input.form!;
+    for (const line of ['WRITE', '連続入力の題', '  最初  ', '', '最後', '.END', 'Y', 'Y', 'LIST']) {
+      input.value = line; form.requestSubmit();
+    }
+  });
+  await expect(page.locator('.output')).toContainText('#17 連続入力の題');
+  const data = await backup(page);
+  expect(data.posts).toHaveLength(31);
+  expect(data.posts.find((p) => p.number === 17)!.body).toBe('  最初  \n\n最後');
+  expect(data.session!.commandHistory).toContain('WRITE');
+  expect(data.session!.commandHistory).not.toContain('  最初  ');
+});
+
+test('first send creates an absent board in an existing SIG; cancelling never creates it', async ({ page }) => {
+  await start(page, '新しい掲示板');
+  for (const [line, response] of [['13', 'コミュニケーション'], ['2', '大自然'], ['FORUMS', 'フォーラム'], ['2', '投稿一覧']]) await command(page, line!, response!);
+  const before = await snapshot(page);
+  await command(page, 'WRITE', 'タイトル='); await command(page, 'CANCEL', '投稿を中止');
+  expect((await snapshot(page)).forums).toEqual(before.forums);
+  await post(page, '新しい話題', '空の掲示板に初投稿');
+  const saved = await snapshot(page);
+  expect(saved.forums).toHaveLength(before.forums.length + 1);
+  const created = saved.posts.find((p) => p.title === '新しい話題')!;
+  expect(created.number).toBe(1); expect(saved.forums.find((f) => f.id === created.forumId)!.boardNo).toBe(2);
+  await command(page, 'READ 1', '空の掲示板に初投稿');
 });

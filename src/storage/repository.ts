@@ -86,6 +86,7 @@ export function openRepository(name = DATABASE_NAME): Promise<LocalRepository> {
 }
 
 export class LocalRepository {
+  readonly notificationSource = createRecordId();
   constructor(private readonly db: IDBDatabase, private generation: string | null = null) {}
 
   close(): void { this.db.close(); }
@@ -94,7 +95,7 @@ export class LocalRepository {
     if (typeof BroadcastChannel === 'undefined') return;
     try {
       const channel = new BroadcastChannel(`pcvan-ai-setup:${this.db.name}`);
-      channel.postMessage(replaced === 'reset' ? 'reset' : replaced ? 'replace' : 'settings');
+      channel.postMessage({ kind: replaced === 'reset' ? 'reset' : replaced ? 'replace' : 'settings', source: this.notificationSource });
       channel.close();
     } catch { /* Optional notifications must not turn a committed write into a failure. */ }
   }
@@ -118,7 +119,7 @@ export class LocalRepository {
       void done.catch(() => {});
       try {
         const current = (await request(tx.objectStore('session').get('world-generation'))) ?? null;
-        if (current !== expected) throw new RepositoryError('stale', '初期状態に戻されたため、このタブを再読み込みしてください。');
+        if (current !== expected) throw new RepositoryError('stale', '世界が置き換えられたため、このタブを再読み込みしてください。');
         const result = await action(tx);
         await done;
         return result;
@@ -451,7 +452,7 @@ export class LocalRepository {
     }).then((state) => { this.notifySetupChanged(); return state; });
   }
 
-  /** The explicit model-download button is the consent boundary, separate from activity ON. */
+  /** The explicit typed model-download confirmation is the consent boundary, separate from activity ON. */
   authorizeModel(modelId: string, now = new Date().toISOString(), expected?: string): Promise<AiActivity> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
@@ -582,6 +583,7 @@ export class LocalRepository {
     let backup: unknown;
     try { backup = JSON.parse(text); } catch { invalid('Backup is not valid JSON.'); }
     validateBackup(backup);
+    const generation = createRecordId();
     // No writes until the entire document passes validation. Clear + insert is one
     // transaction, so any constraint, quota, or write error restores the old world.
     await this.transaction(allStores, 'readwrite', async (tx) => {
@@ -597,8 +599,9 @@ export class LocalRepository {
       }
       if (backup.session !== null) await request(tx.objectStore('session').put(backup.session, 'current'));
       await request(tx.objectStore('session').put(true, 'imported'));
-      if (this.generation !== null) await request(tx.objectStore('session').put(this.generation, 'world-generation'));
+      await request(tx.objectStore('session').put(generation, 'world-generation'));
     });
+    this.generation = generation;
     this.notifySetupChanged(true);
   }
 }

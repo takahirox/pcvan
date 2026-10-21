@@ -1,159 +1,75 @@
-import { openSettings, closeSettings } from './settings-helpers';
-import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { command, start, enterForum, post, backup, importFile, restore, snapshot, noOtherUi } from './terminal-helpers';
 import { backupFixture } from './backup-fixture';
 
-async function downloadBackup(page: Page) {
-  const downloading = page.waitForEvent('download');
-  await openSettings(page, 'storage');
-  await page.getByRole('button', { name: 'JSON バックアップを保存' }).click();
-  const download = await downloading;
-  expect(download.suggestedFilename()).toMatch(/^pcvan-backup-.*\.json$/);
-  return JSON.parse(await readFile((await download.path())!, 'utf8'));
-}
-
-test('visible backup downloads all local data, and command history survives reload', async ({ page }) => {
-  await page.goto('/');
-  await openSettings(page, 'storage');
-  await expect(page.getByText('容量制限やブラウザーの操作で消えることがあります。', { exact: false })).toBeVisible();
-  const input = page.getByRole('textbox', { name: 'コマンド' });
-  await closeSettings(page);
-  await input.fill('echo  保存する ｶﾅ');
-  await input.press('Enter');
-  const backup = await downloadBackup(page);
-  expect(backup).toMatchObject({ format: 'pcvan-local', version: 1, readStates: [] });
-  expect(backup.posts).toHaveLength(30);
-  expect(backup.forums).toHaveLength(2);
-  expect(backup.members).toHaveLength(10);
-  expect(backup.settings.find((r: { id: string }) => r.id === 'ai-activity').value).toMatchObject({ version: 2, maxPosts: 4, consent: false });
-  expect(backup.session.commandHistory).toEqual(['echo  保存する ｶﾅ']);
-  expect(backup.session.lastLoginAt).toBeTruthy();
-  expect(backup.session.lastLogoutAt).toBeNull();
-  await page.reload();
-  // Export is queued after startup, so the restored in-memory history is ready.
-  expect((await downloadBackup(page)).session.commandHistory).toEqual(backup.session.commandHistory);
-  await closeSettings(page);
-  await input.focus();
-  await input.press('ArrowUp');
-  await expect(input).toHaveValue('echo  保存する ｶﾅ');
+test('typed backup/import preserves real Japanese multiline posts, identities, read markers and preferences', async ({ page }) => {
+  await start(page, '保存する人'); await enterForum(page); await post(page, '保存', '  一行目  \n\n二行目');
+  await command(page, 'READ 17', '★内容');
+  const original = await backup(page);
+  expect(original.posts).toHaveLength(31); expect(original.readStates[0]!.lastReadNumber).toBe(17);
+  await importFile(page, backupFixture());
+  await command(page, '', 'Y / N'); await command(page, 'BACK', '操作を中止');
+  expect((await snapshot(page)).posts).toEqual(original.posts);
+  await restore(page, backupFixture()); expect((await snapshot(page)).posts).toEqual(backupFixture().posts);
+  await restore(page, original);
+  const recovered = await backup(page);
+  for (const key of ['members', 'posts', 'readStates', 'settings'] as const) expect(recovered[key]).toEqual(original[key]);
+  await noOtherUi(page);
 });
 
-test('restore requires confirmation; confirmed replace preserves every field and refreshes history', async ({ page }) => {
-  await page.goto('/');
-  const before = await downloadBackup(page);
-  const fixture = backupFixture();
-  await openSettings(page, 'storage');
-  await page.getByLabel('復元ファイル').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
-  page.once('dialog', (dialog) => dialog.dismiss());
-  await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  expect(await downloadBackup(page)).toEqual(before);
-  page.once('dialog', (dialog) => {
-    expect(dialog.message()).toContain('全データ');
-    return dialog.accept();
-  });
-  await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
-  expect(await downloadBackup(page)).toEqual(fixture);
-  const input = page.getByRole('textbox', { name: 'コマンド' });
-  await closeSettings(page);
-  await input.focus();
-  await input.press('ArrowUp');
-  await expect(input).toHaveValue('echo  日本語');
-  await page.reload();
-  const reloaded = await downloadBackup(page);
-  expect(reloaded.posts).toEqual(fixture.posts);
-  expect(reloaded.settings).toEqual(expect.arrayContaining(fixture.settings));
-  expect(reloaded.members).toEqual(expect.arrayContaining(fixture.members));
-});
-
-test('reload bounds a restored history and keeps recalled edits separate from persisted commands', async ({ page }) => {
-  await page.goto('/');
-  const fixture = backupFixture();
-  fixture.session!.commandHistory = Array.from({ length: 105 }, (_, i) => `履歴 ${i}`);
-  await openSettings(page, 'storage');
-  await page.getByLabel('復元ファイル').setInputFiles({
-    name: 'history.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)),
-  });
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
-  await page.reload();
-  const saved = (await downloadBackup(page)).session.commandHistory;
-  expect(saved).toEqual(fixture.session!.commandHistory.slice(-100));
-  const input = page.getByRole('textbox', { name: 'コマンド' });
-  await closeSettings(page);
-  await input.fill('未送信の下書き');
-  await input.press('ArrowUp');
-  await expect(input).toHaveValue('履歴 104');
-  await closeSettings(page);
-  await input.fill('編集中の履歴');
-  await input.press('ArrowUp');
-  await expect(input).toHaveValue('履歴 103');
-  await input.press('ArrowDown');
-  await expect(input).toHaveValue('編集中の履歴');
-  await input.press('ArrowDown');
-  await expect(input).toHaveValue('未送信の下書き');
-  // Exercise the actual keyboard handler beyond the oldest retained command.
-  await input.evaluate((element) => {
-    for (let i = 0; i < 110; i++) element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
-  });
-  await expect(input).toHaveValue('履歴 5');
-  expect((await downloadBackup(page)).session.commandHistory).toEqual(saved);
-});
-
-test('invalid restore displays an error and does not change existing data', async ({ page }) => {
-  await page.goto('/');
-  const before = await downloadBackup(page);
-  let dialogs = 0;
-  page.on('dialog', async (dialog) => { dialogs++; await dialog.dismiss(); });
-  await openSettings(page, 'storage');
-  await page.getByLabel('復元ファイル').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{"format":"pcvan-local","version":999}') });
-  await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
-  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('ローカル保存エラー');
-  expect(dialogs).toBe(0);
-  expect(await downloadBackup(page)).toEqual(before);
-});
-
-test('simulated quota errors are visible while backup and the terminal remain usable', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => {
-    const nativePut = IDBObjectStore.prototype.put;
-    IDBObjectStore.prototype.put = function (value, key) {
-      if (this.name === 'session') throw new DOMException('Simulated quota', 'QuotaExceededError');
-      return key === undefined ? nativePut.call(this, value) : nativePut.call(this, value, key);
+test('malformed JSON, cancelled native picker, and replacement quota failure leave the old world intact', async ({ page }) => {
+  await start(page, '保管者'); const before = await backup(page);
+  const choosing = page.waitForEvent('filechooser'); await command(page, 'IMPORT');
+  await (await choosing).setFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{bad') });
+  await expect(page.locator('.output')).toContainText('復元できません');
+  expect((await snapshot(page)).posts).toEqual(before.posts);
+  const chooseCancel = page.waitForEvent('filechooser'); await command(page, 'IMPORT');
+  await (await chooseCancel).setFiles([]);
+  await expect(page.locator('.output')).toContainText('ファイル選択を中止');
+  await importFile(page, backupFixture());
+  await page.evaluate(() => {
+    const native = IDBObjectStore.prototype.add;
+    IDBObjectStore.prototype.add = function (value, key) {
+      if (this.name === 'posts') throw new DOMException('test quota', 'QuotaExceededError');
+      return key === undefined ? native.call(this, value) : native.call(this, value, key);
     };
   });
-  await page.goto('/');
-  await expect(page.locator('.settings-notice')).toContainText('保存の状態');
-  await openSettings(page, 'storage');
-  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('保存容量が足りません。');
-  const input = page.getByRole('textbox', { name: 'コマンド' });
-  await closeSettings(page);
-  await input.fill('echo still usable');
-  await input.press('Enter');
-  await expect(page.locator('.output')).toContainText('still usable');
-  await openSettings(page, 'storage');
-  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('保存容量が足りません。');
-  expect((await downloadBackup(page)).session).toBeNull();
-  expect(errors).toEqual([]);
+  await command(page, 'Y', '保存容量が足りません');
+  expect((await snapshot(page)).posts).toEqual(before.posts);
 });
 
-test('unavailable IndexedDB is reported without claiming to save data or breaking the shell', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => Object.defineProperty(window, 'indexedDB', { value: undefined }));
-  await page.goto('/');
-  await expect(page.locator('.settings-notice')).toContainText('保存の状態');
-  await openSettings(page, 'storage');
-  await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('IndexedDB is unavailable');
-  await openSettings(page, 'storage');
-  await expect(page.getByRole('button', { name: 'JSON バックアップを保存' })).toBeDisabled();
-  const input = page.getByRole('textbox', { name: 'コマンド' });
-  await closeSettings(page);
-  await input.fill('echo usable');
-  await input.press('Enter');
-  await expect(page.locator('.output')).toContainText('usable');
-  expect(errors).toEqual([]);
+test('a world changed while a native file picker is pending cannot consume old approval', async ({ page, context }) => {
+  await start(page, '先の人'); const data = await backup(page);
+  const picker = page.waitForEvent('filechooser'); await command(page, 'IMPORT');
+  await command(page, 'Y', 'ファイル選択が完了していません');
+  await command(page, 'N', '操作を中止');
+  await (await picker).setFiles({ name: 'late.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
+  await command(page, 'Y', 'この画面では使えない');
+  expect((await snapshot(page)).posts).toHaveLength(30);
+  const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
+  await importFile(page, data);
+  await enterForum(other); await post(other, '別タブの投稿', '保持する');
+  await command(page, 'Y', '世界や設定が変わりました');
+  expect((await snapshot(page)).posts).toHaveLength(31);
+});
+
+test('legacy empty world offers real populate confirmation and only adds the fixture after Y', async ({ page }) => {
+  await start(page); const fixture = backupFixture(); fixture.posts = []; fixture.readStates = [];
+  fixture.forums.forEach((f) => { f.nextPostNumber = 1; });
+  await restore(page, fixture);
+  // Simulate an actual pre-community empty world, rather than an imported one.
+  await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve) => { const req = indexedDB.open('pcvan-local'); req.onsuccess = () => resolve(req.result); });
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(['settings', 'session'], 'readwrite');
+      tx.objectStore('session').delete('imported');
+      tx.objectStore('settings').put({ id: 'community-world', value: { version: 1, createdAt: new Date().toISOString(), status: 'legacy' } });
+      tx.oncomplete = () => resolve();
+    }); db.close();
+  });
+  await command(page, 'SETTINGS', '設定 / SETTINGS'); await command(page, '4', 'POPULATE');
+  await command(page, 'POPULATE', '30件'); await command(page, 'N', '操作を中止');
+  expect((await snapshot(page)).posts).toHaveLength(0);
+  await command(page, 'POPULATE', '30件'); await command(page, 'Y', '初期会話を準備');
+  expect((await snapshot(page)).posts).toHaveLength(30);
 });

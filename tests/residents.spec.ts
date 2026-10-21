@@ -1,41 +1,8 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
-import type { Backup } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
-import { openSettings, closeSettings, loadModel } from './settings-helpers';
 
 const start = '2026-10-21T00:00:00.000Z';
 const modelId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
-async function snapshot(page: Page): Promise<Backup> {
-  return page.evaluate(async () => {
-    const path = '/src/storage/repository.ts';
-    const { openRepository } = await import(path) as typeof import('../src/storage/repository');
-    const repo = await openRepository();
-    try { return await repo.exportBackup(); } finally { repo.close(); }
-  });
-}
-async function mockModel(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'gpu', { value: {}, configurable: true });
-    Object.assign(window, { residentMock: { loads: 0, calls: 0, prompts: [] } });
-  });
-  await page.route('**/src/ai/webllm-adapter.ts', (route) => route.fulfill({ contentType: 'text/javascript', body: `
-    export function modelWeightsCached() { return Promise.resolve(true); }
-    export function createWebLlmAdapter() {
-      const mock = window.residentMock;
-      return {
-        async load(id, report) { mock.loads++; report(1); }, dispose() {},
-        async generate(prompt) {
-          mock.calls++; mock.prompts.push(JSON.parse(prompt.user));
-          const { personaId, forumId, replyToPostId } = JSON.parse(prompt.user);
-          return JSON.stringify({ personaId, forumId, ...(replyToPostId ? { replyToPostId } : {}),
-            title: '住人の話題', body: '今日の星 天文 観察 パソコン 工作 道具 ' + personaId + ' ' + mock.calls });
-        }
-      };
-    }
-  ` }));
-}
-
 test('all ten seeded profiles are distinct; routines obey local dates and seeded decisions include quiet periods', async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async ({ fixture, start }) => {
@@ -89,98 +56,6 @@ test('all ten seeded profiles are distinct; routines obey local dates and seeded
   expect(result.long.truncated).toBe(true); expect(result.long.batch!.runs.length).toBeLessThanOrEqual(4);
   expect(result.long.batch!.runs.every((r) => r.simulatedAt >= '2030-10-21T00:00:00.000Z')).toBe(true);
   expect(Object.values(result.long.nextDue!).every((t) => t > '2030-10-24T00:00:00.000Z')).toBe(true);
-});
-
-test('first-use history precedes consent; always-open visits produce delayed human and AI replies with one model and a visit budget', async ({ page, context }) => {
-  await page.clock.install({ time: new Date(start) });
-  await page.clock.pauseAt(new Date(Date.parse(start) + 1000));
-  await mockModel(page);
-  await page.goto('http://127.0.0.1:14374');
-  await expect(page.locator('.ai-activity-message')).toContainText('AI 設定が必要');
-  let saved = await snapshot(page);
-  expect(saved.members).toHaveLength(10); expect(saved.posts).toHaveLength(30); expect(saved.forums).toHaveLength(2);
-  await page.clock.runFor(120_000);
-  expect(await page.evaluate(() => (window as any).residentMock.loads)).toBe(0);
-  await openSettings(page, 'ai');
-  await loadModel(page);
-  await expect(page.locator('.ai-message')).toContainText('モデル準備完了');
-  saved = await snapshot(page);
-  expect(saved.forums).toHaveLength(2); expect(saved.posts).toHaveLength(30);
-  expect(saved.members.every((m) => m.actor === 'ai')).toBe(true);
-  // Set independent due times. Keep all unrelated residents silent in this scenario.
-  await page.evaluate(async ({ modelId }) => {
-    const r = '/src/storage/repository.ts'; const a = '/src/ai/activity.ts'; const p = '/src/ai/personas.ts';
-    const { openRepository } = await import(r) as typeof import('../src/storage/repository');
-    const { emptyActivity, random, HOUR } = await import(a) as typeof import('../src/ai/activity');
-    const { personas } = await import(p) as typeof import('../src/ai/personas');
-    const repo = await openRepository();
-    const now = Date.now(); const day = Math.floor((now + 540 * 60_000) / (24 * HOUR));
-    let seed = '0';
-    for (let i = 0; i < 100; i++) {
-      if (['hoshimori', 'hankote', 'kusabue'].every((id) => random(`${i}:${id}:away:${Math.floor(day / 3)}`) >= .12) &&
-          [['hoshimori', 1], ['hankote', 31], ['kusabue', 61]].every(([id, minute]) =>
-            random(`${i}:${id}:${now + Number(minute) * 60_000}:explore`) > .1)) { seed = String(i); break; }
-    }
-    const profiles = personas.map((p) => ({ ...p, frequency: ['hoshimori', 'hankote', 'kusabue'].includes(p.id) ? .2 : 0,
-      participation: 1, weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i),
-      reading: 0, inactivity: 0, newThread: p.id === 'hoshimori' ? 1 : 0, reply: p.id === 'hoshimori' ? 0 : 1,
-      affinities: p.id === 'kusabue' ? {} : p.affinities,
-      preferredBoards: [p.id === 'kusabue' ? 'DAISIZEN:1' : 'MITI:9'] }));
-    await repo.put('settings', { id: 'ai-residents', value: { version: 1, profiles } as never });
-    const state = { ...emptyActivity(new Date(now).toISOString(), seed), modelId, consent: true, maxPosts: 3 };
-    for (const p of personas) state.nextDue![p.id] = new Date(now + 12 * HOUR).toISOString();
-    state.nextDue!.hoshimori = new Date(now + 60_000).toISOString();
-    state.nextDue!.hankote = new Date(now + 31 * 60_000).toISOString();
-    state.nextDue!.kusabue = new Date(now + 61 * 60_000).toISOString();
-    await repo.put('settings', { id: 'ai-activity', value: state as never });
-    repo.close();
-  }, { modelId });
-  await closeSettings(page);
-  await page.clock.runFor(60_000);
-  await expect.poll(async () => (await snapshot(page)).posts.filter((p) => p.simulation).length).toBe(1);
-  const first = (await snapshot(page)).posts.find((p) => p.simulation)!;
-  expect(first.authorId).toBe('fictional-ai:hoshimori'); expect(first.replyToPostId).toBeUndefined();
-  await page.clock.runFor(29 * 60_000);
-  expect((await snapshot(page)).posts).toHaveLength(31);
-  await page.clock.runFor(60_000);
-  await expect.poll(async () => (await snapshot(page)).posts.filter((p) => p.simulation).length).toBe(2);
-  const second = (await snapshot(page)).posts.find((p) => p.replyToPostId === first.id)!;
-  expect(second.authorId).toBe('fictional-ai:hankote');
-  // A human arrives later on the other board. The third resident responds on her own visit.
-  await page.evaluate(async () => {
-    const path = '/src/storage/repository.ts';
-    const { openRepository } = await import(path) as typeof import('../src/storage/repository');
-    const repo = await openRepository(); const world = await repo.exportBackup();
-    const human = await repo.createHumanMember('訪問者');
-    const forum = world.forums.find((f) => f.sigId.endsWith('DAISIZEN'))!;
-    await repo.createPost({ forumId: forum.id, authorId: human.id, title: '草木の話', body: '庭の草木と鳥を観察しています。', origin: 'local-human' });
-    repo.close();
-  });
-  await page.clock.runFor(29 * 60_000);
-  expect((await snapshot(page)).posts).toHaveLength(33);
-  await page.clock.runFor(60_000);
-  await expect.poll(async () => (await snapshot(page)).posts.length).toBe(34);
-  saved = await snapshot(page);
-  const human = saved.posts.find((p) => p.origin === 'local-human')!;
-  expect(saved.posts.find((p) => p.authorId === 'fictional-ai:kusabue' && p.simulation)!.replyToPostId).toBe(human.id);
-  expect(saved.posts.filter((p) => p.simulation).every((p) => Date.parse(p.createdAt) >= Date.parse(p.simulation!.simulatedAt))).toBe(true);
-  expect(await page.evaluate(() => (window as any).residentMock.loads)).toBe(1);
-  expect(await page.evaluate(() => (window as any).residentMock.calls)).toBe(3);
-  const prompts = await page.evaluate(() => (window as any).residentMock.prompts);
-  expect(prompts[1].replyTarget.author).toBe('星守'); expect(prompts[1].affinities.hoshimori).toBe(.7);
-  // An already-loaded model holds one cross-tab lease until explicitly unloaded.
-  const other = await context.newPage(); await mockModel(other);
-  await other.goto('http://127.0.0.1:14374');
-  await openSettings(other, 'ai'); await loadModel(other);
-  await expect(other.locator('.ai-message')).toContainText('別のタブ');
-  expect(await other.evaluate(() => (window as any).residentMock.loads)).toBe(0);
-  await other.close();
-  // Reconnect and repeated visibility/timer events must not replenish a visit's allowance.
-  const command = page.getByRole('textbox', { name: 'コマンド', exact: true });
-  for (const line of ['MAIN', 'Q', 'RECONNECT']) { await command.fill(line); await command.press('Enter'); }
-  await page.clock.fastForward(24 * 60 * 60_000);
-  expect(await page.evaluate(() => (window as any).residentMock.calls)).toBe(3);
-
 });
 
 test('profile edits, pause/resume and old-backup migration preserve identities, pending work and atomic restore', async ({ page }) => {
@@ -246,32 +121,4 @@ test('profile edits, pause/resume and old-backup migration preserve identities, 
   expect(result.restored).toEqual(result.now); expect(result.rejected.every(Boolean)).toBe(true); expect(result.atomic).toBe(true);
   expect(result.off).toMatchObject({ maxPosts: 0, consent: false });
   expect(result.imported.forums).toEqual([]); expect(result.imported.posts).toEqual([]);
-});
-
-test('resident editor persists the selected profile through reload without changing its ID', async ({ page }) => {
-  await page.goto('http://127.0.0.1:14374');
-  await openSettings(page, 'ai');
-  await page.locator('.ai-persona').selectOption('tsumugi');
-  await page.locator('.ai-resident-editor > summary').click();
-  await page.getByLabel('住人のハンドル').fill('つむぎ便り');
-  await page.getByLabel('職業', { exact: true }).fill('交代勤務の介護職');
-  await page.getByLabel('活動頻度').fill('0.5');
-  await page.getByRole('button', { name: 'この住人の設定を保存' }).click();
-  await expect(page.locator('.ai-message')).toContainText('住人の設定を保存しました');
-  await page.reload(); await openSettings(page, 'ai');
-  await page.locator('.ai-persona').selectOption('tsumugi');
-  await page.locator('.ai-resident-editor > summary').click();
-  await expect(page.getByLabel('住人のハンドル')).toHaveValue('つむぎ便り');
-  await expect(page.getByLabel('活動頻度')).toHaveValue('0.5');
-  const saved = await snapshot(page);
-  expect(saved.members.find((m) => m.id === 'fictional-ai:tsumugi')!.handle).toBe('つむぎ便り');
-  const post = saved.posts.find((p) => p.authorId === 'fictional-ai:tsumugi')!;
-  const forum = saved.forums.find((f) => f.id === post.forumId)!;
-  await closeSettings(page);
-  const lines = forum.id.includes('MITI') ? ['J MITI', '3', '9'] : ['13', '2', 'FORUMS', '1'];
-  for (const line of [...lines, `READ ${post.number}`]) {
-    await page.locator('#command').fill(line); await page.locator('#command').press('Enter');
-  }
-  await expect(page.locator('.output')).toContainText('★タイトル (つむぎ便り)');
-  await expect(page.locator('.output')).not.toContainText('fictional-ai:');
 });

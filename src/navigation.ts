@@ -39,7 +39,7 @@ function renderMain(): string[] {
     ...rows,
     ...mainMenu.entries.filter((entry) => !/^\d+$/.test(entry.selector)).map(entryText),
     `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
-    'HELP: メニューを表示',
+    'HELP: メニューを表示 / SETTINGS: 設定 / HANDLE: 利用者 / ABOUT: 来歴 / LOG: ログ保存',
     mainMenu.prompt.text,
   ];
 }
@@ -95,7 +95,7 @@ export class PcvanController implements TerminalController {
     }
     switch (this.currentScreen) {
       case 'main': {
-        if (command === 'HELP') return renderMain();
+        if (['HELP', 'MAIN', 'BACK'].includes(command)) return renderMain();
         if (command === miti.steps[0]!.input) return this.enter('miti');
         const entry = mainMenu.entries.find((item) => item.selector === command);
         if (entry?.selector === 'Q') return [entryText(entry), ...this.enter('disconnected')];
@@ -167,7 +167,7 @@ export class PcvanController implements TerminalController {
       const parent = post && replyReference(post, data.posts);
       return post ? [
         ...renderPost(post, forumName(keyword, boardNo), undefined, this.content.members),
-        ...(parent ? [`返信先 RE#${parent.number} → READ ${parent.number}`] : []),
+        ...(parent ? [`返信先：#${parent.number}`] : []),
         this.forumHelp, returnHelp,
         demoPrompt,
       ] : ['その番号の投稿はありません。画面は変わりません。', this.forumHelp, returnHelp, demoPrompt];

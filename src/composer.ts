@@ -1,157 +1,89 @@
-import type { Backup, Post } from './storage/schema';
+import type { Post } from './storage/schema';
 import type { ForumDestination } from './storage/repository';
-import { activeHuman } from './forums';
 
-interface ComposeDraft { authorId: string; title: string; body: string; replyToPostId?: string }
-interface ComposerActions {
-  configureMember(): void;
-  beforeCompose(): void;
-  createMember(handle: string): Promise<void>;
-  selectMember(id: string): Promise<void>;
-  save(destination: ForumDestination, draft: ComposeDraft): Promise<void>;
+export interface ComposeDraft { authorId: string; title: string; body: string; replyToPostId?: string }
+export interface ComposerActions {
+  print(...lines: string[]): void;
+  save(destination: ForumDestination, draft: ComposeDraft): Promise<Post>;
 }
 
-/** All prompts and controls are original reconstruction, never a transcript. */
-export function mountComposer(root: HTMLElement, actions: ComposerActions) {
-  const section = document.createElement('section');
-  section.className = 'member-controls';
-  section.setAttribute('aria-label', 'フォーラムの利用者設定');
-  section.innerHTML = `
-    <details>
-    <summary>利用者設定・新規登録</summary>
-    <label for="local-member">ローカル利用者</label>
-    <select id="local-member" class="member"></select>
-    <label>新しいハンドル <input class="handle" type="text" /></label>
-    <button type="button" class="create-member">人間の利用者を作成</button>
-    <p class="member-message" aria-live="polite"></p>
-    </details>
-    <dialog aria-labelledby="compose-heading">
-      <h2 id="compose-heading">投稿エディター</h2>
-      <p class="destination"></p>
-      <p>初回送信時にローカル掲示板を作成します。</p>
-      <div class="edit-fields">
-        <label>投稿タイトル <input class="post-title" type="text" /></label>
-        <label>投稿本文 <textarea class="post-body" rows="8"></textarea></label>
-      </div>
-      <pre class="post-preview" hidden></pre>
-      <p class="compose-error" aria-live="polite"></p>
-      <button type="button" class="review">内容を確認</button>
-      <button type="button" class="edit" hidden>編集に戻る</button>
-      <button type="button" class="send-post" hidden>この内容で投稿する</button>
-      <button type="button" class="cancel-post">投稿をキャンセル</button>
-    </dialog>
-  `;
-  root.append(section);
-  const select = section.querySelector<HTMLSelectElement>('.member')!;
-  const handle = section.querySelector<HTMLInputElement>('.handle')!;
-  const create = section.querySelector<HTMLButtonElement>('.create-member')!;
-  const message = section.querySelector<HTMLElement>('.member-message')!;
-  const dialog = section.querySelector<HTMLDialogElement>('dialog')!;
-  const title = section.querySelector<HTMLInputElement>('.post-title')!;
-  const body = section.querySelector<HTMLTextAreaElement>('.post-body')!;
-  const fields = section.querySelector<HTMLElement>('.edit-fields')!;
-  const preview = section.querySelector<HTMLElement>('.post-preview')!;
-  const error = section.querySelector<HTMLElement>('.compose-error')!;
-  const review = section.querySelector<HTMLButtonElement>('.review')!;
-  const edit = section.querySelector<HTMLButtonElement>('.edit')!;
-  const send = section.querySelector<HTMLButtonElement>('.send-post')!;
-  const cancel = section.querySelector<HTMLButtonElement>('.cancel-post')!;
-  let destination: ForumDestination;
-  let authorId: string;
-  let parent: Post | undefined;
-  let composing = false;
-  let saving = false;
-  let reviewed: ComposeDraft | undefined;
-
-  function editing(value: boolean): void {
-    fields.hidden = !value;
-    preview.hidden = value;
-    review.hidden = !value;
-    edit.hidden = value;
-    send.hidden = value;
+/** A draft owns the terminal until an explicit send or cancellation. */
+export class TerminalComposer {
+  private stage: 'title' | 'body' | 'review' | 'edit' = 'title';
+  private title = '';
+  private lines: string[] = [];
+  private done = false;
+  constructor(private target: ForumDestination, private authorId: string,
+    private parent: Post | undefined, private actions: ComposerActions) {
+    actions.print(parent ? `返信先：#${parent.number}` : '新規発言', `${target.keyword} / ${target.name}`, 'タイトル=');
   }
-  dialog.addEventListener('compositionstart', () => { composing = true; });
-  dialog.addEventListener('compositionend', () => { composing = false; });
-  // Enter in a title or IME confirmation can never activate a send button.
-  title.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') event.preventDefault();
-  });
-  review.addEventListener('click', () => {
-    if (composing) return;
-    if (!title.value.trim() || !body.value.trim()) {
-      error.textContent = 'タイトルと本文を入力してください。空白だけでは投稿できません。';
+  get active() { return !this.done; }
+  private preview() {
+    this.stage = 'review';
+    this.actions.print(`タイトル：${this.title}`, `本文：${this.lines.length}行`,
+      ...this.lines.map((line, index) => `${index + 1}: ${line}`), '投稿しますか？ (Y/N/EDIT)=');
+  }
+  help() {
+    this.actions.print('下書きは保持されています。.CANCEL / CANCEL: 明示的に破棄。BACK / MAIN: 移動せず保持。',
+      this.stage === 'title' ? 'タイトルを入力（1〜200文字）。'
+      : this.stage === 'body' ? '本文を1行ずつ入力（全体1〜20000文字）。空行も保存。.END: 確認 / .TEXT 文字: 命令もそのまま本文へ。'
+      : this.stage === 'edit' ? 'TITLE 文字 / LINE 番号 文字 / DELETE 番号 / APPEND / REVIEW。空の LINE 番号 は空行に置換。'
+      : 'Y: 保存 / N: 破棄 / EDIT: 編集 / HELP: 案内');
+  }
+  async submit(line: string) {
+    if (this.done) return;
+    const command = line.trim().toUpperCase();
+    if (['CANCEL', '.CANCEL'].includes(command)) {
+      this.done = true; this.actions.print('投稿を中止しました。コマンド='); return;
+    }
+    if (['HELP', 'BACK', 'MAIN'].includes(command)) { this.help(); return; }
+    if (this.stage === 'title') {
+      if (!line.trim() || line.length > 200) { this.actions.print('タイトルは空白だけにせず、200文字以内で入力してください。タイトル='); return; }
+      this.title = line; this.stage = 'body'; this.help(); return;
+    }
+    if (this.stage === 'body') {
+      if (command === '.END') {
+        if (!this.lines.join('\n').trim()) { this.actions.print('本文は空白だけでは投稿できません。入力は保持されています。本文='); return; }
+        this.preview(); return;
+      }
+      const bodyLine = /^\.TEXT(?: |$)/i.test(line) ? line.replace(/^\.TEXT ?/i, '') : line;
+      if ([...this.lines, bodyLine].join('\n').length > 20000) {
+        this.actions.print('本文は20000文字以内です。この行は追加していません。.END で確認し EDIT で修正できます。'); return;
+      }
+      this.lines.push(bodyLine); this.actions.print('本文='); return;
+    }
+    if (this.stage === 'review') {
+      if (command === 'N') { this.done = true; this.actions.print('投稿を中止しました。コマンド='); return; }
+      if (command === 'EDIT') { this.stage = 'edit'; this.help(); return; }
+      if (command !== 'Y') { this.actions.print('Y / N / EDIT を入力してください。下書きは保持されています。'); return; }
+      try {
+        const post = await this.actions.save(this.target, { authorId: this.authorId, title: this.title,
+          body: this.lines.join('\n'), ...(this.parent ? { replyToPostId: this.parent.id } : {}) });
+        // Never leave a sendable draft after the transaction commits.
+        this.done = true;
+        this.actions.print(`発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
+      } catch (error) {
+        this.actions.print(`投稿を保存できませんでした。入力は残っています。${String(error)}`, 'Y: 再試行 / EDIT: 編集 / N: 中止');
+      }
       return;
     }
-    reviewed = { authorId, title: title.value, body: body.value,
-      ...(parent ? { replyToPostId: parent.id } : {}) };
-    preview.textContent = `${parent ? `RE#${parent.number}\n` : ''}${title.value}\n\n${body.value}`;
-    error.textContent = '';
-    editing(false);
-    edit.focus();
-  });
-  edit.addEventListener('click', () => { editing(true); title.focus(); });
-  send.addEventListener('click', async () => {
-    if (!reviewed || composing || saving) return;
-    saving = true;
-    send.disabled = edit.disabled = cancel.disabled = true;
-    try {
-      await actions.save(destination, reviewed);
-      dialog.close();
-    } catch (reason) {
-      error.textContent = `投稿を保存できませんでした。入力は残っています。${reason instanceof Error ? reason.message : String(reason)}`;
-    } finally {
-      saving = false;
-      send.disabled = edit.disabled = cancel.disabled = false;
-    }
-  });
-  dialog.addEventListener('cancel', (event) => { if (saving) event.preventDefault(); });
-  cancel.addEventListener('click', () => { if (!saving) dialog.close(); });
-  dialog.addEventListener('close', () => {
-    reviewed = undefined;
-    title.value = body.value = '';
-    root.querySelector<HTMLInputElement>('#command')!.focus();
-  });
-
-  create.addEventListener('click', async () => {
-    if (!handle.value.trim()) { message.textContent = 'ハンドルを入力してください。'; return; }
-    create.disabled = true;
-    try { await actions.createMember(handle.value); handle.value = ''; message.textContent = '利用者を作成しました。'; }
-    catch (reason) { message.textContent = `利用者を保存できませんでした。${String(reason)}`; }
-    finally { create.disabled = false; }
-  });
-  select.addEventListener('change', async () => {
-    select.disabled = true;
-    try { await actions.selectMember(select.value); message.textContent = '利用者を選択しました。'; }
-    catch (reason) { message.textContent = `利用者を選択できませんでした。${String(reason)}`; }
-    finally { select.disabled = false; }
-  });
-
-  return {
-    refresh(content: Backup) {
-      select.replaceChildren();
-      for (const member of content.members.filter((member) => member.actor === 'human')) {
-        select.add(new Option(`${member.handle} (${member.id})`, member.id));
-      }
-      const active = activeHuman(content);
-      if (active) select.value = active;
-      else select.add(new Option('利用者を作成してください', ''));
-    },
-    open(target: ForumDestination, content: Backup, reply?: Post) {
-      const memberId = activeHuman(content);
-      if (!memberId) { actions.configureMember(); section.querySelector('details')!.open = true; message.textContent = '投稿・既読の記録にはローカル利用者を作成してください。'; handle.focus(); return; }
-      authorId = memberId;
-      destination = target;
-      parent = reply;
-      composing = false;
-      reviewed = undefined;
-      title.value = reply ? `RE#${reply.number} ${reply.title}` : '';
-      body.value = '';
-      dialog.querySelector('.destination')!.textContent = `${target.keyword} / ${target.name} — ${content.members.find((member) => member.id === memberId)!.handle}${reply ? ` / 返信先 RE#${reply.number}` : ''}`;
-      error.textContent = '';
-      editing(true);
-      actions.beforeCompose();
-      dialog.showModal();
-      title.focus();
-    },
-  };
+    const title = /^TITLE (.*)$/i.exec(line);
+    const replace = /^LINE ([1-9]\d*)(?: (.*))?$/i.exec(line);
+    const remove = /^DELETE ([1-9]\d*)$/i.exec(line);
+    if (title) {
+      if (!title[1]!.trim() || title[1]!.length > 200) this.actions.print('タイトルは1〜200文字です。変更していません。');
+      else { this.title = title[1]!; this.actions.print('タイトルを変更しました。'); }
+    } else if (replace || remove) {
+      const index = Number((replace ?? remove)![1]) - 1;
+      if (index >= this.lines.length) { this.actions.print('その行はありません。変更していません。'); return; }
+      const next = [...this.lines];
+      if (replace) next[index] = replace[2] ?? ''; else next.splice(index, 1);
+      if (next.join('\n').length > 20000) this.actions.print('本文は20000文字以内です。変更していません。');
+      else { this.lines = next; this.actions.print('本文を変更しました。REVIEW で確認。'); }
+    } else if (command === 'APPEND') { this.stage = 'body'; this.help(); }
+    else if (command === 'REVIEW') {
+      if (!this.lines.join('\n').trim()) this.actions.print('本文が空白だけです。LINE / APPEND で修正してください。');
+      else this.preview();
+    } else this.help();
+  }
 }
