@@ -3,7 +3,7 @@ import demoPosts from '../data/pcvan/demo-posts.json' with { type: 'json' };
 import type { Backup, Post } from './storage/schema';
 import { ACTIVE_MEMBER_SETTING } from './storage/repository';
 
-export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'readStates'>>;
+export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'readStates' | 'settings'>>;
 // Reader copy omits explanatory paragraphs; the original fiction and all evidence
 // metadata remain intact in the fixture linked from Settings → About.
 const demoReading: Record<string, { title: string; body: string }> = {
@@ -29,11 +29,11 @@ export function replyReference(post: Post, posts: readonly Post[]): Post | undef
 export function forumPosts(content: ForumContent, keyword: 'MITI' | 'DAISIZEN', boardNo: number) {
   const sigs = content.sigs.filter((sig) => sig.keyword.toUpperCase() === keyword);
   const forums = content.forums.filter((forum) => sigs.some((sig) => sig.id === forum.sigId) && forum.boardNo === boardNo);
-  // A stored SIG takes precedence even if its board is missing or empty. Do not
-  // resurrect demo messages after a restore or mask ambiguous local mappings.
-  if (sigs.length) return {
+  // Repository snapshots include settings, even on an empty restore. Suppress
+  // demos there; retain them only for controllers without a loaded repository.
+  if (sigs.length || content.settings !== undefined) return {
     source: 'local' as const,
-    available: sigs.length === 1 && forums.length === 1,
+    available: !sigs.length || (sigs.length === 1 && forums.length === 1),
     posts: forums.length === 1 && sigs.length === 1
       ? content.posts.filter((post) => post.forumId === forums[0]!.id).sort((a, b) => a.number - b.number)
       : [],

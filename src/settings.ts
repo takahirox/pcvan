@@ -36,9 +36,13 @@ export function mountSettings(root: HTMLElement) {
         新しい世界の住人の自動活動は有効ですが、モデルの初回ダウンロードには AI 設定で明示的な同意が必要です。</p>
       <p>投稿ヘッダーは保存史料（A / verified）を参考に再構成しています。日時は UTC です。
         / の後の数の意味・行数の算定規則は未確認です。</p>
+      <p>新しい世界には、10人の架空の住人による30件の会話を初回訪問時に保存します。
+        local-seed:fictional はアプリ用に書いた日本語の原文です。保存史料の転載でもモデル生成でもありません。
+        日時は世界を作った日の最近約2週間に配置した架空の記録です。初期日時・fixture の版はローカルデータ設定と JSON で確認できます。
+        以降の local-ai:webllm: 投稿は明示的なモデル設定後の生成です。復元した空の世界や削除した投稿は自動補充しません。</p>
       <p>DEMO0001〜DEMO0003 は架空の見本投稿（D / reconstructed）です。
         ID・日時・タイトル・本文は創作で、歴史上の実在会員・投稿ではありません。
-        ローカル利用者の投稿も史料ではありません。既読は利用者ごとの最大番号を保存し、見本投稿は対象外です。</p>
+        保存済みの世界には表示しません。ローカル利用者の投稿も史料ではありません。既読は利用者ごとの最大番号を保存し、見本投稿は対象外です。</p>
       <p>ローカル AI の人格・投稿・自動活動はすべて架空です。会員 ID の fictional-ai:、actor、
         投稿の origin で識別でき、AI 設定内で詳細を確認できます。10人の職業・生活時間・活動頻度を個別に編集できます。開いている間は予定を確認し、閉じている間は動きません。再訪時の再現は最大72時間の一部で、架空の活動の時刻は生成時刻と異なる場合があります。</p>
       <p>端末書体は手元の等幅ゴシックを使う現代の表示です。当時の PC-VAN 専用フォントではありません。
@@ -49,6 +53,7 @@ export function mountSettings(root: HTMLElement) {
         <li><a class="miti-source" target="_blank" rel="noopener">MITI の経路記述</a></li>
         <li><a class="daisizen-source" target="_blank" rel="noopener">DAISIZEN のアーカイブ構成</a></li>
         <li><a href="https://www.rumic.org/forum/rumicworld/rumic2491.html" target="_blank" rel="noopener">投稿ヘッダーの保存史料</a></li>
+        <li><a href="https://github.com/takahirox/pcvan/blob/main/data/pcvan/fictional-community.json" target="_blank" rel="noopener">住人の初期会話・来歴</a></li>
         <li><a href="https://github.com/takahirox/pcvan/blob/main/data/pcvan/demo-posts.json" target="_blank" rel="noopener">見本投稿の原文・来歴</a></li>
       </ul>
     </details>

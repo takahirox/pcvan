@@ -100,6 +100,7 @@ test('commands flush preceding text, skip preserves later output, and download i
   await page.clock.install();
   await page.clock.pauseAt(new Date());
   await page.goto('/');
+  const initialWorld = await backup(page);
   await openSettings(page, 'display');
   await page.locator('.terminal-speed').selectOption('300');
   const input = page.getByRole('textbox', { name: 'コマンド', exact: true });
@@ -107,6 +108,7 @@ test('commands flush preceding text, skip preserves later output, and download i
   await input.fill('J MITI'); await input.press('Enter');
   await expect(page.locator('.reveal-output')).toBeEnabled();
   const controller = new ConnectionController();
+  controller.setContent(initialWorld);
   const expected = [...controller.welcome, ...controller.completeConnection(), '> J MITI', ...controller.submit('J MITI')].join('\n');
   expect(await page.locator('.output').textContent()).not.toBe(expected);
   await closeSettings(page);

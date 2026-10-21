@@ -6,7 +6,7 @@ import type { Session } from './storage/repository';
 import { mountStorageControls } from './storage/controls';
 import { ACTIVE_MEMBER_SETTING } from './storage/repository';
 import { TERMINAL_SETTING } from './storage/schema';
-import type { Backup, JsonValue } from './storage/schema';
+import type { AiActivity, Backup, JsonValue } from './storage/schema';
 import { activeHuman, forumPosts, replyReference } from './forums';
 import { mountComposer } from './composer';
 import { mountAiControls } from './ai/controls';
@@ -38,8 +38,11 @@ async function loadHistory(load: () => Promise<Session | null>): Promise<void> {
   } finally { commandsDuringHistoryLoad = null; }
 }
 const startup = enqueue(async () => {
-  await loadHistory(async () => (await repository).startSession());
-  const activity = await (await repository).openActivity();
+  let activity: AiActivity | undefined;
+  await loadHistory(async () => {
+    activity = await (await repository).openActivity();
+    return (await repository).startSession();
+  });
   await refreshContent();
   return activity;
 });
@@ -54,6 +57,7 @@ async function refreshContent(): Promise<Backup> {
   controller.setMemberId(activeHuman(content));
   composer.refresh(content);
   ai.refresh(content);
+  controls.refresh(content);
   return content;
 }
 let connectionTimer: ReturnType<typeof setTimeout> | undefined;
@@ -219,7 +223,10 @@ const controls = mountStorageControls(root, repository, enqueue, (text) => loadH
   displayPreferencesLoaded = false;
   await refreshContent();
   return repo.getSession();
-}));
+}), async () => {
+  await (await repository).populateEmptyCommunity({ confirmPopulate: true });
+  await refreshContent();
+});
 // Model work runs outside the storage/command queue so the terminal stays usable.
 void startup.then((activity) => ai.openActivity(activity)).catch((error) => controls.reportError(error));
 const touchActivity = () => {

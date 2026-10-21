@@ -163,7 +163,7 @@ test('keyboard reading works offline; restore replaces displayed posts without r
   await send(page, 'J MITI', 'MITI / 未知の世界');
   await send(page, '3', 'MITI / フォーラム');
   await send(page, '9', 'MITI / 資料室');
-  await send(page, 'READ 1', '★タイトル (DEMO0001)');
+  await send(page, 'READ 1', '★タイトル (fictional-ai:hankote)');
 
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'MITI';
@@ -185,7 +185,7 @@ test('keyboard reading works offline; restore replaces displayed posts without r
   await send(page, '2', '大自然＆動植物');
   await send(page, 'FORUMS', '7 伝言板／企画室');
   await send(page, '1', '投稿一覧');
-  await send(page, 'READ 1', '★タイトル (DEMO0003)');
+  await send(page, 'READ 1', 'その番号の投稿はありません');
   await send(page, 'BACK', '7 伝言板／企画室');
   await send(page, '7', '投稿はありません');
   expect(page.url()).toBe(url);
@@ -206,7 +206,7 @@ test('rapid submitted commands retain screen order while content loads', async (
     await input.fill(line);
     await input.press('Enter');
   }
-  await expect(page.locator('.output')).toContainText('★タイトル (DEMO0002)');
+  await expect(page.locator('.output')).toContainText('★タイトル (fictional-ai:hoshimori)');
 });
 
 test('failed forum reads show an error without stale content and leave return commands usable', async ({ page }) => {
@@ -214,7 +214,7 @@ test('failed forum reads show an error without stale content and leave return co
   await send(page, 'J MITI', 'MITI / 未知の世界');
   await send(page, '3', 'MITI / フォーラム');
   await send(page, '9', '投稿一覧');
-  await send(page, 'READ 1', '★タイトル (DEMO0001)');
+  await send(page, 'READ 1', '★タイトル (fictional-ai:hankote)');
   await page.evaluate(() => {
     const original = IDBObjectStore.prototype.getAll;
     IDBObjectStore.prototype.getAll = function (...args) {

@@ -7,6 +7,8 @@ import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleA
 import { models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
+import { WORLD_SETTING } from './schema';
+import { canPopulateCommunity, communityBoards, communityPosts, SEED_FIXTURE } from './community';
 import { postInput, validateGeneration } from '../ai/generation';
 
 export * from './schema';
@@ -331,8 +333,17 @@ export class LocalRepository {
     validateActivity(state);
     const migrated = migrateActivity(state);
     const content = await this.snapshot(tx);
-    if (!row) migrated.bootstrap = !content.sigs.length && !content.forums.length && !content.posts.length &&
-      !content.members.length && !await request(tx.objectStore('session').get('imported'));
+    if (!content.settings.some((r) => r.id === WORLD_SETTING)) {
+      const imported = await request(tx.objectStore('session').get('imported'));
+      const pristine = !imported && content.session === null && stores.every((store) => !content[store].length);
+      await request(settings.add({ id: WORLD_SETTING, value: {
+        version: 1, createdAt: now, status: imported ? 'imported' : 'legacy',
+      } }));
+      // The initial fixture, members, boards, provenance and activity state all
+      // commit in this same transaction. Competing tabs serialize on allStores.
+      if (pristine) migrated.bootstrap = true;
+      else migrated.bootstrap = false;
+    } else migrated.bootstrap = false;
     if (!content.settings.some((r) => r.id === RESIDENTS_SETTING)) {
       const profiles = structuredClone(personas).map((profile) => ({ ...profile,
         handle: content.members.find((m) => m.id === personaMemberId(profile.id) && m.actor === 'ai')?.handle ?? profile.handle }));
@@ -346,6 +357,8 @@ export class LocalRepository {
         await request(tx.objectStore('members').add({ id, handle: profile.handle, actor: 'ai' }));
       }
     }
+    if (migrated.bootstrap) await this.populateCommunity(tx, now);
+    migrated.bootstrap = false;
     removePausedRuns(migrated, profiles);
     return migrated;
   }
@@ -356,21 +369,50 @@ export class LocalRepository {
     return state;
   }
 
-  /** Only a pristine, never-imported world receives empty boards, on model setup. */
-  private async bootstrapForums(tx: IDBTransaction, state: AiActivity): Promise<void> {
-    if (!state.bootstrap || !state.consent) return;
-    state.bootstrap = false;
-    if (await request(tx.objectStore('session').get('imported')) ||
-        await request(tx.objectStore('sigs').count()) || await request(tx.objectStore('forums').count())) return;
-    for (const [keyword, boardNo, name] of [
-      ['MITI', 9, evidence.miti.steps[2]!.destination],
-      ['DAISIZEN', 1, evidence.daisizen.forums[0]!.label],
-    ] as const) {
-      const sigId = `resident-sig:${keyword}`;
-      await request(tx.objectStore('sigs').add({ id: sigId, keyword, title: keyword }));
-      await request(tx.objectStore('forums').add({ id: `resident-forum:${keyword}:${boardNo}`,
-        sigId, boardNo, name, nextPostNumber: 1 }));
+  private async populateCommunity(tx: IDBTransaction, now: string): Promise<void> {
+    if (!canPopulateCommunity(await this.snapshot(tx))) invalid('This world cannot safely receive starter posts.');
+    const targets: Record<string, Forum> = {};
+    for (const { keyword, boardNo } of communityBoards) {
+      const content = await this.snapshot(tx);
+      const sig = content.sigs.find((s) => s.keyword.toUpperCase() === keyword) ??
+        { id: `resident-sig:${keyword}`, keyword, title: keyword };
+      if (!content.sigs.some((s) => s.id === sig.id)) await request(tx.objectStore('sigs').add(sig));
+      const forum = content.forums.find((f) => f.sigId === sig.id && f.boardNo === boardNo) ?? {
+        id: `resident-forum:${keyword}:${boardNo}`, sigId: sig.id, boardNo,
+        name: keyword === 'MITI' ? evidence.miti.steps[2]!.destination : evidence.daisizen.forums[0]!.label,
+        nextPostNumber: 1,
+      };
+      if (!content.forums.some((f) => f.id === forum.id)) await request(tx.objectStore('forums').add(forum));
+      targets[`${keyword}:${boardNo}`] = forum;
     }
+    const posts = communityPosts(now, targets);
+    for (const post of posts) {
+      validateRecord('posts', post);
+      await request(tx.objectStore('posts').add(post));
+      const forum = Object.values(targets).find((f) => f.id === post.forumId)!;
+      forum.nextPostNumber = post.number + 1;
+    }
+    for (const forum of Object.values(targets)) await request(tx.objectStore('forums').put(forum));
+    await request(tx.objectStore('settings').put({ id: WORLD_SETTING, value: {
+      version: 1, createdAt: now, status: 'seeded', fixture: SEED_FIXTURE,
+    } }));
+    // Check every foreign key and ordered reply before any writes can commit.
+    validateBackup(await this.snapshot(tx));
+  }
+
+  /** Settings confirmation is required. Re-check eligibility inside the write transaction. */
+  populateEmptyCommunity(options: { confirmPopulate: boolean }, now = new Date().toISOString()): Promise<boolean> {
+    if (options?.confirmPopulate !== true) return Promise.reject(new RepositoryError('confirmation-required',
+      'Adding fictional starter posts requires explicit confirmation.'));
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const state = await this.readActivity(tx, now);
+      const content = await this.snapshot(tx);
+      if (!canPopulateCommunity(content)) return false;
+      if (await request(tx.objectStore('session').get('imported'))) return false;
+      await this.populateCommunity(tx, now);
+      await this.writeActivity(tx, state);
+      return true;
+    });
   }
 
   /** Pause preserves pending work. Future visits restart now, without accruing a paused backlog. */
@@ -389,7 +431,6 @@ export class LocalRepository {
       if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
       const state = await this.readActivity(tx, now);
       state.consent = true; state.modelId = modelId;
-      await this.bootstrapForums(tx, state);
       return this.writeActivity(tx, state);
     });
   }
@@ -417,7 +458,6 @@ export class LocalRepository {
   openActivity(now = new Date().toISOString()): Promise<AiActivity> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       const state = await this.readActivity(tx, now);
-      await this.bootstrapForums(tx, state);
       return this.writeActivity(tx, scheduleActivity(await this.snapshot(tx), state, now));
     });
   }
@@ -502,7 +542,13 @@ export class LocalRepository {
     await this.transaction(allStores, 'readwrite', async (tx) => {
       for (const store of allStores) await request(tx.objectStore(store).clear());
       for (const store of stores) {
-        for (const row of backup[store]) await request(tx.objectStore(store).add(row));
+        for (const row of backup[store]) {
+          // A restored legacy marker must not advertise the pre-feature opt-in.
+          const restored = store === 'settings' && 'id' in row && row.id === WORLD_SETTING &&
+            'value' in row && (row.value as { status?: string })?.status === 'legacy'
+            ? { ...row, value: { ...(row.value as object), status: 'imported' } } : row;
+          await request(tx.objectStore(store).add(restored));
+        }
       }
       if (backup.session !== null) await request(tx.objectStore('session').put(backup.session, 'current'));
       await request(tx.objectStore('session').put(true, 'imported'));

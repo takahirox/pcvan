@@ -105,25 +105,28 @@ test('create, review, edit and cancel preserve Japanese text without accidental 
   await page.getByRole('button', { name: 'この内容で投稿する' }).click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   const saved = await snapshot(page);
-  expect(saved.posts).toHaveLength(1);
-  expect(saved.posts[0]).toMatchObject({ number: 1, authorId: saved.members[0]!.id, title, body, origin: 'local-human' });
-  expect(new Date(saved.posts[0]!.createdAt).toISOString()).toBe(saved.posts[0]!.createdAt);
-  expect(saved.forums[0]!.nextPostNumber).toBe(2);
+  expect(saved.posts).toHaveLength(31);
+  const human = saved.members.find((m) => m.actor === 'human')!;
+  const written = saved.posts.find((p) => p.origin === 'local-human')!;
+  expect(written).toMatchObject({ number: 17, authorId: human.id, title, body, origin: 'local-human' });
+  expect(new Date(written.createdAt).toISOString()).toBe(written.createdAt);
+  expect(saved.forums.find((f) => f.id === written.forumId)!.nextPostNumber).toBe(18);
   await send(page, 'LIST', '[未読]');
-  await send(page, 'READ 1', '★内容');
+  await send(page, 'READ 17', '★内容');
   expect((await page.locator('.output').textContent())!).toContain(body);
   await expect(page.locator('.output b')).toHaveCount(0);
   await page.reload();
   await enterForum(page);
   await send(page, 'LIST', '[既読]');
   expect((await snapshot(page)).posts).toEqual(saved.posts);
-  expect((await snapshot(page)).readStates).toEqual([{ memberId: saved.members[0]!.id, forumId: saved.forums[0]!.id, lastReadNumber: 1 }]);
+  expect((await snapshot(page)).readStates).toEqual([{ memberId: human.id, forumId: written.forumId, lastReadNumber: 17 }]);
 });
 
 test('empty fields never send; replies use allocated numbers and navigable references', async ({ page }) => {
   await page.goto('/');
   await enterForum(page);
-  await send(page, 'REPLY 1', '見本の投稿には返信できません');
+  await command(page, 'REPLY 1');
+  await expect(page.locator('.member-message')).toContainText('ローカル利用者を作成');
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'MITI';
   fixture.forums[0]!.boardNo = 9;
@@ -202,6 +205,7 @@ test('read markers are separate by human member and forum, monotonic and persist
 
 test('failed sends roll back board creation and numbering, retain the draft and allow one explicit retry', async ({ page }) => {
   await page.goto('/');
+  await restore(page, { ...backupFixture(), members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [], session: null });
   await createMember(page, '人');
   await enterForum(page);
   const before = await snapshot(page);

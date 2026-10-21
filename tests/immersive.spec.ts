@@ -21,7 +21,7 @@ test('startup, every ordinary directory, articles, help, empty services and reco
   }
   await expect(output).toContainText('参加者：0人');
   await expect(output).not.toContainText('未実装');
-  await expect(output).toContainText('★タイトル (DEMO0001)');
+  await expect(output).toContainText('★タイトル (fictional-ai:hankote)');
   await expect(output).toContainText('接続を終了しました');
 });
 

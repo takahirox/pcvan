@@ -1,5 +1,6 @@
 import type { AiActivity, AiBatch, AiRun, Backup, Post } from '../storage/schema';
 import { models, personas, personaMemberId, residentProfiles } from './personas';
+import { localConversation } from '../storage/community';
 import type { ResidentProfile } from './personas';
 
 export const ACTIVITY_SETTING = 'ai-activity';
@@ -34,9 +35,6 @@ export function routineFactor(profile: ResidentProfile, at: number): number {
   // Work and sleep strongly reduce visits but permit occasional exceptions.
   return hours.includes(local.getUTCHours()) ? 1 : .04;
 }
-function localPost(post: Post): boolean {
-  return post.origin === 'local-human' || post.origin.startsWith('local-ai:webllm:');
-}
 function chooseAction(content: Backup, profile: ResidentProfile, at: number, seed: string): Omit<AiRun, 'id' | 'status' | 'simulatedAt'> | null {
   const draw = (key: string) => random(`${seed}:${profile.id}:${at}:${key}`);
   const localDay = Math.floor((at + profile.utcOffsetMinutes * 60_000) / (24 * HOUR));
@@ -54,9 +52,9 @@ function chooseAction(content: Backup, profile: ResidentProfile, at: number, see
   pool.sort((a, b) => a.id.localeCompare(b.id));
   const forum = pool[Math.floor(draw('board') * pool.length)]!;
   const ownId = personaMemberId(profile.id);
-  const memory = content.posts.filter((p) => p.forumId === forum.id && p.authorId === ownId && localPost(p) &&
+  const memory = content.posts.filter((p) => p.forumId === forum.id && p.authorId === ownId && localConversation(p) &&
     Date.parse(p.simulation?.simulatedAt ?? p.createdAt) <= at).sort((a, b) => b.number - a.number).slice(0, 8);
-  const parents = content.posts.filter((p) => p.forumId === forum.id && p.id.length <= 128 && localPost(p) &&
+  const parents = content.posts.filter((p) => p.forumId === forum.id && p.id.length <= 128 && localConversation(p) &&
     p.authorId !== ownId && Date.parse(p.simulation?.simulatedAt ?? p.createdAt) <= at - 20 * 60_000 &&
     !memory.some((m) => m.replyToPostId === p.id)).sort((a, b) => b.number - a.number).slice(0, 8);
   const score = (p: Post) => 1 + (profile.affinities[p.authorId.replace('fictional-ai:', '')] ?? 0) * 2 +
