@@ -1,9 +1,9 @@
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import demoPosts from '../data/pcvan/demo-posts.json' with { type: 'json' };
-import type { Backup, Post } from './storage/schema';
+import type { Backup, Member, Post } from './storage/schema';
 import { ACTIVE_MEMBER_SETTING } from './storage/repository';
 
-export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'readStates' | 'settings'>>;
+export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'members' | 'readStates' | 'settings'>>;
 // Reader copy omits explanatory paragraphs; the original fiction and all evidence
 // metadata remain intact in the fixture linked from Settings → About.
 const demoReading: Record<string, { title: string; body: string }> = {
@@ -51,12 +51,17 @@ export function forumName(keyword: 'MITI' | 'DAISIZEN', boardNo: number): string
 }
 
 /** UTC keeps the stored date stable across browsers; spacing is reconstructed. */
-export function renderPost(post: Post, name: string, lineCount?: number): string[] {
+export function renderPost(post: Post, name: string, lineCount?: number, members: readonly Member[] = []): string[] {
   const date = new Date(post.simulation?.simulatedAt ?? post.createdAt).toISOString();
   const stamp = `${date.slice(2, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}  ${date.slice(11, 16)}`;
+  const handle = members.find((member) => member.id === post.authorId)?.handle.trim();
+  // Never derive a display name from an internal record key. Old snapshots may
+  // lack member data; only the documented demo identifiers stand on their own.
+  const author = handle && !handle.includes('fictional-ai:') ? handle
+    : /^DEMO\d{4}$/.test(post.authorId) ? post.authorId : '名無し';
   return [
     `#${post.number}${post.displaySecondNumber === undefined ? '' : `/${post.displaySecondNumber}`}　${name}`,
-    `★タイトル (${post.authorId})  ${stamp}${post.simulation ? ' [架空の投稿時刻]' : ''}${lineCount === undefined ? '' : `  ( ${lineCount})`}`,
+    `★タイトル (${author})  ${stamp}${lineCount === undefined ? '' : `  ( ${lineCount})`}`,
     post.title,
     '★内容',
     post.body,

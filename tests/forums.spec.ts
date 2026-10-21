@@ -1,4 +1,5 @@
 import { openSettings, closeSettings } from './settings-helpers';
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -97,6 +98,32 @@ test('all seeded demo posts have original provenance and synthetic IDs', () => {
   }
 });
 
+test('author headers use current handles for human, seed, generated and legacy posts without changing records', () => {
+  const fixture = backupFixture();
+  const human = fixture.posts[0]!;
+  const seeded = { ...human, authorId: 'fictional-ai:resident', origin: 'local-seed:fictional' };
+  const generated = { ...seeded, id: 'run', origin: 'local-ai:webllm:test-model',
+    simulation: { runId: 'run', simulatedAt: '1996-07-06T12:34:00.000Z', fictional: true as const } };
+  const members = [...fixture.members, { id: seeded.authorId, handle: '常連', actor: 'ai' as const }];
+  const before = structuredClone([human, seeded, generated]);
+  expect(renderPost(human, '広場', undefined, members)[1]).toContain('(人間)');
+  expect(renderPost(seeded, '広場', undefined, members)[1]).toContain('(常連)');
+  const rendered = renderPost(generated, '広場', undefined, members).join('\n');
+  expect(rendered).toContain('(常連)  96/07/06  12:34');
+  expect(rendered).not.toMatch(/fictional-ai:|架空の投稿時刻|local-ai:|runId|AI住人|シミュレーション/);
+  members[2]!.handle = '星の番人';
+  expect(renderPost(generated, '広場', undefined, members)[1]).toContain('(星の番人)');
+  for (const authorId of ['missing', 'fictional-ai:missing', 'local-human:old', '<b>record key</b>']) {
+    expect(renderPost({ ...human, authorId }, '広場')[1]).toContain('(名無し)');
+  }
+  expect(renderPost({ ...human, authorId: 'ai' }, '広場', undefined, fixture.members)[1]).toContain('(AI)');
+  members[2]!.handle = '';
+  expect(renderPost(seeded, '広場', undefined, members)[1]).toContain('(名無し)');
+  members[2]!.handle = seeded.authorId;
+  expect(renderPost(seeded, '広場', undefined, members)[1]).toContain('(名無し)');
+  expect([human, seeded, generated]).toEqual(before);
+});
+
 test('repository identities map by SIG keyword and board number; empty/missing/ambiguous boards stay empty', () => {
   const controller = miti();
   const content = backupFixture();
@@ -163,7 +190,7 @@ test('keyboard reading works offline; restore replaces displayed posts without r
   await send(page, 'J MITI', 'MITI / 未知の世界');
   await send(page, '3', 'MITI / フォーラム');
   await send(page, '9', 'MITI / 資料室');
-  await send(page, 'READ 1', '★タイトル (fictional-ai:hankote)');
+  await send(page, 'READ 1', '★タイトル (半田ごて)');
 
   const fixture = backupFixture();
   fixture.sigs[0]!.keyword = 'MITI';
@@ -174,7 +201,7 @@ test('keyboard reading works offline; restore replaces displayed posts without r
   await page.getByRole('button', { name: '全データを置き換えて復元' }).click();
   await expect(page.getByRole('status', { name: 'ローカル保存の状態' })).toContainText('バックアップを復元しました。');
   await send(page, 'LIST', '#4 返事');
-  await send(page, 'READ 1', '★タイトル (human)');
+  await send(page, 'READ 1', '★タイトル (人間)');
   const output = (await page.locator('.output').textContent())!;
   expect(output.slice(output.lastIndexOf('> READ 1\n'))).toContain('★内容\n  ｶﾅ\n<b>文字</b>　。');
   await expect(page.locator('.output b')).toHaveCount(0);
@@ -206,7 +233,67 @@ test('rapid submitted commands retain screen order while content loads', async (
     await input.fill(line);
     await input.press('Enter');
   }
-  await expect(page.locator('.output')).toContainText('★タイトル (fictional-ai:hoshimori)');
+  await expect(page.locator('.output')).toContainText('★タイトル (星守)');
+});
+
+test('restored handles and display times stay ordinary while expanded provenance and JSON retain every origin', async ({ page }) => {
+  const fixture = backupFixture();
+  fixture.sigs[0]!.keyword = 'MITI';
+  fixture.forums[0]!.boardNo = 9;
+  fixture.forums[0]!.nextPostNumber = 10;
+  fixture.members.push({ id: 'fictional-ai:hoshimori', handle: '<b>星の番人</b>', actor: 'ai' });
+  fixture.posts.push({ id: 'run', forumId: 'forum', number: 8, authorId: 'fictional-ai:hoshimori',
+    title: '夜空の話', body: '今夜の星を見ました。', replyToPostId: 'first',
+    createdAt: '2026-10-20T02:03:04.000Z', origin: 'local-ai:webllm:test-model',
+    simulation: { runId: 'run', simulatedAt: '1996-07-06T12:34:00.000Z', fictional: true } },
+  { id: 'seed', forumId: 'forum', number: 9, authorId: 'fictional-ai:hoshimori',
+    title: '星の便り', body: 'お便りです。', createdAt: '1996-07-05T01:02:00.000Z', origin: 'local-seed:fictional' });
+  await page.goto('/');
+  await openSettings(page, 'storage');
+  await page.getByLabel('復元ファイル').setInputFiles({ name: 'authors.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('.restore').click();
+  await expect(page.locator('.storage-status')).toContainText('バックアップを復元しました');
+
+  for (let visit = 0; visit < 2; visit++) {
+    if (visit) await page.reload();
+    await send(page, 'J MITI', 'MITI / 未知の世界');
+    await send(page, '3', 'MITI / フォーラム');
+    await send(page, '9', '#9 星の便り');
+    await send(page, 'READ 1', '★タイトル (人間)');
+    await send(page, 'READ 4', '★タイトル (AI)');
+    await send(page, 'READ 8', '★タイトル (<b>星の番人</b>)  96/07/06  12:34');
+    await expect(page.locator('.output')).toContainText('返信先 RE#1 → READ 1');
+    await send(page, 'READ 9', '★タイトル (<b>星の番人</b>)  96/07/05  01:02');
+    expect(await page.locator('.output').innerText()).not.toMatch(/fictional-ai:|local-ai:|架空の投稿時刻|AI住人|シミュレーション/);
+    await expect(page.locator('.output b')).toHaveCount(0);
+
+    await openSettings(page, 'ai');
+    await expect(page.locator('.ai-persona option')).toHaveCount(10);
+    await expect(page.locator('.ai-provenance')).not.toHaveAttribute('open');
+    await expect(page.locator('.ai-records')).toBeHidden();
+    expect(await page.locator('.ai-controls').innerText()).not.toMatch(/fictional-ai:|架空の AI|10人|シミュレーション/);
+    await page.getByText('詳細・出自', { exact: true }).click();
+    for (const phrase of ['架空の AI 人格', '10人', 'シミュレーション', 'Hugging Face / MLC / GitHub', '外部推論・API キーは使いません']) {
+      await expect(page.locator('.ai-provenance')).toContainText(phrase);
+    }
+    const records = page.locator('.ai-records');
+    await expect(records).toBeVisible();
+    for (const phrase of ['利用者の投稿 / 人間 / human / actor=human / origin=local-human',
+      '取り込んだ投稿 / AI / ai / actor=ai / origin=imported',
+      'ローカル AI 生成 / <b>星の番人</b> / fictional-ai:hoshimori / actor=ai / origin=local-ai:webllm:test-model',
+      '事前に書いた創作 / <b>星の番人</b>', 'generatedAt=2026-10-20T02:03:04.000Z', 'simulatedAt=1996-07-06T12:34:00.000Z']) {
+      await expect(records).toContainText(phrase);
+    }
+    await expect(records.locator('b')).toHaveCount(0);
+    await openSettings(page, 'storage');
+    const downloading = page.waitForEvent('download');
+    await page.locator('.backup').click();
+    const exported = JSON.parse(await readFile((await (await downloading).path())!, 'utf8'));
+    expect(exported.posts).toHaveLength(fixture.posts.length);
+    expect(exported.posts).toEqual(expect.arrayContaining(fixture.posts));
+    expect(exported.members).toEqual(expect.arrayContaining(fixture.members));
+  }
 });
 
 test('failed forum reads show an error without stale content and leave return commands usable', async ({ page }) => {
@@ -214,7 +301,7 @@ test('failed forum reads show an error without stale content and leave return co
   await send(page, 'J MITI', 'MITI / 未知の世界');
   await send(page, '3', 'MITI / フォーラム');
   await send(page, '9', '投稿一覧');
-  await send(page, 'READ 1', '★タイトル (fictional-ai:hankote)');
+  await send(page, 'READ 1', '★タイトル (半田ごて)');
   await page.evaluate(() => {
     const original = IDBObjectStore.prototype.getAll;
     IDBObjectStore.prototype.getAll = function (...args) {

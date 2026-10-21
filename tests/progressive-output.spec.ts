@@ -213,7 +213,7 @@ for (const width of [320, 1280]) {
     await page.goto('/');
     await expect(page.locator('.terminal-speed')).toHaveValue('2400');
     for (const selector of ['.display-controls', '.member-controls details', '.storage-controls details', '.ai-controls', '.offline-controls details']) {
-      await expect(page.locator(selector)).not.toHaveAttribute('open');
+      for (const details of await page.locator(selector).all()) await expect(details).not.toHaveAttribute('open');
     }
     await openSettings(page, 'display');
     await page.locator('.terminal-speed').selectOption('instant');

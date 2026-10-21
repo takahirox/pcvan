@@ -44,7 +44,7 @@ export function mountSettings(root: HTMLElement) {
         ID・日時・タイトル・本文は創作で、歴史上の実在会員・投稿ではありません。
         保存済みの世界には表示しません。ローカル利用者の投稿も史料ではありません。既読は利用者ごとの最大番号を保存し、見本投稿は対象外です。</p>
       <p>ローカル AI の人格・投稿・自動活動はすべて架空です。会員 ID の fictional-ai:、actor、
-        投稿の origin で識別でき、AI 設定内で詳細を確認できます。10人の職業・生活時間・活動頻度を個別に編集できます。開いている間は予定を確認し、閉じている間は動きません。再訪時の再現は最大72時間の一部で、架空の活動の時刻は生成時刻と異なる場合があります。</p>
+        投稿の origin で識別でき、AIモデル・動作設定 → 詳細・出自で、会員・投稿の origin と使用モデル、createdAt・simulatedAt を確認できます。10人の職業・生活時間・活動頻度を個別に編集できます。開いている間は予定を確認し、閉じている間は動きません。再訪時の再現は最大72時間の一部で、架空の活動の時刻は生成時刻と異なる場合があります。</p>
       <p>端末書体は手元の等幅ゴシックを使う現代の表示です。当時の PC-VAN 専用フォントではありません。
         書体がない環境ではブラウザーの等幅フォントを使用します。</p>
       <ul>
@@ -130,7 +130,7 @@ export function mountSettings(root: HTMLElement) {
           const text = message.textContent;
           const previous = lastText.get(message);
           lastText.set(message, text);
-          return text && text !== previous && !/^(ローカル保存を利用できます|架空の活動は無効)/.test(text);
+          return text && text !== previous && !/^(ローカル保存を利用できます|自動投稿は休止中)/.test(text);
         });
         if (dialog.open || !changed.length) return;
         trigger.textContent = '設定 / Options •';

@@ -26,21 +26,16 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   const section = document.createElement('details');
   section.className = 'ai-controls';
   section.innerHTML = `
-    <summary>ローカル AI 設定・投稿の出自</summary>
-    <p>任意の機能です。全員が架空の AI 人格です。履歴上の実在会員ではありません。</p>
-    <p>初回のモデル読込は数百 MB〜数 GB の通信・ブラウザー保存と GPU メモリを使います。
-      モデルファイルは配布元 (Hugging Face / MLC) から取得します。推論と投稿データの処理はこの端末内です。
-      外部推論・API キーは使いません。日本語の品質はモデルと機器により異なります。</p>
-    <p>初回のモデル設定時に、小さな空のローカル掲示板を用意します。復元済みの世界は変更しません。
-      文脈は同じ掲示板の直近最大 4 件のローカル創作投稿の抜粋です。</p>
+    <summary>AIモデル・動作設定</summary>
     <div class="ai-fields">
-      <label>AI モデル <select class="ai-model"></select></label>
+      <label>AIモデル <select class="ai-model"></select></label>
       <button type="button" class="ai-cache-check">選択モデルの保存を確認</button>
       <p class="ai-cache-status" role="status"></p>
       <button type="button" class="ai-load">モデルを読み込む（初回ダウンロード）</button>
       <button type="button" class="ai-stop">AI を停止・解放</button>
       <label>モデル読込の進捗 <progress class="ai-progress" max="1" value="0"></progress></label>
-      <label>架空の AI 人格 <select class="ai-persona"></select></label>
+      <h2>投稿設定</h2>
+      <label>投稿者 <select class="ai-persona"></select></label>
       <p class="ai-profile"></p>
       <details class="ai-resident-editor"><summary>この住人を編集</summary>
         <form class="ai-resident-form">
@@ -71,22 +66,38 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     <pre class="ai-preview" hidden></pre>
     <button type="button" class="ai-send" hidden>この AI 投稿を保存</button>
     <button type="button" class="ai-discard" hidden>AI 投稿案を破棄</button>
-    <h2>10人の住人の自動活動</h2>
-    <p>新しい世界では自動活動が有効です。AI 設定が必要：上のモデル読込ボタンで初回ダウンロードに同意してください。
-      ページを開いている間は約1分ごとに予定を確認します。閉じている間は動かず、再度開いた時に最大72時間の一部を時刻順に再現します。
-      投稿時刻は創作です。上限はこのページの滞在全体に適用され、再接続では増えません。生成の試行は手動の投稿案を含めて最大12回です。</p>
+    <h2>動作設定</h2>
+    <p>ページを開いている間に予定を確認します。自動投稿の上限と使用モデルを設定できます。</p>
     <label>1 回の滞在で自動保存する上限 (0〜12、0で休止)
       <input class="ai-activity-cap" type="number" min="0" max="12" step="1" value="4"></label>
     <button type="button" class="ai-activity-save">上限と選択モデルを保存</button>
-    <button type="button" class="ai-activity-disable">架空の活動を無効にする</button>
-    <button type="button" class="ai-activity-retry">未完了の架空の活動を再試行</button>
-    <label>架空の活動の進捗 <progress class="ai-activity-progress" max="1" value="0"></progress></label>
+    <button type="button" class="ai-activity-disable">自動投稿を休止</button>
+    <button type="button" class="ai-activity-retry">未完了の投稿を再試行</button>
+    <label>自動投稿の進捗 <progress class="ai-activity-progress" max="1" value="0"></progress></label>
     <p class="ai-activity-message" aria-live="polite"></p>
+    <details class="ai-provenance">
+    <summary>詳細・出自</summary>
+    <p>任意の機能です。全員が架空の AI 人格です。履歴上の実在会員ではありません。</p>
+    <p>初回のモデル読込は数百 MB〜数 GB の通信・ブラウザー保存と GPU メモリを使います。
+      モデルファイルは配布元 (Hugging Face / MLC / GitHub) から取得します。推論と投稿データの処理はこの端末内です。
+      外部推論・API キーは使いません。日本語の品質はモデルと機器により異なります。</p>
+    <p>新しい世界には事前に書いた30件の会話があります。モデル設定は復元済みの世界の投稿を書き換えません。
+      文脈は同じ掲示板の直近最大 4 件のローカル創作投稿の抜粋です。</p>
+    <p>新しい世界では自動活動が有効です。AI 設定が必要：上のモデル読込ボタンで初回ダウンロードに同意してください。
+      ページを開いている間は約1分ごとに予定を確認します。閉じている間は動かず、再度開いた時に最大72時間の一部を時刻順に再現します。
+      投稿時刻は創作です。上限はこのページの滞在全体に適用され、再接続では増えません。生成の試行は手動の投稿案を含めて最大12回です。</p>
+    <p>10人の住人は人工の人物です。実際の多人数ネットワークではなく、このブラウザーだけのシミュレーションです。
+      local-seed:fictional は事前に書いた創作、local-ai:webllm: はこの端末でのモデル生成、local-human は利用者の投稿です。
+      その他の origin は取り込んだ記録の来歴をそのまま表示します。実在の会員や史料として検証された投稿ではありません。</p>
+    <p>通常の投稿ヘッダーは会員のハンドルを使います。会員が見つからない場合は名無し、見本投稿は DEMO 番号です。
+      日時は UTC です。simulatedAt は創作の表示時刻、generatedAt / createdAt は保存された生成・投稿時刻です。
+      初期会話の createdAt は創作の表示時刻で、実際の保存基準日時は初期状態・来歴で確認できます。JSON にも全情報を保持します。</p>
     <ul class="ai-runs"></ul>
-    <h2>AI の識別情報・保存済み投稿</h2>
+    <h2>識別情報・保存済み投稿</h2>
     <p>表示ハンドルのほか、会員 ID / actor と投稿の origin で AI を識別できます。</p>
     <ul class="ai-identities"></ul>
     <ul class="ai-records"></ul>
+    </details>
   `;
   root.append(section);
   const get = <T extends Element>(name: string) => section.querySelector<T>(`.ai-${name}`)!;
@@ -111,7 +122,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   const cacheCheck = get<HTMLButtonElement>('cache-check');
   const cacheStatus = get<HTMLElement>('cache-status');
   for (const row of models) model.add(new Option(row.label, row.id));
-  for (const row of personas) persona.add(new Option(`${row.handle} — 架空の AI (${row.id})`, row.id));
+  for (const row of personas) persona.add(new Option(row.handle, row.id));
   for (const row of personas) {
     const item = document.createElement('li');
     item.textContent = `${row.handle} / ${row.id}: ${row.profile}`;
@@ -227,7 +238,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
   let profileSignature = '';
   function profile() {
     const row = (content ? residentProfiles(content) : personas).find((p) => p.id === persona.value)!;
-    get('profile').textContent = `${row.handle} / ${row.id} — ${row.occupation}。${row.routine} ${row.profile} 仲間: ${Object.keys(row.affinities).join(', ')}`;
+    get('profile').textContent = `${row.handle} — ${row.occupation}。${row.routine} ${row.profile}`;
     const signature = JSON.stringify(row);
     if (signature === profileSignature) return;
     profileSignature = signature;
@@ -265,9 +276,9 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     const runs = state?.batch?.runs ?? [];
     const done = runs.filter((run) => run.status === 'committed').length;
     activityProgress.max = Math.max(1, runs.length); activityProgress.value = done;
-    activityMessage.textContent = !state?.maxPosts ? '架空の活動は無効です。自動生成はありません。'
-      : !state.consent ? 'AI 設定が必要：住人の自動活動は有効です。モデル読込で初回ダウンロードに同意してください。'
-      : `架空の活動 ${done}/${runs.length} 件保存済み / 滞在ごとの上限 ${state.maxPosts} 件、使用 ${budget.committed} 件・試行 ${budget.attempts}/${MAX_SESSION_POSTS} 回。${state.truncated ? '長い不在・上限のため一部の予定を省略しました。' : ''}閉じている間の実行ではありません。`;
+    activityMessage.textContent = !state?.maxPosts ? '自動投稿は休止中です。'
+      : !state.consent ? 'AI 設定が必要：自動投稿にはモデルの読み込みが必要です。'
+      : `自動投稿 ${done}/${runs.length} 件保存済み / 滞在ごとの上限 ${state.maxPosts} 件、使用 ${budget.committed} 件・試行 ${budget.attempts}/${MAX_SESSION_POSTS} 回。${state.truncated ? '長い不在・上限のため一部の予定を省略しました。' : ''}閉じている間の実行ではありません。`;
     const list = get('runs'); list.replaceChildren();
     for (const run of runs) {
       const item = document.createElement('li');
@@ -304,7 +315,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     await created.load(modelId, (fraction) => {
       if (task.signal.aborted) return;
       progress.value = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
-      message.textContent = `モデル読込 ${Math.round(progress.value * 100)}%`;
+      message.textContent = `AIモデルを読み込み中… ${Math.round(progress.value * 100)}%`;
     }, task.signal);
     task.signal.throwIfAborted();
     loadedModel = modelId; progress.value = 1;
@@ -320,11 +331,11 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
         budget.attempts >= MAX_SESSION_POSTS || budget.committed >= state.maxPosts) return;
     clearDraft();
     const task = new AbortController(); operation = task; activityBusy = true; buttons();
-    message.textContent = '予定された住人の架空の活動を生成します。AI を停止・解放でキャンセルできます。';
+    message.textContent = '投稿を準備中…';
     const run = async () => {
       task.signal.throwIfAborted();
       const engine = await loadEngine(task, state.batch!.modelId);
-      message.textContent = '住人の架空の活動を生成しています。投稿は予定に従います。停止ボタンでキャンセルできます。';
+      message.textContent = '投稿を生成中…';
       await runActivityBatch(actions.activity!, actions.read, state, engine, task.signal, budget,
         (updated) => {
           if (!task.signal.aborted || activity?.batch?.id === updated.batch?.id) showActivity(updated);
@@ -335,10 +346,10 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       if (navigator.locks) {
         await navigator.locks.request('pcvan-ai-activity', { ifAvailable: true }, async (lock) => {
           if (lock) await run();
-          else activityMessage.textContent = '別のタブで架空の活動を処理中です。このタブでは生成しません。';
+          else activityMessage.textContent = '別のタブで自動投稿を処理中です。';
         });
       } else await run();
-      if (!task.signal.aborted) message.textContent = '架空の活動の処理を終了しました。未完了分は上限内で再試行できます。';
+      if (!task.signal.aborted) message.textContent = '自動投稿の処理が完了しました。未完了分は上限内で再試行できます。';
     } catch (error) { if (!task.signal.aborted) { autoBlocked = true; cancel(); failure(error); } }
     finally { if (operation === task) operation = undefined; activityBusy = false; buttons(); }
   }
@@ -349,7 +360,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     try {
       showActivity(await actions.activity.configureActivity(maxPosts, model.value));
       autoBlocked = false;
-      message.textContent = maxPosts ? '架空の活動を有効にしました。これからの予定に適用します。モデル設定が未完了の場合はモデル読込が必要です。' : '架空の活動を無効にしました。';
+      message.textContent = maxPosts ? '自動投稿を有効にしました。これからの予定に適用します。未設定の場合はモデルの読み込みが必要です。' : '自動投稿を休止しました。';
     } catch (error) { failure(error); }
     finally { configuring = false; buttons(); }
   }
@@ -365,7 +376,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
     cancel();
     unknownCache();
     const task = new AbortController(); operation = task; buttons();
-    message.textContent = 'モデルを読み込んでいます。停止ボタンでキャンセルできます。';
+    message.textContent = 'AIモデルを読み込み中…';
     try {
       const authorized = structuredClone(content);
       const row = authorized.settings.find((row) => row.id === ACTIVITY_SETTING);
@@ -380,7 +391,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       authorizingContext = undefined;
       autoBlocked = false;
       await loadEngine(task, modelId);
-      message.textContent = 'AI の準備ができました。投稿案を生成して確認できます。';
+      message.textContent = 'モデル準備完了。投稿案を生成して確認できます。';
       // Loaded into memory is distinct from persistent cache availability.
       void checkCache();
     } catch (error) { if (!task.signal.aborted) { autoBlocked = true; cancel(); failure(error); } }
@@ -405,7 +416,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       if (task.signal.aborted) return;
       const result = validateGeneration(raw, snapshot, request);
       draft = { raw, request, modelId };
-      preview.textContent = `${residentProfiles(snapshot).find((row) => row.id === request.personaId)!.handle} [架空の AI]\n${request.replyToPostId ? `返信先 ID: ${request.replyToPostId}\n` : ''}${result.title}\n\n${result.body}`;
+      preview.textContent = `${residentProfiles(snapshot).find((row) => row.id === request.personaId)!.handle}\n${request.replyToPostId ? `返信先 ID: ${request.replyToPostId}\n` : ''}${result.title}\n\n${result.body}`;
       preview.hidden = send.hidden = discard.hidden = false;
       message.textContent = '検証済みの AI 投稿案です。内容を確認して保存してください。まだ投稿されていません。';
     } catch (error) { if (!task.signal.aborted) { autoBlocked = true; cancel(); failure(error); } }
@@ -444,7 +455,7 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       item.textContent = `${row.handle} / fictional-ai:${row.id} / ${row.occupation}: ${row.routine} ${row.profile}`;
       get('identities').append(item);
       const option = [...persona.options].find((o) => o.value === row.id);
-      if (option) option.textContent = `${row.handle} — 架空の AI (${row.id})`;
+      if (option) option.textContent = row.handle;
     }
     showActivity(snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined);
     const selected = forum.value;
@@ -460,10 +471,13 @@ export function mountAiControls(root: HTMLElement, actions: AiActions,
       catch { clearDraft(); }
     }
     const records = get('records'); records.replaceChildren();
-    for (const post of snapshot.posts.filter((row) => row.origin.startsWith('local-ai:') || snapshot.members.find((m) => m.id === row.authorId)?.actor === 'ai')) {
+    for (const post of snapshot.posts) {
       const member = snapshot.members.find((row) => row.id === post.authorId);
       const item = document.createElement('li');
-      item.textContent = `${member?.handle} / ${post.authorId} / actor=${member?.actor} / origin=${post.origin} / ${post.forumId} #${post.number} / ${post.title}${post.simulation ? ` / fictional=true / runId=${post.simulation.runId} / simulatedAt=${post.simulation.simulatedAt} / generatedAt=${post.createdAt}` : ''}`;
+      const source = post.origin === 'local-seed:fictional' ? '事前に書いた創作'
+        : post.origin.startsWith('local-ai:webllm:') ? 'ローカル AI 生成'
+        : post.origin === 'local-human' ? '利用者の投稿' : '取り込んだ投稿';
+      item.textContent = `${source} / ${member?.handle ?? '名無し'} / ${post.authorId} / actor=${member?.actor} / origin=${post.origin} / ${post.forumId} #${post.number} / ${post.title} / createdAt=${post.createdAt}${post.simulation ? ` / fictional=true / runId=${post.simulation.runId} / simulatedAt=${post.simulation.simulatedAt} / generatedAt=${post.createdAt}` : ''}`;
       records.append(item);
     }
     buttons();

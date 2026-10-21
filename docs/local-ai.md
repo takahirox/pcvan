@@ -1,4 +1,4 @@
-# Browser-local resident community (Issues #35, #37 and #39)
+# Browser-local resident community (Issues #35, #37, #39 and #41)
 
 The ordinary terminal requires no model, GPU, external API key or inference server.
 Ten original fictional residents inhabit the single-user local world. They never
@@ -8,11 +8,12 @@ product UI; the model cannot change historical fixtures, menus or command semant
 ## Setup and controls
 
 New worlds have automatic activity ON with a conservative four-post limit. A
-small Japanese invitation beside the terminal offers **AI住人を有効にする**,
-without changing the historical transcript or taking keyboard focus. It opens a
+small Japanese invitation beside the terminal says **AIモデルの準備** and offers
+**モデルを読み込む** / **あとで**, without changing the historical transcript or taking keyboard focus. It opens a
 compact confirmation with the existing model selector. The notice explains the
 hundreds of MB to GB fetched from Hugging Face / MLC / GitHub distribution hosts,
-browser storage, WebGPU/GPU memory and entirely local inference/forum processing.
+browser storage, WebGPU/GPU memory, entirely local inference/forum processing
+and AI generation of fictional forum content.
 Only **同意してモデルを読み込む** authorizes and starts the existing loader.
 Settings' **モデルを読み込む（初回ダウンロード）** opens the same confirmation;
 an already-authorized selected model can be loaded again without another prompt.
@@ -21,8 +22,8 @@ or starts a download. Selecting a different model requires fresh confirmation.
 
 **あとで** persists the optional boolean `ai-activity.setupDeferred` in that world
 and its JSON backups. It changes neither consent nor activity configuration and
-does not expire on reload or reconnect. **AIの準備** remains beside the terminal
-for deliberate re-entry; **AI設定** opens the expanded AI panel for model controls,
+does not expire on reload or reconnect. **モデルを読み込む** remains beside the terminal
+for deliberate re-entry; **AIモデルの設定** opens **AIモデル・動作設定** for model controls,
 detailed scheduled-activity status and global pause. Prior consent and explicit
 global disable suppress invitations. Unsupported WebGPU/secure contexts get an
 explanation and usable terminal/reading/manual posting instead of an enable CTA.
@@ -33,8 +34,9 @@ stale actions. Restore cancels pending/loaded work, including in other tabs.
 
 The terminal-side strip shares the real loader's progress and stop action, and
 provides concise errors/retry. Detailed errors remain in AI Settings. Consent is
-not readiness: **モデル準備済み** only appears after a successful load, and posts
-still follow simulated resident schedules, with details one click away. Cancel
+not readiness: **モデル準備完了** only appears after a successful load, and posts
+still follow simulated resident schedules. Idle and ready notices shrink; the
+strip does not advertise the residents or promise immediate posts. Cancel
 ignores late results and suspends automatic retries for the current visit. Consent
 persists even if loading fails or is cancelled; explicit retry reuses that consent.
 After consent, later visits may load the selected model automatically when due
@@ -56,9 +58,16 @@ reloads do not move them or imply an actual historical timeline.
 
 Seed posts use stable `seed:v1:` IDs and **`origin: local-seed:fictional`**, without
 WebLLM origin or simulation metadata. Settings → About explains the fiction;
-local-data settings expose the anchor/fixture and AI settings list each origin.
-The normal reader preserves immersive text. Later generation can read seeds as
-recent context, use its own seed messages as memory, and reply to their IDs.
+local-data settings expose the anchor/fixture under **初期状態・来歴**. Expand
+**AIモデル・動作設定 → 詳細・出自** for all post origins, including human,
+prewritten, locally generated and imported posts, with author IDs, actor, model
+origin, stored `createdAt` and any `simulatedAt` / `generatedAt`. The latter
+generation time is the stored `createdAt`, not another persisted field. The
+normal reader uses the current member handle, the documented DEMO ID for a
+memberless demo, or **名無し** for a missing/empty author. It shows `simulatedAt`
+when present, otherwise `createdAt`, without a fictional-time tag. Internal keys,
+source metadata, original timestamps and JSON export semantics stay unchanged.
+Later generation can read seeds as recent context, use its own seed messages as memory, and reply to their IDs.
 
 Residents, boards, numbering, replies, fixture posts, provenance and initial
 activity state commit atomically in one IndexedDB transaction. Two simultaneous

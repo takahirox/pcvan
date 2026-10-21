@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { openSettings, closeSettings } from './settings-helpers';
 
-const meta = /創作|再構成|暫定|未確認|reconstructed|https?:\/\/|\[[ABCD] \/ /;
+const meta = /創作|再構成|暫定|未確認|reconstructed|https?:\/\/|\[[ABCD] \/ |架空の投稿時刻|架空の AI|AI住人|シミュレーション|fictional-ai:/;
 
 test('startup, every ordinary directory, articles, help, empty services and reconnect stay clean', async ({ page }) => {
   await page.goto('/');
@@ -21,7 +21,7 @@ test('startup, every ordinary directory, articles, help, empty services and reco
   }
   await expect(output).toContainText('参加者：0人');
   await expect(output).not.toContainText('未実装');
-  await expect(output).toContainText('★タイトル (fictional-ai:hankote)');
+  await expect(output).toContainText('★タイトル (半田ごて)');
   await expect(output).toContainText('接続を終了しました');
 });
 

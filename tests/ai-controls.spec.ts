@@ -67,7 +67,7 @@ async function snapshot(page: Page): Promise<Backup> {
 async function load(page: Page) {
   await openSettings(page, 'ai');
   await loadModel(page);
-  await expect(page.locator('.ai-message')).toContainText('準備ができました');
+  await expect(page.locator('.ai-message')).toContainText('モデル準備完了');
 }
 
 async function command(page: Page, line: string, response: string) {
@@ -97,7 +97,7 @@ test('explicit lazy load, model/persona selection, validated preview and single 
   expect(await page.evaluate(() => window.aiMock.loads)).toEqual(['Qwen2.5-1.5B-Instruct-q4f16_1-MLC']);
   await openSettings(page, 'ai');
   await page.locator('.ai-generate').click();
-  await expect(page.locator('.ai-preview')).toContainText('草笛 [架空の AI]');
+  await expect(page.locator('.ai-preview')).toContainText('草笛');
   expect(await snapshot(page)).toEqual(before);
   await page.locator('.ai-send').dblclick();
   await expect(page.locator('.ai-message')).toContainText('AI 投稿を保存しました');
@@ -245,7 +245,7 @@ test('background model progress stays inspectable after Settings closes without 
   await expect(page.locator('.open-settings')).toContainText('•');
   expect(await page.locator('.output').textContent()).toBe(before);
   await openSettings(page, 'ai');
-  await expect(page.locator('.ai-message')).toContainText('準備ができました');
+  await expect(page.locator('.ai-message')).toContainText('モデル準備完了');
   await page.evaluate(() => { window.aiMock.mode = 'inference-fail'; });
   await page.locator('.ai-generate').click();
   await expect(page.locator('.ai-message')).toContainText('再試行はモデル読込から');

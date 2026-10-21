@@ -166,7 +166,7 @@ test('journey: offline human post, reply, unread, reload and JSON round-trip wit
     await page.reload();
     await expect(page.locator('.network-status')).toContainText('オフライン');
     await enterForum(page);
-    await command(page, 'READ 1', '★タイトル (fictional-ai:hankote)');
+    await command(page, 'READ 1', '★タイトル (半田ごて)');
     await createHuman(page);
     const title = '旅の記録　ｶﾅ';
     const body = '一行目\n\n  二行目 <b>文字のまま</b>  \n';
@@ -266,7 +266,7 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   await post(page, '人間の話題', '自分で書いた最初の話題です。');
   await openSettings(page, 'ai');
   await loadModel(page);
-  await expect(page.locator('.ai-message')).toContainText('準備ができました');
+  await expect(page.locator('.ai-message')).toContainText('モデル準備完了');
   await page.locator('.ai-activity-cap').fill('2');
   await openSettings(page, 'ai');
   await page.locator('.ai-activity-save').click();
@@ -305,11 +305,15 @@ test('journey: production AI resumes a partially committed run after tab loss wi
   const generatedMiti = generated.find((p) => p.forumId === 'resident-forum:MITI:9');
   if (generatedMiti) {
     await enterForum(resumed);
-    await command(resumed, `READ ${generatedMiti.number}`, '[架空の投稿時刻]');
+    const handle = recovered.members.find((m) => m.id === generatedMiti.authorId)!.handle;
+    await command(resumed, `READ ${generatedMiti.number}`, `★タイトル (${handle})`);
   } else {
     for (const [line, response] of [['13', 'コミュニケーション'], ['2', '大自然＆動植物'], ['FORUMS', 'フォーラム（電子掲示板）'], ['1', '投稿一覧']]) await command(resumed, line!, response!);
-    await command(resumed, `READ ${generated[0]!.number}`, '[架空の投稿時刻]');
+    const handle = recovered.members.find((m) => m.id === generated[0]!.authorId)!.handle;
+    await command(resumed, `READ ${generated[0]!.number}`, `★タイトル (${handle})`);
   }
+  await expect(resumed.locator('.output')).not.toContainText('[架空の投稿時刻]');
+  await expect(resumed.locator('.output')).not.toContainText('fictional-ai:');
   await command(resumed, 'MAIN', '番号またはコマンド=');
   await command(resumed, 'Q', '接続を終了しました');
   await command(resumed, 'RECONNECT', 'PC-VAN 接続中');
@@ -331,7 +335,7 @@ for (const mode of ['invalid', 'failure'] as const) {
     await page.locator('.ai-forum').selectOption({ index: 0 });
     await openSettings(page, 'ai');
     await loadModel(page);
-    await expect(page.locator('.ai-message')).toContainText('準備ができました');
+    await expect(page.locator('.ai-message')).toContainText('モデル準備完了');
     await openSettings(page, 'ai');
     await page.locator('.ai-generate').click();
     await expect(page.locator('.ai-message')).toContainText('端末・閲覧・手動投稿は利用できます');

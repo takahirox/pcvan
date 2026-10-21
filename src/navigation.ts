@@ -166,7 +166,7 @@ export class PcvanController implements TerminalController {
       const post = data.posts.find((item) => item.number === Number(read[1]));
       const parent = post && replyReference(post, data.posts);
       return post ? [
-        ...renderPost(post, forumName(keyword, boardNo)),
+        ...renderPost(post, forumName(keyword, boardNo), undefined, this.content.members),
         ...(parent ? [`返信先 RE#${parent.number} → READ ${parent.number}`] : []),
         this.forumHelp, returnHelp,
         demoPrompt,

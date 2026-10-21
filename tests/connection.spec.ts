@@ -147,9 +147,9 @@ test('queued forum reading survives logout and reconnect with one history entry 
   await expect(page.locator('.session-times')).toContainText(saved.lastLogoutAt!);
   await expect(page.getByRole('button', { name: '接続演出をスキップ' })).toBeHidden();
   const visible = (await page.locator('.output').textContent())!;
-  expect(visible).toContain('★タイトル (fictional-ai:hankote)');
+  expect(visible).toContain('★タイトル (半田ごて)');
   expect(visible).toContain('接続を終了しました。');
-  expect(visible).toContain('★タイトル (fictional-ai:hoshimori)');
+  expect(visible).toContain('★タイトル (星守)');
   expect(visible.match(/> READ 1\n/g)).toHaveLength(1);
   const downloading = page.waitForEvent('download');
   await openSettings(page, 'display');

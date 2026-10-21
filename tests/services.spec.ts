@@ -120,7 +120,7 @@ test('keyboard collections work offline without service requests or changing loc
   await expect(page.locator('.output b')).toHaveCount(0);
   await send('FORUMS', '7 伝言板／企画室');
   await send('1', '#4 返事');
-  await send('READ 1', '★タイトル (human)');
+  await send('READ 1', '★タイトル (人間)');
   await send('MAIN', 'MAIN');
   await send('J MITI', 'MITI / 未知の世界');
   await send('3', 'MITI / フォーラム');
