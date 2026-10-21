@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import { PcvanController } from '../src/navigation';
-import { openSettings, closeSettings } from './settings-helpers';
 import { backupFixture } from './backup-fixture';
 
 const collections = mainMenu.entries.filter((entry) => !['2', '13', 'Q'].includes(entry.selector));
@@ -83,45 +82,6 @@ for (const route of [['1'], ['X'], ['13', '2', 'MAIL']]) {
     expect(controller.screen).toBe('main');
   });
 }
-
-test('keyboard index and mailbox exploration preserves Settings state and makes no network requests', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('.output')).toContainText('番号またはコマンド=');
-  const requests: string[] = [];
-  page.on('request', (request) => requests.push(request.url()));
-  const url = page.url();
-  const input = page.locator('#command');
-  const send = async (command: string, expected: string) => {
-    await input.fill(command); await input.press('Enter');
-    await expect.poll(async () => {
-      const text = (await page.locator('.output').textContent())!;
-      return text.slice(text.lastIndexOf(`> ${command}\n`));
-    }).toContain(expected);
-    await expect(input).toBeFocused();
-  };
-  await send('2', '索引');
-  for (const entry of mainMenu.entries.filter((entry) => !['2', 'Q'].includes(entry.selector))) {
-    await send(entry.selector, entry.label);
-    await send('HELP', entry.label);
-    await send('BACK', '索引');
-  }
-  await send('X', '旧電子メール');
-  await send('INBOX', '旧電子メール / 受信箱');
-  const transcript = await page.locator('.output').textContent();
-  await input.fill('書きかけ　ｶﾅ');
-  await openSettings(page, 'about');
-  await expect(page.locator('.about-controls')).toContainText('史実の件数ではありません');
-  await closeSettings(page);
-  await expect(input).toHaveValue('書きかけ　ｶﾅ');
-  expect(await page.locator('.output').textContent()).toBe(transcript);
-  await send('HELP', '旧電子メール / 受信箱');
-  await send('BACK', 'INBOX: 受信箱');
-  await send('SENT', '旧電子メール / 送信済み');
-  await send('MAIN', '番号またはコマンド=');
-  expect(await page.locator('.output').textContent()).not.toMatch(/未実装|利用不可/);
-  expect(page.url()).toBe(url);
-  expect(requests).toEqual([]);
-});
 
 test('empty saved boards remain empty after exploring sections and services', () => {
   const controller = new PcvanController();

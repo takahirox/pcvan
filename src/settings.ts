@@ -1,142 +1,41 @@
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
-import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
+import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
+import type { Backup } from './storage/schema';
+import { WORLD_SETTING } from './storage/schema';
+import { residentProfiles } from './ai/personas';
 
-/** Relocate existing controls without replacing their state or event handlers. */
-export function mountSettings(root: HTMLElement) {
-  const trigger = root.querySelector<HTMLButtonElement>('.open-settings')!;
-  const dialog = document.createElement('dialog');
-  dialog.id = 'settings-dialog';
-  dialog.className = 'settings-dialog';
-  dialog.setAttribute('aria-labelledby', 'settings-heading');
-  dialog.innerHTML = `
-    <header class="settings-header"><h2 id="settings-heading">設定 / Options</h2>
-      <button type="button" class="close-settings" autofocus>閉じる</button></header>
-    <div class="settings-panels"></div>
-    <details class="about-controls">
-      <summary>このシステムについて / 出典・制約</summary>
-      <p>ブラウザー内だけで動く PC-VAN の再構成です。実際の通信回線には接続しません。
-        史実の完全な複製ではありません。接続文・待ち時間・表示速度・配色は創作の演出です。</p>
-      <p>MAIN の項目とプロンプトは1996年頃の回顧転記（C / provisional）です。
-        1997年全期間への適用は未確認。2列配置は再構成です。</p>
-      <p>MITI の J MITI → 3 → 9 は1996年の経路記述（B / verified）で確認しています。
-        画面・配置・プロンプトや他のコマンドは確認できていません。</p>
-      <p>DAISIZEN は年代不明のアーカイブ構成（B / provisional）です。
-        山のフォーラムは1992年に独立との記述があり、1996–1997年への適用は暫定です。
-        コミュニケーションの 1 / 2、FORUMS、MAIL / LIBRARY / CONFERENCE / OLT / OSL、
-        MAIN / BACK / HELP / RECONNECT、LIST / READ / WRITE / REPLY は創作の橋渡し・操作補助です。
-        英字の大小文字や余分な空白の許容も操作補助です。</p>
-      <p>索引から各 MAIN 項目へ移動でき、BACK は直前のメニュー、MAIN は MAIN に戻ります。
-        LIST は一覧の再表示、INBOX / SENT は受信箱・送信済みの閲覧です。
-        索引・各カテゴリ・メールボックス・ファイル一覧・無人の会議室は現代の操作補助で、
-        当時のメニュー順序やコマンドを示す史料ではありません。</p>
-      <p>メール・記事・データベース・商品・刊行物・ファイルの一覧は読み取り専用の空のコレクションです。
-        OLT・電子会議室の参加者は0人です。このブラウザーの空の状態であり、史実の件数ではありません。
-        実際のメール送受信・購入・アップロード・ダウンロード・インターネット接続・他者との通信は行いません。
-        利用できる保存操作はローカル掲示板への投稿・返信・既読、設定、JSON バックアップ・復元です。
-        新しい世界の住人の自動活動は有効ですが、モデルの初回ダウンロードには AI 設定で明示的な同意が必要です。</p>
-      <p>投稿ヘッダーは保存史料（A / verified）を参考に再構成しています。日時は UTC です。
-        / の後の数の意味・行数の算定規則は未確認です。</p>
-      <p>新しい世界には、10人の架空の住人による30件の会話を初回訪問時に保存します。
-        local-seed:fictional はアプリ用に書いた日本語の原文です。保存史料の転載でもモデル生成でもありません。
-        日時は世界を作った日の最近約2週間に配置した架空の記録です。初期日時・fixture の版はローカルデータ設定と JSON で確認できます。
-        以降の local-ai:webllm: 投稿は明示的なモデル設定後の生成です。復元した空の世界や削除した投稿は自動補充しません。</p>
-      <p>DEMO0001〜DEMO0003 は架空の見本投稿（D / reconstructed）です。
-        ID・日時・タイトル・本文は創作で、歴史上の実在会員・投稿ではありません。
-        保存済みの世界には表示しません。ローカル利用者の投稿も史料ではありません。既読は利用者ごとの最大番号を保存し、見本投稿は対象外です。</p>
-      <p>ローカル AI の人格・投稿・自動活動はすべて架空です。会員 ID の fictional-ai:、actor、
-        投稿の origin で識別でき、AIモデル・動作設定 → 詳細・出自で、会員・投稿の origin と使用モデル、createdAt・simulatedAt を確認できます。10人の職業・生活時間・活動頻度を個別に編集できます。開いている間は予定を確認し、閉じている間は動きません。再訪時の再現は最大72時間の一部で、架空の活動の時刻は生成時刻と異なる場合があります。</p>
-      <p>端末書体は手元の等幅ゴシックを使う現代の表示です。当時の PC-VAN 専用フォントではありません。
-        書体がない環境ではブラウザーの等幅フォントを使用します。</p>
-      <ul>
-        <li><a href="https://github.com/takahirox/pcvan/blob/main/docs/research/pcvan-1996-1997.md" target="_blank" rel="noopener">史料・年代・不確実性の調査記録</a></li>
-        <li><a class="main-source" target="_blank" rel="noopener">MAIN の回顧転記</a></li>
-        <li><a class="miti-source" target="_blank" rel="noopener">MITI の経路記述</a></li>
-        <li><a class="daisizen-source" target="_blank" rel="noopener">DAISIZEN のアーカイブ構成</a></li>
-        <li><a href="https://www.rumic.org/forum/rumicworld/rumic2491.html" target="_blank" rel="noopener">投稿ヘッダーの保存史料</a></li>
-        <li><a href="https://github.com/takahirox/pcvan/blob/main/data/pcvan/fictional-community.json" target="_blank" rel="noopener">住人の初期会話・来歴</a></li>
-        <li><a href="https://github.com/takahirox/pcvan/blob/main/data/pcvan/demo-posts.json" target="_blank" rel="noopener">見本投稿の原文・来歴</a></li>
-      </ul>
-    </details>
-  `;
-  root.append(dialog);
-  for (const [name, href] of [['main', mainMenu.source_url], ['miti', sigEvidence.miti.source_url], ['daisizen', sigEvidence.daisizen.source_url]]) {
-    dialog.querySelector<HTMLAnchorElement>(`.${name}-source`)!.href = href!;
-  }
-  const notice = document.createElement('span');
-  notice.className = 'settings-notice sr-only';
-  notice.id = 'settings-notice';
-  trigger.setAttribute('aria-describedby', notice.id);
-  notice.setAttribute('role', 'status');
-  root.append(notice);
-  let previous: HTMLElement | null = null;
-  function open(panel?: string) {
-    if (!dialog.open) {
-      // A composer owns keyboard focus until it is closed.
-      if (root.querySelector('dialog[open]')) return;
-      previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      dialog.showModal();
-      trigger.textContent = '設定 / Options';
-      notice.textContent = '';
-    }
-    if (panel) {
-      const section = dialog.querySelector<HTMLElement>(`.${panel}-controls`);
-      const details = section instanceof HTMLDetailsElement ? section : section?.querySelector('details');
-      if (details) { details.open = true; details.querySelector('summary')!.focus(); }
-    }
-  }
-  trigger.addEventListener('click', () => open());
-  function close() {
-    if (!dialog.open) return;
-    dialog.close();
-    composing = false;
-    (previous?.isConnected ? previous : root.querySelector<HTMLElement>('#command'))?.focus({ preventScroll: true });
-  }
-  dialog.querySelector('.close-settings')!.addEventListener('click', close);
-  // Escape keeps its native modal behavior, except during IME confirmation.
-  let composing = false;
-  dialog.addEventListener('compositionstart', () => { composing = true; });
-  dialog.addEventListener('compositionend', () => { composing = false; });
-  dialog.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && (composing || event.isComposing || event.keyCode === 229)) event.preventDefault();
-    if (event.key === 'Tab') {
-      const stops = [...dialog.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], summary, [tabindex]')]
-        .filter((element) => element.tabIndex >= 0 && !element.matches(':disabled') && element.checkVisibility());
-      const first = stops[0];
-      const last = stops.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    }
-  });
-  dialog.addEventListener('cancel', (event) => {
-    event.preventDefault();
-    if (!composing) close();
-  });
-  return {
-    open, close,
-    collect() {
-      // The editor remains a sibling modal, never inside the Settings dialog.
-      const composer = root.querySelector<HTMLDialogElement>('.member-controls dialog')!;
-      root.append(composer);
-      const panels = dialog.querySelector('.settings-panels')!;
-      for (const selector of ['.display-controls', '.member-controls', '.ai-controls', '.storage-controls', '.offline-controls', '.help-controls']) {
-        panels.append(root.querySelector(selector)!);
-      }
-      // Preserve detailed progress/errors in their original controls. Background
-      // changes get one discreet, accessible indication outside the closed modal.
-      const messages = dialog.querySelectorAll<HTMLElement>('.ai-message, .ai-activity-message, .ai-cache-status, .member-message, .storage-status, .shell-status');
-      const lastText = new Map([...messages].map((message) => [message, message.textContent]));
-      const observer = new MutationObserver(() => {
-        const changed = [...messages].filter((message) => {
-          const text = message.textContent;
-          const previous = lastText.get(message);
-          lastText.set(message, text);
-          return text && text !== previous && !/^(ローカル保存を利用できます|自動投稿は休止中)/.test(text);
-        });
-        if (dialog.open || !changed.length) return;
-        trigger.textContent = '設定 / Options •';
-        notice.textContent = `${changed[0]!.closest('.ai-controls') ? 'AI' : '保存'}の状態が更新されました。設定で確認できます。`;
-      });
-      messages.forEach((message) => observer.observe(message, { childList: true, characterData: true, subtree: true }));
-    },
-  };
+export const settingsMenu = ['設定 / SETTINGS', '1 表示・速度', '2 ハンドル', '3 モデル・活動・住人',
+  '4 JSON バックアップ・復元・初期化', '5 オフライン・容量', '6 セッション時刻', '7 ログ保存', '8 操作案内', '9 詳細・出自',
+  '番号 / BACK: 元の画面 / MAIN: MAIN / HELP: この案内'];
+export const keyboardHelp = ['Enter: 送信 / 日本語変換中の Enter は送信しません。',
+  '↑ / ↓: 入力履歴 / PageUp・PageDown: 出力スクロール / Tab: 出力と入力を移動',
+  '出力にフォーカスして ← / →: 横スクロール / Esc: 全文表示・接続演出をスキップ',
+  'SETTINGS / CONFIG: 設定 / HANDLE: 利用者 / ABOUT: 詳細・出自 / LOG: ログ保存',
+  'BACK: 一つ戻る / MAIN: MAIN / HELP: 現在の画面の案内',
+  '編集中は BACK / MAIN で移動しません。.CANCEL で明示的に破棄します。',
+  'WRITE → タイトル → 本文を1行ずつ → .END → EDIT / Y / N',
+  '確認中の空入力は承認になりません。Y はその確認だけを承認します。'];
+export function about(content: Backup): string[] {
+  return ['PC-VAN / 詳細・出自',
+    'このブラウザーだけで動くローカルシミュレーションです。実際の多人数ネットワークではありません。',
+    'MAIN の項目名と J MITI → 3 → 9 は史料を参考にしています。表示配置・便利コマンド・設定・編集操作は現代の再構成です。',
+    'DAISIZEN のアーカイブ構成を参考にした再構成であり、番号による橋渡しは検証済みコマンドではありません。',
+    '投稿ヘッダーは保存史料を参考に再構成しています。/ の後の数と行数の規則は未確認です。日時は UTC。書体は現代の等幅フォントです。',
+    '10人の住人は架空の人物です。local-seed:fictional は事前に書いた30件・8話題の創作で、史料の転載でもモデル生成でもありません。',
+    'local-ai:webllm: は端末内で生成した人工の投稿、local-human は利用者の投稿です。DEMO は架空の見本です。',
+    '初期会話の日時は世界作成日前の約2週間に配置した創作です。生成投稿の simulatedAt は創作の活動時刻、createdAt は保存時刻です。',
+    'モデルの重みは外部から取得しますが、推論・投稿データの処理は端末内です。外部推論・API キーは使いません。',
+    '同じ掲示板の直近最大4件のローカル創作を文脈に使用。日本語品質はモデル・機器によります。',
+    '新しい世界の自動活動上限は4。モデル同意前は生成しません。約1分ごとに予定確認。閉じている間は動かず、再訪時に最大72時間の一部を再現します。',
+    '滞在全体の生成試行は手動を含め12回まで。再接続では増えません。住人の生活時間・活動頻度は個別編集できます。',
+    '既読は人間の利用者ごとの最大番号です。データはブラウザーの容量・保持ポリシーで消えることがあります。JSON バックアップを外部に保存してください。',
+    `初期状態・来歴: ${JSON.stringify(content.settings.find((row) => row.id === WORLD_SETTING)?.value ?? null)}`,
+    '史料・不確実性: https://github.com/takahirox/pcvan/blob/main/docs/research/pcvan-1996-1997.md',
+    `MAIN: ${mainMenu.source_url}`, `MITI: ${evidence.miti.source_url}`, `DAISIZEN: ${evidence.daisizen.source_url}`,
+    '投稿ヘッダー: https://www.rumic.org/forum/rumicworld/rumic2491.html',
+    '初期会話: https://github.com/takahirox/pcvan/blob/main/data/pcvan/fictional-community.json',
+    '見本: https://github.com/takahirox/pcvan/blob/main/data/pcvan/demo-posts.json',
+    ...residentProfiles(content).map((row) => `${row.handle} / fictional-ai:${row.id} / ${JSON.stringify(row)}`),
+    ...content.posts.map((post) => `${post.forumId} #${post.number} / ${post.authorId} / actor=${content.members.find((m) => m.id === post.authorId)?.actor} / origin=${post.origin} / createdAt=${post.createdAt} / ${JSON.stringify(post.simulation ?? null)}`),
+  ];
 }

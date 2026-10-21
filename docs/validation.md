@@ -811,3 +811,46 @@ Validated on 2026-10-21 with Node.js 24.12.0 and npm 11.6.2 on macOS.
 No real GPU/model download, physical-device/native IME, screen-reader observation
 or optional subjective visual review was performed. No post-merge verification is
 required by Issue #41. No push, PR, merge or comment was performed.
+
+
+## Terminal-only interaction migration (#45)
+
+This section supersedes the earlier button/dialog interaction descriptions above.
+Latest GitHub `main` was inspected at `23802091c207a6d6207e239d16b6aed746a3c4c5`
+and Issue #45 was read before implementation. Historical fixtures, seeded
+conversations, ten-resident profiles and the version-1 public backup schema remain
+unchanged. Reconstructed prompts are documented separately from historical evidence.
+
+Validation performed in the assigned worktree:
+
+- `npm ci`: passed; 24 packages audited with no vulnerabilities.
+- `npm test -- --workers=4 --reporter=line`: **150 passed** in Chromium (25.9 s),
+  against the production build and source-module test server. No real model/GPU
+  download was used. Production WebLLM adapter tests replace its Worker; source
+  tests inject adapters. Native file choosers/downloads are driven after commands.
+- `npm run build`: passed TypeScript and Vite static production compilation.
+  The existing large WebLLM bundle warning remains; the adapter stays lazy-loaded.
+- `git diff --check`: passed. Documentation local paths/anchors checked.
+
+The tests complete first-run handle registration/skip, pending WRITE handoff,
+seeded READ, line-by-line WRITE/REPLY, preview/edit/cancel/confirmation, exact
+Japanese whitespace, transactional saves, read tracking, reload and JSON recovery.
+They cover malformed/oversize/blank drafts, IME events, duplicate input, quota
+rollback/retry, deleted parents, missing-board creation, multiple human identities,
+model consent refusal/acceptance, deferral, leases, progress/cancellation and late
+results, profile validation, generation budgets and autonomous interruption/recovery.
+Import/reset require context-bound typed approval; stale tabs are fenced even when
+notifications are missed. Reset preserves shell/model/unrelated caches. Offline
+checks run the real service worker and exercise reload, human posting, backup and
+storage persistence request outcomes. DOM checks reject dialogs, helper links,
+buttons, selects, textareas and floating panels; the sole visible input keeps focus.
+Existing controller, repository, renderer and scheduling tests remain alongside
+the migrated command-only browser tests. See [the current coverage map](e2e.md).
+
+Earlier failing development runs exposed mutable activity watermarks in confirmation
+contexts, self-delivered restore notifications and old test connections invalidated
+by the stronger restore generation fence. Those were corrected; the complete suite
+above passed afterward. Physical desktop/mobile keyboards, native Japanese IME
+candidate windows, screen-reader speech quality and real WebGPU model execution
+were not manually tested. These are optional observations, not pre-merge gates.
+No post-merge verification is required.

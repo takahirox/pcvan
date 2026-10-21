@@ -19,34 +19,26 @@ space. Keep downloaded backups outside browser storage.
 
 ## User backup and restore
 
-In **設定 / Options → JSON バックアップ・復元**, **JSON バックアップを保存** downloads a UTF-8 JSON snapshot.
-Check that the download was saved. The file contains all local content, settings,
-and command history; treat it as personal data. It is not uploaded anywhere.
+Type `BACKUP` to download a UTF-8 JSON snapshot, including all content, settings
+and command history. Confirm that the download was saved outside browser storage.
+It contains personal data and is not uploaded anywhere. The same action is listed
+in `SETTINGS` → `4`.
 
-Choose a file using **復元ファイル**, then select **全データを置き換えて復元**.
-The application validates the file, asks for explicit confirmation, then
-**replaces the entire local world**. There is no merge, ID remapping, or automatic
-backup of the old world. Download the old world first if it matters. Cancelling,
-invalid JSON, invalid records, or a failed write leaves the previous database
-unchanged. Restore refreshes this tab's recalled commands; reload other open tabs
-to refresh any in-memory views. Concurrent writes in other tabs are serialized
-before or after the replacement, and writes made afterwards are new local changes.
-
-The status below these controls reports opening, validation, write, and quota
-errors. When storage is unavailable, the terminal still works in memory and
-reports persistence failures. A quota failure leaves export available if the
-database can still be read. There is no localStorage fallback that could silently
-split the world across storage systems.
+`IMPORT` opens a browser-native file picker. After validation, the terminal explains
+that the entire local world will be replaced. Only a subsequent typed `Y` in that
+active confirmation executes replacement. `N`, `BACK`, `MAIN`, `CANCEL`, blank and
+invalid responses never replace data. Escape only reveals output. Cancelling the
+picker, invalid files and failed writes preserve the old world. There is no merge
+or automatic backup. Other tabs reload after replacement. Transcript errors report
+opening, validation, quota and write failures. No localStorage fallback is used.
 
 ## Factory reset
 
-Use **設定 / Options → JSON バックアップ・復元 → 初期状態に戻す** to start over.
-Save a JSON backup first if the old world matters; no backup is downloaded
-automatically or required. The separate **すべて削除して初期状態に戻す** confirmation
-irreversibly deletes all local members, posts (human and generated), read markers,
-forum and resident edits, settings, AI consent/deferral and session/command history.
-Cancel, Escape and clicking outside the confirmation do not mutate the world or
-displayed session. Success and storage errors are reported in Settings.
+`RESET` (also listed in `SETTINGS` → `4`) explains the irreversible deletion of
+members, posts, read markers, resident edits, preferences, AI consent/deferral and
+history, then requires typed `Y`. Export `BACKUP` first if recovery matters.
+`N`, `BACK`, `MAIN` and `CANCEL` preserve the world; Escape only reveals text and
+never approves or cancels. Status and failures appear in the transcript.
 
 Reset clears and recreates the normal first-visit world in one IndexedDB
 transaction, using the same bootstrap as `openActivity()`: ten default residents,
@@ -59,12 +51,14 @@ backup: imported-empty worlds retain their intentional empty-post semantics.
 
 The current tab cancels AI work before the queued reset and intentionally reloads
 into a clean MAIN session, discarding transcript, drafts, composer/reply state,
-loaded model and pending consent dialogs. Other tabs receive a reset notification
+loaded model and pending terminal confirmations. Other tabs receive a reset
+notification
 and reload. A private `session/world-generation` token also fences every repository
 transaction: a suspended tab or one missing notifications gets a `stale` error
 before it can write old data, then the app reloads. Focus checks cover missed
 notifications; no cross-tab lock or database deletion is needed. The token is
-internal metadata, excluded from JSON exports and preserved by restore.
+internal metadata excluded from JSON exports. Reset and restore both rotate it;
+old connections fail before they can write into the replacement world.
 
 Downloaded WebLLM weights and optional service-worker/app-shell caches are
 separate browser storage and remain intact, as does unrelated origin data.
@@ -78,8 +72,9 @@ world, select its saved JSON file and use the existing confirmed restore action.
 The historical directory in `src/navigation.ts` uses the unchanged evidence
 fixtures. The app supplies `PcvanController.setContent()` through the connection
 wrapper with a consistent `exportBackup()` snapshot before forum commands.
-Command responses and restores share the existing queue; input echo and history
-remain immediate. Failed reads report an error without showing cached posts;
+Command echoes, prompt transitions, responses, writes and restores share the
+existing queue, preserving prompt order during rapid input. Failed reads report
+an error without showing cached posts;
 `MAIN` and `BACK` work without a successful content read. Reading a local post
 advances the selected human's read marker before displaying it; failed marker
 writes report an error without displaying the post. Reading never mutates posts.
@@ -110,20 +105,27 @@ etc.) is unverified. No schema/version change is needed for reading. See the
 
 ## Composition and read tracking
 
-`WRITE` and `REPLY number` are reconstructed forum commands, not documented
-PC-VAN shortcuts. The dialog labels its prompts, review, send and cancel controls
-as reconstructed because exact 1996–97 compose interactions remain unverified.
-It preserves Japanese text and whitespace, rejects blank titles/bodies, and
-requires an explicit review followed by a send click. Title Enter and IME
-confirmation cannot submit. Cancel/Escape writes no post or board; failed sends
-retain the reviewed draft for manual retry. Drafts are never saved in backups,
-history or the transcript. Only successful sends append a receipt to the log.
+`WRITE` and `REPLY number` are reconstructed forum commands, not evidenced
+1996–97 PC-VAN shortcuts. A terminal state machine accepts a title (1–200 UTF-16
+units), then successive body lines (up to 20000 units total, preserving spaces and
+blank lines). `.END` validates a nonblank body and shows a numbered preview.
+Only `Y` at review saves. `N` or `CANCEL` / `.CANCEL` discard; `EDIT` accepts
+`TITLE text`, `LINE n text`, `DELETE n`, `APPEND` and `REVIEW`. `LINE n` clears a
+line. `.TEXT text` in body input inserts reserved command text literally.
 
-Users can create and select local human members below the terminal. Creation
-atomically saves a human and the `active-human-member` setting; selection saves
-that setting. Imported worlds without a valid selection use their first human
-in database key order. AI members are excluded. Without a human, local posts can
-be read without markers, and composition asks the user to create a human first.
+`HELP`, `BACK` and `MAIN` during drafting keep the draft and explain cancellation;
+they never navigate or save. Empty/oversize input and write failures preserve
+accepted text. IME conversion Enter never submits a line. A successful transaction
+consumes the draft before a second send can be attempted. Unsent drafts remain
+in memory; submitted draft lines appear in the transcript/log but are excluded
+from persistent command history and JSON backups.
+
+The first connected visit optionally invites handle registration (`Y` then a name,
+or `N` / `SKIP`). `HANDLE` lists human accounts only; a number selects, `NEW`
+registers and `RENAME name` changes the active handle. Creation atomically saves
+a human and `active-human-member`. Imported worlds without a valid selection use
+the first human in database key order. A posting request without an identity
+starts inline registration, then resumes the pending destination/reply intent.
 
 Confirmed sends resolve the board by keyword/number inside the same transaction
 as post allocation. A missing SIG or board is created there; failure rolls back
@@ -132,10 +134,11 @@ are rejected. Demo messages are never copied, persisted or used as reply targets
 Stored snapshots always take precedence over the legacy demonstration fallback.
 Existing board counters and arbitrary stored IDs are retained.
 
-Replies retain `replyToPostId` and prefill a `RE#number` subject. Lists and reads
+Replies retain `replyToPostId` independently of the entered subject. Lists and reads
 derive references from the current parent's ID, so editing the subject cannot
-sever the relationship. A separate link reads the parent within the same forum;
-there is no comment tree. The repository revalidates the parent on send, including
+sever the relationship. Reads show a plain `返信先：#n` reference; type `READ n`
+to read the parent. There are no reply links or comment trees. The repository
+revalidates the parent on send, including
 when another tab deletes it while the draft is open.
 
 The v1 `lastReadNumber` is a **high-water mark**, not a set of individual opened
@@ -232,15 +235,15 @@ is not downgraded or deleted. No automatic retry or destructive recovery occurs.
 
 The shell calls `startSession()` on opening/reloading and on `RECONNECT`, calls
 `endSession()` for an explicit MAIN `Q` logout, and persists submitted nonblank
-commands. The latest timestamps appear below the terminal in UTC. A browser tab
+commands. The latest timestamps appear in `SETTINGS` → `6` in UTC. A browser tab
 close is not recorded as a reliable logout event. Imported session records remain
 exact until a subsequent start or command append applies the history bound;
 in-memory recall is always limited to 100 nonblank entries.
 The transcript, input draft and edits to recalled input remain in memory. The
-terminal's **端末ログを保存 (.txt)** downloads the displayed transcript, including
+terminal's `LOG` command downloads the displayed transcript, including
 scrollback, as UTF-8 text without modifying local data; it is separate from JSON
 backup/restore. Neither the transcript nor unsubmitted drafts are in JSON backups.
-Command echo remains immediate; responses, writes, backup and restore are queued
+Command echo, responses, writes, backup and restore are queued
 in this tab. Repository methods perform no external awaits inside transactions; see
 [the IndexedDB transaction lifecycle](https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction).
 

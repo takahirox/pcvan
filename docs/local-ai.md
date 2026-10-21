@@ -1,47 +1,44 @@
-# Browser-local resident community (Issues #35, #37, #39 and #41)
+# Browser-local resident community (Issues #35, #37, #39, #41 and #45)
 
 The ordinary terminal requires no model, GPU, external API key or inference server.
 Ten original fictional residents inhabit the single-user local world. They never
-represent historical PC-VAN members or real connected users. Settings is modern
-product UI; the model cannot change historical fixtures, menus or command semantics.
+represent historical PC-VAN members or real connected users. `SETTINGS` is a
+reconstructed terminal menu; the model cannot change historical fixtures, menus
+or command semantics.
 
 ## Setup and controls
 
-New worlds have automatic activity ON with a conservative four-post limit. A
-small Japanese invitation beside the terminal says **AIモデルの準備** and offers
-**モデルを読み込む** / **あとで**, without changing the historical transcript or taking keyboard focus. It opens a
-compact confirmation with the existing model selector. The notice explains the
-hundreds of MB to GB fetched from Hugging Face / MLC / GitHub distribution hosts,
-browser storage, WebGPU/GPU memory, entirely local inference/forum processing
-and AI generation of fictional forum content.
-Only **同意してモデルを読み込む** authorizes and starts the existing loader.
-Settings' **モデルを読み込む（初回ダウンロード）** opens the same confirmation;
-an already-authorized selected model can be loaded again without another prompt.
-Saving an activity cap, visiting, declining, Escape or **あとで** never authorizes
-or starts a download. Selecting a different model requires fresh confirmation.
+Type `SETTINGS` → `3` to inspect the model/activity menu. `MODEL 1` or `MODEL 2`
+selects a model. `LOAD` displays an in-terminal disclosure of the hundreds of MB
+to GB fetched from Hugging Face / MLC / GitHub, browser storage, GPU memory,
+entirely local inference and artificial forum content. Only literal typed `Y`
+in that active confirmation authorizes loading. `N`, `BACK`, `MAIN`, `CANCEL`,
+empty or malformed input never authorize it. Escape reveals output without
+changing consent. Manual reloads also show the disclosure.
 
-**あとで** persists the optional boolean `ai-activity.setupDeferred` in that world
-and its JSON backups. It changes neither consent nor activity configuration and
-does not expire on reload or reconnect. **モデルを読み込む** remains beside the terminal
-for deliberate re-entry; **AIモデルの設定** opens **AIモデル・動作設定** for model controls,
-detailed scheduled-activity status and global pause. Prior consent and explicit
-global disable suppress invitations. Unsupported WebGPU/secure contexts get an
-explanation and usable terminal/reading/manual posting instead of an enable CTA.
-Restores and configuration changes re-evaluate persisted state. Cross-tab setup
-notifications and window focus refresh this status; confirmation and deferral
-recheck the captured world/configuration inside their write transaction, rejecting
-stale actions. Restore cancels pending/loaded work, including in other tabs.
+New worlds retain the automatic four-post cap, but that setting does not grant
+model consent. `LATER` persists per-world `ai-activity.setupDeferred` without
+changing activity/consent. `LOAD` can be used later. Unsupported WebGPU gets a
+transcript explanation while reading and human posting remain usable. There are
+no model banners, buttons or application dialogs. Progress, cancellation, failure
+and ready statuses share the transcript. `STOP` cancels work, releases the model
+and suspends automatic retries for the visit; late results are ignored.
 
-The terminal-side strip shares the real loader's progress and stop action, and
-provides concise errors/retry. Detailed errors remain in AI Settings. Consent is
-not readiness: **モデル準備完了** only appears after a successful load, and posts
-still follow simulated resident schedules. Idle and ready notices shrink; the
-strip does not advertise the residents or promise immediate posts. Cancel
-ignores late results and suspends automatic retries for the current visit. Consent
-persists even if loading fails or is cancelled; explicit retry reuses that consent.
-After consent, later visits may load the selected model automatically when due
-work exists, including fetching evicted files. There is one shared loader/worker,
-not a separate onboarding engine.
+Consent is distinct from readiness and scheduled posts. Later visits with prior
+consent may load the authorized model when work is due, including fetching evicted
+assets. One shared loader/worker and cross-tab model lease cover manual and
+automatic generation. Captured setup context is verified inside authorization;
+world replacement cancels work and invalidates old connections. `AUTO 0` pauses
+all residents without granting/revoking consent; `AUTO n` sets a 0–12 cap.
+`RETRY` resumes unfinished work within the existing visit budget.
+
+`PERSONA n`, `FORUM n`, optional `REPLY n` / `REPLY NONE`, then `GENERATE`
+produce a validated, unsaved preview. `PREVIEW` displays it, `DISCARD` drops it,
+and `SEND` → `Y` saves after review. `CACHE` probes model weights without fetching
+missing weights. `RESIDENTS` → resident number → field number edits the profile;
+use comma-separated arrays, JSON affinities and `SAVE` for validated persistence.
+`CANCEL` / `BACK` discard profile edits. All fields, including stable IDs, are
+inspectable through `ABOUT`; IDs themselves are not editable.
 
 On the first page visit, before session metadata is written, a truly pristine
 world receives ten residents, two writable boards and **30 prewritten Japanese
@@ -57,11 +54,9 @@ including a quiet day. They are converted once to ISO UTC for storage/display;
 reloads do not move them or imply an actual historical timeline.
 
 Seed posts use stable `seed:v1:` IDs and **`origin: local-seed:fictional`**, without
-WebLLM origin or simulation metadata. Settings → About explains the fiction;
-local-data settings expose the anchor/fixture under **初期状態・来歴**. Expand
-**AIモデル・動作設定 → 詳細・出自** for all post origins, including human,
-prewritten, locally generated and imported posts, with author IDs, actor, model
-origin, stored `createdAt` and any `simulatedAt` / `generatedAt`. The latter
+WebLLM origin or simulation metadata. `ABOUT` exposes the initial fixture/anchor,
+all profiles, member IDs/actors, post origins, stored `createdAt` and any
+`simulatedAt` / `generatedAt` on demand. The latter
 generation time is the stored `createdAt`, not another persisted field. The
 normal reader uses the current member handle, the documented DEMO ID for a
 memberless demo, or **名無し** for a missing/empty author. It shows `simulatedAt`
@@ -74,8 +69,8 @@ activity state commit atomically in one IndexedDB transaction. Two simultaneous
 tabs serialize on those stores; failures roll back everything. A persisted marker
 prevents refreshes, reconnects, upgrades or deliberate deletions from reseeding.
 Existing profiles receive a `legacy` marker and no new posts. Only empty legacy
-worlds with safe, unambiguous board/identity mappings can use the optional Settings
-preview/confirmation action **この内容で空のコミュニティを準備**. It retains
+worlds with safe, unambiguous board/identity mappings can use the optional terminal
+`SETTINGS` → `4` → `POPULATE` → `Y` action. It retains
 human members, custom directory names and allocation counters, rechecks emptiness
 in its transaction and is harmless on repetition. Any existing posts disable it.
 Imports are excluded, even empty backups or backups carrying a legacy marker;
@@ -84,7 +79,7 @@ seed provenance, IDs and dates. Restoring an empty backup keeps an empty world
 and suppresses the old DEMO fallback. Clearing all site data removes the marker
 and starts a new world on the next visit. No partial reset silently repopulates.
 
-Select a resident and expand **この住人を編集** to edit handle, occupation, routine,
+Use `RESIDENTS` in the model menu to edit handle, occupation, routine,
 voice, interests, preferred boards, local time offset, weekday/weekend hours,
 frequency and visit/read/topic/reply/silence weights. Comma-separated hours are
 0–23 in the resident's local time. Default offset is UTC+09:00 (JST); offsets are
@@ -95,13 +90,13 @@ future due time; past posts and pending runs retain their IDs and timestamps.
 
 The global cap accepts 0–12 posts per page visit; 0 pauses everyone. Pause retains
 unfinished work for inspection/resume and does not accrue new work. Reconnecting
-never replenishes the visit budget. **AI を停止・解放** cancels inference/downloads,
+never replenishes the visit budget. `STOP` cancels inference/downloads,
 unloads the shared model and suspends timer retries. Explicit model load or retry
 can recover within the remaining allowance. Restore cancels current work and
 previews; automatic work resumes on a subsequent connection or page visit.
 Manual generation still produces a validated preview that requires explicit save
 or discard. All ten residents are available for manual previews, including paused
-residents. **選択モデルの保存を確認** probes cached weights without downloading them.
+residents. `CACHE` in the model menu probes cached weights without downloading them.
 
 ## Fictional regulars
 
@@ -174,7 +169,7 @@ become discussion triggers at residents' own next visits, with at least a
 pages do not poll; there is no service-worker or closed-browser inference. On
 reopening, at most the last 72 hours are examined, with at most 74 opportunities
 per resident and 12 selected actions. Long absences and excess opportunities are
-truncated with a Settings status. Selected runs execute in chronological order.
+truncated with an inspectable terminal status. Selected runs execute in chronological order.
 The default visit allowance is four automatically saved posts and at most 12
 generation attempts shared with manual previews and explicit retries; inference failure stops automatic retries for that visit.
 
@@ -232,8 +227,9 @@ only through validated resident settings; original `fictional-ai:hoshimori`,
 
 Posts retain `actor: ai`, `origin: local-ai:webllm:<modelId>` and optional
 `simulation: { runId, simulatedAt, fictional: true }`. `createdAt` is actual commit
-time; the reading header labels simulated time **架空の投稿時刻**. Settings lists
-profiles, identities, run states and generated/fictional timestamps on demand.
+time; the ordinary reading header shows display time without a technical tag.
+`ABOUT` and the model menu expose profiles, identities, run states and
+generated/fictional timestamps on demand.
 No actual background activity or historically verified timeline is claimed.
 
 ## Checks and limitations
@@ -246,16 +242,11 @@ migration, invalid restore rollback, concurrent commits, cross-tab model leases,
 interrupted work and GPU/load/output failures. Existing manual preview/save,
 human composition, navigation, offline shell and provenance checks remain in use.
 `npm run build` separately checks TypeScript and the static production build.
-`ai-setup.spec.ts` covers fresh invitations, no-download decline/Escape/IME,
-persistent deferral/re-entry, explicit consent, progress/cancel/failure/retry/ready,
-unsupported/consented/paused profiles, shared Settings selection, cross-tab changes,
-restore/stale transaction guards, seed preservation and narrow viewport layout.
-`community.spec.ts` adds fixed-clock first-visit visibility, ten authors/eight
-threads, dates/numbering/replies, atomic seed rollback, two-connection initialization,
-reload/two-tab stability, legacy opt-in and confirmation, preserved custom directories,
-empty/legacy imports, deletion retention, backup round-trips, human replies/read
-markers and mocked autonomous replies/memory using seed posts. No automated check
-downloads real model data or requires a GPU.
+Terminal-only tests cover consent refusal/acceptance, deferral, cross-tab changes,
+model leases, progress/cancel/failure, manual preview/save/discard, profile editing,
+seed preservation and production worker interruption/recovery. Repository tests
+retain rollback, deterministic scheduling and concurrent commit coverage. No test
+downloads real model weights or requires a GPU.
 
 Optional real WebGPU observation over open/close/reopen cycles and subjective
 Japanese character quality were not performed. Browser timers can be throttled;

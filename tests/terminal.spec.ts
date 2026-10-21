@@ -1,7 +1,8 @@
+import { start } from './terminal-helpers';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
+  await start(page);
 });
 
 test('starts without services and submits Japanese text as plain text with exact spacing', async ({ page }) => {
@@ -22,7 +23,7 @@ test('starts without services and submits Japanese text as plain text with exact
   await input.press('Enter');
   await expect(output).toContainText('コミュニケーション');
   await input.fill('help');
-  await page.getByRole('button', { name: '送信' }).click();
+  await input.press('Enter');
   await expect(output).toContainText('MAIN に戻る');
   await expect(input).toBeFocused();
   await input.fill('unknown');
