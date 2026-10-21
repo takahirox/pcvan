@@ -2,6 +2,10 @@ import type { Page } from '@playwright/test';
 export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure') {
   await page.addInitScript((mode) => {
     Object.defineProperty(navigator, 'gpu', { value: {} });
+    // Keep outputs distinct when a new page resumes the same persona/forum run.
+    const visitKey = 'pcvan-test-worker-visit';
+    const visit = Number(localStorage.getItem(visitKey) ?? 0) + 1;
+    localStorage.setItem(visitKey, String(visit));
     const stats = { generations: 0, loads: 0 };
     Object.assign(window, { journeyWorker: stats });
     class MockWorker {
@@ -18,7 +22,7 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           const raw = mode === 'invalid' ? '{}' : JSON.stringify({
             personaId: data.personaId, forumId: data.forumId,
             ...(data.replyToPostId ? { replyToPostId: data.replyToPostId } : {}),
-            title: '架空の旅だより', body: `これは創作の活動です。${data.personaId}/${stats.generations}`,
+            title: '架空の旅だより', body: `これは創作の活動です。${data.personaId}/${visit}/${stats.generations}`,
           });
           content = { choices: [{ finish_reason: 'stop', message: { content: raw } }] };
         }

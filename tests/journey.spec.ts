@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { command, start, enterForum, post, backup, restore, noOtherUi, settings, snapshot } from './terminal-helpers';
 import { mockWorker } from './ai-helpers';
+import { emptyActivity } from '../src/ai/activity';
+import type { AiActivity, JsonValue } from '../src/storage/schema';
 
 test('production keyboard journey preserves all MAIN mappings, Japanese posts, read states and backup recovery', async ({ page, context }) => {
   const requests: string[] = [], errors: string[] = [];
@@ -27,6 +29,10 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   const startTime = new Date('2026-10-21T00:00:00Z'), returnTime = new Date('2026-10-24T00:00:00Z');
   await page.clock.setFixedTime(startTime); await mockWorker(page, 'interrupt'); await start(page, '旅行者');
   await enterForum(page); await post(page, '元の話題', '星を眺めました。');
+  // This fixed seed schedules the same persona/forum twice, reproducing the old mock's copy collision.
+  const fixture = await backup(page);
+  fixture.settings.find((row) => row.id === 'ai-activity')!.value = emptyActivity(startTime.toISOString(), 'recovery-42') as unknown as JsonValue;
+  await restore(page, fixture);
   await settings(page, 3); await command(page, 'AUTO 2', '有効');
   await command(page, 'LOAD', '同意してモデル'); await command(page, 'Y');
   await expect(page.locator('.output')).toContainText('モデル準備完了');
@@ -36,11 +42,17 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   await expect.poll(() => page.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)).toBe(2);
   const interrupted = await backup(page), generated = interrupted.posts.filter((p) => p.simulation);
   expect(generated).toHaveLength(1); expect(interrupted.posts).toHaveLength(32);
+  const batch = (interrupted.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity).batch!;
+  expect(batch.runs.map((run) => run.status)).toEqual(['committed', 'running']);
+  expect(batch.runs[1]).toMatchObject({ personaId: batch.runs[0]!.personaId, forumId: batch.runs[0]!.forumId });
   await page.close(); const resumed = await context.newPage(); await resumed.clock.setFixedTime(returnTime); await mockWorker(resumed, 'ok');
   await resumed.goto('/');
   await expect.poll(async () => (await snapshot(resumed)).posts.length).toBe(33);
   const recovered = await backup(resumed);
   expect(recovered.posts.filter((p) => p.simulation)).toHaveLength(2);
+  const recoveredBatch = (recovered.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity).batch!;
+  expect(recoveredBatch.runs).toEqual(batch.runs.map((run) => ({ ...run, status: 'committed' })));
+  expect(new Set(recovered.posts.filter((p) => p.simulation).map((p) => p.body)).size).toBe(2);
   expect(recovered.posts.find((p) => p.id === generated[0]!.id)).toEqual(generated[0]);
   await settings(resumed, 3); await command(resumed, 'HELP', 'committed');
   await command(resumed, 'MAIN', 'MAIN'); await command(resumed, 'Q', '接続を終了');
