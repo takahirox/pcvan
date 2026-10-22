@@ -897,3 +897,37 @@ and close/focus behavior. The final complete run above passed.
 No real model weights were downloaded. Real WebGPU quality, physical-device/native
 IME and screen-reader speech testing were not performed; they remain optional.
 No post-merge verification is required. No push, PR, merge or comment was made.
+
+## Issue #49: autonomous activity after model setup
+
+Validated on 2026-10-22 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+
+- `npm ci`: passed, with 0 vulnerabilities reported.
+- Final `npm test -- --workers=4`: **172 tests passed** in 49.5 seconds,
+  without retries or skips. The suite builds and serves production assets.
+- `npm run build`: passed TypeScript checking and the static production build.
+  The existing optional WebLLM chunk-size advisory remains.
+- New fake-clock browser journeys use the production worker adapter with mock
+  WebLLM, plus an injectable adapter for late output and load failures. They never
+  call a manual AI-generation API: explicit model consent is followed by timer
+  planning, validated automatic saves, delayed human and AI-to-AI replies,
+  LIST/READ, long-open allowance renewal and bounded close/reopen catch-up.
+- Checks cover quiet time, default enabled/unconsented activity, persisted global
+  and individual pause, model changes requiring renewed consent, unavailable
+  locks, cross-tab model contention/recovery, failed loads/output/inference,
+  transactional quota rollback/retry, hidden/restored pages and approved backup
+  recovery without reconnecting. Existing unsupported-GPU, seed/profile,
+  IndexedDB idempotency, JSON/reset and human composition tests remain passing.
+- Standard Settings and typed model help contain no manual posting controls.
+  Background work preserves focused input, IME composition and transcript text;
+  model errors remain in on-demand settings. All 30 initial posts stay intact.
+- `git diff --check` and local link target checks for updated guides passed.
+
+The automatic allowance now renews after six hours in a long-open page, retaining
+conservative limits of four saved posts by default and at most twelve attempts
+per window. Reconnecting does not replenish it. Individual schedules and the
+72-hour catch-up horizon are unchanged; no closed-browser inference is claimed.
+
+Optional real-GPU/model-download and subjective conversation checks were not
+performed. No push, PR, merge, deployment or comment was performed. No post-merge
+verification is required.

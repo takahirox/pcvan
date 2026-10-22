@@ -20,7 +20,8 @@ native file pickers/downloads, confirmations, keyboard focus and mocked models.
 | Invalid lengths, IME, quota rollback/retry, deleted parent, failed read markers | `composition.spec.ts` |
 | Human selection and independent read states | `composition.spec.ts` |
 | Model consent refusal/blank/invalid/acceptance, deferral, cross-tab changes and leases | `ai-controls.spec.ts`, `ai-setup.spec.ts` |
-| Progress, cancel/late results, errors, generation budget, profiles and provenance | `ai-controls.spec.ts` |
+| Autonomous timer, delayed human/resident replies, quiet time, renewed bounds, cancellation, errors and cross-tab recovery | `autonomy.spec.ts` |
+| Typed profile editing and model consent without manual generation controls | `ai-controls.spec.ts` |
 | Production Worker adapter and autonomous batch recovery/idempotency | `ai-adapter.spec.ts`, `journey.spec.ts` |
 | Real JSON export/import, cancellation, invalid file/quota rollback, stale confirmations | `storage-controls.spec.ts` |
 | Typed reset, transactional rollback, stale connections, tabs, preserved caches/recovery | `factory-reset.spec.ts` |

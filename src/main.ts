@@ -7,7 +7,6 @@ import type { Backup } from './storage/schema';
 import { activeHuman, forumPosts } from './forums';
 import { TerminalCommands } from './commands';
 import { createAiControls } from './ai/controls';
-import { postInput, validateGeneration } from './ai/generation';
 import { mountSettings } from './settings-dialog';
 import './style.css';
 
@@ -106,7 +105,7 @@ const terminal = mountTerminal(root, {
       if (before === 'disconnected' && after !== 'disconnected') {
         terminal.showSessionTimes(await repo.startSession());
         const activity = await repo.openActivity();
-        void ai.openActivity(activity).catch(reportError);
+        if (document.visibilityState === 'visible') void ai.openActivity(activity).catch(reportError);
       }
       if (before !== 'disconnected' && after === 'disconnected') {
         ai.invalidate(); terminal.showSessionTimes(await repo.endSession());
@@ -145,15 +144,6 @@ const ai = createAiControls({
       try { await refreshContent(); } catch (error) { reportError(error); } return post;
     }),
   },
-  save: (request, raw, modelId, signal) => enqueue(async () => {
-    signal.throwIfAborted();
-    const repo = await repository, snapshot = await repo.exportBackup();
-    signal.throwIfAborted();
-    const generated = validateGeneration(raw, snapshot, request);
-    const input = postInput(generated, modelId, snapshot);
-    await repo.createAiPost(input.member, input.post);
-    try { await refreshContent(); } catch (error) { reportError(error); }
-  }),
 });
 const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
@@ -175,6 +165,7 @@ const commandActions = {
       try { await refreshContent(); } catch (error) { reportError(error); }
       return repo.getSession();
     });
+    ai.resume();
     if (!settingsDialog?.open) terminal.focus();
   },
   reset: async (expectedContext) => {
@@ -202,7 +193,9 @@ const startup = enqueue(async () => {
   return activity;
 });
 updateConnection();
-void startup.then((activity) => ai.openActivity(activity)).catch(reportError);
+void startup.then((activity) => {
+  if (document.visibilityState === 'visible' && controller.screen !== 'disconnected') return ai.openActivity(activity);
+}).catch(reportError);
 const touchActivity = () => {
   if (!resetting && controller.screen !== 'disconnected') void enqueue(async () => (await repository).touchActivity()).catch(reportError);
 };
@@ -212,7 +205,9 @@ function tickResidents() {
 setInterval(tickResidents, 60_000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') touchActivity(); else tickResidents(); });
 window.addEventListener('pagehide', () => { ai.invalidate(); touchActivity(); });
-window.addEventListener('pageshow', (event) => { if (event.persisted) void ai.openActivity().catch(reportError); });
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) { ai.resume(); tickResidents(); }
+});
 if (typeof BroadcastChannel !== 'undefined') {
   try {
     const changes = new BroadcastChannel(`pcvan-ai-setup:${DATABASE_NAME}`);

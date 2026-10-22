@@ -18,7 +18,7 @@ import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
 type Intent = { target: ForumDestination; parent?: Post };
-type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate' | 'ai-save'; expected: string; text?: string; modelId?: string };
+type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
   repository(): Promise<LocalRepository>;
@@ -53,9 +53,6 @@ export class TerminalCommands {
   private confirmation: Confirmation | undefined;
   private detailReturns: (Menu | null)[] = [];
   private selectedModel: string = models[0].id;
-  private selectedResident = 0;
-  private selectedForum = 0;
-  private selectedReply: number | undefined;
   private profile: ResidentProfile | undefined;
   private profileContext: string | undefined;
   private field: keyof ResidentProfile | undefined;
@@ -105,10 +102,7 @@ export class TerminalCommands {
       this.selectedModel = models.find((row) => row.id === saved?.modelId)?.id ?? models[0].id;
       print('モデル・活動・住人', ...this.actions.ai.status(), ...models.map((row, i) => `MODEL ${i + 1}: ${row.label}`),
         `選択モデル: ${this.selectedModel}`, 'LOAD: 説明・読込確認 / LATER: 準備を延期 / STOP: 中止・モデル解放 / CACHE: 重み確認',
-        'AUTO 0〜12: 自動保存上限（0で休止）/ RETRY: 未完了を再試行 / RESIDENTS: 住人編集',
-        ...residentProfiles(data).map((row, i) => `PERSONA ${i + 1}: ${row.handle}${i === this.selectedResident ? ' [選択中]' : ''}`),
-        ...data.forums.map((row, i) => `FORUM ${i + 1}: ${row.name}${i === this.selectedForum ? ' [選択中]' : ''}`),
-        `返信先: ${this.selectedReply ?? 'なし'}`, 'REPLY 番号 / REPLY NONE / GENERATE: 投稿案 / PREVIEW / SEND / DISCARD');
+        'AUTO 0〜12: 6時間の自動投稿上限（0で休止）/ RETRY: 未完了を再試行 / RESIDENTS: 住人編集');
     }
     if (menu === 'storage') print('JSON バックアップ・復元・初期化', 'BACKUP: JSON 保存 / IMPORT: ファイル選択・置換確認 / RESET: 初期状態に戻す',
       ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・既読・設定・履歴を含みます。モデルと端末キャッシュは含みません。外部に保存してください。');
@@ -177,7 +171,6 @@ export class TerminalCommands {
       // Consume before the asynchronous action: repeated Y cannot reuse approval.
       this.confirmation = undefined;
       if (pending.kind === 'model') void this.actions.ai.load(pending.modelId!, pending.expected);
-      if (pending.kind === 'ai-save') void this.actions.ai.send();
       if (pending.kind === 'import') await this.actions.restore(pending.text!, pending.expected);
       if (pending.kind === 'reset') await this.actions.reset(pending.expected);
       if (pending.kind === 'populate') { await (await this.actions.repository()).populateEmptyCommunity({ confirmPopulate: true }); await this.actions.read(); print('初期会話を準備しました。'); }
@@ -319,18 +312,6 @@ export class TerminalCommands {
         await this.settings.activity(Number(arg), this.selectedModel); print(Number(arg) ? '自動投稿を有効にしました。モデル読込への同意は別に必要です。' : '自動投稿を休止しました。');
       } else if (command === 'RETRY') void this.actions.ai.retry();
       else if (command === 'RESIDENTS') { await this.show('profiles'); return true; }
-      else if (key === 'PERSONA' && residentProfiles(data)[index]) { this.actions.ai.discard(); this.selectedResident = index; print('投稿者を選択しました。'); }
-      else if (key === 'FORUM' && data.forums[index]) { this.actions.ai.discard(); this.selectedForum = index; this.selectedReply = undefined; print('投稿先を選択しました。'); }
-      else if (key === 'REPLY' && (arg === 'NONE' || /^[1-9]\d*$/.test(arg ?? ''))) {
-        this.actions.ai.discard(); this.selectedReply = arg === 'NONE' ? undefined : Number(arg); print(`返信先: ${this.selectedReply ?? 'なし'}`);
-      } else if (command === 'GENERATE') {
-        const forum = data.forums[this.selectedForum], persona = residentProfiles(data)[this.selectedResident];
-        const parent = data.posts.find((p) => p.forumId === forum?.id && p.number === this.selectedReply);
-        if (!forum || !persona || (this.selectedReply !== undefined && !parent)) print('投稿先・投稿者・返信先を選択し直してください。');
-        else void this.actions.ai.generate({ forumId: forum.id, personaId: persona.id, ...(parent ? { replyToPostId: parent.id } : {}) });
-      } else if (command === 'PREVIEW') print(...this.actions.ai.preview());
-      else if (command === 'DISCARD') this.actions.ai.discard();
-      else if (command === 'SEND' && this.actions.ai.hasDraft) { this.confirm({ kind: 'ai-save', expected: context(data) }, ...this.actions.ai.preview(), '投稿案を保存しますか？ (Y/N)='); return true; }
       else print('HELP でモデル・活動の操作を表示します。');
     }
     print('コマンド=');

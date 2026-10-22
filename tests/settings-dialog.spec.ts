@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { command, start, enterForum, post, snapshot, noOtherUi } from './terminal-helpers';
+import { epoch, hour, lifestyles } from './autonomy-helpers';
 import { mockWorker, mockPendingWorker, mockModel } from './ai-helpers';
 import type { AiActivity } from '../src/storage/schema';
 import type { ResidentSettings } from '../src/ai/personas';
@@ -23,7 +24,7 @@ async function choose(page: Page, text: string) {
   await (await choosing).setFiles({ name: 'world.json', mimeType: 'application/json', buffer: Buffer.from(text) });
 }
 async function cap(page: Page, max: number) {
-  await dialog(page).getByLabel('自動投稿の上限', { exact: false }).fill(String(max));
+  await dialog(page).getByLabel('自動投稿上限', { exact: false }).fill(String(max));
   await dialog(page).getByRole('button', { name: '活動設定を保存', exact: true }).click();
   await expect(dialog(page).locator('.settings-message')).toContainText(max ? '有効' : '休止');
 }
@@ -107,7 +108,7 @@ test('terminal IME defers Settings without losing text; neutral setup cue suppor
   expect(await page.evaluate(() => (window as unknown as { journeyWorker: { loads: number } }).journeyWorker.loads)).toBe(0);
 });
 
-test('Settings model selector, refusal, affirmative consent, manual preview/save, pause and provenance share stored actions', async ({ page }) => {
+test('Settings model selector, refusal, affirmative consent, pause and on-demand provenance share stored actions', async ({ page }) => {
   await mockWorker(page, 'ok'); await start(page); const transcript = await page.locator('.output').textContent();
   await open(page, 'ai'); const modal = dialog(page);
   await modal.getByRole('combobox', { name: 'モデル', exact: true }).selectOption({ index: 1 });
@@ -122,20 +123,8 @@ test('Settings model selector, refusal, affirmative consent, manual preview/save
   expect(await page.evaluate(() => (window as unknown as { journeyWorker: { loads: number } }).journeyWorker.loads)).toBe(0);
   await load(page); await expect(modal.locator('.ai-status')).toContainText('モデル準備完了');
   expect(await activity(page)).toMatchObject({ consent: true, modelId: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', maxPosts: 0 });
-  await modal.getByText('手動生成・投稿案の確認', { exact: true }).click();
-  await modal.getByRole('combobox', { name: '投稿者', exact: true }).selectOption('kusabue');
-  await modal.getByLabel('返信先の番号（空欄で新規）', { exact: true }).fill('1');
-  await modal.getByRole('button', { name: '投稿案を生成', exact: true }).click();
-  await expect(modal.locator('.ai-status')).toContainText('投稿案（未保存）');
-  await modal.getByRole('button', { name: '投稿案を表示', exact: true }).click();
-  await expect(modal.locator('.ai-preview')).toContainText('架空の旅だより');
-  await modal.getByRole('button', { name: '投稿案を保存', exact: true }).click();
-  await expect(modal.locator('.confirmation-copy')).toContainText('この投稿案を保存');
-  await modal.getByRole('button', { name: '投稿案を保存する', exact: true }).click();
-  await expect(modal.locator('.ai-status')).toContainText('AI 投稿を保存しました');
-  await expect(modal.locator('.ai-preview')).toBeEmpty();
-  const data = await snapshot(page); expect(data.posts).toHaveLength(31);
-  expect(data.posts.find((p) => p.origin.startsWith('local-ai:'))).toMatchObject({ origin: 'local-ai:webllm:Qwen2.5-1.5B-Instruct-q4f16_1-MLC', authorId: 'fictional-ai:kusabue' });
+  await expect(modal.locator('.generate-ai, .preview-ai, .save-ai, .discard-ai, .persona-select, .forum-select, .ai-reply')).toHaveCount(0);
+  expect((await snapshot(page)).posts).toHaveLength(30);
   await modal.getByRole('button', { name: '処理を中止・モデルを解放', exact: true }).click();
   await expect(modal.locator('.ai-status')).toContainText('キャンセル');
   await modal.locator('.about-panel > summary').click(); await expect(modal.locator('.settings-about')).toContainText('local-ai:webllm:');
@@ -174,14 +163,13 @@ test('all ten resident profiles and schedule fields are editable, validated, can
 });
 
 for (const work of ['load', 'generate'] as const) {
-  test(`Settings can cancel pending ${work} without a late draft or blocking human posting`, async ({ page }) => {
-    await mockPendingWorker(page, work); await start(page, '手動'); await open(page, 'ai'); await cap(page, 0); await load(page);
+  test(`Settings can cancel pending ${work} without late output or blocking human posting`, async ({ page }) => {
+    await page.clock.install({ time: epoch });
+    await mockPendingWorker(page, work); await start(page, '手動'); await lifestyles(page); await open(page, 'ai'); await load(page);
     const modal = dialog(page);
     if (work === 'generate') {
       await expect(modal.locator('.ai-status')).toContainText('モデル準備完了');
-      await modal.getByText('手動生成・投稿案の確認', { exact: true }).click();
-      await modal.getByRole('button', { name: '投稿案を生成', exact: true }).click();
-      await expect(modal.locator('.ai-status')).toContainText('生成中');
+      await page.clock.fastForward(hour);
     }
     await expect.poll(() => page.evaluate(() => (window as unknown as { pendingWork: string[] }).pendingWork)).toContain(work === 'load' ? 'reload' : 'chatCompletionNonStreaming');
     await modal.getByRole('button', { name: '処理を中止・モデルを解放', exact: true }).click();
