@@ -47,14 +47,14 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       <p class="session-times"></p><button type="button" class="download-log">端末ログを保存</button>
     </details>
     <details class="ai-panel"><summary>AIモデル・活動</summary>
-      <p>モデルの準備は任意です。WebGPU 対応ブラウザーの HTTPS / localhost と十分な GPU メモリが必要です。</p>
+      <p>モデルの準備後は生活時間に沿って自動で投稿・返信します。すぐに投稿するとは限りません。モデルの準備は任意です。WebGPU 対応ブラウザーの HTTPS / localhost と十分な GPU メモリが必要です。</p>
       <label>モデル<select class="model-select"></select></label>
       <div class="settings-buttons"><button type="button" class="load-model">モデルを読み込む</button>
         <button type="button" class="stop-model">処理を中止・モデルを解放</button>
         <button type="button" class="defer-model">あとで準備</button>
         <button type="button" class="model-cache">モデルの保存状態を確認</button></div>
       <pre class="ai-status" role="status" aria-live="polite"></pre>
-      <form class="activity-form"><label>自動投稿の上限（0で休止、最大12）<input name="maxPosts" type="number" min="0" max="12" required></label>
+      <form class="activity-form"><label>6時間の自動投稿上限（0で休止、最大12）<input name="maxPosts" type="number" min="0" max="12" required></label>
         <button type="submit">活動設定を保存</button></form>
       <button type="button" class="retry-activity">未完了の活動を再試行</button>
       <details><summary>住人のプロフィール・生活時間</summary>
@@ -62,14 +62,6 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
         <form class="resident-form">${profileFields.map((key, i) => `<label>${profileLabels[i]}<textarea name="${key}" rows="2"></textarea></label>`).join('')}
           <p>配列はカンマ区切り。親しさは JSON。保存時に範囲・内容を検証します。</p>
           <button type="submit">住人の設定を保存</button><button type="button" class="cancel-resident">変更を破棄</button></form>
-      </details>
-      <details><summary>手動生成・投稿案の確認</summary>
-        <label>投稿者<select class="persona-select"></select></label>
-        <label>投稿先<select class="forum-select"></select></label>
-        <label>返信先の番号（空欄で新規）<input class="ai-reply" type="number" min="1"></label>
-        <div class="settings-buttons"><button type="button" class="generate-ai">投稿案を生成</button>
-          <button type="button" class="preview-ai">投稿案を表示</button><button type="button" class="save-ai">投稿案を保存</button>
-          <button type="button" class="discard-ai">投稿案を破棄</button></div><pre class="ai-preview"></pre>
       </details>
     </details>
     <details class="storage-panel"><summary>ローカルデータ・保守</summary>
@@ -92,8 +84,6 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
   const residentForm = query<HTMLFormElement>('.resident-form');
   const modelSelect = query<HTMLSelectElement>('.model-select');
   const residentSelect = query<HTMLSelectElement>('.resident-select');
-  const personaSelect = query<HTMLSelectElement>('.persona-select');
-  const forumSelect = query<HTMLSelectElement>('.forum-select');
   const field = <T extends HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(form: HTMLFormElement, name: string) => form.elements.namedItem(name) as T;
   for (const model of models) modelSelect.add(new Option(model.label, model.id));
   let snapshot: Backup | undefined;
@@ -113,7 +103,6 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
   function updateStatus() {
     const text = actions.ai.status().join('\n');
     if (query('.ai-status').textContent !== text) query('.ai-status').textContent = text;
-    if (!actions.ai.hasDraft) query('.ai-preview').textContent = '';
   }
   function clearConfirmation() {
     confirmation = undefined;
@@ -160,8 +149,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       field<HTMLInputElement>(activityForm, 'maxPosts').value = String(activity?.maxPosts ?? 0);
     }
     const residents = residentProfiles(content).map((row) => ({ id: row.id, label: row.handle }));
-    options(residentSelect, residents); options(personaSelect, residents);
-    options(forumSelect, content.forums.map((row) => ({ id: row.id, label: row.name })));
+    options(residentSelect, residents);
     query('.session-times').textContent = actions.sessionTimes();
     query('.settings-help').textContent = keyboardHelp.join('\n');
     query('.settings-about').textContent = about(content).join('\n');
@@ -247,24 +235,6 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     const expected = profileContext;
     await actions.run(() => actions.settings.resident(edited, expected));
     editResident(); message('住人の設定を保存しました。次の予定から反映します。');
-  });
-  for (const select of [personaSelect, forumSelect, query<HTMLInputElement>('.ai-reply')]) {
-    select.addEventListener('change', () => { actions.ai.discard(); query('.ai-preview').textContent = ''; });
-  }
-  click('.generate-ai', async () => {
-    const forumId = forumSelect.value, personaId = personaSelect.value, reply = query<HTMLInputElement>('.ai-reply').value;
-    const content = await actions.read();
-    const parent = reply ? content.posts.find((p) => p.forumId === forumId && p.number === Number(reply)) : undefined;
-    if (reply && !parent) throw new Error('返信先のローカル投稿がありません。');
-    void actions.ai.generate({ forumId, personaId, ...(parent ? { replyToPostId: parent.id } : {}) });
-  });
-  click('.preview-ai', () => { query('.ai-preview').textContent = actions.ai.preview().join('\n'); });
-  click('.discard-ai', () => { actions.ai.discard(); query('.ai-preview').textContent = ''; });
-  click('.save-ai', async () => {
-    if (!actions.ai.hasDraft) { message('投稿案はありません。'); return; }
-    const accepted = epoch, content = await actions.read();
-    if (accepted !== epoch) return;
-    confirm('world', content, [...actions.ai.preview(), 'この投稿案を保存しますか？'], () => actions.ai.send(), '投稿案を保存する');
   });
   click('.import-json', async () => {
     const accepted = epoch;

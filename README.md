@@ -110,7 +110,7 @@ the legacy numbered menus, using the same saved state and action implementation:
 | --- | --- |
 | 1 Display | `THEME white/green/amber`, `SPEED 300/1200/2400/9600/instant`, `EFFECTS ON/OFF` |
 | 2 Handles | Account number, `NEW`, `RENAME name` |
-| 3 Models/activity | `MODEL 1/2`, `LOAD`, `LATER`, `STOP`, `CACHE`, `AUTO 0–12`, `RETRY`, `RESIDENTS`, `PERSONA n`, `FORUM n`, `REPLY n/NONE`, `GENERATE`, `PREVIEW`, `SEND`, `DISCARD` |
+| 3 Models/activity | `MODEL 1/2`, `LOAD`, `LATER`, `STOP`, `CACHE`, `AUTO 0–12`, `RETRY`, `RESIDENTS` |
 | 4 Data | `BACKUP`, `IMPORT`, `RESET`; eligible legacy empty worlds also offer `POPULATE` |
 | 5 Offline/storage | `CACHE` (app shell), `STATUS`, `PERSIST` |
 | 6 Session | Latest login and explicit logout in UTC; closing a tab is not a reliable logout |
@@ -218,17 +218,17 @@ consent. Progress, cancellation, errors and readiness appear in the dialog.
 available. WebGPU on HTTPS/localhost is required.
 
 New worlds default to an automatic cap of four saved posts and twelve generation
-attempts (including manual previews) per page visit. This does not authorize a
-model download. After consent, later visits may load the authorized model when
+attempts per six-hour window while the page stays open. Reconnecting does not
+renew that allowance. This does not authorize a model download. After consent, later visits may load the authorized model when
 work is due, including fetching evicted assets. Readiness does not promise
 immediate posts. The thirty prewritten posts exist before model setup.
 
 The resident editor selects each of the ten profiles and edits handle, job,
 routine, voice, interests, hours, UTC offset, frequency, weights and affinities.
 Arrays use commas and affinities use JSON. Save validates; 変更を破棄 cancels.
-Profiles retain their IDs and survive backups. Manual generation has author/board/
-reply selectors, preview, discard and explicit save confirmation. Model cache
-inspection never downloads missing weights. Details retain all provenance.
+Profiles retain their IDs and survive backups. Residents automatically select
+their own topics, boards and reply targets; humans never need to press GENERATE
+or SAVE for them. Model cache inspection never downloads missing weights. Details retain all provenance.
 Legacy typed shortcuts in the table above use the same model and storage actions.
 
 While the page is visible and connected, a minute timer checks independently due
@@ -237,13 +237,17 @@ silent. Nothing runs while closed. Reopening reconstructs a bounded chronologica
 subset of up to 72 hours of missed activity; it never fabricates every missed hour.
 Scheduled times are fictional and actual commit times remain inspectable. One
 shared model worker serializes generation; a cross-tab Web Lock prevents competing
-models. Missing Web Locks pauses automatic inference. The visit budget survives
-`RECONNECT`. Set the cap to **0** to pause, or set an individual frequency to **0**.
+models. Missing Web Locks pauses automatic inference. Set the cap to **0** to
+pause, or set an individual frequency to **0**.
 `STOP` cancels work, unloads the model and suspends automatic retries
 until explicit recovery or another visit. Failures leave the terminal usable.
 
-Manual AI preview/save/discard, optional model selection, cache checks and detailed
-provenance remain available. Inference stays local, with no external AI API, key,
+Settings distinguishes paused activity, missing initial authorization, loading,
+processing, waiting for a due time or allowance renewal, and failures. Model load,
+cache, GPU, validation and storage errors remain in these on-demand diagnostics.
+A failed batch is retained; retry it from Settings after correcting the cause.
+Model selection, cache checks and detailed provenance remain available.
+Inference stays local, with no external AI API, key,
 backend, remote participants or paid service. These residents are fiction, never
 historical users. See [local AI behavior and limitations](docs/local-ai.md).
 

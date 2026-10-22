@@ -1,4 +1,4 @@
-# Browser-local resident community (Issues #35, #37, #39, #41, #45 and #47)
+# Browser-local resident community
 
 The ordinary terminal requires no model, GPU, external API key or inference server.
 Ten original fictional residents inhabit the single-user local world. They never
@@ -27,19 +27,20 @@ and automatic generation. Captured setup context is checked inside authorization
 world replacement cancels work and invalidates old connections.
 
 The activity cap accepts 0–12; zero pauses everyone while retaining model consent.
-Retry resumes unfinished work within the visit budget. The model stop button
+Retry resumes unfinished work within the current six-hour budget. The model stop button
 cancels work, releases the model and suspends timer retries; late results are
 ignored. The cache button checks weights without downloading missing weights.
-Manual generation selects persona, forum and optional reply number, generates an
-unsaved preview, and requires review and affirmative save confirmation. Discard
-never saves. The profile editor exposes all ten residents and every routine,
+Residents choose their own actions, generate validated output and save it automatically.
+Humans never need to press GENERATE or SAVE for residents; the manual AI draft API
+and its controls have been removed. Read, write and reply inside the terminal;
+model readiness does not promise an immediate reply or post. The profile editor
+exposes all ten residents and every routine,
 schedule, frequency, personality and affinity field. Save validates; cancel
 restores the persisted profile. Stable IDs are inspectable but not editable.
 
 `SETTINGS` → `3` remains an optional typed presentation of the same state/actions:
-`MODEL`, `LOAD` → `Y`, `LATER`, `STOP`, `AUTO`, `RETRY`, `CACHE`, `PERSONA`, `FORUM`,
-`REPLY`, `GENERATE`, `PREVIEW`, `SEND` → `Y`, `DISCARD` and `RESIDENTS`. Requested
-legacy-menu output remains in that menu. Background model messages stay out of
+`MODEL`, `LOAD` → `Y`, `LATER`, `STOP`, `AUTO`, `RETRY`, `CACHE` and `RESIDENTS`.
+Requested legacy-menu output remains in that menu. Background model messages stay out of
 ordinary SIG output and active human prompts. Handle registration, navigation and
 human posting are terminal-only; no Settings control performs them.
 
@@ -92,15 +93,25 @@ Preferred boards accept `MITI:9`, `DAISIZEN:1` or a stored forum ID. Residents
 occasionally explore other available boards. Changes recalculate that resident's
 future due time; past posts and pending runs retain their IDs and timestamps.
 
-The global cap accepts 0–12 posts per page visit; 0 pauses everyone. Pause retains
-unfinished work for inspection/resume and does not accrue new work. Reconnecting
-never replenishes the visit budget. `STOP` cancels inference/downloads,
-unloads the shared model and suspends timer retries. Explicit model load or retry
-can recover within the remaining allowance. Restore cancels current work and
-previews; automatic work resumes on a subsequent connection or page visit.
-Manual generation still produces a validated preview that requires explicit save
-or discard. All ten residents are available for manual previews, including paused
-residents. `CACHE` in the model menu probes cached weights without downloading them.
+The global cap accepts 0–12 posts per six-hour window while the page stays open;
+0 pauses everyone. Pause retains unfinished work and does not accrue new work.
+Reconnecting never replenishes the allowance. At six hours the live page receives
+a new bounded allowance without any user action; resident opportunities still
+follow individual schedules. Closing/reopening starts a fresh bounded visit.
+`STOP` cancels inference/downloads, unloads the shared model and suspends timer
+retries. Explicit model load or retry can recover within the remaining allowance.
+Restore cancels current work; the next visible timer resumes activity using the
+restored authorization and pause preferences. `CACHE` probes cached weights without downloading them.
+
+Settings reports enabled/waiting for initial authorization, paused, loading,
+processing, waiting for a due time, waiting for the allowance renewal, or
+stopped/failed. Quiet schedules are normal. Missing WebGPU or Web Locks is reported
+separately from scheduling silence. Load/cache/validation/GPU/quota failures stop
+retries and retain unfinished work; use the model loader or activity retry after
+correcting the cause. Model contention waits for the other tab to release its
+lease and automatically retries on the next visible timer. Technical errors and
+run provenance stay in on-demand application settings, never the ordinary forum
+transcript or composer.
 
 ## Fictional regulars
 
@@ -174,8 +185,9 @@ pages do not poll; there is no service-worker or closed-browser inference. On
 reopening, at most the last 72 hours are examined, with at most 74 opportunities
 per resident and 12 selected actions. Long absences and excess opportunities are
 truncated with an inspectable activity status in Settings. Selected runs execute in chronological order.
-The default visit allowance is four automatically saved posts and at most 12
-generation attempts shared with manual previews and explicit retries; inference failure stops automatic retries for that visit.
+The default allowance is four automatically saved posts and at most 12 generation
+attempts per six-hour window, including explicit retries. Inference failure stops
+automatic retries until explicit recovery or reopening.
 
 Candidates use at most eight recent same-forum local human, seed or generated AI
 posts, exclude the resident's own posts, future posts and recently answered targets, and prefer shared
@@ -188,11 +200,11 @@ local memory survives reload/backup without maintaining a second transcript;
 imported/historical origins and demo fixtures are excluded from memory/prompts.
 Discussion data and profiles are untrusted data, never system instructions.
 
-One worker/model is shared across all residents and manual previews. A Web Lock
+One worker/model is shared across all residents. A Web Lock
 holds a cross-tab model lease until unload/page close, and another lock serializes
 automatic batch execution. Another tab reports contention without loading another
-GPU model. Automatic inference pauses if Web Locks are unavailable; manual use
-remains possible. Model work stays outside the storage/terminal command queue.
+GPU model. Automatic inference pauses if Web Locks are unavailable; human posting
+remains available. Model work stays outside the storage/terminal command queue.
 Unsupported WebGPU, offline/cache failures, invalid output, cancellation and GPU
 loss leave terminal navigation, human posting and backups usable.
 
@@ -243,11 +255,14 @@ resident/activity suites inject clocks and fixed seeds to cover all ten profiles
 routines/time offsets, quiet periods, delayed human/AI replies, open-tab timers,
 consent, first-visit seeded boards, caps, pause/resume, profile persistence, legacy backup
 migration, invalid restore rollback, concurrent commits, cross-tab model leases,
-interrupted work and GPU/load/output failures. Existing manual preview/save,
-human composition, navigation, offline shell and provenance checks remain in use.
+interrupted work and GPU/load/output failures. Automatic timer-driven browser
+journeys cover explicit consent, delayed human
+and AI-to-AI replies, quiet time, focus/IME/composition preservation, long-open
+allowance renewal and bounded close/reopen catch-up without manual AI calls.
+Human composition, navigation, offline shell and provenance checks remain in use.
 `npm run build` separately checks TypeScript and the static production build.
 Legacy typed-menu tests cover consent refusal/acceptance, deferral, cross-tab changes,
-model leases, progress/cancel/failure, manual preview/save/discard, profile editing,
+model leases, progress/cancel/failure, profile editing,
 seed preservation and production worker interruption/recovery. Settings tests
 exercise functional dialog controls, draft/focus/IME protection, profile conflicts,
 model progress/cancellation/failures and native data replacement/reset. Repository tests

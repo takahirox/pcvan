@@ -1,3 +1,4 @@
+import { epoch, hour, lifestyles } from './autonomy-helpers';
 import { mockWorker, mockPendingWorker } from './ai-helpers';
 import { command, start, enterForum, post, backup, restore, snapshot, noOtherUi, settings } from './terminal-helpers';
 import { expect, test } from '@playwright/test';
@@ -207,10 +208,11 @@ test('a suspended tab missing notifications cannot approve old consent after res
 
 for (const work of ['load', 'generate'] as const) {
   test(`reset invalidates pending production ${work} and ignores late worker results`, async ({ page }) => {
-    await mockPendingWorker(page, work); await start(page, '操作する人'); await settings(page, 3);
+    await page.clock.install({ time: epoch });
+    await mockPendingWorker(page, work); await start(page, '操作する人'); await lifestyles(page); await settings(page, 3);
     await command(page, 'LOAD', '同意してモデル'); await command(page, 'Y');
     if (work === 'generate') {
-      await expect(page.locator('.output')).toContainText('モデル準備完了'); await command(page, 'GENERATE', '生成中');
+      await expect(page.locator('.output')).toContainText('モデル準備完了'); await page.clock.fastForward(hour);
     }
     await expect.poll(() => page.evaluate(() => (window as unknown as { pendingWork: string[] }).pendingWork)).toContain(work === 'load' ? 'reload' : 'chatCompletionNonStreaming');
     await command(page, 'RESET', '初期状態に戻しますか');
