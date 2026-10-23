@@ -17,6 +17,17 @@ export interface Post {
   origin: string;
   simulation?: { runId: string; simulatedAt: string; fictional: true };
 }
+/** Retained messages are separate from forum posts and OLT attendance. */
+export const CONFERENCE_SETTING = 'daisizen-conference';
+export const CONFERENCE_ID = 'DAISIZEN';
+export interface Contribution {
+  id: string; number: number; authorId: string; title: string; body: string;
+  createdAt: string; origin: 'local-human' | 'local-seed:conference-v1';
+  replyToPostId?: string;
+}
+export interface ConferenceState {
+  version: 1; conferenceId: typeof CONFERENCE_ID; nextNumber: number; contributions: Contribution[];
+}
 export interface Mail {
   id: string; number: number; senderId: string; recipientId: string;
   subject: string; body: string; createdAt: string; origin: string;
@@ -287,6 +298,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
       if (value.id === OLT_SETTING) validateOlt(value.value);
+      if (value.id === CONFERENCE_SETTING) validateConference(value.value);
       if (value.id === 'ai-activity') validateActivity(value.value);
       if (value.id === RESIDENTS_SETTING) validateResidents(value.value);
       if (value.id === TERMINAL_SETTING) validateTerminalPreferences(value.value);
@@ -345,6 +357,8 @@ export function validateBackup(value: unknown): asserts value is Backup {
   }
   const olt = backup.settings.find((s) => s.id === OLT_SETTING)?.value;
   if (olt) { validateOlt(olt); validateOltMembers(olt, backup.members); }
+  const conference = backup.settings.find((s) => s.id === CONFERENCE_SETTING)?.value;
+  if (conference !== undefined) { validateConference(conference); validateConferenceMembers(conference, backup.members); }
   validateMailRelations(backup.mail ?? [], backup.members);
   for (const read of backup.readStates) {
     if (!members.has(read.memberId) || !forums.has(read.forumId)) invalid('Read state references a missing member or forum.');
@@ -380,4 +394,38 @@ export function resolveMailResident(members: readonly Member[], address: string)
   const matches = byId.length ? byId : residents.filter((m) => m.handle === address);
   if (matches.length !== 1) invalid('宛先の住人が見つからないか、ハンドルが重複しています。MEMBERS の宛先を使ってください。');
   return matches[0]!;
+}
+
+/** Validate the whole conference before a direct write or atomic backup restore. */
+export function validateConference(value: unknown): asserts value is ConferenceState {
+  fields(value, ['version', 'conferenceId', 'nextNumber', 'contributions']);
+  if (value.version !== 1 || value.conferenceId !== CONFERENCE_ID || !Array.isArray(value.contributions)) invalid('Invalid conference.');
+  integer(value.nextNumber, 1);
+  const ids = new Set<string>();
+  let previous = 0;
+  for (const row of value.contributions) {
+    fields(row, ['id', 'number', 'authorId', 'title', 'body', 'createdAt', 'origin'], ['replyToPostId']);
+    string(row.id); string(row.authorId); integer(row.number, 1); timestamp(row.createdAt);
+    if (row.id.length > 256 || row.authorId.length > 128 || ids.has(row.id) ||
+        (row.number as number) <= previous || (row.number as number) >= (value.nextNumber as number) ||
+        !['local-human', 'local-seed:conference-v1'].includes(row.origin as string)) invalid('Invalid conference identity, order or provenance.');
+    for (const [key, max] of [['title', 200], ['body', 20000]] as const) {
+      string(row[key]);
+      if (row[key].length > max || /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/.test(row[key]) ||
+          (key === 'title' && row[key].includes('\n'))) invalid('Invalid conference text.');
+    }
+    if (row.replyToPostId !== undefined) {
+      string(row.replyToPostId);
+      if (!ids.has(row.replyToPostId)) invalid('Conference replies require an earlier contribution in the same conference.');
+    }
+    ids.add(row.id); previous = row.number as number;
+  }
+}
+
+export function validateConferenceMembers(state: ConferenceState, members: readonly Member[]): void {
+  for (const row of state.contributions) {
+    const author = members.find((m) => m.id === row.authorId);
+    if (!author || (row.origin === 'local-human' ? author.actor !== 'human' :
+        author.actor !== 'ai' || !personas.some((p) => personaMemberId(p.id) === author.id))) invalid('Invalid conference author/provenance.');
+  }
 }

@@ -6,7 +6,8 @@ upgrading version 1 preserves every existing store and record. The repository ha
 no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. Before starting the first
 session, `openActivity()` initializes a pristine world with ten fictional residents,
-ten populated boards and 66 original static Japanese posts in eighteen threads. Model consent remains
+ten populated boards and 66 original static Japanese forum posts in eighteen threads,
+plus three electronic-conference contributions. Model consent remains
 separate. The world anchor and fiction provenance live in `community-world`;
 seeds use `local-seed:fictional` (original thirty) or `local-seed:authored-sigs-v1`
 (additional thirty-six), while later inference uses `local-ai:webllm:`.
@@ -48,7 +49,8 @@ shortcut to the same reset method.
 
 Reset clears and recreates the normal first-visit world in one IndexedDB
 transaction, using the same bootstrap as `openActivity()`: ten default residents,
-ten populated forums, 66 original posts/eighteen threads and `community-world`
+ten populated forums, 66 original forum posts/eighteen threads, three electronic-conference
+contributions and `community-world`
 provenance. The default auto-activity cap is four, with no model consent or setup
 deferral. No model, WebGPU or network is needed. Failure rolls back both clears
 and inserts, preserving the previous world. Repeated explicit resets recreate the
@@ -419,7 +421,8 @@ settings store. IndexedDB remains version 2; JSON remains `pcvan-local` version 
 Pre-OLT backups omit this setting and lazily get empty rooms on their first OLT
 operation. No store-number migration can collide with SIG/mail work. Existing
 members, posts, mail and counters are preserved. Reset removes OLT and recreates
-only the established ten residents/30 forum posts; OLT has no seeded transcript.
+the established ten residents/66 forum posts and three conference contributions;
+OLT has no seeded transcript.
 
 The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly
 two rooms (`lounge`, `night`). Each room stores a monotonic `nextNumber`, the last
@@ -461,3 +464,33 @@ and private world-generation fence; old tabs cannot write into a new world.
 No host-tab runtime objects or model data enter the backup. Backup contains public
 OLT text as well as private mail and should be stored accordingly. The existing
 explicit replace/reset confirmations include OLT through the settings payload.
+
+## Conference persistence
+
+Issue #65 adds reserved setting `daisizen-conference`, version 1, without changing
+IndexedDB version 2 or JSON `pcvan-local` version 1. It contains `conferenceId`
+(`DAISIZEN`), monotonic `nextNumber` and ordered `contributions`. Each contribution
+has a stable `id`, per-conference `number`, shared `authorId`, `title`, multiline
+`body`, canonical UTC `createdAt`, `origin` and optional `replyToPostId`. The
+composer's generic parent field names a contribution here, never a forum post.
+Replies must name an earlier retained contribution in this same conference.
+Titles are 1–200 characters, bodies 1–20000, excluding blank-only/control text;
+Japanese/full-width spaces, blank lines and literal markup are preserved.
+
+`createConferenceContribution` checks the world-generation fence, author and
+parent, allocates the next number and writes the setting in one transaction.
+A draft ID is allocated once before composing; retrying the same input returns
+the committed record, while a conflicting reuse fails. Failed writes consume no
+number. Member changes/deletes cannot invalidate conference authors. Only human
+submissions use this API; the three fresh-world authored examples carry
+`local-seed:conference-v1`. No forum record is reused, so existing forum AI
+planning and private-mail context cannot select conference messages.
+
+Absence means empty, with no hidden demonstration fallback or read-side write.
+Only pristine creation/reset seeds examples, atomically with the starter world.
+Older existing/seeded/imported worlds, empty restores and forum POPULATE do not.
+Existing JSON export includes the setting; import validates shape, unique IDs,
+ordered safe numbers, timestamps, provenance, authors and earlier local parents
+before replacement. Quota failures roll back replacement, and old tabs/drafts
+remain fenced after replacement/reset. Stored timestamps survive round-trips;
+conference operations do not reschedule residents or change forum/mail counters.

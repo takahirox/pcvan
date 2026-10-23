@@ -1,3 +1,4 @@
+import { conferenceState } from './conference';
 import { oltState } from './olt-state';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -17,6 +18,7 @@ export const keyboardHelp = ['PC-VAN 内の閲覧・利用者登録・投稿は�
   '編集中は BACK / MAIN で移動しません。.CANCEL で明示的に破棄します。',
   'メール: MAIN 1 / X または SIG MAIL → MEMBERS / WRITE 宛先 / INBOX / SENT / READ 番号 / REPLY 番号',
   'ライブラリィ / OSL: 13 → 2 → LIBRARY / OSL → 分類番号 → READ 番号。LIST: 一覧 / BACK: 一つ戻る。',
+  '電子会議室: 13 → 2 → CONFERENCE。LIST / READ 番号 / WRITE / REPLY 番号。BACK: DAISIZEN。',
   'OLT: 13 → 2 → OLT → JOIN 番号。入室中は通常の入力が発言。/WHO / /LIST / /HELP / /LEAVE / /MAIN。',
   'WRITE → タイトル → 本文を1行ずつ → .END → EDIT / Y / N',
   '確認中の空入力は承認になりません。Y はその確認だけを承認します。'];
@@ -43,6 +45,10 @@ export function about(content: Backup): string[] {
     'メールも架空の住人と人間の間だけでブラウザー内に保存・生成します。外部配送はありません。コマンド・宛先・箱の共有は現代の再構成です。',
     'メールはローカル世界内での私信で、暗号化されません。同じ端末・ブラウザープロファイルにアクセスできる人からの隔離はありません。JSON とログにも私信が含まれます。',
     'メールの文脈は相手との最大4通と両者の公開投稿最大4件。ほかの相手の私信は含めません。メール既読は受信者ごとの各通に記録します。',
+    '電子会議室はフォーラム・OLTとは別の保存型の発言交換です。会議の構成・LIST・READ・WRITE・REPLY・編集操作は現代の再構成です。在室人数・AI生成は扱いません。',
+    '新しい世界だけに草笛・こまどりの創作3件（local-seed:conference-v1）を準備します。史料の文章・実在人物の転載ではありません。既存・復元した空の会議は補充しません。日時は作成前の創作時刻をUTCで保存します。',
+    '2026-10-23確認: DAISIZEN記念碑は会議・フォーラム・OLTを区別します（年代不明）。1994年10月Internet Magazine 104頁は保存型の会議を支持し、1996-08-07の別SIG保存記録は会議への投稿を示します。一般の読み書き・保存の確度は高く、DAISIZEN固有の話題・操作・参加規則・管理方法は未確定です。',
+    'まいとーく作者説明は会議の読み書きとOLT参加を別記します。公開日は未確認で、クライアント機能からホスト操作は確定しません。',
     'OLT の部屋名・JOIN・/WHO・/LIST・/LEAVE・行表示は現代の再構成です。史料から確定した操作ではありません。',
     'OLT の在室は架空の住人のローカルな生活シミュレーションで、遠隔の接続人数ではありません。local-presence は生成文ではない入退室記録です。',
     'OLT は公開会話最大12行と公開投稿最大3件のみを文脈に使い、私信を渡しません。各部屋200行まで保存、/LIST は直近40行。日時 UTC。',
@@ -61,12 +67,16 @@ export function about(content: Backup): string[] {
     '別サービス NORMA: https://www.mimi-hp.normanet.ne.jp/MIMI312.pdf',
     'OSL 目録参考（別SIG CIARI）: https://cba.sakura.ne.jp/soft01/soft_pic.htm',
     '同梱創作: https://github.com/takahirox/pcvan/blob/main/data/pcvan/daisizen-collections.json',
+    '会議の保存モデル（1994年10月104頁）: https://iwparchives.jp/wp-content/themes/twentytwelve/bn/pdf/im199410-104-bbs.pdf',
+    '別SIGの1996-08-07記録: https://someya.sakura.ne.jp/poem/tansi/tansimain.html',
+    '会議の同梱創作: https://github.com/takahirox/pcvan/blob/main/src/conference.ts',
     '投稿ヘッダー: https://www.rumic.org/forum/rumicworld/rumic2491.html',
     '追加SIGと史料: https://github.com/takahirox/pcvan/blob/main/data/pcvan/expanded-sigs.json',
     '追加創作: https://github.com/takahirox/pcvan/blob/main/data/pcvan/expanded-community.json',
     '初期会話: https://github.com/takahirox/pcvan/blob/main/data/pcvan/fictional-community.json',
     '見本: https://github.com/takahirox/pcvan/blob/main/data/pcvan/demo-posts.json',
     ...residentProfiles(content).map((row) => `${row.handle} / fictional-ai:${row.id} / ${JSON.stringify(row)}`),
+    ...conferenceState(content).contributions.map((row) => `電子会議室 #${row.number} / ${row.id} / ${row.authorId} / origin=${row.origin} / createdAt=${row.createdAt}`),
     ...(content.mail ?? []).map((m) => `メール #${m.number} / ${m.senderId} → ${m.recipientId} / origin=${m.origin} / createdAt=${m.createdAt} / ${JSON.stringify(m.simulation ?? null)}`),
     ...content.posts.map((post) => `${post.forumId} #${post.number} / ${post.authorId} / actor=${content.members.find((m) => m.id === post.authorId)?.actor} / origin=${post.origin} / createdAt=${post.createdAt} / ${JSON.stringify(post.simulation ?? null)}`),
   ];

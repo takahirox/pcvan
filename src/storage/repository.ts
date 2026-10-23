@@ -1,3 +1,6 @@
+import { conferenceState, starterConference } from '../conference';
+import { CONFERENCE_SETTING, validateConference, validateConferenceMembers } from './schema';
+import type { Contribution } from './schema';
 import { OLT_SETTING, oltState, observeOlt, appendOlt, attendance, VISITOR_LEASE, iso, validOltText,
   validateOlt, validateOltMembers, oltAuthorization, oltEnabled } from '../olt-state';
 import type { OltRoom, OltState, OltTurn, RoomId } from '../olt-state';
@@ -190,6 +193,7 @@ export class LocalRepository {
         const member = row as Member;
         const content = await this.snapshot(tx);
         validateMailRelations(content.mail ?? [], [...content.members.filter((m) => m.id !== member.id), member]);
+        validateConferenceMembers(conferenceState(content), [...content.members.filter((m) => m.id !== member.id), member]);
         validateOltMembers(oltState(content), [...content.members.filter((m) => m.id !== member.id), member]);
       }
       if (store === 'forums') {
@@ -207,9 +211,33 @@ export class LocalRepository {
         const state = (row as Records['settings']).value; validateOlt(state);
         validateOltMembers(state, (await this.snapshot(tx)).members);
       }
+      if (store === 'settings' && (row as Records['settings']).id === CONFERENCE_SETTING) {
+        const state = (row as Records['settings']).value; validateConference(state);
+        validateConferenceMembers(state, (await this.snapshot(tx)).members);
+      }
       await request(tx.objectStore(store).put(row));
       return row;
     }).then((saved) => { if (store === 'settings') this.notifySetupChanged(); return saved; });
+  }
+
+  /** One settings transaction allocates numbers, checks parents and deduplicates retries. */
+  createConferenceContribution(input: Pick<Contribution, 'id' | 'authorId' | 'title' | 'body' | 'replyToPostId'>,
+    now = new Date().toISOString()): Promise<Contribution> {
+    const draft = structuredClone(input);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const content = await this.snapshot(tx), state = conferenceState(content);
+      const existing = state.contributions.find((row) => row.id === draft.id);
+      if (existing) {
+        if (existing.authorId !== draft.authorId || existing.title !== draft.title || existing.body !== draft.body ||
+            existing.replyToPostId !== draft.replyToPostId) invalid('Contribution ID is already in use.');
+        return existing;
+      }
+      const row: Contribution = { ...draft, number: state.nextNumber++, createdAt: now, origin: 'local-human' };
+      state.contributions.push(row);
+      validateConference(state); validateConferenceMembers(state, content.members);
+      await request(tx.objectStore('settings').put({ id: CONFERENCE_SETTING, value: state }));
+      return row;
+    });
   }
 
   createPost(value: NewPost): Promise<Post> {
@@ -380,7 +408,9 @@ export class LocalRepository {
       if (store === 'mail') hasChildren = await referenced('mail', 'replyToMailId', key);
       if (store === 'posts') hasChildren = await referenced('posts', 'replyToPostId', key);
       if (store === 'members') {
-        const state = oltState(await this.snapshot(tx));
+        const content = await this.snapshot(tx);
+        hasChildren ||= conferenceState(content).contributions.some((row) => row.authorId === key);
+        const state = oltState(content);
         hasChildren ||= state.rooms.some((r) => r.lines.some((l) => l.authorId === key) ||
           r.residents.some((p) => p.memberId === key) || r.visitors.some((p) => p.memberId === key));
       }
@@ -462,7 +492,12 @@ export class LocalRepository {
         await request(tx.objectStore('members').add({ id, handle: profile.handle, actor: 'ai' }));
       }
     }
-    if (migrated.bootstrap) await this.populateCommunity(tx, now);
+    if (migrated.bootstrap) {
+      await this.populateCommunity(tx, now);
+      const state = starterConference(now);
+      validateConference(state); validateConferenceMembers(state, (await this.snapshot(tx)).members);
+      await request(settings.add({ id: CONFERENCE_SETTING, value: state }));
+    }
     await this.expandCommunity(tx, now);
     migrated.bootstrap = false;
     removePausedRuns(migrated, profiles);
