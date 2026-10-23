@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { initialCalendar, serviceDate, historicalAnchor, calendarSetting } from '../src/calendar';
 import { ConnectionController } from '../src/connection';
 import { renderPost } from '../src/forums';
+import { identityToken } from '../src/member-presentation';
 import { renderMail, renderMailList } from '../src/mail';
 import { renderContribution, starterConference, conferenceState } from '../src/conference';
 import { validateRecord } from '../src/storage/schema';
@@ -104,11 +105,12 @@ for (const timezoneId of ['Asia/Tokyo', 'America/Los_Angeles']) {
     await command(page, 'CONFERENCE', '電子会議室'); await post(page, '会議の暦', literal);
     expect(await command(page, 'READ 4', literal)).toContain(stamp);
     await command(page, 'BACK', 'DAISIZEN'); await command(page, 'OLT', '部屋一覧'); await command(page, 'JOIN 1', '日時 JST');
-    const live = await command(page, literal, `${stamp} <暦の旅人> ${literal}`);
+    const oltLabel = `(${identityToken(data.members.find((m) => m.id === own.authorId))}) <暦の旅人>`;
+    const live = await command(page, literal, `${stamp} ${oltLabel} ${literal}`);
     // A queued /LIST waits for the live write and replays the identical dated line.
     const replay = await command(page, '/LIST', `<暦の旅人> ${literal}`);
-    expect(replay).toContain(`${stamp} <暦の旅人> ${literal}`);
-    expect(live).toContain(`${stamp} <暦の旅人> ${literal}`);
+    expect(replay).toContain(`${stamp} ${oltLabel} ${literal}`);
+    expect(live).toContain(`${stamp} ${oltLabel} ${literal}`);
     await command(page, '/MAIN', 'MAIN'); data = await backup(page);
     expect(data.posts.find((p) => p.id === own.id)!.createdAt).toBe(anchor);
     expect(data.mail![0]!.createdAt).toBe(anchor);
@@ -122,7 +124,7 @@ for (const timezoneId of ['Asia/Tokyo', 'America/Los_Angeles']) {
       await command(tab, 'MAIN', 'MAIN'); await command(tab, '13', 'コミュニケーション'); await command(tab, '2', 'DAISIZEN');
       await command(tab, 'CONFERENCE', '電子会議室'); expect(await command(tab, 'READ 4', literal)).toContain(stamp);
       await command(tab, 'BACK', 'DAISIZEN'); await command(tab, 'OLT', '部屋一覧');
-      expect(await command(tab, 'JOIN 1', '日時 JST')).toContain(`${stamp} <暦の旅人> ${literal}`);
+      expect(await command(tab, 'JOIN 1', '日時 JST')).toContain(`${stamp} ${oltLabel} ${literal}`);
       await command(tab, '/MAIN', 'MAIN');
     };
     await page.clock.setFixedTime(new Date('2026-10-24T01:02:03.000Z'));
