@@ -366,7 +366,7 @@ export class TerminalCommands {
         if (!mail) { print('その番号のメールはこの箱にありません。INBOX / SENT / LIST で確認してください。'); return true; }
         if (selected[1] === 'REPLY') {
           if (mail.recipientId !== human) print('受信したメールに返信してください。INBOX / REPLY 番号');
-          else this.startCompose({ mail: true, recipient: mail.senderId, parent: mail }, data);
+          else this.startCompose({ mail: true, recipient: mail.senderInternetAddress !== undefined ? `INET#${mail.senderInternetAddress}` : mail.senderId!, parent: mail }, data);
         } else {
           if (mail.recipientId === human) await (await this.actions.repository()).markMailRead(human!, mail.id);
           print(...renderMail(mail, data.members, data.mail ?? [], calendarSetting(data)));

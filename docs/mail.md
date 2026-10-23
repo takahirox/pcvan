@@ -80,13 +80,15 @@ in-memory transcript and a downloaded terminal log. Reload discards unsent draft
 
 Numbers are stable, ascending local mail numbers shared across boxes, with gaps
 when letters belong to other handles or have been deleted. They are not forum
-numbers. Reading displays subject, both parties' tokens and safe handles, the
-shared historical JST date and the reply reference; listings show the
+numbers. Reading displays subject, resident parties' tokens and safe handles (or
+the external correspondent's address), the shared historical JST date and reply
+reference; listings show the
 correspondent, subject and date. INBOX retains its individual unread/read marker.
 Resident-addressed human SENT rows show `既読確認なし` or `既読確認あり`;
 sent-letter READ shows `既読確認：確認なし` or the confirmation's historical JST time.
 Absence means **unknown/unconfirmed**, never proven unread.
-No starter letters or archived/private source material are seeded.
+No private mail is added automatically. Settings can explicitly add the fictional
+Internet sample described below; no archived/private source material is seeded.
 
 ## Browser-local Internet destinations (Issue #93)
 
@@ -122,21 +124,66 @@ submissions share one record; changed content or destination with the same draft
 ID fails. Numbering is shared with resident letters and remains monotonic.
 
 SENT and READ display `INET#` plus the original address and truthful local-save
-status. There is no member token, remote delivery/receipt/read evidence, generated
-reply or reply-parent relationship. External letters appear only in their human
-sender's SENT projection, never INBOX or another human's mailbox. They create no
-resident acquaintance, pair memory, generation target or correspondence-limit
+status. There is no external member token, remote delivery/receipt/read evidence
+or generated reply. Outgoing Internet letters appear only in their
+human sender's SENT projection; an explicit reply can retain its incoming parent.
+They create no resident acquaintance, pair memory, generation target or correspondence-limit
 usage; addresses, subjects and bodies stay out of mail/forum/OLT prompts. This
 journey initiates no network request, email lookup, `mailto` handoff or model load.
 
 External addresses and letters survive reload and JSON export/import with the
 rest of mail. Read/drafted text also appears in terminal logs. Unsent drafts are
-not backed up; reset/restore invalidate them across tabs. No inbound Internet
-mail, mailbox migration, remote transport, attachments, delivery simulation or
+not backed up; reset/restore invalidate them across tabs. No mailbox migration,
+remote transport, arbitrary incoming-message editor, attachments, delivery simulation or
 multiple recipients are implemented. Historical `INET#` addressing has high
 confidence for November 1996; these controls, limits, local-save status and layout
 are category D product choices. See the [dated evidence and unresolved mailbox
 relationships](research/pcvan-1996-1997.md#outbound-internet-mail-issue-93).
+
+## Opt-in incoming Internet sample and replies (Issue #97)
+
+In modern **Settings / Options → Internetメールの創作サンプル**, choose
+`創作メールをローカルに追加`, inspect the selected human recipient, then approve
+`創作メールを追加する`. Without a human, use terminal `HANDLE` to register or
+select one first; the action creates no identity. This adds one original Japanese
+letter about an autumn walk, a secondhand astronomy book, radio and photographs,
+from the fictional `observer@letters.example.invalid`. Its address is independent
+of the member directory. The action is a local demonstration, never network reception.
+
+Each human may explicitly add their own copy. Repeated activation, retries and
+concurrent tabs retain the existing sample and its read marker. Startup,
+registration, reload, reset and restore never load it. An empty restored mailbox
+stays empty until this action is explicitly approved.
+
+Enter any existing mail route, then `INBOX`, `READ number`, and `REPLY number`.
+INBOX/READ show the sender address, selected human, original text, historical JST
+date and personal unread/read state, with a local fictional-sample label. Another
+human cannot select that letter in their mailbox. No synthetic sender, historical
+gateway account or functioning address is invented.
+
+REPLY pins `INET#observer@letters.example.invalid` and the incoming parent's ID.
+The existing literal-text composer prefills `Re: subject`; `.END`, `EDIT`,
+`REVIEW`, cancellation, retry and explicit review `Y` work as above. Only that
+approval saves the reply locally, with no transmission or recipient-read evidence.
+SENT/READ retain the external destination and parent reference. A valid parent is
+an earlier incoming external letter to the same human from exactly the same
+address; missing, later, cross-human, different-address and resident/external
+mismatches fail on writes and imports. Ordinary outbound Internet letters may
+still omit a parent. Incoming samples cannot contain resident simulation or
+recipient-confirmation fields. Both directions stay outside resident memory,
+acquaintance, prompts, scheduling and mail-activity budgets.
+
+Samples, external addresses, provenance, replies, parent IDs and human read
+markers are included in JSON backups; viewed and entered text is included in
+terminal logs. All share the existing atomic number allocator, rollback, reload
+and reset/restore fences. These PC-VAN letters are separate from TELNET's two
+bundled, read-only remote-mail demonstration letters.
+
+Text reception and `INET#` addressing have high historical confidence. Sample
+loading, fictional correspondence, sender presentation, destination selection,
+editor behavior, shared mailbox projection and browser-local persistence are
+**category D reconstruction**, not a recovered host session. See the
+[dated source evidence and limitations](research/pcvan-1996-1997.md#incoming-internet-mail-issue-97).
 
 ## Sender-visible recipient confirmation (Issue #89)
 
@@ -207,7 +254,7 @@ routing and context; they cannot guarantee model truthfulness or perfect tone.
 Letters and original resident fiction are stored entirely within this browser's
 local world. Nothing is sent to actual PC-VAN members, other browser users,
 email servers or an external inference API. Model files may be downloaded only
-after authorization. Ordinary reading keeps provenance out of letter headers;
+after authorization. Resident reading keeps storage provenance out of letter headers;
 Settings → Details/About explains the simulation, origins and limitations.
 
 Private means separated from public forums and unrelated prompt contexts inside

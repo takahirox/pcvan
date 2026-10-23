@@ -312,3 +312,59 @@ test('failed dialog import keeps a human draft; confirmed import cancels it and 
   await command(page, 'Y', 'この画面では使えない');
   expect((await snapshot(page)).posts).toHaveLength(66);
 });
+
+test('Internet sample Settings explains missing human, supports cancellation and explicitly targets each selected human', async ({ page }) => {
+  await start(page); expect((await snapshot(page)).mail).toEqual([]);
+  await open(page, 'mail-sample');
+  await expect(dialog(page).locator('.mail-sample-recipient')).toContainText('HANDLE');
+  await dialog(page).locator('.load-mail-sample').click();
+  await expect(dialog(page).locator('.settings-message')).toContainText('会員は自動作成しません');
+  expect((await snapshot(page)).members.filter((m) => m.actor === 'human')).toEqual([]);
+  await close(page); await command(page, 'HANDLE', 'ハンドル設定'); await command(page, 'NEW', 'ハンドル名=');
+  await command(page, '最初の読者', '登録しました');
+  expect((await snapshot(page)).mail).toEqual([]);
+  await open(page);
+  await expect(dialog(page).locator('.mail-sample-recipient')).toContainText('最初の読者');
+  await dialog(page).locator('.load-mail-sample').click(); await dialog(page).locator('.cancel-action').click();
+  expect((await snapshot(page)).mail).toEqual([]);
+  await dialog(page).locator('.load-mail-sample').click(); await dialog(page).locator('.confirm-action').click();
+  await expect(dialog(page).locator('.settings-message')).toContainText('創作メールをローカルに追加しました');
+  await close(page);
+  await command(page, 'HANDLE', 'ハンドル設定'); await command(page, 'NEW', 'ハンドル名='); await command(page, '次の読者', '登録しました');
+  await open(page); await expect(dialog(page).locator('.mail-sample-recipient')).toContainText('次の読者');
+  await dialog(page).locator('.load-mail-sample').click(); await dialog(page).locator('.confirm-action').click();
+  await expect(dialog(page).locator('.settings-message')).toContainText('創作メールをローカルに追加しました');
+  const data = await snapshot(page);
+  expect(data.mail).toHaveLength(2); expect(new Set(data.mail!.map((m) => m.recipientId)).size).toBe(2);
+});
+
+for (const operation of ['restore', 'reset'] as const) {
+  test(`${operation} invalidates a pending sample action and reviewed external reply across tabs; empty mail stays empty`, async ({ page, context }) => {
+    await start(page, '置換前の読者'); const empty = await snapshot(page);
+    await open(page, 'mail-sample'); await dialog(page).locator('.load-mail-sample').click();
+    await dialog(page).locator('.confirm-action').click();
+    await expect(dialog(page).locator('.settings-message')).toContainText('創作メールをローカルに追加しました');
+    await close(page);
+    const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
+    await command(other, '1', '電子メール'); await command(other, 'INBOX', '[未読]');
+    await command(other, 'REPLY 1', '本文を1行ずつ'); await command(other, '古い返事', '本文=');
+    await command(other, '.END', 'このブラウザー内に保存しますか');
+    await open(other, 'mail-sample'); await dialog(other).locator('.load-mail-sample').click();
+    await expect(dialog(other).locator('.confirm-action')).toBeVisible();
+    if (operation === 'restore') {
+      await open(page, 'storage'); await choose(page, JSON.stringify(empty));
+      await expect(dialog(page).locator('.confirm-action')).toHaveText('置き換えて復元する');
+      await Promise.all([other.waitForEvent('load'), dialog(page).locator('.confirm-action').click()]);
+      await expect(dialog(page)).not.toBeVisible();
+    } else {
+      await command(page, 'RESET', '初期状態に戻しますか');
+      await Promise.all([page.waitForEvent('load'), other.waitForEvent('load'), command(page, 'Y')]);
+    }
+    await expect(other.locator('.output')).toContainText('MAIN');
+    await expect(dialog(other)).not.toBeVisible();
+    await command(other, 'SKIP'); await command(other, 'Y', 'この画面では使えない');
+    expect((await snapshot(page)).mail).toEqual([]);
+    await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
+    expect((await snapshot(page)).mail).toEqual([]);
+  });
+}

@@ -474,7 +474,7 @@ used in SIGs, or an explicit Internet destination such as
 `WRITE INET#observer@letters.example.invalid` (`COMPOSE` also works). Internet
 letters save only in this browser and send nothing to an email server. Their
 addresses retain spelling/case through review/edit, SENT/READ, reload and backup;
-they create no members, replies, read evidence or resident AI context. See the
+they create no external members, remote read evidence or resident AI context. See the
 [bounded ASCII address subset](docs/mail.md#browser-local-internet-destinations-issue-93).
 Compose subject/body, `.END`, then `EDIT` / `Y` / `N` through the single terminal
 input. Sent and received letters have stable numbers, subjects,
@@ -498,6 +498,19 @@ records high-confidence November 1996 `INET#` addressing separately from the
 reconstructed local-save journey, address limits and unresolved new/old-mail
 relationships. JSON backups and terminal logs include external letters/addresses.
 Settings → Details/About carries the source URLs and qualifications.
+
+Settings / Options → **Internetメールの創作サンプル** explicitly adds one
+original fictional incoming letter to the selected human. Register/select a human
+with `HANDLE` first. Loading is local, opt-in and idempotent per recipient; startup,
+registration, reload, reset and restore do not load it. Enter any mail route,
+`INBOX` → `READ number` → `REPLY number`, compose, `.END`, optionally `EDIT` →
+`REVIEW`, then explicitly approve `Y` to save the reply in this browser. INBOX
+shows the external address and sample label; SENT/READ retain the reply destination
+and incoming parent. Neither direction uses resident AI context or sends external
+requests. Address, fictional provenance, parent and read marker survive JSON
+backup/restore. This is separate from TELNET remote mail. See the
+[incoming-mail contract](docs/mail.md#opt-in-incoming-internet-sample-and-replies-issue-97)
+and [historical evidence](docs/research/pcvan-1996-1997.md#incoming-internet-mail-issue-97).
 
 Residents may privately initiate or reply at their scheduled visits after model
 consent, with quiet periods and bounded shared generation budgets. They use only

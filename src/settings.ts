@@ -92,7 +92,10 @@ export function about(content: Backup): string[] {
     '2026-10-24確認: 年代不明の参加者資料はメールの名前を登録ニックネームに替えられると説明します（記述は高確度、対象年への適用は中程度）。1994年10月106〜107頁はPC-VAN内のID宛先と外部宛先を区別します。1997-12-22判決転載もIDとハンドルを区別しますが、掲載者は正確性・真正性を保証せず原本・別紙は未回収です。名前とIDの区別は中程度の史実推定、1996年の正確なメール配置は低確度です。',
     '括弧・配置・短いローカル宛先・現名への更新は再構成で、実名欄は追加しません。1996年11月221頁はINET#のインターネットメールを別記しており、史実で外部メールがなかったという意味ではありません。PDF本文は確認しましたがページ画像取得は失敗しました。',
     '2026-10-24確認: 1996年11月Internet Magazine 221頁のPC-VAN INET#指定は対象年の高確度資料で、1994年10月106〜107頁も裏付けます。外部宛先を会員には登録せず、入力した大小文字を保持。WRITE / COMPOSE、編集・確認・取消、保存のみの状態表示、ASCII単一宛先の検証制限とexample.invalidの創作例はcategory Dの選択です。完全な1996年ホスト作成手順・新旧メール移行の関係は未確認です。',
-    'Internet宛ては受信・返信・既読確認・AI文脈を作らず、外部宛先・件名・本文は住人の記憶・生成・回数制限に使いません。JSONには外部宛先と手紙を含み、表示・入力した内容はログにも残ります。実配送・照会・mailto・モデル読込は行いません。',
+    '設定から選択中の人間にInternet受信の創作サンプルを1通だけ明示追加できます（未登録ならHANDLEで登録・選択）。起動・登録・再読込・リセット・復元では自動追加しません。返信はINET#宛先と親を固定して確認後にブラウザー内保存するだけで、外部送信・相手の既読確認・AI文脈を作りません。外部宛先・件名・本文は住人の記憶・生成・回数制限に使いません。JSONには外部宛先と手紙を含み、表示・入力した内容はログにも残ります。実配送・照会・mailto・モデル読込は行いません。',
+    '2026-10-24調査: 1996年11月221頁はPC-VAN Internetメールの送信・受信の両制限を示し、送信のみの注記はバイナリ自動変換についてです。テキスト受信とINET#は高確度。受信の完全な操作記録・ゲートウェイID・ヘッダーは未回収。設定の明示追加、手紙・差出人、返信操作・表示・保存はcategory Dの創作です。TELNETの同梱メールとは別です。',
+    '1999-05-01の参加者回想は1994年頃の海外メーリングリストを補足（中程度、操作の証拠ではありません）。https://searchdesk.com/help/history.html / 1994年10月106〜107頁: https://iwparchives.jp/wp-content/themes/twentytwelve/bn/pdf/im199410-104-bbs.pdf',
+    'Issue #97調査ではPDFページ画像と1996年11月のML記事本文の取得が失敗。1995年4月のゲートウェイ返信の説明はNIFTY-Serveのものなので採用しません。https://iwparchives.jp/wp-content/themes/twentytwelve/bn/pdf/im199504-104-bbs.pdf / https://groups.google.com/g/fj.archives.answers/c/xQrZS1ki0Tk',
     '1994年1月の商用ネットワーク論文は以前のWIDENET/X.400経路の文脈です。抽出が不鮮明で、1996年の経路要件にはしません。https://www.jstage.jst.go.jp/article/agrmet1943/49/4/49_4_297/_pdf',
     'メールはローカル世界内での私信で、暗号化されません。同じ端末・ブラウザープロファイルにアクセスできる人からの隔離はありません。JSON とログにも私信が含まれます。',
     '住人メールの文脈は相手との最大4通と両者の公開投稿最大4件。ほかの相手の私信は含めません。メール既読は受信者ごとの各通に記録します。',
@@ -173,7 +176,7 @@ export function about(content: Backup): string[] {
     '見本: https://github.com/takahirox/pcvan/blob/main/data/pcvan/demo-posts.json',
     ...residentProfiles(content).map((row) => `${row.handle} / fictional-ai:${row.id} / ${JSON.stringify(row)}`),
     ...conferenceState(content).contributions.map((row) => `電子会議室 #${row.number} / ${row.id} / ${row.authorId} / origin=${row.origin} / createdAt=${row.createdAt}`),
-    ...(content.mail ?? []).map((m) => `メール #${m.number} / ${m.senderId} → ${m.internetAddress !== undefined ? `INET#${m.internetAddress}` : m.recipientId} / origin=${m.origin} / createdAt=${m.createdAt} / ${JSON.stringify(m.simulation ?? null)}`),
+    ...(content.mail ?? []).map((m) => `メール #${m.number} / ${m.senderInternetAddress ?? m.senderId} → ${m.internetAddress !== undefined ? `INET#${m.internetAddress}` : m.recipientId} / origin=${m.origin} / createdAt=${m.createdAt} / ${JSON.stringify(m.simulation ?? null)}`),
     ...content.posts.map((post) => `${post.forumId} #${post.number} / ${post.authorId} / actor=${content.members.find((m) => m.id === post.authorId)?.actor} / origin=${post.origin} / createdAt=${post.createdAt} / ${JSON.stringify(post.simulation ?? null)}`),
   ];
 }

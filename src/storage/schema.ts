@@ -40,8 +40,11 @@ export interface NetNewsState {
   version: 1; nextNumbers: Record<string, number>; contributions: LocalNetNewsArticle[];
 }
 export type MailDestination = { recipientId: string; internetAddress?: never } | { recipientId?: never; internetAddress: string };
-export type Mail = MailDestination & {
-  id: string; number: number; senderId: string;
+export type MailIdentity = (MailDestination & { senderId: string; senderInternetAddress?: never }) |
+  { senderId?: never; senderInternetAddress: string; recipientId: string; internetAddress?: never };
+export const INTERNET_SAMPLE_ORIGIN = 'local-sample:internet-letter-v1';
+export type Mail = MailIdentity & {
+  id: string; number: number;
   subject: string; body: string; createdAt: string; origin: string;
   replyToMailId?: string; readAt?: string;
   recipientConfirmation?: { at: string; replyMailId: string; provenance: 'local-resident-reply-v1' };
@@ -285,18 +288,28 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       }
       break;
     case 'mail':
-      fields(value, ['id', 'number', 'senderId', 'subject', 'body', 'createdAt', 'origin'],
-        ['recipientId', 'internetAddress', 'replyToMailId', 'readAt', 'simulation', 'recipientConfirmation']);
-      string(value.id); integer(value.number, 1); string(value.senderId);
-      if (Object.hasOwn(value, 'recipientId') === Object.hasOwn(value, 'internetAddress')) invalid('Expected exactly one mail destination.');
-      if (Object.hasOwn(value, 'internetAddress')) {
-        validateInternetAddress(value.internetAddress);
-        if (value.origin !== 'local-human' || ['replyToMailId', 'readAt', 'simulation', 'recipientConfirmation'].some((key) => Object.hasOwn(value, key))) {
-          invalid('Internet letters are outbound local saves only.');
+      fields(value, ['id', 'number', 'subject', 'body', 'createdAt', 'origin'],
+        ['senderId', 'senderInternetAddress', 'recipientId', 'internetAddress', 'replyToMailId', 'readAt', 'simulation', 'recipientConfirmation']);
+      string(value.id); integer(value.number, 1);
+      if (Object.hasOwn(value, 'senderInternetAddress')) {
+        validateInternetAddress(value.senderInternetAddress); string(value.recipientId);
+        if (value.origin !== INTERNET_SAMPLE_ORIGIN ||
+            ['senderId', 'internetAddress', 'replyToMailId', 'simulation', 'recipientConfirmation'].some((key) => Object.hasOwn(value, key))) {
+          invalid('Incoming Internet letters require fictional local sample provenance.');
         }
-      } else string(value.recipientId);
+      } else {
+        string(value.senderId);
+        if (Object.hasOwn(value, 'recipientId') === Object.hasOwn(value, 'internetAddress')) invalid('Expected exactly one mail destination.');
+        if (Object.hasOwn(value, 'internetAddress')) {
+          validateInternetAddress(value.internetAddress);
+          if (value.origin !== 'local-human' || ['readAt', 'simulation', 'recipientConfirmation'].some((key) => Object.hasOwn(value, key))) {
+            invalid('Outgoing Internet letters are local saves only.');
+          }
+        } else string(value.recipientId);
+      }
       string(value.origin); timestamp(value.createdAt);
-      if (value.id.length > 256 || value.senderId.length > 128 || (typeof value.recipientId === 'string' && value.recipientId.length > 128)) invalid('Mail identity is too long.');
+      if (value.id.length > 256 || (typeof value.senderId === 'string' && value.senderId.length > 128) ||
+          (typeof value.recipientId === 'string' && value.recipientId.length > 128)) invalid('Mail identity is too long.');
       for (const [key, max] of [['subject', 200], ['body', 20000]] as const) {
         string(value[key]);
         if (value[key].length > max || /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/.test(value[key]) ||
@@ -403,13 +416,28 @@ export function validateBackup(value: unknown): asserts value is Backup {
 /** Validate projections and parents against the same world, for imports and sends. */
 export function validateMailRelations(mail: readonly Mail[], members: readonly Member[]): void {
   const numbers = new Set<number>();
+  const samples = new Set<string>();
   for (const row of mail) {
+    validateRecord('mail', row);
     const sender = members.find((m) => m.id === row.senderId);
     if (numbers.has(row.number)) invalid('Duplicate mail number.');
     numbers.add(row.number);
+    if (row.senderInternetAddress !== undefined) {
+      if (!members.some((m) => m.id === row.recipientId && m.actor === 'human') || samples.has(row.recipientId)) {
+        invalid('Incoming samples require an existing human and one sample per recipient.');
+      }
+      samples.add(row.recipientId);
+      continue;
+    }
     if (row.internetAddress !== undefined) {
-      validateRecord('mail', row);
       if (sender?.actor !== 'human') invalid('Internet letters require an existing human sender.');
+      if (row.replyToMailId !== undefined) {
+        const parent = mail.find((m) => m.id === row.replyToMailId);
+        if (!parent || parent.number >= row.number || Date.parse(parent.createdAt) > Date.parse(row.createdAt) ||
+            parent.recipientId !== row.senderId || parent.senderInternetAddress !== row.internetAddress) {
+          invalid('Internet replies require an earlier incoming letter from the same address to the same human.');
+        }
+      }
       continue;
     }
     const recipient = members.find((m) => m.id === row.recipientId);
@@ -430,7 +458,8 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
     }
     if (row.replyToMailId !== undefined) {
       const parent = mail.find((m) => m.id === row.replyToMailId);
-      if (!parent || parent.number >= row.number || parent.senderId !== row.recipientId ||
+      if (!parent || parent.senderInternetAddress !== undefined || parent.internetAddress !== undefined ||
+          parent.number >= row.number || parent.senderId !== row.recipientId ||
           parent.recipientId !== row.senderId) invalid('Mail replies require an earlier letter from the correspondent.');
     }
   }
