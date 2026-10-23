@@ -256,7 +256,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
   click('.populate-world', async () => {
     const accepted = epoch, content = await actions.read();
     if (accepted !== epoch) return;
-    confirm('world', content, ['空の掲示板に30件・8話題の創作を追加します。モデルは取得しません。'], async () => {
+    confirm('world', content, ['空の掲示板に最大66件・18話題の創作を追加します。モデルは取得しません。'], async () => {
       await actions.run(async () => { await (await actions.repository()).populateEmptyCommunity({ confirmPopulate: true }); });
       refresh(await actions.read());
     }, '初期会話を追加する');
@@ -265,7 +265,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     const accepted = epoch, content = await actions.read(), expected = worldContext(content);
     if (accepted !== epoch) return;
     confirm('world', content, ['投稿・メール・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴・未送信の下書きを削除します。取り消せません。',
-      '必要なら先に JSON を保存してください。最初の10人・30件の投稿を準備し、他のタブも再読み込みします。',
+      '必要なら先に JSON を保存してください。最初の10人・66件の投稿を準備し、他のタブも再読み込みします。',
       'モデルの重み・端末キャッシュは保持します。AI には再同意が必要です。'], () => actions.run(() => actions.reset(expected)), '初期状態に戻す');
   });
   click('.cache-shell', () => actions.offline.cache());

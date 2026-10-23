@@ -10,9 +10,10 @@ import { COMMAND_HISTORY_LIMIT } from '../history';
 import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
 import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
+import { expandedBoards, additionalSigs } from '../communities';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { WORLD_SETTING } from './schema';
-import { canPopulateCommunity, communityBoards, communityPosts, SEED_FIXTURE } from './community';
+import { canPopulateCommunity, communityBoards, communityPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
 import { validateMailGeneration } from '../ai/mail';
 import { postInput, validateGeneration } from '../ai/generation';
 
@@ -20,7 +21,7 @@ export * from './schema';
 export const DATABASE_NAME = 'pcvan-local';
 export const DATABASE_VERSION = 2;
 export const ACTIVE_MEMBER_SETTING = 'active-human-member';
-export interface ForumDestination { keyword: 'MITI' | 'DAISIZEN'; boardNo: number; name: string }
+export interface ForumDestination { keyword: string; boardNo: number; name: string }
 // Command activity watermarks and session history advance without editing the world.
 export const worldContext = (data: Backup): string => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.mail ?? [], data.readStates,
   data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } } : row)]);
@@ -462,6 +463,7 @@ export class LocalRepository {
       }
     }
     if (migrated.bootstrap) await this.populateCommunity(tx, now);
+    await this.expandCommunity(tx, now);
     migrated.bootstrap = false;
     removePausedRuns(migrated, profiles);
     return migrated;
@@ -504,6 +506,36 @@ export class LocalRepository {
     validateBackup(await this.snapshot(tx));
   }
 
+  /** Add only absent places to an eligible v1 world. One transaction includes the
+   * version marker; imports, customized boards and deleted seeds are never refilled. */
+  private async expandCommunity(tx: IDBTransaction, now: string): Promise<void> {
+    const content = await this.snapshot(tx);
+    if (await request(tx.objectStore('session').get('imported')) || !canExpandCommunity(content)) return;
+    for (const board of expandedBoards) {
+      const sigs = content.sigs.filter((s) => s.keyword.toUpperCase() === board.keyword);
+      if (sigs.length > 1) continue;
+      const sig = sigs[0] ?? { id: `resident-sig:${board.keyword}`, keyword: board.keyword,
+        title: additionalSigs.find((s) => s.keyword === board.keyword)?.name ?? board.keyword };
+      if ((!sigs.length && content.sigs.some((s) => s.id === sig.id)) ||
+          content.forums.some((f) => (f.sigId === sig.id && f.boardNo === board.boardNo) ||
+            f.id === `resident-forum:${board.keyword}:${board.boardNo}`)) continue;
+      if (!sigs.length) {
+        await request(tx.objectStore('sigs').add(sig)); content.sigs.push(sig);
+      }
+      const forum: Forum = { id: `resident-forum:${board.keyword}:${board.boardNo}`, sigId: sig.id,
+        boardNo: board.boardNo, name: board.name, nextPostNumber: 1 };
+      const posts = expandedPosts(now, `${board.keyword}:${board.boardNo}`, forum.id);
+      // A reserved seed ID collision skips this place without touching existing records.
+      if (posts.some((p) => content.posts.some((old) => old.id === p.id))) continue;
+      for (const post of posts) await request(tx.objectStore('posts').add(post));
+      forum.nextPostNumber = posts.length + 1;
+      await request(tx.objectStore('forums').add(forum));
+    }
+    const world = content.settings.find((s) => s.id === WORLD_SETTING)!;
+    await request(tx.objectStore('settings').put({ ...world, value: { ...(world.value as object), expansion: 1 } }));
+    validateBackup(await this.snapshot(tx));
+  }
+
   /** Settings confirmation is required. Re-check eligibility inside the write transaction. */
   populateEmptyCommunity(options: { confirmPopulate: boolean }, now = new Date().toISOString()): Promise<boolean> {
     if (options?.confirmPopulate !== true) return Promise.reject(new RepositoryError('confirmation-required',
@@ -514,6 +546,7 @@ export class LocalRepository {
       if (!canPopulateCommunity(content)) return false;
       if (await request(tx.objectStore('session').get('imported'))) return false;
       await this.populateCommunity(tx, now);
+      await this.expandCommunity(tx, now);
       await this.writeActivity(tx, state);
       return true;
     });

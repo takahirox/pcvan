@@ -1,3 +1,4 @@
+import { boardCulture } from '../communities';
 import type { Backup, Member, NewPost } from '../storage/schema';
 import { localConversation } from '../storage/community';
 import { aiOrigin, models, personaMemberId, personas, residentProfiles } from './personas';
@@ -60,7 +61,7 @@ export function buildPrompt(content: Backup, request: GenerationRequest): Genera
           title: p.title.slice(0, 80), body: p.body.slice(0, 240),
         }))[0] : undefined,
       sig: { keyword: sig.keyword.slice(0, 80), title: sig.title.slice(0, 160) },
-      forum: { name: forum.name.slice(0, 160), boardNo: forum.boardNo },
+      forum: { name: forum.name.slice(0, 160), boardNo: forum.boardNo, culture: boardCulture(sig.keyword, forum.boardNo) },
       recentPosts: recentPosts(content, forum.id).map((post) => ({
         id: post.id.slice(0, 128), author: content.members.find((m) => m.id === post.authorId)?.handle.slice(0, 40), title: post.title.slice(0, 80), body: post.body.slice(0, 300),
       })),

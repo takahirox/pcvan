@@ -13,7 +13,7 @@ test('atomic seed failure rolls back every record; concurrent connections seed o
     const native = IDBObjectStore.prototype.add;
     let writes = 0; let failed = false;
     IDBObjectStore.prototype.add = function (value, key) {
-      if (this.name === 'posts' && ++writes === 8) throw new DOMException('Simulated quota', 'QuotaExceededError');
+      if (this.name === 'posts' && this.transaction.db.name === 'seed-atomic' && ++writes === 8) throw new DOMException('Simulated quota', 'QuotaExceededError');
       return key === undefined ? native.call(this, value) : native.call(this, value, key);
     };
     try { await repo.openActivity(anchor); } catch { failed = true; }
@@ -27,7 +27,7 @@ test('atomic seed failure rolls back every record; concurrent connections seed o
     await reopened.openActivity('2026-10-23T00:00:00.000Z');
     const roundtrip = await repo.exportBackup();
     const invalidMarkers: boolean[] = [];
-    for (const change of [{ status: 'unknown' }, { fixture: 'other' }, { createdAt: '1996' }]) {
+    for (const change of [{ status: 'unknown' }, { fixture: 'other' }, { createdAt: '1996' }, { expansion: 2 }, { status: 'legacy', expansion: 1 }]) {
       const broken = structuredClone(first);
       Object.assign(broken.settings.find((s) => s.id === 'community-world')!.value as object, change);
       const before = await repo.exportJson();
@@ -43,8 +43,8 @@ test('atomic seed failure rolls back every record; concurrent connections seed o
     return { failed, writes, rolledBack, first, roundtrip, cleared, repeat, invalidMarkers };
   }, anchor);
   expect(result.failed).toBe(true); expect(result.rolledBack).toBe(true); expect(result.writes).toBe(8);
-  expect(result.invalidMarkers).toEqual([true, true, true]);
-  expect(result.first.posts).toHaveLength(30); expect(new Set(result.first.posts.map((p) => p.id)).size).toBe(30);
+  expect(result.invalidMarkers).toEqual([true, true, true, true, true]);
+  expect(result.first.posts).toHaveLength(66); expect(new Set(result.first.posts.map((p) => p.id)).size).toBe(66);
   expect(result.roundtrip.posts).toEqual(result.first.posts);
   expect(result.roundtrip.settings.find((s) => s.id === 'community-world')).toEqual(result.first.settings.find((s) => s.id === 'community-world'));
   expect(result.cleared.posts).toEqual([]); expect(result.cleared.forums).toEqual(result.first.forums); expect(result.repeat).toBe(false);
@@ -104,7 +104,7 @@ test('legacy opt-in preserves custom directories and allocation; populated, ambi
       unsafe: [canPopulateCommunity(ambiguous), canPopulateCommunity(collision)], oldPosts, oldAfter, previewEligible, arrived, raceResult, racePosts };
   }, { anchor, fixture: backupFixture() });
   expect(result.legacy.posts).toEqual([]); expect(result.refused).toBe(true);
-  expect(result.optins.sort()).toEqual([false, true]); expect(result.populated.posts).toHaveLength(30);
+  expect(result.optins.sort()).toEqual([false, true]); expect(result.populated.posts).toHaveLength(66);
   expect(result.populated.sigs).toContainEqual(result.legacy.sigs[0]!);
   expect(result.populated.forums.find((f) => f.id === 'custom-board')).toMatchObject({ name: '保存した名前', nextPostNumber: 57 });
   expect(result.populated.members).toContainEqual(result.legacy.members.find((m) => m.id === 'existing-human')!);

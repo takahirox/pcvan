@@ -143,7 +143,7 @@ test('JSON backup, import and reset preserve transcript and shared authors, then
   await command(page, 'JOIN 2', '保存する発言'); await command(page, '/LEAVE', '退出');
   await command(page, 'RESET', '初期状態に戻しますか'); await command(page, 'Y');
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
-  expect(await state(page)).toBeUndefined(); expect((await snapshot(page)).posts).toHaveLength(30);
+  expect(await state(page)).toBeUndefined(); expect((await snapshot(page)).posts).toHaveLength(66);
 });
 
 test('pending OLT generation times out, releases its worker, and keeps navigation usable', async ({ page }) => {

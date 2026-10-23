@@ -6,9 +6,10 @@ upgrading version 1 preserves every existing store and record. The repository ha
 no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. Before starting the first
 session, `openActivity()` initializes a pristine world with ten fictional residents,
-two writable boards and 30 original static Japanese posts. Model consent remains
+ten populated boards and 66 original static Japanese posts in eighteen threads. Model consent remains
 separate. The world anchor and fiction provenance live in `community-world`;
-seeds use `local-seed:fictional`, while later inference uses `local-ai:webllm:`.
+seeds use `local-seed:fictional` (original thirty) or `local-seed:authored-sigs-v1`
+(additional thirty-six), while later inference uses `local-ai:webllm:`.
 See [first-visit and population semantics](local-ai.md#setup-and-controls).
 
 Storage belongs to the browser profile and origin (scheme, hostname, and port).
@@ -47,7 +48,7 @@ shortcut to the same reset method.
 
 Reset clears and recreates the normal first-visit world in one IndexedDB
 transaction, using the same bootstrap as `openActivity()`: ten default residents,
-two writable forums, thirty original posts/eight threads and `community-world`
+ten populated forums, 66 original posts/eighteen threads and `community-world`
 provenance. The default auto-activity cap is four, with no model consent or setup
 deferral. No model, WebGPU or network is needed. Failure rolls back both clears
 and inserts, preserving the previous world. Repeated explicit resets recreate the
@@ -72,6 +73,38 @@ site-data deletion is a separate operation and can remove these caches too.
 After reset, check `J MITI` → `3` → `9` → `LIST` / `READ 1`. To recover the old
 world, select its saved JSON file and use the existing confirmed restore action.
 
+## Community expansion migration
+
+No IndexedDB or JSON format bump is required. The reserved version-1
+`community-world` setting accepts optional `expansion: 1` only with `seeded`
+status and the original fixture ID. Old backups without it remain valid.
+
+On first visit/reset, the original thirty posts and the expansion’s thirty-six
+posts, boards, members, counters, marker and activity settings commit in the same
+transaction. Existing locally seeded v1 worlds qualify only while all thirty
+original seed IDs/origins and their AI author IDs remain present, the marker has
+no expansion version, and the private `session/imported` guard is absent.
+Deletion of originals is treated conservatively as customization/opt-out.
+
+The migration adds only missing boards. An existing board with the same SIG
+keyword/number is never renamed, renumbered or filled, even if empty. Ambiguous
+SIGs, reserved record-ID collisions and reserved post-ID collisions skip that
+place. Other independent missing places can still be added. The expansion marker
+records completion even when places were skipped: later reload/deletion does not
+refill them. Existing posts/authors, counters, human IDs, read markers, resident
+preferences, consent and all other settings are preserved. Existing resident
+preferences continue to allow occasional visits outside their preferred boards.
+
+All writes, including the marker, serialize in one `allStores` transaction;
+a quota/write/validation failure rolls everything back and permits a later retry.
+Concurrent tabs cannot duplicate content. JSON restore preserves exported
+provenance, but its private imported guard prevents a restored v1 seeded world
+from acquiring unrequested new history. Legacy/imported/empty/opted-out worlds
+stay unchanged. Explicit legacy empty-world population remains available only
+under its existing eligibility/confirmation rules and now supplies the expanded
+baseline (up to 66 posts when customized additional boards are skipped); reset
+explicitly recreates the full baseline for any world.
+
 ## Forum reading
 
 The historical directory in `src/navigation.ts` uses the unchanged evidence
@@ -85,8 +118,8 @@ advances the selected human's read marker before displaying it; failed marker
 writes report an error without displaying the post. Reading never mutates posts.
 
 `src/forums.ts` maps stored SIGs by case-insensitive `keyword` (`MITI` or
-`DAISIZEN`) and stored forums by `sigId` plus `boardNo` (MITI `9`, DAISIZEN
-`1`–`7`). Stored record IDs do not need to match fixture IDs. One matching SIG
+`DAISIZEN`, `LOCAL-DOSV`, `LOCAL-GAMES`, `LOCAL-GV`) and stored forums by
+`sigId` plus `boardNo`. See [SIG navigation](sig-navigation.md). Stored record IDs do not need to match fixture IDs. One matching SIG
 and board are required: a missing or ambiguous mapping reports unavailability,
 and an empty stored forum stays empty. Posts are sorted by ascending `number`;
 allocation gaps and missing read numbers do not change the active screen.

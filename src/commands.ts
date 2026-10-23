@@ -274,7 +274,7 @@ export class TerminalCommands {
     if (command === 'RESET') {
       this.confirm({ kind: 'reset', expected: context(await this.actions.read()) },
         '投稿・メール・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
-        '最初の10人・30件の投稿を準備し、他のタブも再読み込みします。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
+        '最初の10人・66件の投稿を準備し、他のタブも再読み込みします。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
     }
     if (!this.menu && this.actions.mailbox?.()) {
       const data = await this.actions.read(), human = activeHuman(data);
@@ -361,7 +361,7 @@ export class TerminalCommands {
       if (row) { this.profile = structuredClone(row); this.profileContext = residentContext(data); this.profileHelp(); return true; }
       else print('表示された住人の番号 / BACK');
     } else if (this.menu === 'storage') {
-      if (command === 'POPULATE' && canPopulateCommunity(data)) { this.confirm({ kind: 'populate', expected: context(data) }, '空の掲示板に30件・8話題の創作を追加します。モデルのダウンロードはありません。追加しますか？ (Y/N)='); return true; }
+      if (command === 'POPULATE' && canPopulateCommunity(data)) { this.confirm({ kind: 'populate', expected: context(data) }, '空の掲示板に最大66件・18話題の創作を追加します。モデルのダウンロードはありません。追加しますか？ (Y/N)='); return true; }
       else print('BACKUP / IMPORT / RESET / HELP / BACK');
     } else if (this.menu === 'ai') {
       const savedModel = (data.settings.find((row) => row.id === 'ai-activity')?.value as { modelId?: string } | undefined)?.modelId;

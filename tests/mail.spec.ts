@@ -38,7 +38,7 @@ test('fresh visitor registers in mail, edits multiline Japanese with IME, retrie
   await command(page, 'Y', 'メール #1 を送信しました'); await command(page, 'Y', 'この画面では使えない');
   await command(page, 'SENT', '#1 夜の便り / 星守'); await command(page, 'READ 1', '件名：夜の便り');
   const data = await snapshot(page);
-  expect(data.mail).toHaveLength(1); expect(data.posts).toHaveLength(30); expect(data.members.filter((m) => m.actor === 'human')).toHaveLength(1);
+  expect(data.mail).toHaveLength(1); expect(data.posts).toHaveLength(66); expect(data.members.filter((m) => m.actor === 'human')).toHaveLength(1);
   expect(data.mail![0]).toMatchObject({ subject: '夜の便り', body: '  一行目　ｶﾅ <b>文字</b>  \n\n二行目を変更', recipientId: 'fictional-ai:hoshimori', origin: 'local-human' });
   expect(data.session?.commandHistory).not.toContain('星の便り'); expect(data.session?.commandHistory).not.toContain('二行目を変更');
   await expect(page.locator('.output b')).toHaveCount(0); await noOtherUi(page);
@@ -79,9 +79,11 @@ test('stored mail is usable without GPU, survives offline reload/backup/import a
   await context.setOffline(false);
   const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
   await command(other, '1', '電子メール'); await compose(other, '古い下書き', '送信しません。');
-  await command(page, 'RESET', '初期状態に戻しますか'); await command(page, 'Y');
+  await command(page, 'RESET', '初期状態に戻しますか');
+  await Promise.all([page.waitForEvent('load'), other.waitForEvent('load'), command(page, 'Y')]);
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
-  await expect(other.locator('.output')).toContainText('ハンドル名を登録しますか');
-  await command(other, 'SKIP', '登録を中止'); await command(other, 'Y', 'この画面では使えない');
+  await expect(other.locator('.output')).toContainText('MAIN');
+  // Only one tab receives the shared welcome invitation; discard it if present.
+  await command(other, 'SKIP'); await command(other, 'Y', 'この画面では使えない');
   expect((await snapshot(page)).mail).toEqual([]);
 });

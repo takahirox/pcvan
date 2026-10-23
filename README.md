@@ -24,9 +24,9 @@ are no external font requests. Local content, settings, session timestamps, and
 command history use IndexedDB in this browser profile. The terminal display and input
 draft remain in memory; OLT room history is persisted.
 
-On the first visit, a new local world already has 30 original Japanese posts by
-ten fictional regulars: eight conversations in MITI 資料室 and DAISIZEN
-自然の森／ＦＲＥＥ. Read them immediately, before creating a human member or
+On the first visit, a new local world already has 66 original Japanese posts by
+ten fictional regulars: eighteen conversations across nature, mysteries, PCs,
+games and everyday life. Read them immediately, before creating a human member or
 allowing a model download. They are bundled fiction, never historical archives
 or claims of live network activity.
 
@@ -144,12 +144,12 @@ live drafts. OLT room history is included as world data.
 | `5` | 公共情報と政治 | Article list, 0 articles |
 | `6` | ビジネス | Article list, 0 articles |
 | `7` | インターネット | Information article list, 0 articles |
-| `8` | コンピュータ | Article list, 0 articles |
+| `8` | コンピュータ | Article list; `SIGS` opens the community directory |
 | `9` | ショッピングモール | Product catalog, 0 products |
 | `10` | 電子出版 | Publication list, 0 publications |
-| `11` | 趣味 | Article list, 0 articles |
+| `11` | 趣味 | Article list; `SIGS` opens the community directory |
 | `12` | 生活 | Article list, 0 articles |
-| `13` | コミュニケーション | Existing MITI / DAISIZEN bridge |
+| `13` | コミュニケーション | Five-community directory |
 | `14` | ＰＣ－ＶＡＮ利用情報（無料） | Article list, 0 articles |
 | `15` | ☆★☆ おすすめ ☆★☆ | Article list, 0 articles |
 | `16` | ☆★☆ わかばマーク ☆★☆ | Article list, 0 articles |
@@ -166,6 +166,22 @@ At DAISIZEN (`13` → `2`), `MAIL` opens its own mailbox directory,
 chat room directory; `CONFERENCE` retains its empty room view. `FORUMS` retains
 boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
 posting, reply and unread behavior. A saved empty board stays empty.
+
+The community directory (`13`, or `8` / `11` → `SIGS`) adds these routes.
+Selectors below are reconstructed bridges; historical names and date limitations
+are recorded in [the research notes](docs/research/pcvan-1996-1997.md#expanded-communities-issue-51).
+
+| Directory route | Boards | Local practice |
+| --- | --- | --- |
+| `3` DOS/Vワールド | `1` パソコン相談室, `2` 工作机 | State machine/OS/conditions, report results; keep small failed experiments |
+| `4` ゲーム談話室 | `1` 攻略と感想, `2` 週末スコア帳 | Hint before answer, warn about plot details; compare personal progress |
+| `5` グローバル・ビレッジ | `1` ビレッジ・ボード | Monthly gatherings and brief introductions, reading-only visits welcome |
+| `2` → `FORUMS` | DAISIZEN `3`, `5`, `7` gain histories | Book notes, observations without precise nest locations, optional neighborhood events |
+
+Every board accepts `LIST`, `READ number`, `WRITE`, `REPLY number`, `HELP`,
+`BACK` and `MAIN`. The same human handle/member ID and ten residents travel
+between boards. AI remains optional and uses the existing consent and budgets.
+See [SIG navigation](docs/sig-navigation.md).
 
 OLT accepts `JOIN 1` / `JOIN 2` (or a room number), `WHO number` and `LIST`.
 Inside a room, ordinary lines are speech, including literal `MAIN`, `BACK`,
@@ -247,7 +263,7 @@ New worlds default to an automatic cap of four saved posts and twelve generation
 attempts per six-hour window while the page stays open. Reconnecting does not
 renew that allowance. This does not authorize a model download. After consent, later visits may load the authorized model when
 work is due, including fetching evicted assets. Readiness does not promise
-immediate posts. The thirty prewritten posts exist before model setup.
+immediate posts. The 66 prewritten posts exist before model setup.
 
 The resident editor selects each of the ten profiles and edits handle, job,
 routine, voice, interests, hours, UTC offset, frequency, weights and affinities.
@@ -287,17 +303,20 @@ invalid data and transaction failures preserve the old world. Errors stay in the
 dialog. Other tabs reload after replacement; stale connections cannot write into
 the replacement world. `BACKUP` / `IMPORT` remain optional typed shortcuts.
 
-A truly pristine profile receives ten resident identities, two writable boards
-and 30 prewritten posts from [the original fixture](data/pcvan/fictional-community.json)
-in one transaction. The eight threads cover repairs, old PCs, stargazing,
-experiments, gardening, birds and walks. Their dates are fixed once relative to
-world creation, over the preceding roughly two weeks, with a quiet day and recent
+A truly pristine profile receives ten resident identities, ten populated boards
+and 66 prewritten posts in eighteen threads in one transaction. The original
+[30 posts/eight threads](data/pcvan/fictional-community.json) remain intact;
+[36 additional authored posts](data/pcvan/expanded-community.json) add PC help,
+games, books, bird observations, a small observation event and everyday
+conversation. Dates are fixed once relative to creation (or the one-time expansion), over the preceding roughly two weeks, with a quiet day and recent
 activity; they are not dated as genuine 1996 material. `origin: local-seed:fictional`
-and the `community-world` setting preserve provenance in `ABOUT` and JSON backups.
+and `local-seed:authored-sigs-v1` plus the `community-world` setting preserve provenance in `ABOUT` and JSON backups.
 Subsequent model output uses `local-ai:webllm:<modelId>` instead.
 
-Reloads, other tabs and app updates never refill deleted posts. Existing profiles
-receive no unsolicited history. For a pre-feature profile with no posts and safe,
+Reloads and other tabs never refill deleted posts. Intact, locally seeded v1
+worlds receive a one-time expansion into missing default boards; existing boards,
+identities, settings and read markers are preserved. Imported or legacy worlds
+receive no automatic history. See [migration eligibility](docs/local-storage.md#community-expansion-migration). For a pre-feature profile with no posts and safe,
 unambiguous board mappings, Settings → ローカルデータ・保守 offers 初期会話を追加
 with an explanation and explicit confirmation (`POPULATE` remains a typed shortcut). It preserves members, custom names and counters,
 and can succeed only once. Imported worlds, including empty restores, are excluded.
@@ -305,8 +324,9 @@ Restoring an empty backup keeps the world empty; it also suppresses the old DEMO
 fallback. Clearing all browser site data removes the initialization marker, so the
 next visit creates a new world. Export first to retain your current world.
 
-Stored SIGs map to the evidence directory by `keyword` (`MITI`/`DAISIZEN`, case
-insensitive), and forums by `boardNo` (`9` for MITI, `1`–`7` for DAISIZEN).
+Stored SIGs map by case-insensitive `keyword` and forums by `boardNo`. The
+MITI/DAISIZEN routes remain stable; application keys `LOCAL-DOSV`, `LOCAL-GAMES`
+and `LOCAL-GV` identify reconstructed additions, never historical jump commands.
 Repository snapshots always take precedence over the legacy display-only demos,
 including empty restores or missing boards. Ambiguous mappings are reported
 without choosing arbitrary content.
@@ -325,7 +345,7 @@ it irreversibly deletes local posts, mail, members, read
 markers, resident edits, AI activity/consent, display preferences and history.
 中止 or closing preserves them. `RESET` remains a typed shortcut with its own
 explicit `Y` confirmation.
-The app recreates the original ten residents and thirty posts in eight threads,
+The app recreates the expanded baseline: ten residents and 66 posts in eighteen threads,
 then reloads this and other open tabs into a fresh MAIN session. Check the restored
 posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.
 Reset needs no model, WebGPU or download. It preserves downloaded model weights,

@@ -980,6 +980,48 @@ optional validation; mocked output verifies routing, scheduling and persistence.
 No push, PR, merge, comment or deployment was performed. No post-merge verification
 is required.
 
+## Issue #51 — expanded SIG communities
+
+Implemented against the selected worktree at `cba62b449ab130f030e74061e01d7d5ba55e083a`
+(application upstream includes local mail, PR #54). Read the open GitHub Issue
+and rechecked primary/operator sources; the research notes distinguish historical
+names from reconstructed target-era layouts and the original game community.
+
+The new baseline has five communities, ten populated boards, eighteen threads
+and 66 authored posts. The original thirty posts/eight threads remain unchanged.
+New tests cover shared identities, differentiated content, every additional SIG
+board’s navigation/read/empty states, terminal human writes/replies and read
+markers, reload, actual scheduled mocked-worker replies across two SIGs, bounded
+board-specific context, and suppression of internal storage keys in composition.
+Repository checks cover expansion rollback under injected quota failure,
+concurrent connections, custom-board/counter/profile/read preservation, repeated
+opens, pre-expansion JSON restore exclusion, deleted-original opt-out, and strict
+expansion provenance validation. Existing reset, backup/restore, IME, focus,
+consent, budgets, cross-tab locking, mail and MAIN mapping checks also pass.
+
+Validation on 2026-10-23:
+
+- `npm ci`: succeeded, 24 packages audited, zero reported vulnerabilities.
+- `npm run build`: passed TypeScript and production bundling. The existing large
+  WebLLM chunk warning remains; weights are not bundled or downloaded.
+- Final `npm test -- --config .tmp-playwright.config.ts --workers=4`:
+  **192 passed in 55.5 seconds**, no retries. Another independent worktree was
+  using ports 14373/14374, so temporary copies of the unchanged tests/config
+  substituted only ports 15373/15374. Both development-module tests and production
+  browser tests ran against this worktree’s servers/assets. Temporary files were
+  removed afterward; the normal repository configuration is unchanged.
+- The first full regression run had 187 passes/two failures due to older test
+  assumptions: an injected write fault could hit startup in another database,
+  and the recovery fixture assumed a resident’s default preferred board stayed
+  singular. Scoped the fault to its database and explicitly pinned that recovery
+  fixture’s preferences. A focused new-content test also corrected an assertion
+  that searched a body for a term present only in its title. Final runs passed.
+- Local Markdown link/heading checks and `git diff --check`: passed.
+
+No real model/GPU, deployment, push, PR, merge or external comment was used.
+Subjective human walkthrough and further target-era archival research remain
+optional; no post-merge verification is required by this Issue.
+
 ## Issue #53 — local terminal OLT rooms (2026-10-23)
 
 Read the open GitHub Issue and repository flow/review guidance before coding.
@@ -1023,3 +1065,25 @@ period OLT manual/screen comparison remain optional and unperformed. Mocked
 models validate lifecycle, routing and persistence without claiming language
 quality or authentic historical controls. No push, PR, merge, comment or deployment
 was performed. No post-merge verification is required.
+
+### Issue #51 integration before PR publication
+
+Integrated `main` at `1cdf6d484d125e8d27eef01ea241d3cf89f9b093` (OLT PR #55)
+before publishing #51. Resolved additive README/research/validation overlaps and
+retained both SIG and OLT navigation imports. No new transport was implemented.
+
+- `npm ci`: passed, 24 packages audited, zero reported vulnerabilities.
+- Initial integrated `npm test -- --workers=4`: 204 passed, two failed. Updated
+  OLT's reset assertion from thirty to 66 posts. Made the mail reset test await
+  both page reloads and tolerate either tab claiming the shared welcome prompt;
+  it still checks that an old draft cannot send after reset.
+- Final `npm test -- --workers=4`: **206 passed (1.0m)**, no retries, using the
+  normal configuration and ports 14373/14374. Includes production build,
+  expanded SIGs, mail, OLT, shared identities, backup/reset and cross-tab checks.
+- Separate `npm run build`: passed TypeScript and production bundling; the
+  existing WebLLM chunk-size warning remains.
+- All 60 local Markdown link targets in the six affected documentation files
+  exist. Working-tree and staged whitespace checks passed.
+
+Real-model quality, native-device checks, subjective walkthrough and deployment
+remain unperformed. No required post-merge verification applies.

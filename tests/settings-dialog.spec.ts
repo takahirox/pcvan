@@ -82,12 +82,12 @@ for (const stage of ['title', 'body', 'review']) {
     await expect(dialog(page).locator('.ai-status')).toContainText('モデル準備完了');
     await close(page); await expect(input).toHaveValue(text);
     expect(await page.locator('.output').textContent()).toBe(output);
-    expect((await snapshot(page)).posts).toHaveLength(30);
+    expect((await snapshot(page)).posts).toHaveLength(66);
     await input.press('Enter');
     if (stage === 'title') { await expect(page.locator('.output')).toContainText('本文を1行ずつ'); await command(page, '本文', '本文='); }
     if (stage !== 'review') { await command(page, '.END', '投稿しますか'); await command(page, 'Y', 'を登録しました'); }
     else await expect(page.locator('.output')).toContainText('を登録しました');
-    expect((await snapshot(page)).posts).toHaveLength(31);
+    expect((await snapshot(page)).posts).toHaveLength(67);
   });
 }
 
@@ -124,7 +124,7 @@ test('Settings model selector, refusal, affirmative consent, pause and on-demand
   await load(page); await expect(modal.locator('.ai-status')).toContainText('モデル準備完了');
   expect(await activity(page)).toMatchObject({ consent: true, modelId: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', maxPosts: 0 });
   await expect(modal.locator('.generate-ai, .preview-ai, .save-ai, .discard-ai, .persona-select, .forum-select, .ai-reply')).toHaveCount(0);
-  expect((await snapshot(page)).posts).toHaveLength(30);
+  expect((await snapshot(page)).posts).toHaveLength(66);
   await modal.getByRole('button', { name: '処理を中止・モデルを解放', exact: true }).click();
   await expect(modal.locator('.ai-status')).toContainText('キャンセル');
   await modal.locator('.about-panel > summary').click(); await expect(modal.locator('.settings-about')).toContainText('local-ai:webllm:');
@@ -175,7 +175,7 @@ for (const work of ['load', 'generate'] as const) {
     await modal.getByRole('button', { name: '処理を中止・モデルを解放', exact: true }).click();
     await expect(modal.locator('.ai-status')).toContainText('キャンセル');
     await close(page); await enterForum(page); await post(page, '手動で投稿', 'モデル処理は不要');
-    expect((await snapshot(page)).posts).toHaveLength(31);
+    expect((await snapshot(page)).posts).toHaveLength(67);
   });
 }
 
@@ -195,7 +195,7 @@ test('Settings native JSON import/export require replacement consent, retain rol
   await command(page, 'READ 17', '★内容'); await open(page, 'storage'); const modal = dialog(page);
   const downloading = page.waitForEvent('download'); await modal.getByRole('button', { name: 'JSON を保存', exact: true }).click();
   const saved = JSON.parse(await readFile((await (await downloading).path())!, 'utf8'));
-  expect(saved.posts).toHaveLength(31); expect(saved.readStates).toHaveLength(1);
+  expect(saved.posts).toHaveLength(67); expect(saved.readStates).toHaveLength(1);
   await choose(page, '{'); await expect(modal.locator('.settings-message')).toContainText('操作できません');
   const changed = structuredClone(saved); changed.posts.find((p: { title: string }) => p.title === '保存する題').title = '復元した題';
   await choose(page, JSON.stringify(changed)); await expect(modal.locator('.confirmation-copy')).toContainText('取り消せません');
@@ -216,11 +216,11 @@ test('Settings native JSON import/export require replacement consent, retain rol
   expect((await snapshot(page)).posts).toEqual(changed.posts);
   await open(page, 'storage'); await modal.getByRole('button', { name: '初期状態に戻す', exact: true }).click();
   await expect(modal.locator('.confirmation-copy')).toContainText('モデルの重み・端末キャッシュは保持');
-  await modal.getByRole('button', { name: '中止', exact: true }).click(); expect((await snapshot(page)).posts).toHaveLength(31);
+  await modal.getByRole('button', { name: '中止', exact: true }).click(); expect((await snapshot(page)).posts).toHaveLength(67);
   await modal.getByRole('button', { name: '初期状態に戻す', exact: true }).click();
   const backupBeforeReset = page.waitForEvent('download'); await modal.getByRole('button', { name: '先に JSON を保存', exact: true }).click(); await backupBeforeReset;
   await modal.locator('.confirm-action').click(); await expect(page.locator('.output')).toContainText('初期状態に戻しました');
-  await expect(page.locator('#command')).toBeFocused(); expect((await snapshot(page)).posts).toHaveLength(30);
+  await expect(page.locator('#command')).toBeFocused(); expect((await snapshot(page)).posts).toHaveLength(66);
   expect((await snapshot(page)).members.every((m) => m.actor === 'ai')).toBe(true); expect(await activity(page)).toMatchObject({ consent: false, maxPosts: 4 });
 });
 
@@ -285,7 +285,7 @@ test('profile conflicts and cross-tab display/reset refresh Settings and invalid
   await otherModal.locator('.confirm-action').click();
   await expect(page.locator('.output')).toContainText('ハンドル名を登録しますか');
   await expect(modal).not.toBeVisible(); await expect(otherModal).not.toBeVisible();
-  expect((await snapshot(page)).posts).toHaveLength(30);
+  expect((await snapshot(page)).posts).toHaveLength(66);
   expect(await activity(page)).toMatchObject({ consent: false });
   await expect(page.locator('.terminal')).toHaveAttribute('data-theme', 'white');
 });
@@ -310,5 +310,5 @@ test('failed dialog import keeps a human draft; confirmed import cancels it and 
   await dialog(page).getByRole('button', { name: '置き換えて復元する', exact: true }).click();
   await expect(dialog(page)).not.toBeVisible(); await expect(page.locator('#command')).toHaveValue('');
   await command(page, 'Y', 'この画面では使えない');
-  expect((await snapshot(page)).posts).toHaveLength(30);
+  expect((await snapshot(page)).posts).toHaveLength(66);
 });

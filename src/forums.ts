@@ -1,3 +1,4 @@
+import { expandedBoards } from './communities';
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import demoPosts from '../data/pcvan/demo-posts.json' with { type: 'json' };
 import type { Backup, Member, Post } from './storage/schema';
@@ -26,7 +27,7 @@ export function replyReference(post: Post, posts: readonly Post[]): Post | undef
 
 // IDs, dates, titles and bodies are original fiction. Historical evidence is
 // confined to the SIG/board directory, never the demonstration's contents.
-export function forumPosts(content: ForumContent, keyword: 'MITI' | 'DAISIZEN', boardNo: number) {
+export function forumPosts(content: ForumContent, keyword: string, boardNo: number) {
   const sigs = content.sigs.filter((sig) => sig.keyword.toUpperCase() === keyword);
   const forums = content.forums.filter((forum) => sigs.some((sig) => sig.id === forum.sigId) && forum.boardNo === boardNo);
   // Repository snapshots include settings, even on an empty restore. Suppress
@@ -45,9 +46,10 @@ export function forumPosts(content: ForumContent, keyword: 'MITI' | 'DAISIZEN', 
   };
 }
 
-export function forumName(keyword: 'MITI' | 'DAISIZEN', boardNo: number): string {
+export function forumName(keyword: string, boardNo: number): string {
   return keyword === 'MITI' ? evidence.miti.steps[2]!.destination
-    : evidence.daisizen.forums.find((forum) => forum.number === boardNo)!.label;
+    : keyword === 'DAISIZEN' ? evidence.daisizen.forums.find((forum) => forum.number === boardNo)!.label
+    : expandedBoards.find((board) => board.keyword === keyword && board.boardNo === boardNo)!.name;
 }
 
 /** UTC keeps the stored date stable across browsers; spacing is reconstructed. */
