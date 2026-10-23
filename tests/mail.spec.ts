@@ -79,9 +79,11 @@ test('stored mail is usable without GPU, survives offline reload/backup/import a
   await context.setOffline(false);
   const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
   await command(other, '1', '電子メール'); await compose(other, '古い下書き', '送信しません。');
-  await command(page, 'RESET', '初期状態に戻しますか'); await command(page, 'Y');
+  await command(page, 'RESET', '初期状態に戻しますか');
+  await Promise.all([page.waitForEvent('load'), other.waitForEvent('load'), command(page, 'Y')]);
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
-  await expect(other.locator('.output')).toContainText('ハンドル名を登録しますか');
-  await command(other, 'SKIP', '登録を中止'); await command(other, 'Y', 'この画面では使えない');
+  await expect(other.locator('.output')).toContainText('MAIN');
+  // Only one tab receives the shared welcome invitation; discard it if present.
+  await command(other, 'SKIP'); await command(other, 'Y', 'この画面では使えない');
   expect((await snapshot(page)).mail).toEqual([]);
 });

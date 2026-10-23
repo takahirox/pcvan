@@ -100,6 +100,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   let times = 'セッション時刻を読み込み中…';
   input.focus({ preventScroll: true });
   return {
+    get hasInput() { return !!input.value; },
     get composing() { return composing; },
     get preferences() { return { ...preferences }; },
     setPreferences(value: TerminalPreferences) {

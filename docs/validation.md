@@ -1021,3 +1021,69 @@ Validation on 2026-10-23:
 No real model/GPU, deployment, push, PR, merge or external comment was used.
 Subjective human walkthrough and further target-era archival research remain
 optional; no post-merge verification is required by this Issue.
+
+## Issue #53 — local terminal OLT rooms (2026-10-23)
+
+Read the open GitHub Issue and repository flow/review guidance before coding.
+The selected worktree already contains mail #52; upstream `main` was rechecked as
+`35088332ddaf4aa8a809e751fd36352c8042ed23`. OLT reuses its human/resident identities,
+authorization, model worker, locks and world-generation fences.
+
+- Final `npm test`: **203 passed in 41.9 seconds**, no retries or skips. This
+  includes 14 OLT tests plus the existing forum, mail, Settings, offline, storage,
+  terminal and autonomous activity coverage. An intermediate run found one old
+  service assertion expecting OLT not to load content; it was updated for the
+  room directory. One final-suite startup encountered the prior preview server
+  still closing its port; after checking the ports were free, the full run passed.
+- `npm run build`: passed TypeScript and production bundling. The existing
+  optional WebLLM chunk-size advisory remains.
+- Terminal journeys cover directory/join/who/speech/list/help/leave/main,
+  room changes and reentry, literal command words and slash escaping, IME Enter,
+  history/focus, handle rename, transcript backup/import/reset and subsequent
+  forum posting. No in-world buttons, dialog or second input is required.
+- Fake clocks and mocked WebLLM exercise delayed human-to-resident and
+  resident-to-resident speech, input/IME preservation, two-tab arbitration,
+  same-member attendance, quiet residents, absent/off-hour departure, reload/
+  catch-up, no-consent/no-WebGPU fallback, malformed output/worker failure,
+  cancellation on leaving/hiding and a stalled generation deadline. Default
+  evening profiles over 100 deterministic seeds include populated and empty visits.
+- Real IndexedDB checks cover monotonic IDs and 200-line retention, leases,
+  concurrent turn reservation/duplicate commit, independent persisted allowance,
+  quota rollback, strict atomic restore, legacy pre-OLT/pre-mail backup compatibility,
+  reset and stale-connection fencing. OLT does not edit forums or consume their
+  generated-post budget. Prompt checks exclude private mail, bound public excerpts,
+  and reject wrong speaker/room, coerced IDs, controls, HTML, oversized/repeated
+  output and extra fields.
+- README, local AI behavior, shared mail identity text, JSON contract, Settings
+  provenance and OLT historical research are updated. Forty-one relative links/
+  anchors in the changed research/product documentation pass local checks.
+  The full staged diff passes `git diff --cached --check`.
+
+No real model weights were downloaded. Compatible real WebGPU chat pacing,
+subjective persona quality, physical Japanese IME/mobile keyboards and original
+period OLT manual/screen comparison remain optional and unperformed. Mocked
+models validate lifecycle, routing and persistence without claiming language
+quality or authentic historical controls. No push, PR, merge, comment or deployment
+was performed. No post-merge verification is required.
+
+### Issue #51 integration before PR publication
+
+Integrated `main` at `1cdf6d484d125e8d27eef01ea241d3cf89f9b093` (OLT PR #55)
+before publishing #51. Resolved additive README/research/validation overlaps and
+retained both SIG and OLT navigation imports. No new transport was implemented.
+
+- `npm ci`: passed, 24 packages audited, zero reported vulnerabilities.
+- Initial integrated `npm test -- --workers=4`: 204 passed, two failed. Updated
+  OLT's reset assertion from thirty to 66 posts. Made the mail reset test await
+  both page reloads and tolerate either tab claiming the shared welcome prompt;
+  it still checks that an old draft cannot send after reset.
+- Final `npm test -- --workers=4`: **206 passed (1.0m)**, no retries, using the
+  normal configuration and ports 14373/14374. Includes production build,
+  expanded SIGs, mail, OLT, shared identities, backup/reset and cross-tab checks.
+- Separate `npm run build`: passed TypeScript and production bundling; the
+  existing WebLLM chunk-size warning remains.
+- All 60 local Markdown link targets in the six affected documentation files
+  exist. Working-tree and staged whitespace checks passed.
+
+Real-model quality, native-device checks, subjective walkthrough and deployment
+remain unperformed. No required post-merge verification applies.

@@ -1,3 +1,4 @@
+import { TerminalOlt } from './olt';
 import type { Backup, Mail, Post, TerminalPreferences } from './storage/schema';
 import { resolveMailResident, validateBackup } from './storage/schema';
 import type { ForumDestination, LocalRepository } from './storage/repository';
@@ -29,6 +30,7 @@ export interface CommandActions {
   print(...lines: string[]): void;
   navigate(line: string): void;
   destination(): ForumDestination | null;
+  isOlt?(): boolean;
   mailbox?(): { box: Mailbox; title: string } | null;
   save(target: ForumDestination, draft: ComposeDraft): Promise<Post>;
   restore(text: string, expectedContext: string): Promise<void>;
@@ -61,9 +63,11 @@ export class TerminalCommands {
   private profile: ResidentProfile | undefined;
   private profileContext: string | undefined;
   private field: keyof ResidentProfile | undefined;
+  readonly olt;
   readonly offline;
   readonly settings;
   constructor(private actions: CommandActions) {
+    this.olt = new TerminalOlt({ ...actions, isOlt: () => actions.isOlt?.() ?? false });
     this.offline = createOfflineControls(actions.applicationPrint ?? actions.print);
     this.settings = createSettingsActions(actions);
   }
@@ -72,6 +76,7 @@ export class TerminalCommands {
   }
   get recordsHistory() { return !this.composer?.active && !this.mailAddress && !this.registration && !this.confirmation && !this.profile; }
   invalidate() {
+    this.olt.invalidate();
     const active = this.composer?.active || this.mailAddress || this.registration || this.confirmation || this.profile;
     this.composer = undefined; this.mailAddress = false; this.registration = null; this.intent = undefined;
     this.confirmation = undefined; this.profile = undefined; this.field = undefined; this.menu = null;
@@ -236,6 +241,10 @@ export class TerminalCommands {
       } else this.profileHelp();
       return true;
     }
+    if (!this.menu && this.olt.active && ['/HANDLE', '/SETTINGS'].includes(command)) {
+      await this.olt.leave(); return this.submit(command.slice(1));
+    }
+    if (!this.menu && await this.olt.submit(line)) return true;
     if (!command) return !!this.menu;
     if (command === 'STOP') { this.actions.ai.stop(); if (!this.applicationOutput('ai')) print('処理をキャンセルし、モデルを解放しました。'); return true; }
     if (['SETTINGS', 'CONFIG'].includes(command)) { await this.show('settings'); return true; }

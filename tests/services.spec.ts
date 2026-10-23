@@ -31,12 +31,12 @@ test('service helpers preserve provisional metadata and show concise operational
 });
 
 for (const [input, label, empty] of entries) {
-  test(`${input} opens its own empty collection with stable HELP, BACK and MAIN`, () => {
+  test(`${input} opens its service view with stable HELP, BACK and MAIN`, () => {
     const controller = daisizen();
     const directory = controller.submit('HELP');
     const output = controller.submit(`  ${input.toLowerCase()}  `);
     expect(controller.screen).toBe('daisizen-service');
-    expect(controller.needsContent).toBe(input === 'MAIL');
+    expect(controller.needsContent).toBe(['MAIL', 'OLT'].includes(input));
     expect(output.join('\n')).toContain(`大自然＆動植物（DAISIZEN） / ${label}`);
     expect(output.join('\n')).toContain(empty);
     expect(output.join('\n')).not.toMatch(/未実装|利用不可/);

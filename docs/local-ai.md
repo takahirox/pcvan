@@ -333,3 +333,61 @@ small, and generations may fail or sound inconsistent. Other engines, physical
 devices and native IME are not covered by these Chromium mocks. No post-merge
 verification is required. See [WebLLM](https://github.com/mlc-ai/web-llm) and
 [offline caching](offline.md) for runtime/cache constraints.
+
+## OLT rooms
+
+DAISIZEN's `OLT` directory is a terminal-only local chat simulation. `JOIN 1` or
+`JOIN 2` enters; ordinary lines immediately send human speech. `/WHO`, `/LIST`,
+`/HELP`, `/JOIN number`, `/LEAVE` / `/BACK` and `/MAIN` control the room. Plain
+`MAIN`, `BACK`, `WRITE`, `HELP` and `STOP` are speech. `//` escapes a leading slash;
+`/HANDLE` or `/SETTINGS` leaves for the corresponding typed menu. Read-only
+visitors can register later. No AI preview, send button or model popup is involved.
+
+The existing ten stable resident IDs, profile editor, selected human and handles
+are shared with forums/mail. Presence is fictional local scheduling, never a
+remote connection: fixed seeded twenty-minute windows use personal hours, daily
+absence, participation/frequency, preferred-board interest and occasional exploration.
+Visits last about 7–18 minutes within their window. Out-of-hours residents leave;
+not all residents appear, and some windows/rooms are empty. Identical observations,
+reentry and reload do not reroll arrival chances. Local presence events are
+`local-presence`, not model output or prewritten dialogue. No OLT history is seeded.
+
+An active visible room renews its human lease every three seconds. After human
+speech, the earliest response is eight seconds later, then subsequent resident
+turns are at least fourteen seconds apart (polling/GPU work may add delay).
+Interest, affinity, reply and inactivity weights choose a present speaker or
+silence. A resident may greet another arrival or respond to another resident;
+three consecutive resident utterances end that exchange until new room activity.
+A resident never replies as an absent character or impersonates the human.
+There is no guarantee of an answer. Only currently visible tabs infer; hidden,
+closed and long-unobserved intervals do not generate retrospective conversation.
+On return, expired presence can be recorded conservatively, then a fresh quiet
+interval begins. The next observation reconciles attendance rather than replaying
+missed intervals.
+
+OLT uses the already authorized model, shared loader/worker, Web Locks and stop/
+retry controls. Opening/joining alone grants no consent. `AUTO 0` pauses OLT too.
+Unsupported WebGPU, missing Web Locks, offline model-load errors, malformed output
+and worker failures leave human speech, navigation and readback usable without
+invented replies. A separate persisted **24 attempts per hour across all rooms**
+budget never spends the forum/mail allowance. A transaction reserves each turn;
+failed/cancelled attempts also consume allowance, and reload does not replenish it.
+One inference at a time shares the forum/mail activity lock and model lease;
+a second tab cannot duplicate a turn. Losing visibility, leaving/changing rooms,
+stop, restore/reset and profile/model changes cancel work. OLT loading/generation
+has a 30-second deadline. Failure/timeout suspends automatic retry until Settings
+retry/load. Commit checks consent, profiles, current presence, turn token, lease
+and world epoch again. Tokens expire after 35 seconds; stale output is discarded.
+
+The prompt contains the last 12 room events (text excerpts up to 120 characters), present identities, the speaker's
+profile/affinities and at most three public posts (180 characters each). **No mail
+records or private-mail excerpts are passed**, even for the speaking resident.
+All supplied conversation is untrusted data. Output must be exact JSON for the
+selected speaker/room, one plain line of 1–400 UTF-16 units, without terminal
+controls, invisible formatting, HTML or a repeated recent utterance. Rejected
+output never becomes chat. Settings exposes technical status and per-line origin.
+Background readback waits while the input has text, Japanese composition is active
+or Options is open; it never edits input, changes focus or submits a partial line.
+
+See [OLT persistence](local-storage.md#olt-persistence) and
+[historical uncertainty](research/pcvan-1996-1997.md#olt-interaction-research-issue-53).

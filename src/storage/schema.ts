@@ -1,3 +1,4 @@
+import { OLT_SETTING, validateOlt, validateOltMembers } from '../olt-state';
 import { personas, personaMemberId, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentSettings } from '../ai/personas';
 export interface Member { id: string; handle: string; actor: 'human' | 'ai' }
@@ -285,6 +286,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
+      if (value.id === OLT_SETTING) validateOlt(value.value);
       if (value.id === 'ai-activity') validateActivity(value.value);
       if (value.id === RESIDENTS_SETTING) validateResidents(value.value);
       if (value.id === TERMINAL_SETTING) validateTerminalPreferences(value.value);
@@ -341,6 +343,8 @@ export function validateBackup(value: unknown): asserts value is Backup {
       }
     }
   }
+  const olt = backup.settings.find((s) => s.id === OLT_SETTING)?.value;
+  if (olt) { validateOlt(olt); validateOltMembers(olt, backup.members); }
   validateMailRelations(backup.mail ?? [], backup.members);
   for (const read of backup.readStates) {
     if (!members.has(read.memberId) || !forums.has(read.forumId)) invalid('Read state references a missing member or forum.');

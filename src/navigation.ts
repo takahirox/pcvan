@@ -1,4 +1,5 @@
 import { additionalSigs, boardCulture } from './communities';
+import { renderOltDirectory } from './olt';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import type { TerminalController } from './controller';
@@ -80,8 +81,10 @@ export class PcvanController implements TerminalController {
       ? { box: this.currentScreen === 'mailbox' ? this.mailbox : 'INBOX', title: this.collectionTitle } : null;
   }
 
+  get isOlt(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'OLT'; }
+
   get needsContent(): boolean {
-    return !!this.mailContext || ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
+    return this.isOlt || !!this.mailContext || ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
   }
 
   get screen(): Screen {
@@ -258,7 +261,8 @@ export class PcvanController implements TerminalController {
         returnHelp, demoPrompt,
       ];
       case 'section':
-      case 'daisizen-service': return [
+      case 'daisizen-service': if (this.isOlt) return renderOltDirectory({ settings: this.content.settings ?? [] });
+        return [
         ...(this.collectionKind === 'mail' ? [this.collectionTitle,
           `受信箱：${mailboxRows(this.content.mail ?? [], this.memberId, 'INBOX').length}件 / 送信済み：${mailboxRows(this.content.mail ?? [], this.memberId, 'SENT').length}件`,
           ...((this.content.mail ?? []).length ? [] : ['現在、メールはありません。']), mailHelp]

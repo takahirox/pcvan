@@ -23,7 +23,7 @@ An address is the exact current resident handle, stable short ID such as
 `hoshimori`, or full local member ID such as `fictional-ai:hoshimori`. No domain,
 PC-VAN-era account format, remote address or other human recipient is accepted.
 Ambiguous handles require a stable ID. Resident profile edits retain IDs and
-existing conversations. Added SIGs and future OLT can use the same member IDs
+existing conversations. Added SIGs and OLT use the same member IDs
 without creating another identity registry.
 
 ```text

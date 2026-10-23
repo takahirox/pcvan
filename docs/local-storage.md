@@ -280,7 +280,8 @@ in-memory recall is always limited to 100 nonblank entries.
 The transcript, input draft and edits to recalled input remain in memory. The
 terminal's `LOG` command downloads the displayed transcript, including
 scrollback, as UTF-8 text without modifying local data; it is separate from JSON
-backup/restore. Neither the transcript nor unsubmitted drafts are in JSON backups.
+backup/restore. The terminal display and unsubmitted drafts are excluded; the bounded OLT room
+history is world data included in JSON backups.
 Command echo, responses, writes, backup and restore are queued
 in this tab. Repository methods perform no external awaits inside transactions; see
 [the IndexedDB transaction lifecycle](https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction).
@@ -410,3 +411,53 @@ use real Chromium IndexedDB in fresh isolated contexts and a separate test
 database; UI tests exercise the production bundle. No fake database or runtime
 storage library is used. See [the validation record](validation.md#issue-6-local-storage-validation)
 for results and checks not executed.
+
+## OLT persistence
+
+OLT adds a validated reserved setting `olt-rooms`, version 1, using the existing
+settings store. IndexedDB remains version 2; JSON remains `pcvan-local` version 1.
+Pre-OLT backups omit this setting and lazily get empty rooms on their first OLT
+operation. No store-number migration can collide with SIG/mail work. Existing
+members, posts, mail and counters are preserved. Reset removes OLT and recreates
+only the established ten residents/30 forum posts; OLT has no seeded transcript.
+
+The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly
+two rooms (`lounge`, `night`). Each room stores a monotonic `nextNumber`, the last
+**200 lines**, resident leases, human visitor leases, `observedAt`, `nextTurnAt`,
+`handledNumber`, bounded consecutive-resident `chain`, and an optional pending
+turn token. `/LIST` displays the most recent 40 lines; terminal scrollback retains
+what this session has displayed. Pruning never reuses a sequence or ID.
+
+Every line has `{id, number, authorId, createdAt, kind, text, origin}`. IDs are
+`olt:<roomId>:<number>`; timestamps are canonical UTC ISO strings, nondecreasing
+within the room even if the system clock moves backwards. `kind` is `enter`,
+`leave`, or `say`. Presence lines have empty text and `local-presence` origin;
+human speech uses `local-human`; model speech uses `local-ai:webllm:<modelId>`.
+Authors reference shared members, so selecting/renaming/restoring a handle never
+creates a second OLT identity. Presence and AI authors must use the stable ten
+fictional resident IDs. No remote participant identities are created.
+
+Resident entries store `{memberId, joinedAt, until}` (at most ten total across
+rooms). Visitors store `{clientId, memberId, until}` (at most sixteen per room),
+renewed with a 45-second lease by an open room. Attendance deduplicates member
+IDs across tabs. Leaving one tab preserves the human while another lease remains;
+reload renews that identity without a duplicate entrance. Expired leases are
+reconciled on observation. Closing/hiding never claims continued live presence.
+A read-only unregistered visitor has no fictional member record.
+
+`observeRoom`, `speakRoom`, `claimRoomTurn` and `finishRoomTurn` each read/update
+the complete bounded setting in one repository transaction. Inference happens
+outside transactions. A pending `{id, authorId, modelId, context, until}` token
+reserves a turn for 35 seconds; commit revalidates authorization/profile context,
+presence, expiry and token before atomically appending and clearing it. Repeated
+or stale commits cannot duplicate a line. Handled events, attempt counters and
+next-turn times survive cancellation, reload, backup and restore. Old pending
+leases expire; import never automatically infers a saved pending turn.
+
+Strict import validation checks shapes, bounds, ordering, stable IDs, author
+references, actor/provenance consistency, attendance uniqueness and timestamps
+before any writes. JSON replacement/reset retain the existing atomic rollback
+and private world-generation fence; old tabs cannot write into a new world.
+No host-tab runtime objects or model data enter the backup. Backup contains public
+OLT text as well as private mail and should be stored accordingly. The existing
+explicit replace/reset confirmations include OLT through the settings payload.

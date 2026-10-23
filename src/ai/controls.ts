@@ -136,12 +136,40 @@ export function createAiControls(actions: AiActions,
   }
   return {
     refresh,
+    cancelBackground() { cancel(); },
+    async runRoom(work: (engine: LocalLlmAdapter, signal: AbortSignal) => Promise<void>, external: AbortSignal) {
+      if (operation || autoBlocked || !supported || !navigator.locks || external.aborted || document.visibilityState !== 'visible') return;
+      const snapshot = await actions.read(); refresh(snapshot);
+      if (!activity?.consent || !activity.maxPosts || operation || autoBlocked || external.aborted) return;
+      const task = new AbortController(); operation = task;
+      const abort = () => { if (operation === task) cancel(); };
+      external.addEventListener('abort', abort, { once: true });
+      let timedOut = false;
+      const timeout = setTimeout(() => { timedOut = true; abort(); }, 30_000);
+      try {
+        await navigator.locks.request('pcvan-ai-activity', { ifAvailable: true }, async (lock) => {
+          if (!lock || document.visibilityState !== 'visible') return;
+          const engine = await loadEngine(task, activity!.modelId);
+          task.signal.throwIfAborted();
+          await work(engine, task.signal);
+        });
+      } catch (error) {
+        if (!task.signal.aborted) {
+          if (error instanceof ModelBusy) report(error.message); else failure(error);
+        }
+      } finally {
+        clearTimeout(timeout); external.removeEventListener('abort', abort);
+        if (operation === task) operation = undefined;
+        if (timedOut) { autoBlocked = true; report('OLT の生成が時間切れです。設定から再試行できます。'); }
+      }
+    },
     get supported() { return supported; },
     get busy() { return !!operation; },
     status() {
       return [activityStatus(), supported ? message : 'WebGPU が利用できません。端末・閲覧・手動投稿は利用できます。',
         `6時間の自動投稿上限: ${activity?.maxPosts ?? 0} / 同意: ${activity?.consent ? 'あり' : 'なし'} / 試行 ${budget.attempts}/${MAX_SESSION_POSTS} / 保存 ${budget.committed}`,
         'メールも同じ生成上限を使い、住人の次の予定で届くことがあります。',
+        'OLT は別枠で全室1時間24試行まで。自動活動0で OLT も休止。可視タブのみで動作します。',
         ...(activity?.batch?.runs.map((run) => `${run.id} / ${run.status} / ${run.personaId} / simulatedAt=${run.simulatedAt}`) ?? [])];
     },
     invalidate() { autoBlocked = true; cancel(); message = 'モデル解放済み'; },
