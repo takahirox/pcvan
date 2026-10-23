@@ -173,7 +173,7 @@ live drafts. OLT room history is included as world data.
 | `4` | データベース | Database directory; `1` opens 日経テレコン BiZ |
 | `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
-| `7` | インターネット | Internet directory; `1` opens NetNews's two example groups |
+| `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo |
 | `8` | コンピュータ | Article list; `SIGS` opens the community directory |
 | `9` | ショッピングモール | Product catalog, 0 products |
 | `10` | 電子出版 | Publication list, 0 publications |
@@ -269,11 +269,44 @@ the durable historical calendar for an English RFC-style `Date` with seconds and
 reconstruction, not recovered PC-VAN session syntax.
 
 Subscriptions/unread persistence, expiry, crossposting, thread navigation,
-WWW/TELNET/FTP and remote access are outside this implementation subset. The
+WWW/FTP and real remote access are outside this implementation subset. The
 [NetNews research record](docs/research/pcvan-1996-1997.md#netnews-reading-and-header-search-issue-81)
 and [participation research](docs/research/pcvan-1996-1997.md#netnews-local-participation-issue-87),
 with Settings/About, distinguish the 1995 restrictions, 1996 reading/posting report,
 general fj evidence, assumed PC-VAN group carriage and reconstructed controls.
+
+For a browser-local outbound TELNET journey, use `7` → `2 TELNET` →
+`OPEN mail.demo.example.invalid` → `MAIL` → `READ 1` or `READ 2`. The single
+fictional host automatically displays `demo@mail.demo.example.invalid`; it never
+requests credentials, resolves a destination or opens a network connection.
+Its shell-like `remote-demo$` and mailbox `remote-mail>` prompts keep the two
+original Japanese letters separate from PC-VAN electronic mail. The letters use
+fictional correspondents, `.invalid` addresses and fixed November 22–23, 1996
+dates, and are bundled outside IndexedDB and community backups.
+
+The TELNET directory accepts only `OPEN mail.demo.example.invalid`, `LIST`,
+`HELP`, `BACK`, `MAIN`. The remote shell accepts `MAIL`, `LOGOUT`, `HELP`, `BACK`,
+`MAIN`; its mailbox/detail accepts `LIST`, `READ number`, `LOGOUT`, `HELP`, `BACK`,
+`MAIN`. HELP preserves the view and selection. LIST restores the complete mailbox.
+BACK follows letter → mailbox → remote shell → TELNET directory → Internet
+directory → actual MAIN/index parent. LOGOUT ends only the remote demonstration;
+MAIN clears its state and returns directly to MAIN. Settings/About return to the
+same view; reload, confirmed restore and reset clear remote login/selection.
+
+Anonymous and registered users need no model, AI consent or registration. The
+journey creates no community records, read markers, consent or schedules and
+preserves restored-empty collections. Ordinary session history, activity
+bookkeeping and terminal logs still operate. Arbitrary hosts/ports, general shell
+commands, remote composition/sending, inbound access and downloads are excluded.
+
+November 1996 documentation supports entering PC-VAN and using TELNET for mail
+on a separate server. April 1995's incoming-only restriction describes an earlier
+snapshot. Selector 2, host/account, prompts, commands, letters and returns are
+category D authored controls, not authenticated PC-VAN gateway syntax or a
+particular UNIX mail program. Exact historical controls remain unknown. See
+[the TELNET evidence record](docs/research/pcvan-1996-1997.md#browser-local-outbound-telnet-issue-95)
+and Settings/About for dates, confidence and source URLs. Existing terminal reveal
+and skip behavior supplies pacing; there is no separate TELNET timer.
 
 For database retrieval, use `4` → `1` → `FIND パソコン` → `SHOW P1 /1`
 → `SHOW P3 /1 1`. 日経テレコン BiZ searches four short, original, undated Japanese
@@ -738,6 +771,7 @@ it is resolved.
 - `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
   offline/retention panel and build-generated app-shell worker.
 - `src/news.ts`: original fictional briefs and news directory/headline/detail rendering.
+- `src/telnet.ts`: bundled fictional host/account/letters and browser-local TELNET views, outside persistence.
 - `src/netnews.ts`: fixed-date NetNews examples, merged local articles, header matching and group/list/article rendering.
 - `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
 - `tests/`: controller/session checks and browser interaction checks.
@@ -775,7 +809,8 @@ Composition checks cover edit/review/cancel/send, blank drafts, Japanese multili
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.
 Section/service checks cover every MAIN and index destination, all five service views,
-mailbox browsing, news providers/headlines/briefs, NetNews groups/header searches/articles and isolated browsing,
+mailbox browsing, news providers/headlines/briefs, NetNews groups/header
+searches/articles and isolated browsing, local TELNET login/mail/logout and parent returns,
 BiZ search/sets/titles/articles and fresh visits, empty collections,
 OLT conversation/presence, preserved fixture
 evidence, scoped helpers,

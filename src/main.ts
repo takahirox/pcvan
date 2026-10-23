@@ -172,6 +172,7 @@ const ai = createAiControls({
 const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
+  isTelnet: () => controller.isTelnet,
   isNetNewsDirectory: () => ['internet-directory', 'netnews-directory'].includes(controller.screen),
   oslDownload: (number: number) => controller.selectOslFile(number),
   netNews: () => controller.netNewsContext, netNewsSaved: () => navigate('LIST'),
@@ -188,6 +189,7 @@ const commandActions = {
       const repo = await repository;
       await repo.replaceFromJson(text, { confirmReplace: true, expectedContext });
       commands.invalidate(); terminal.clearInput(); revision++;
+      if (controller.isTelnet) navigate('MAIN');
       if (!settingsDialog?.open) print('バックアップを復元しました。コマンド=');
       try { await refreshContent(); } catch (error) { reportError(error); }
       return repo.getSession();

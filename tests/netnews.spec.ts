@@ -44,10 +44,9 @@ for (const viaIndex of [false, true]) {
     expect(internet.join('\n')).toContain('インターネット / サービス一覧\n1 NetNews');
     for (const isInternet of [true, false]) {
       const view = isInternet ? internet : controller.submit('1');
-      const errors = isInternet ? ['2', ...directoryErrors] : directoryErrors;
       expect(controller.submit('LIST')).toEqual(view);
       expect(view.join('\n')).not.toMatch(/創作|再構成|https?:/);
-      for (const invalid of errors) {
+      for (const invalid of directoryErrors) {
         expect(controller.submit(invalid).join('\n')).toContain('この画面では使えない');
         expect(controller.submit('HELP')).toEqual(view); isolated(controller);
       }
@@ -210,7 +209,7 @@ for (const world of ['registered populated', 'registered empty', 'anonymous empt
     for (const viaIndex of [false, true]) {
       if (viaIndex) await command(page, '2', '索引');
       await command(page, '7', 'インターネット / サービス一覧');
-      await invalids(['2', ...directoryErrors]);
+      await invalids(directoryErrors);
       await command(page, 'HELP', '1 NetNews');
       await command(page, 'LIST', 'サービス一覧');
       await command(page, '1', 'NetNews / グループ一覧');

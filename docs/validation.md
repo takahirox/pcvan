@@ -2053,3 +2053,58 @@ The November 1996 and October 1994 publisher PDF texts were rechecked; the earli
 January 1994 paper's damaged extraction remains contextual only. External letters
 and addresses are documented as included in JSON backups and terminal logs.
 No post-merge verification is required by #93.
+
+## Browser-local outbound TELNET (#95)
+
+Implemented the Issue's MAIN/index → 7 → 2 → bundled host → automatic fictional
+login → remote MAIL → two original Japanese letters → logout and parent returns.
+Historical capability, chronology, confidence and category D controls are recorded
+in [the TELNET research section](research/pcvan-1996-1997.md#browser-local-outbound-telnet-issue-95)
+and existing Settings/About. No storage schema, network transport or model work
+was added.
+
+Validation on 2026-10-24 in the assigned worktree after reading live Issue #95:
+
+- `npm ci` and `npx playwright install chromium`: passed.
+- `npm run build`: passed TypeScript checking and production build. Vite reported
+  the existing large WebLLM chunk warning; no build error.
+- Initial focused run,
+  `npm test -- tests/telnet.spec.ts tests/netnews.spec.ts --workers=2`:
+  **15 passed, 1 failed (3.1m)**. The new controller isolation assertion incorrectly
+  expected the Internet directory itself to be a TELNET view during service
+  switching. Corrected the test to assert isolation after entering TELNET. All
+  three TELNET production journeys and all eight NetNews checks passed that run.
+- Final documented `npm test`: **340 passed (3.7m)**, using the unchanged
+  Playwright configuration and eight workers. This includes all nine new TELNET
+  checks and all 331 existing checks, plus configured TypeScript checking and
+  the production build. Functional, storage/import/reset, consent, mail privacy,
+  IME and terminal reveal/pacing/skip coverage passed.
+- Local Markdown links/heading anchors across README, research and this validation
+  record resolve. Working-tree and staged `git diff --check` pass.
+
+The nine TELNET checks cover both actual MAIN/index parents, both full letter
+bodies, strict host/number validation, unsupported service/composition/OLT input,
+all BACK/MAIN/LOGOUT depths, repeated reads/logout/re-entry and NetNews afterward.
+Production keyboard journeys cover anonymous restored-empty, registered empty and
+registered populated worlds, Settings/About returns at every TELNET depth,
+application log/backup, canceled model preparation/import/reset, confirmed
+restore/reset, native restore rollback and successful/cross-tab invalidation,
+reload, literal Japanese and angle-bracket text/log export, composing Enter guards,
+and keyboard scrolling/input at 320px.
+
+Protected comparisons pause automatic activity and retain members, SIGs, forums,
+posts, mail, read states and settings exactly, including empty restored
+collections. Session command history, activity bookkeeping and terminal logs may
+change; this is not a claim of complete backup equality. Bundled letters never
+appear in exported world records, and host/account/mailbox state is not stored as
+community content. OPEN commands may appear in ordinary command history and logs.
+The production tests observe no external requests, model asset requests, workers,
+WebSockets, popups or DNS-prefetch/preconnect links caused by the journey. Static
+review confirms that the TELNET module only renders bundled data and dispatches
+local commands; it contains no resolver, fetch, transport or external handoff.
+
+Reviewed the complete implementation/test/documentation diff against #95.
+No real model, additional browser engine, native IME/hardware check or recovered
+outbound historical session comparison was used. Those optional checks are not
+completion gates. No required post-merge verification applies. No push, PR,
+comment, merge or deployment was performed.
