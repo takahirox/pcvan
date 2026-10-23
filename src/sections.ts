@@ -12,7 +12,7 @@ export const mainCollections: Record<string, CollectionKind> = {
 };
 
 export const serviceCollections: Record<string, CollectionKind> = {
-  MAIL: 'mail', LIBRARY: 'files', OSL: 'files', OLT: 'room', CONFERENCE: 'room',
+  MAIL: 'mail', LIBRARY: 'articles', OSL: 'files', OLT: 'room', CONFERENCE: 'room',
 };
 
 export const mailboxes = { INBOX: '受信箱', SENT: '送信済み' } as const;

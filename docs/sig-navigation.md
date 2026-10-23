@@ -27,6 +27,16 @@ active composition, `.CANCEL` explicitly discards the draft before navigation.
 An absent board is created only on a successful human send; ambiguous mappings
 report an error. Invalid reads/selectors leave the current screen intact.
 
+DAISIZEN also has static, read-only collections: `LIBRARY` → `2` or `5` →
+`READ 1` reads original seasonal material or a digest; `OSL` → `1` or `2` →
+`READ 1` shows a text file's description, metadata and actual preview. All eleven
+category destinations work, with the others empty. `HELP` repeats the current
+view; `LIST` from content returns to its category listing. `BACK` follows item →
+category → service directory → SIG, and `MAIN` clears nested navigation. These
+reads require no handle and never update forum/mail records or read markers.
+The category organization is provisionally observed; numeric controls, content
+and 1996 file dates are reconstructed. See [collection provenance](research/pcvan-1996-1997.md#library-and-osl-browsing-issue-59).
+
 The same stable human member ID/handle and ten resident IDs are used in all
 SIGs and by existing local mail. No new personas or transport are introduced.
 The fixtures name fictional volunteer guides rather than impersonating historical

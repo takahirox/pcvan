@@ -66,6 +66,35 @@
         "unavailable_reason": "Online Software Library の区分名は確認できますが、一覧・転送・登録・取消のコマンドと手順は未確認です。"
       }
     ],
+    "collections": {
+      "LIBRARY": {
+        "labels": [
+          "説明",
+          "自然の森（歳時記）",
+          "山の情報バンク",
+          "ライブラリィ実験室",
+          "フォーラムダイジェスト"
+        ],
+        "source_url": "https://www.chayagate.com/daisizen/index.htm",
+        "evidence_category": "B",
+        "status": "provisional",
+        "limitation": "Observed category order in an undated memorial configuration; applicability to 1996 is provisional. Numbers, LIST/READ, layouts and bundled content are category D reconstruction, not verified host controls."
+      },
+      "OSL": {
+        "labels": [
+          "ＳＩＧの道具箱",
+          "データベース",
+          "ユーティリティ",
+          "画像データ",
+          "バイナリ書庫",
+          "その他"
+        ],
+        "source_url": "https://www.chayagate.com/daisizen/index.htm",
+        "evidence_category": "B",
+        "status": "provisional",
+        "limitation": "Observed category order in an undated memorial configuration; applicability to 1996 is provisional. Numbers, LIST/READ, layouts and bundled content are category D reconstruction, not verified host controls."
+      }
+    },
     "forums": [
       {
         "number": 1,

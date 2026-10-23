@@ -162,8 +162,21 @@ live drafts. OLT room history is included as world data.
 | `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
 
 At DAISIZEN (`13` → `2`), `MAIL` opens its own mailbox directory,
-`LIBRARY` and `OSL` each open a named file list (0 files). `OLT` opens a local
-chat room directory; `CONFERENCE` retains its empty room view. `FORUMS` retains
+`LIBRARY` opens five reading categories and `OSL` opens six file categories.
+Choose a category number, then `READ number` to read an original article or a
+file description and text preview. Try `LIBRARY` → `2` → `READ 1` (seasonal
+observations), `LIBRARY` → `5` → `READ 1` (an original digest), `OSL` → `1` →
+`READ 1` (documentation), or `OSL` → `2` → `READ 1` (observation data).
+Other categories are honestly empty. `HELP` repeats the current view; `LIST`
+returns from content to its listing. `BACK` follows content → category listing →
+service directory → SIG; `MAIN` clears that path. These controls and all examples
+are reconstructed. Category labels/order follow an undated memorial and remain
+provisional for 1996. OSL dates are fictional 1996 simulation dates; sizes count
+the preview body's UTF-8 bytes (LF, no BOM), not historical transmission bytes.
+No files execute or transfer, and browsing does not change community records or
+require a handle. See [collection provenance](docs/research/pcvan-1996-1997.md#library-and-osl-browsing-issue-59).
+
+`OLT` opens a local chat room directory; `CONFERENCE` retains its empty room view. `FORUMS` retains
 boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
 posting, reply and unread behavior. A saved empty board stays empty.
 
@@ -215,7 +228,7 @@ and human sending need no model, GPU or network. Letters stay in IndexedDB and
 JSON backups. Private within this fictional world does not mean encryption or
 isolation from anyone using the same browser profile/device.
 
-Other service collections remain empty and read-only. `HELP`, `BACK` and `MAIN`
+Other information collections and `CONFERENCE` remain empty. `HELP`, `BACK` and `MAIN`
 work throughout; `BACK` from a mailbox returns to its own entry directory. The
 index uses MAIN selectors except `2` and `Q`. `Q` remains scoped to MAIN, without
 single-letter `B`/`M` aliases. Commands, mailbox sharing and layouts are reconstructed

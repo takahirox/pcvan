@@ -1,3 +1,53 @@
+# Issue #59: distinct DAISIZEN library and OSL journeys
+
+Validated on 2026-10-23 with Node.js 24.12.0 on macOS.
+
+- `npm ci`: passed, zero reported vulnerabilities; no dependency or lockfile changes.
+- `npm run build`: passed (`tsc --noEmit` and the Vite production build).
+- `npm test -- tests/services.spec.ts tests/sections.spec.ts`: **37 passed**
+  after correcting a test expectation. The initial run had 35 passes and two
+  failures: the new browser journeys expected a generic command notice for
+  `WRITE`, while the existing dispatcher correctly returned its forum-target
+  guidance. The assertion now checks that actual guidance; no dispatcher change
+  was needed. The successful focused rerun took 11.4 seconds.
+- `npm test`: **213 passed**, no failures or skips, in 45.6 seconds. The existing
+  configuration first type-checks and builds the production app, then runs
+  Chromium against production assets and the repository-module Vite server.
+  Existing MAIN/MITI, composition/reply, mail, OLT, consent/storage, backup/import/
+  reset, IME, literal rendering, scrolling, output pacing and skip checks passed.
+  Vite reported its existing large-chunk warning; Node reported the existing
+  `NO_COLOR`/`FORCE_COLOR` warning. Neither prevented checks from passing.
+- A Python check of added local Markdown links passed for all four links,
+  including heading anchors. Reviewed the implementation, bundled Japanese
+  content, provenance and documentation diff against Issue #59.
+- `git diff --check` and `git diff --cached --check`: passed, including the two
+  new bundled collection files in the staged check.
+
+New controller coverage visits all five library and six OSL categories in order,
+including empty destinations; reads both original articles and both text files;
+checks catalog metadata and UTF-8 sizes using an independent Node byte count;
+and exercises invalid inputs, HELP/LIST, nested BACK, repeated reads, service
+switching, MAIN at each depth and command scoping. Service-entry evidence
+metadata and existing mail/conference/OLT assertions remain protected.
+
+Two production browser journeys at 320×640 cover both services and every category,
+with and without a human handle. They open/close both modal Settings and terminal
+Settings/About while viewing content, preserving the modal's input draft and
+transcript and returning to the same content. Unsupported composition, mail,
+OLT and transfer commands cannot acquire those contexts. Snapshots before and
+after browsing are identical for members, SIGs, forums, posts, mail, read states
+and settings; only ordinary command history/session bookkeeping is allowed.
+Restored empty boards stay empty, including the separate ダーウィン図書館
+forum and MITI 資料室. No model download or real inference was needed.
+
+The memorial's undated category configuration remains provisional for 1996.
+Interactions and bundled content are reconstructed; assigned 1996 file dates
+are fictional and displayed UTF-8 bytes are local preview sizes. No historical
+transfer UI or binary transfer is claimed. Physical IME/device checks and
+additional period manuals were not performed and are not Issue #59 gates.
+No push, PR, comment or deployment was performed. No post-merge verification
+is required.
+
 # Issue #4 implementation validation
 
 Validated on 2026-10-20 with Node.js 24.12.0 and npm 11.6.2 on macOS.
