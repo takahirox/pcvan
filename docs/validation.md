@@ -1428,3 +1428,46 @@ non-failing. No model download, real inference or new framework was used.
 Optional visual archive comparison was not performed. No push, PR, merge,
 external comment or deployment was performed; no post-merge verification is
 required.
+
+## Japanese character display weights (#73)
+
+Validated on 2026-10-23 in the assigned worktree after reading the live open
+Issue and repository development/review guidance:
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities.
+- Focused `npm test -- tests/progressive-output.spec.ts --workers=1`:
+  **5 passed (6.6s)**, including configured TypeScript checking and production
+  build. No failures, retries or skips.
+- Final `npm test -- --workers=4`: **259 passed (1.9m)**, with no failures,
+  retries or skips, including TypeScript checking, production build and both
+  configured production/source-module servers. All 257 existing checks remain.
+- Independent literal cost expectations cover empty input, ASCII/LF and its
+  upper boundary, both half-width range boundaries and adjacent code points,
+  kanji, hiragana, katakana, Japanese punctuation/full-width space, yen,
+  overline, supplementary emoji, combining marks and joined emoji.
+- Fresh controlled-frame renderers at nominal 300 reveal 30 ASCII, 30 half-width
+  kana or 15 repeated Japanese characters after one second. Mixed text waits
+  for sufficient Japanese-character credit. Separate combining/emoji checks
+  preserve complete graphemes, original logical text and drained announcements.
+  Existing per-speed ASCII budgets, asynchronous ordering, batched painting,
+  reveal, speed-change flushing and overflow assertions remain intact. A Japanese
+  backlog verifies the UTF-16 pending-work bound independently of timing costs.
+- A real UTF-8 download through the terminal logical-log accessor and existing
+  download helper includes accepted but entirely unpainted Unicode, literal
+  markup and whitespace, while excluding the unsent draft. Existing production
+  export, preferences, reduced-motion, IME, scrolling, storage, consent, offline,
+  reconnect and service journeys pass. OSL preview sizes and forum identity
+  hashing retain their original UTF-8 implementations.
+- Rechecked the two new research-source links: the 1993 NEC office article's
+  extracted PDF text and the WHATWG encoder section. PDF page-image retrieval
+  failed; no page-image inspection is claimed. Research records target-year
+  continuity confidence, modern fallback and throughput limitations.
+- All **60** local Markdown links/anchors across README, terminal-display,
+  research and this validation record resolve. Reviewed the final diff against
+  #73; working-tree and staged whitespace checks pass.
+
+Existing Vite chunk-size and Node color-environment advisories remain
+non-failing. No real inference, model download, encoding dependency or storage
+migration was used. Optional subjective pacing, historical hardware and native
+IME observation were not performed. No push, PR, merge, external comment or
+deployment was performed; no post-merge verification is required.

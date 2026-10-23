@@ -1,13 +1,23 @@
 import type { TerminalSpeed } from './storage/schema';
 
-// Pending animation is bounded; the complete logical log is intentionally retained.
+// Bound pending UTF-16 string length independently of timing costs; retain the full log.
 export const MAX_PENDING_UNITS = 65_536;
-const encoder = new TextEncoder();
 const segmenter = new Intl.Segmenter('ja', { granularity: 'grapheme' });
 
-/** UTF-8 bytes per grapheme, including ASCII/newlines. No text is transcoded. */
+/**
+ * Shift-JIS-oriented timing units, not wire bytes or a representability check.
+ * ASCII (including LF), half-width kana/punctuation, yen and overline cost one;
+ * all other code points cost two, including modern emoji and combining marks.
+ * Graphemes wait for their summed cost. Text is never transcoded or normalized.
+ */
 export function displayCost(text: string): number {
-  return encoder.encode(text).length;
+  let cost = 0;
+  for (const character of text) {
+    const point = character.codePointAt(0)!;
+    cost += point <= 0x7f || (point >= 0xff61 && point <= 0xff9f)
+      || point === 0xa5 || point === 0x203e ? 1 : 2;
+  }
+  return cost;
 }
 
 export class OutputRenderer {

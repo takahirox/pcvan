@@ -315,9 +315,15 @@ The default is 2400 bps, or Instant with reduced motion. Effects default off.
 Escape reveals queued text; a submitted command also reveals earlier
 text before the queued command response. Changing speed reveals the current backlog.
 Theme, speed and effects persist locally and travel with JSON backups; an explicit
-choice overrides the motion-aware defaults. The animation uses UTF-8 byte costs
-at nominal bps / 10 bytes per second, preserving whole Unicode graphemes. This is
-a perception simulation, not a historical encoding or measured modem connection.
+choice overrides the motion-aware defaults. Animation uses a limited Shift-JIS-oriented
+cost model at nominal bps / 10 units per second: ASCII (including LF), half-width
+kana/punctuation U+FF61–U+FF9F, yen and overline cost one unit per code point;
+every other code point costs two. At nominal 300 this gives 30 ASCII/half-width
+kana or 15 common full-width Japanese characters per second. Complete Unicode
+graphemes wait for their summed cost; transcript text stays unchanged. Emoji and
+combining marks use the explicit modern two-unit fallback. These are perception
+choices, not exact wire bytes, framing, compression, host delays or measured modem
+throughput. See the [evidence and reconstruction policy](docs/research/pcvan-1996-1997.md#japanese-character-pacing-issue-73).
 See [display controls, accessibility, timing and limitations](docs/terminal-display.md).
 
 ## Optional local AI
@@ -513,7 +519,7 @@ it is resolved.
   `append(...text)`, which appends literal text without replacing or focusing the
   input. It follows new output only if the transcript was already at the bottom.
 - `src/output-renderer.ts`: bounded progressive display queue and independent logical
-  log, with UTF-8 grapheme costs and batched animation frames.
+  log, with Shift-JIS-oriented grapheme costs and batched animation frames.
 - `src/session.ts`, `src/history.ts`: transcript and command recall, independent
   of the DOM. `main.ts` restores/persists recalled commands through the repository.
   `session.append(...text)` records additional output;
@@ -589,7 +595,7 @@ model leases, mocked generation and offline reload, with no in-world secondary U
 Settings browser tests cover keyboard/focus/mobile/IME, active drafts, display,
 model consent/progress/cancellation/failures, ten profile editors, native JSON
 export/import/reset, stale confirmations and offline/storage controls.
-Renderer tests retain controlled UTF-8 timing/grapheme/queue checks. Repository
+Renderer tests retain controlled character-weight timing/grapheme/queue checks. Repository
 and scheduler suites cover transactional rollback, references, deterministic
 resident plans, budgets and concurrent commits. Mail suites cover all terminal routes,
 IME/edit/cancel/retry, private replies and public follow-ups via mocked WebLLM,
