@@ -1,4 +1,4 @@
-import { ConnectionController } from './connection';
+import { ConnectionController, ENTRY_STAGE_MS } from './connection';
 import { TerminalSession } from './session';
 import { mountTerminal } from './terminal';
 import { openRepository, RepositoryError, DATABASE_NAME } from './storage/repository';
@@ -19,6 +19,7 @@ let resetting = false;
 let revision = 0;
 let settingsDialog: ReturnType<typeof mountSettings> | undefined;
 let connectionTimer: ReturnType<typeof setTimeout> | undefined;
+let connectionRevision = 0;
 let commandsDuringHistoryLoad: string[] | null = null;
 const RESET_NOTICE = 'pcvan-reset-notice';
 const print = (...lines: string[]) => terminal.append(...session.append(...lines));
@@ -46,7 +47,7 @@ function enqueue<T>(action: () => Promise<T>): Promise<T> {
 async function loadHistory(load: () => Promise<Session | null>) {
   const lines: string[] = []; commandsDuringHistoryLoad = lines;
   try {
-    const saved = await load(); session.history.replace([...(saved?.commandHistory ?? []), ...lines]); terminal.showSessionTimes(saved);
+    const saved = await load(); session.history.replace([...(saved?.commandHistory ?? []), ...lines]); showSessionTimes(saved);
   } finally { commandsDuringHistoryLoad = null; }
 }
 async function refreshContent(): Promise<Backup> {
@@ -57,28 +58,50 @@ async function refreshContent(): Promise<Backup> {
   catch (error) { settingsDialog?.showError(error); }
   return content;
 }
-function completeConnection() {
+function showSessionTimes(saved: Session | null) {
+  terminal.showSessionTimes(saved); controller.setSession(saved);
+}
+function cancelConnectionTimer() {
   clearTimeout(connectionTimer);
+  connectionRevision++;
+}
+async function finishConnection() {
+  cancelConnectionTimer();
   const opening = controller.completeConnection();
   if (opening.length) {
     print(...opening);
-    void enqueue(() => commands.welcome()).catch(reportError);
+    await commands.welcome();
   }
 }
-function updateConnection() {
-  clearTimeout(connectionTimer);
-  if (controller.screen === 'connecting') connectionTimer = setTimeout(completeConnection, 1200);
+function completeConnection() {
+  cancelConnectionTimer();
+  void enqueue(finishConnection).catch(reportError);
 }
-function navigate(line: string) { print(...controller.submit(line)); updateConnection(); }
+function updateConnection() {
+  cancelConnectionTimer();
+  const expected = connectionRevision;
+  if (controller.screen === 'connecting') connectionTimer = setTimeout(() => {
+    // Startup/session reads and command ownership share this queue. A cancelled
+    // callback must not advance a later reconnect or print into a human prompt.
+    void enqueue(async () => {
+      if (expected !== connectionRevision || controller.screen !== 'connecting') return;
+      print(...controller.advanceConnection());
+      if (controller.screen === 'connecting') updateConnection();
+      else await commands.welcome();
+    }).catch(reportError);
+  }, ENTRY_STAGE_MS);
+}
+function navigate(line: string) { print(...controller.submit(line)); }
 const terminal = mountTerminal(root, {
   submit: (line) => {
     if (resetting) return;
-    completeConnection();
+    cancelConnectionTimer();
     const acceptedRevision = revision;
     // Echo inside the same queue as the response so rapid lines never split a
     // title/body prompt. Empty lines reach the composer unchanged.
     void enqueue(async () => {
       if (acceptedRevision !== revision) return;
+      await finishConnection();
       const recordable = commands.recordsHistory;
       if (recordable) { session.history.add(line); commandsDuringHistoryLoad?.push(line); }
       print(`> ${line}`); terminal.reveal();
@@ -103,15 +126,16 @@ const terminal = mountTerminal(root, {
       if (resetting) return;
       const repo = await repository, after = controller.screen;
       if (before === 'disconnected' && after !== 'disconnected') {
-        terminal.showSessionTimes(await repo.startSession());
+        showSessionTimes(await repo.startSession());
         const activity = await repo.openActivity();
         if (document.visibilityState === 'visible') void ai.openActivity(activity).catch(reportError);
       }
       if (before !== 'disconnected' && after === 'disconnected') {
-        ai.invalidate(); terminal.showSessionTimes(await repo.endSession());
+        ai.invalidate(); showSessionTimes(await repo.endSession());
       }
       if (before !== 'disconnected') await repo.touchActivity();
       if (recordable) await repo.recordCommand(line);
+      updateConnection();
     }).catch(reportError);
   },
   previous: (current) => session.history.previous(current),
@@ -190,9 +214,9 @@ const startup = enqueue(async () => {
   try {
     if (sessionStorage.getItem(RESET_NOTICE)) { sessionStorage.removeItem(RESET_NOTICE); print('初期状態に戻しました。'); }
   } catch { /* Optional notice. */ }
+  updateConnection();
   return activity;
 });
-updateConnection();
 void startup.then((activity) => {
   if (document.visibilityState === 'visible' && controller.screen !== 'disconnected') return ai.openActivity(activity);
 }).catch(reportError);
