@@ -2257,3 +2257,101 @@ warnings remain informational. Additional browser engines, native IME, hardware,
 real-model and historical-user checks were not run; they are optional. No required
 post-merge verification applies. No push, PR, comment, merge or deployment was
 performed.
+
+## Browser-local ECOM postal letters (#101)
+
+The #101 implementation was validated locally on 2026-10-24. An initial
+`npm run build` before dependency installation reported `tsc: command not found`.
+`npm ci` resolved the missing local dependencies using the existing lockfile,
+without changing the dependency manifest or lockfile. The first focused invocation
+stopped at production-server startup on a TypeScript exhaustiveness error after adding the ECOM screen; the explicit
+screen comparison was corrected before browser tests ran. The subsequent
+`npm test -- tests/ecom.spec.ts --workers=3` passed all **7 tests** in **39.7s**.
+Playwright used one worker for that single test file despite the three-worker cap.
+
+The first full `npm test -- --workers=3` run completed with **365 passed and
+2 failed in 7.2m**. Both failures were existing long NetNews empty-world
+preservation checks: the minute activity refresh recreated ten missing resident
+members after restore. The existing activity initializer added absent members
+unconditionally. It now respects imported membership, including absent residents;
+bootstrap and explicit resident edits retain their existing paths. ECOM's
+production preservation journeys explicitly trigger the same visible-page
+activity refresh, and the imported-empty community test checks membership too.
+That run had no timeouts; no assertions were removed to mask the failures.
+
+Diff review also corrected empty-letter guidance to suggest continued body input
+before entering the editor. The focused follow-up adds assertions for that
+message, ECOM history-key isolation and failed JSON import preserving the reviewed
+draft and unsent approval text.
+
+The follow-up command
+`npm test -- tests/ecom.spec.ts tests/community.spec.ts tests/residents.spec.ts tests/activity.spec.ts tests/mail-autonomy.spec.ts --workers=3`
+passed **30 tests in 41.4s**, including all seven ECOM checks and the affected
+community/resident/activity/mail-autonomy behavior. The strengthened imported-empty
+assertion also checks membership after a second restore/open.
+
+A second full three-worker run completed with **365 passed and 2 failed in
+7.0m**. All three long NetNews preservation journeys passed, including registered
+and anonymous restored-empty membership. The anonymous news journey instead
+exceeded the existing default 30-second whole-test timeout (the other exhaustive
+news journeys took roughly 25 seconds), and an OLT reset test raced the expected
+page reload while polling for an approval echo in the old transcript. The news
+journeys now use the existing NetNews journey's 90-second budget; no response
+expectations were relaxed. OLT reset approval is entered directly and the test
+waits for the reset notice and checks the resulting records, rather than requiring
+an echo that can disappear on reload. These narrow test corrections retain the
+behavioral assertions and do not change application behavior.
+
+The final `npm test -- --workers=3` run passed **all 367 tests in 6.6m**,
+with **three workers, zero failures, zero retries and zero skipped checks**. The
+existing configuration runs TypeScript checking and production bundling before
+Chromium tests against production assets; the separate Vite server supports
+existing repository/controller tests. No default/eight-worker reliability claim
+is made from a three-worker run.
+
+The new controller/service checks cover MAIN/index discovery, unchanged numbered
+mappings, actual parent returns, isolated contexts, field bounds and nonblank
+validation, exact Japanese/case/spacing/blank lines/full-width/half-width/markup,
+.TEXT escapes, review/editing every value, explicit cancellation at every stage,
+renewed review after editing, repeated approval, receipt inspection in guidance,
+receipt replacement and visit invalidation. Existing MAIN display expectations
+include the new discovery line without changing fixture selectors.
+
+Anonymous restored-empty and registered production keyboard journeys use the
+existing 320px viewport with automatic activity paused and AI consent disabled.
+They verify contextual rejection, field limits, literal review/editing, queued
+triple approval with one success, latest-receipt inspection/replacement,
+cancellation retaining the earlier receipt, typed Settings/About returns, modern
+Settings/About draft and unsent-input preservation, simulated composing-Enter
+protection, departure/disconnect/reconnect lifetime and visible terminal input.
+A separate production journey covers same-tab identical-JSON restore, cross-tab
+replacement, reload, reset and stale queued commands after departure, with both
+an existing receipt and an active reviewed draft.
+
+Protected IndexedDB snapshots and actual JSON backups compare members, SIGs,
+forums/posts, ordinary mail/read evidence, read markers and all settings,
+including calendar, consent, scheduling, conference and populated OLT/NetNews.
+Restored empty community collections remain empty. Postal fields and unique body
+text are absent from snapshots/backups and durable command history; the actual
+exported terminal log retains the exact displayed letter. Requests, workers and
+popups are observed with no ECOM external requests, model workers or handoffs.
+Normal session/activity bookkeeping continues.
+
+The [focused ECOM guide](ecom.md), README, modern Settings storage description,
+keyboard help, About and [historical research record](research/pcvan-1996-1997.md#browser-local-ecom-postal-letters-issue-101)
+explain the local simulation, lifetime/privacy boundary, source dates/access and
+confidence, fee contradiction, provisional continuity and reconstructed controls.
+The historical assessments are attributed to the Issue investigation of
+2026-10-24; implementation fetched the source Issue but did not recover or claim
+new source access, dated transcripts or page images.
+
+The full staged diff and affected documentation links were reviewed; all eight
+ECOM local links/anchors resolve. `git diff --check` and
+`git diff --cached --check` pass, including the new files. No new dependency,
+backup schema or delivery scheduler was added.
+
+The existing optional-WebLLM large-chunk advisory and Node color-environment
+warnings remain informational. Additional browser engines, native IME, real-model,
+hardware and historical-user checks were not run; they are optional. No required
+post-merge verification applies. No push, PR, comment, merge or deployment was
+performed.

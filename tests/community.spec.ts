@@ -110,7 +110,9 @@ test('legacy opt-in preserves custom directories and allocation; populated, ambi
   expect(result.populated.members).toContainEqual(result.legacy.members.find((m) => m.id === 'existing-human')!);
   expect(result.human).toMatchObject({ number: 57, replyToPostId: 'seed:v1:repair-1' }); expect(result.notEmpty).toBe(false);
   expect(result.immediate).toMatchObject({ source: 'local', posts: [] });
-  for (const world of [result.imported, result.importedAgain]) { expect(world.posts).toEqual([]); expect(world.forums).toEqual([]); }
+  for (const world of [result.imported, result.importedAgain]) {
+    expect(world.members).toEqual([]); expect(world.posts).toEqual([]); expect(world.forums).toEqual([]);
+  }
   expect(result.importedOptin).toBe(false); expect(result.importedLegacy).toBe(false); expect(result.unsafe).toEqual([false, false]);
   expect(result.oldAfter.posts).toEqual(result.oldPosts);
   expect(result.previewEligible).toBe(true); expect(result.raceResult).toBe(false); expect(result.racePosts).toEqual([result.arrived]);

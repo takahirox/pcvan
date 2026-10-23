@@ -557,10 +557,14 @@ export class LocalRepository {
       await request(settings.put({ id: RESIDENTS_SETTING, value: { version: 1, profiles } }));
     }
     const profiles = residentProfiles(await this.snapshot(tx));
-    for (const profile of profiles) {
-      const id = personaMemberId(profile.id);
-      if (!await request(tx.objectStore('members').get(id))) {
-        await request(tx.objectStore('members').add({ id, handle: profile.handle, actor: 'ai' }));
+    // Restored membership is authoritative, including deliberately absent residents.
+    // Timer/reconnect initialization must not refill an imported community.
+    if (!await request(tx.objectStore('session').get('imported'))) {
+      for (const profile of profiles) {
+        const id = personaMemberId(profile.id);
+        if (!await request(tx.objectStore('members').get(id))) {
+          await request(tx.objectStore('members').add({ id, handle: profile.handle, actor: 'ai' }));
+        }
       }
     }
     if (migrated.bootstrap) {

@@ -41,6 +41,7 @@ function expectMain(lines: readonly string[]) {
   }
   expect(lines.slice(13)).toEqual([
     'J MITI: 未知の世界へ',
+    'J ECOM: 電子郵便（紙の郵便を模擬体験）',
     'HELP: メニューを表示 / SETTINGS: 設定 / HANDLE: 利用者 / ABOUT: 来歴 / LOG: ログ保存',
     mainMenu.prompt.text,
   ]);

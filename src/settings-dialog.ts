@@ -71,7 +71,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       <p class="mail-sample-recipient"></p><button type="button" class="load-mail-sample">創作メールをローカルに追加</button>
     </details>
     <details class="storage-panel"><summary>ローカルデータ・保守</summary>
-      <p>JSON は投稿・メール（INET#外部宛先・手紙を含む）・ローカルNetNews記事・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書きは含みません。外部に保存してください。</p>
+      <p>JSON は投稿・メール（INET#外部宛先・手紙を含む）・ローカルNetNews記事・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書き、ECOMの郵便内容・模擬受付票は含みません。外部に保存してください。</p>
       <div class="settings-buttons"><button type="button" class="export-json">JSON を保存</button>
         <button type="button" class="import-json">JSON から復元</button><button type="button" class="populate-world" hidden>初期会話を追加</button><button type="button" class="reset-world">初期状態に戻す</button></div>
       <h3>オフライン・保存領域</h3><p>端末とモデルの重みは別の保存です。端末の保存ではモデルを取得しません。</p>

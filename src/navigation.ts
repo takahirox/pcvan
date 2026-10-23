@@ -1,3 +1,4 @@
+import { EcomVisit } from './ecom';
 import { ftpFiles, renderFtp } from './ftp';
 import { remoteLetters, renderTelnet, telnetControls, telnetHost, telnetPrompt } from './telnet';
 import type { TelnetScreen } from './telnet';
@@ -28,7 +29,7 @@ const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = TelnetScreen | 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
-  'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
+  'ecom' | 'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
   'news-directory' | 'news-headlines' | 'news-brief' |
   'ftp-list' | 'ftp-preview' | 'internet-directory' | 'netnews-directory' | 'netnews-list' | 'netnews-article' |
@@ -65,6 +66,7 @@ function renderMain(): string[] {
     '　＝＝＝ＰＣ－ＶＡＮ＝＝＝ (MAIN)',
     ...rows,
     `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
+    'J ECOM: 電子郵便（紙の郵便を模擬体験）',
     'HELP: メニューを表示 / SETTINGS: 設定 / HANDLE: 利用者 / ABOUT: 来歴 / LOG: ログ保存',
     mainMenu.prompt.text,
   ];
@@ -78,6 +80,10 @@ const demoPrompt = 'コマンド=';
 export class PcvanController implements TerminalController {
   readonly welcome = renderMain();
   private currentScreen: Screen = 'main';
+  private readonly ecom = new EcomVisit();
+  get isEcom() { return this.currentScreen === 'ecom'; }
+  get ecomDrafting() { return this.isEcom && this.ecom.drafting; }
+  invalidateEcom() { this.ecom.invalidate(); }
   private content = emptyContent();
   private boardNo = 9;
   private community = additionalSigs[0]!;
@@ -157,6 +163,13 @@ export class PcvanController implements TerminalController {
 
   submit(line: string): readonly string[] {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
+    if (this.currentScreen === 'ecom') {
+      const result = this.ecom.submit(line);
+      if (typeof result !== 'string') return result;
+      this.ecom.invalidate();
+      if (result === 'back') { this.currentScreen = this.parents.pop() ?? 'main'; return this.render(); }
+      return this.enter(result === 'main' ? 'main' : 'disconnected');
+    }
     if (this.currentScreen !== 'main' && this.currentScreen !== 'disconnected') {
       if (command === 'MAIN') {
         this.ftpItem = 0;
@@ -187,22 +200,24 @@ export class PcvanController implements TerminalController {
     switch (this.currentScreen) {
       case 'main': {
         if (['HELP', 'MAIN', 'BACK'].includes(command)) return renderMain();
+        if (command === 'J ECOM') { this.ecom.invalidate(); return this.enter('ecom'); }
         if (command === miti.steps[0]!.input) return this.enter('miti');
         const entry = mainMenu.entries.find((item) => item.selector === command);
         if (entry?.selector === 'Q') return [entryText(entry), ...this.enter('disconnected')];
         if (entry) return this.openSection(entry);
         return [
           command.startsWith('J ')
-            ? '移動先が見つかりません。この画面で対応するジャンプは J MITI です。'
-            : 'この画面では使えないコマンドです。1–21 / X / Q / J MITI / HELP を入力してください。',
+            ? '移動先が見つかりません。この画面で対応するジャンプは J MITI / J ECOM です。'
+            : 'この画面では使えないコマンドです。1–21 / X / Q / J MITI / J ECOM / HELP を入力してください。',
           mainMenu.prompt.text,
         ];
       }
       case 'index': {
         const entry = indexEntries.find((item) => item.selector === command);
         if (entry) return this.openSection(entry);
+        if (command === 'J ECOM') { this.ecom.invalidate(); return this.enter('ecom'); }
         if (command === miti.steps[0]!.input) return this.enter('miti');
-        return this.invalidCommand('表示された番号 / X / J MITI / BACK / MAIN / HELP');
+        return this.invalidCommand('表示された番号 / X / J MITI / J ECOM / BACK / MAIN / HELP');
       }
       case 'section':
       case 'daisizen-service': {
@@ -570,12 +585,14 @@ export class PcvanController implements TerminalController {
   private render(): readonly string[] {
     switch (this.currentScreen) {
       case 'main': return renderMain();
+      case 'ecom': return this.ecom.render();
       case 'disconnected': return [
         '接続を終了しました。',
         'RECONNECT で MAIN から再接続できます。',
       ];
       case 'index': return [
         '索引', ...indexEntries.map(entryText),
+        'J ECOM: 電子郵便（紙の郵便を模擬体験）',
         `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
         returnHelp, demoPrompt,
       ];

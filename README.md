@@ -72,7 +72,7 @@ accounts: type a number to select, `NEW` to register, or `RENAME new name` to ch
 the selected handle. Selection and each human's read markers survive reloads.
 Unregistered `WRITE` / `REPLY` requests resume after inline registration.
 
-MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`. The verified route remains
+MAIN accepts `1`–`21`, `X`, `Q`, `J MITI`, and `J ECOM`. The verified route remains
 `J MITI` → `3` → `9`. Numbers apply to the current screen. From MAIN,
 `13` → `2` → `FORUMS` reaches DAISIZEN's seven boards. Its directory also accepts
 `MAIL`, `LIBRARY`, `OLT`, `OSL`, and `CONFERENCE`. These bridge/service commands,
@@ -80,6 +80,19 @@ MAIN accepts `1`–`21`, `X`, `Q`, and `J MITI`. The verified route remains
 they are not claims of verified 1996–97 PC-VAN commands. `J DAISIZEN` remains
 unsupported. `ABOUT` provides evidence, source URLs and local fiction provenance
 on demand. Historical fixture labels and MAIN mappings are preserved.
+
+From MAIN or the index, `J ECOM` opens a [postal-letter simulation](docs/ecom.md):
+`1` guidance → `2` application → fictional recipient/address → multiline letter →
+`.END` → review, `EDIT` or explicit `Y` simulated acceptance. `RECEIPT` inspects the
+latest accepted letter, including while visiting guidance; `E` returns to the
+actual entry parent. No postal submission, payment or delivery occurs. Anonymous
+visitors can use the fictional example without registration or personal data.
+Drafts and the latest receipt stay in memory for that ECOM visit; departure,
+disconnection, reload, reset and restore clear them. Postal text never enters
+IndexedDB, durable command history, JSON backups or resident generation context.
+Displayed text remains in the in-memory transcript and explicitly exported logs.
+The [evidence record](docs/research/pcvan-1996-1997.md#browser-local-ecom-postal-letters-issue-101)
+distinguishes qualified source observations from reconstructed controls and limits.
 
 In a forum, `LIST` lists numbers and unread/read markers. `READ n` displays the
 stored title/body literally, with one full-width space and the current pen name

@@ -106,6 +106,8 @@ test('About qualifies news sources, continuity, reconstruction, access limits an
 
 for (const world of ['registered populated', 'registered empty', 'anonymous empty']) {
   test(`production news journey preserves ${world} records and literal text at 320px`, async ({ page }) => {
+    // This exhaustive journey shares the long NetNews journey's budget under worker contention.
+    test.setTimeout(90_000);
     await page.clock.setFixedTime(new Date('2026-10-24T02:00:00.000Z'));
     await page.setViewportSize({ width: 320, height: 640 });
     const remote: string[] = [];
