@@ -1622,3 +1622,61 @@ No real inference, model download, storage migration or new tooling was needed.
 Optional additional dated-capture comparison, subjective layout review and
 physical/native-IME checks were not performed. No push, PR, merge, external
 comment or deployment was performed; no post-merge verification is required.
+
+## NetNews reading and header search (#81)
+
+Implemented in the assigned worktree on 2026-10-24 after reading the live open
+Issue #81 and repository development/review guidance. The supplied Issue research
+is recorded in the [NetNews research section](research/pcvan-1996-1997.md#netnews-reading-and-header-search-issue-81);
+no new historical-source or page-image inspection is claimed.
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities.
+- Initial focused command:
+  `npm test -- tests/netnews.spec.ts tests/sections.spec.ts tests/navigation.spec.ts --workers=2`:
+  **57 passed, 1 failed (2.2m)**. All seven new NetNews checks passed. The failure
+  was the old MAIN 7 mapping assertion expecting the generic `section` screen;
+  it now explicitly checks the Internet directory and NetNews selection. The
+  obsolete empty MAIN 7 collection check is replaced by dedicated coverage,
+  retaining all other destination checks. The final full suite below includes
+  the correction and an added production literal-query check.
+- Final documented `npm test`: **282 passed (2.7m)** with eight workers,
+  both configured servers, TypeScript checking and production bundling. No
+  failures, retries or skips. Existing Vite chunk-size and Node color-environment
+  advisories remain non-failing. Existing functional, storage/import/reset,
+  consent, calendar, composition/IME and terminal pacing/skip regressions pass.
+- Controller coverage reads all six articles, verifies every header and linked
+  References, fixed authored November 1996 dates and distinct fictional `.invalid`
+  identities. Subject/From searches cover Japanese, Latin case, doubled internal
+  whitespace, query-end trimming, zero/one/multiple results, literal regex/Boolean
+  text, header-versus-body exclusion, complete-corpus replacement, group isolation,
+  stable numbers and active-result-only READ. Missing queries, unknown fields,
+  malformed/unsafe/absent numbers and unrelated service commands preserve views.
+  Direct/index parents, HELP, LIST, repeated reads/searches, MAIN at every depth,
+  fresh visits and isolation from forum/mail/conference/OLT contexts pass.
+- Production keyboard journeys cover registered populated, registered restored-empty
+  and anonymous restored-empty worlds at 320px. Automatic activity is paused and
+  consent disabled before record/backup comparisons. All six articles are read
+  through both entry paths; settings shortcuts and the modern About panel preserve
+  detail/filter context and unsent input. Simulated composing Enter, literal
+  headers/prose/query rendering, UTF-8 LOG export, keyboard horizontal scrolling,
+  viewport bounds and input focus are verified. Each journey observes zero
+  external requests. Before/after IndexedDB and exported backups preserve members,
+  SIGs/forums/posts, mail, read markers and every setting, including conference/OLT,
+  consent, scheduling and calendar. Empty collections stay empty; article bodies
+  remain outside backups, while ordinary command history continues.
+- README, research and Settings/About disclose the source URLs and supplied
+  2026-10-24 inspection date, confidence, historical scope and inaccessible-source
+  limits. They distinguish 1995 restrictions from the January 1996 reading/posting
+  comparison, general fj existence from reconstructed PC-VAN carriage, and original
+  fixed-date fiction from historical articles. Selectors, matching, commands,
+  errors and returns are explicitly reconstructed; this reading subset does not
+  imply that historical 1996 posting was unavailable.
+- Reviewed the complete diff against #81 and verified local Markdown targets and
+  heading anchors across README, research and this validation record. Working-tree
+  and staged whitespace checks pass.
+
+No framework, schema migration, real-model execution or model download was added.
+Optional physical/native-IME tests, authenticated historical-session comparison
+and subjective screenshot matching were not performed. No push, PR, merge,
+external comment or deployment was performed; no post-merge verification is
+required.
