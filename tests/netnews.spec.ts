@@ -1,7 +1,10 @@
+import { identityToken } from '../src/member-presentation';
+import { calendarSetting, initialCalendar, serviceDate } from '../src/calendar';
+import { validateBackup } from '../src/storage/schema';
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PcvanController } from '../src/navigation';
-import { netNewsGroups } from '../src/netnews';
+import { emptyNetNews, netNewsGroup, localNetNewsMessageId, netNewsGroups } from '../src/netnews';
 import { about } from '../src/settings';
 import { backupFixture } from './backup-fixture';
 import type { AiActivity } from '../src/storage/schema';
@@ -16,7 +19,7 @@ const unrelated = ['WRITE', 'REPLY 1', 'COMPOSE someone', 'WRITE someone', 'SEND
   'MEMBERS', 'MAIL', 'LIBRARY', 'OSL', 'CONFERENCE', 'OLT', 'JOIN 1', '/JOIN 1', '/WHO', '/LIST',
   '/LEAVE', '/MAIN', 'UPLOAD file', 'DOWNLOAD 1', 'FIND 通信', 'SHOW P1 /1', 'Q', 'J MITI'];
 const directoryErrors = ['0', '3', '99', '01', '1.0', '1 extra', 'READ 1', ...invalidReads, ...invalidSearches, ...unrelated];
-const readingErrors = ['1', '2', '0', '99', ...invalidReads, ...invalidSearches, ...unrelated];
+const readingErrors = ['1', '2', '0', '99', ...invalidReads, ...invalidSearches, ...unrelated.filter((s) => !['WRITE', 'REPLY 1'].includes(s))];
 const sourceUrls = [
   'https://iwparchives.jp/wp-content/themes/twentytwelve/bn/pdf/im199504-104-bbs.pdf',
   'https://iwparchives.jp/files/pdf/iwp1996/iwp1996-ch04-01-p110.pdf',
@@ -29,7 +32,7 @@ const sourceUrls = [
 function isolated(controller: PcvanController) {
   expect(controller.forum).toBeNull(); expect(controller.mailContext).toBeNull();
   expect(controller.isConference).toBe(false); expect(controller.isOlt).toBe(false);
-  expect(controller.needsContent).toBe(false);
+  expect(controller.needsContent).toBe(controller.netNewsContext !== null || controller.screen === 'netnews-directory');
 }
 
 for (const viaIndex of [false, true]) {
@@ -172,7 +175,7 @@ test('NetNews corpus has fixed fictional headers and linked followups; About qua
   const text = about(backupFixture()).join('\n');
   for (const detail of [...sourceUrls, '2026-10-24', 'NetNews', 'fj.questions.fj', 'fj.news.usage',
     '1996年1月', '読み書き', '2週間', 'Subject章', 'ページ画像', '個別グループ', '創作記事6件',
-    '1996年11月4〜7日', '正規表現', '部分一致', '投稿不可だったという意味ではありません']) expect(text).toContain(detail);
+    '1996年11月4〜7日', '正規表現', '部分一致', '公開フォローアップ']) expect(text).toContain(detail);
 });
 
 for (const world of ['registered populated', 'registered empty', 'anonymous empty']) {
@@ -196,7 +199,8 @@ for (const world of ['registered populated', 'registered empty', 'anonymous empt
     const before = await snapshot(page), input = page.locator('#command'), output = page.locator('.output');
     async function invalids(lines: string[], reading = false) {
       for (const invalid of lines.filter((line) => line.length < 100)) {
-        await command(page, invalid, /^(WRITE$|REPLY 1$)/.test(invalid) ? '投稿先の掲示板'
+        await command(page, invalid, !reading && /^(WRITE$|REPLY 1$)/.test(invalid) ? 'この画面では使えない'
+          : reading && invalid === 'WRITE someone' ? 'WRITE / REPLY 番号'
           : reading && invalidSearches.includes(invalid) ? 'SEARCH SUBJECT'
             : reading && /^READ (?:4|999|9007199254740992)$/.test(invalid) ? '現在の一覧にありません'
               : 'この画面では使えない');
@@ -308,3 +312,37 @@ for (const world of ['registered populated', 'registered empty', 'anonymous empt
     expect(remote).toEqual([]); await noOtherUi(page);
   });
 }
+
+test('local NetNews attribution shares safe stable identities and calendar projection without altering bundled dates or stored records', () => {
+  const data = backupFixture(); data.members.push({ id: '別の人🌌', handle: '人間', actor: 'human' });
+  const now = '2026-10-24T02:00:00.000Z';
+  data.settings.push({ id: 'historical-calendar', value: { version: 1, sourceAnchor: now } });
+  const state = emptyNetNews();
+  state.contributions = data.members.filter((m) => m.actor === 'human').map((m, i) => ({
+    id: `draft-${i}`, group: netNewsGroups[i]!.name, number: 4, authorId: m.id, title: '同じ題', body: '  <b>本文</b>  ',
+    createdAt: now, origin: 'local-human', messageId: localNetNewsMessageId(netNewsGroups[i]!.name, 4), references: [],
+  }));
+  state.nextNumbers = { 'fj.questions.fj': 5, 'fj.news.usage': 5 };
+  data.settings.push({ id: 'netnews-local', value: state as never }); validateBackup(data);
+  const before = structuredClone(data), groups = [netNewsGroup(data, 0), netNewsGroup(data, 1)];
+  expect(groups[0]!.articles[3]!.from).not.toBe(groups[1]!.articles[3]!.from);
+  for (const [i, group] of groups.entries()) {
+    const row = state.contributions[i]!, member = data.members.find((m) => m.id === row.authorId)!;
+    expect(group.articles.slice(0, 3)).toEqual(netNewsGroups[i]!.articles);
+    expect(group.articles[3]!.from).toBe(`人間 <${identityToken(member).toLowerCase()}@members.example.invalid>`);
+    expect(group.articles[3]!.date).toBe('Sat, 23 Nov 1996 11:00:00 +0900');
+    const address = group.articles[3]!.from.slice(3);
+    member.handle = '<i>新名</i>'; data.members.reverse();
+    expect(netNewsGroup(data, i).articles[3]!.from).toBe(`<i>新名</i> ${address}`);
+    member.handle = member.id;
+    expect(netNewsGroup(data, i).articles[3]!.from).toBe(`名無し ${address}`);
+    member.handle = '人間';
+  }
+  data.members = [...before.members]; expect(data).toEqual(before);
+  // A legacy world containing only NetNews dates gets a deterministic anchor at
+  // import/initialization; rendering does not advance it or rewrite UTC records.
+  const onlyNews = { ...data, posts: [], mail: [], session: null, settings: data.settings.filter((s) => s.id === 'netnews-local') };
+  expect(initialCalendar(onlyNews, '2030-01-01T00:00:00.000Z')).toEqual({ version: 1, sourceAnchor: now });
+  expect(serviceDate('2026-10-24T02:00:01.000Z', calendarSetting(data), 'netnews')).toBe('Sat, 23 Nov 1996 11:00:01 +0900');
+  expect(serviceDate('1997-01-01T00:00:00.000Z', calendarSetting(data), 'netnews')).toBe('Wed, 01 Jan 1997 09:00:00 +0900');
+});

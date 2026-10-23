@@ -1,3 +1,8 @@
+import { calendarSetting, serviceDate } from './calendar';
+import { identityToken, penName } from './member-presentation';
+import { NETNEWS_SETTING } from './storage/schema';
+import type { Backup, NetNewsState } from './storage/schema';
+
 // Original fiction with authored, fixed dates; not recovered articles or a
 // verified PC-VAN carriage directory. Bundled only, outside the local world.
 export interface NetNewsArticle {
@@ -83,7 +88,7 @@ export const netNewsGroups: readonly NetNewsGroup[] = [
   },
 ];
 
-export const netNewsHelp = 'READ 番号: 本文 / SEARCH SUBJECT 文字列 / SEARCH FROM 文字列 / LIST: 全記事一覧';
+export const netNewsHelp = 'WRITE: 新規記事 / REPLY 番号: 公開フォローアップ / READ 番号: 本文 / SEARCH SUBJECT 文字列 / SEARCH FROM 文字列 / LIST: 全記事一覧';
 export const netNewsSearchHelp = '検索は Subject / From のどちらか一方の文字どおりの部分一致（英字の大小は区別しません）。前後の空白を除き、途中の空白はそのまま。正規表現・論理式・本文検索はありません。';
 
 export function netNewsResults(group: NetNewsGroup, search?: NetNewsSearch): readonly NetNewsArticle[] {
@@ -114,4 +119,26 @@ export function renderNetNewsArticle(group: NetNewsGroup, article: NetNewsArticl
     `Date: ${article.date}`, `Message-ID: ${article.messageId}`,
     ...(article.references ? [`References: ${article.references}`] : []), '', ...article.body.split('\n'),
     'BACK: 元の記事一覧 / LIST: 全記事一覧', netNewsHelp];
+}
+
+export const emptyNetNews = (): NetNewsState => ({ version: 1,
+  nextNumbers: Object.fromEntries(netNewsGroups.map((g) => [g.name, 4])), contributions: [] });
+/** Pure read: old backups and restored empty worlds acquire no stored examples. */
+export function netNewsState(content: { settings?: Backup['settings'] }): NetNewsState {
+  return structuredClone(content.settings?.find((s) => s.id === NETNEWS_SETTING)?.value as unknown as NetNewsState ?? emptyNetNews());
+}
+export function localNetNewsMessageId(group: string, number: number): string {
+  return `<local.${group}.${number}@netnews.example.invalid>`;
+}
+/** Shared stable synthetic identity and safe current pen name; never a real address. */
+export function netNewsGroup(content: { settings?: Backup['settings']; members?: Backup['members'] }, index: number): NetNewsGroup {
+  const group = netNewsGroups[index]!;
+  return { name: group.name, articles: [...group.articles,
+    ...netNewsState(content).contributions.filter((a) => a.group === group.name).map((a) => {
+      const member = content.members?.find((m) => m.id === a.authorId);
+      return { number: a.number, subject: a.title, body: a.body,
+        from: `${penName(member)} <${identityToken(member).toLowerCase()}@members.example.invalid>`,
+        date: serviceDate(a.createdAt, calendarSetting(content), 'netnews'), messageId: a.messageId,
+        ...(a.references.length ? { references: a.references.join(' ') } : {}) };
+    })] };
 }

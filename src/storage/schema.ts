@@ -1,3 +1,4 @@
+import { netNewsGroups, localNetNewsMessageId } from '../netnews';
 import { CALENDAR_SETTING, isHistorical } from '../calendar';
 import { OLT_SETTING, validateOlt, validateOltMembers } from '../olt-state';
 import { personas, personaMemberId, RESIDENTS_SETTING } from '../ai/personas';
@@ -28,6 +29,15 @@ export interface Contribution {
 }
 export interface ConferenceState {
   version: 1; conferenceId: typeof CONFERENCE_ID; nextNumber: number; contributions: Contribution[];
+}
+export const NETNEWS_SETTING = 'netnews-local';
+export interface LocalNetNewsArticle {
+  id: string; group: string; number: number; authorId: string; title: string; body: string;
+  createdAt: string; origin: 'local-human'; messageId: string; references: string[];
+  parentMessageId?: string;
+}
+export interface NetNewsState {
+  version: 1; nextNumbers: Record<string, number>; contributions: LocalNetNewsArticle[];
 }
 export interface Mail {
   id: string; number: number; senderId: string; recipientId: string;
@@ -298,6 +308,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
+      if (value.id === NETNEWS_SETTING) validateNetNews(value.value);
       if (value.id === CALENDAR_SETTING) {
         fields(value.value, ['version', 'sourceAnchor']);
         timestamp(value.value.sourceAnchor);
@@ -365,6 +376,8 @@ export function validateBackup(value: unknown): asserts value is Backup {
   if (olt) { validateOlt(olt); validateOltMembers(olt, backup.members); }
   const conference = backup.settings.find((s) => s.id === CONFERENCE_SETTING)?.value;
   if (conference !== undefined) { validateConference(conference); validateConferenceMembers(conference, backup.members); }
+  const netnews = backup.settings.find((s) => s.id === NETNEWS_SETTING)?.value;
+  if (netnews !== undefined) { validateNetNews(netnews); validateNetNewsMembers(netnews, backup.members); }
   validateMailRelations(backup.mail ?? [], backup.members);
   for (const read of backup.readStates) {
     if (!members.has(read.memberId) || !forums.has(read.forumId)) invalid('Read state references a missing member or forum.');
@@ -433,5 +446,52 @@ export function validateConferenceMembers(state: ConferenceState, members: reado
     const author = members.find((m) => m.id === row.authorId);
     if (!author || (row.origin === 'local-human' ? author.actor !== 'human' :
         author.actor !== 'ai' || !personas.some((p) => personaMemberId(p.id) === author.id))) invalid('Invalid conference author/provenance.');
+  }
+}
+
+/** Validate identities and complete reference chains before any state replacement. */
+export function validateNetNews(value: unknown): asserts value is NetNewsState {
+  fields(value, ['version', 'nextNumbers', 'contributions']);
+  if (value.version !== 1 || !Array.isArray(value.contributions)) invalid('Invalid NetNews state.');
+  fields(value.nextNumbers, netNewsGroups.map((g) => g.name));
+  const expected = Object.fromEntries(netNewsGroups.map((g) => [g.name, 4]));
+  const parents = new Map(netNewsGroups.flatMap((g) => g.articles.map((a) => [a.messageId, {
+    group: g.name, number: a.number, references: a.references?.split(' ') ?? [], createdAt: a.date,
+  }] as const)));
+  const ids = new Set<string>();
+  for (const row of value.contributions) {
+    fields(row, ['id', 'group', 'number', 'authorId', 'title', 'body', 'createdAt', 'origin', 'messageId', 'references'], ['parentMessageId']);
+    string(row.id); string(row.group); string(row.authorId); integer(row.number, 4); timestamp(row.createdAt);
+    if (!Object.hasOwn(expected, row.group) || row.number !== expected[row.group] ||
+        row.origin !== 'local-human' || ids.has(row.id) || row.id.length > 256 || row.authorId.length > 128 ||
+        /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(row.id + row.authorId) ||
+        row.messageId !== localNetNewsMessageId(row.group, row.number as number)) invalid('Invalid NetNews identity, number or provenance.');
+    for (const [key, max] of [['title', 200], ['body', 20000]] as const) {
+      string(row[key]);
+      if (row[key].length > max || /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/.test(row[key]) ||
+          (key === 'title' && row[key].includes('\n'))) invalid('Invalid NetNews text.');
+    }
+    if (!Array.isArray(row.references)) invalid('Invalid NetNews References.');
+    let references: string[] = [];
+    if (row.parentMessageId !== undefined) {
+      string(row.parentMessageId);
+      const parent = parents.get(row.parentMessageId);
+      if (!parent || parent.group !== row.group || parent.number >= (row.number as number) ||
+          Date.parse(parent.createdAt) > Date.parse(row.createdAt as string)) invalid('NetNews followups require an earlier same-group parent.');
+      references = [...parent.references, row.parentMessageId];
+    }
+    if (row.references.length !== references.length || row.references.some((id, i) => id !== references[i])) invalid('Invalid NetNews reference chain.');
+    ids.add(row.id); expected[row.group]!++;
+    parents.set(row.messageId as string, { group: row.group, number: row.number as number, references, createdAt: row.createdAt as string });
+  }
+  for (const group of netNewsGroups) {
+    integer(value.nextNumbers[group.name], 4);
+    if (value.nextNumbers[group.name] !== expected[group.name]) invalid('Invalid NetNews counter.');
+  }
+}
+
+export function validateNetNewsMembers(state: NetNewsState, members: readonly Member[]): void {
+  for (const row of state.contributions) {
+    if (!members.some((m) => m.id === row.authorId && m.actor === 'human')) invalid('Invalid NetNews human author.');
   }
 }

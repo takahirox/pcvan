@@ -1,3 +1,4 @@
+import type { NetNewsArticle } from './netnews';
 import { calendarSetting } from './calendar';
 import { conferenceState } from './conference';
 import type { Contribution } from './storage/schema';
@@ -24,7 +25,7 @@ import { modelDisclosure } from './ai/setup';
 import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
-type Intent = { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
+type Intent = { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
@@ -35,6 +36,9 @@ export interface CommandActions {
   destination(): ForumDestination | null;
   isOlt?(): boolean;
   isConference?(): boolean;
+  netNews?(): { group: string; articles: readonly NetNewsArticle[] } | null;
+  netNewsSaved?(): void;
+  isNetNewsDirectory?(): boolean;
   mailbox?(): { box: Mailbox; title: string } | null;
   save(target: ForumDestination, draft: ComposeDraft): Promise<Post>;
   restore(text: string, expectedContext: string): Promise<void>;
@@ -119,7 +123,7 @@ export class TerminalCommands {
         'AUTO 0〜12: 6時間の自動投稿上限（0で休止）/ RETRY: 未完了を再試行 / RESIDENTS: 住人編集');
     }
     if (menu === 'storage') print('JSON バックアップ・復元・初期化', 'BACKUP: JSON 保存 / IMPORT: ファイル選択・置換確認 / RESET: 初期状態に戻す',
-      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・メール・既読・設定・履歴を含みます。モデルと端末キャッシュは含みません。外部に保存してください。');
+      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・メール・ローカルNetNews記事・既読・設定・履歴を含みます。モデルと端末キャッシュは含みません。外部に保存してください。');
     if (menu === 'offline') { print('オフライン・容量', 'CACHE: 端末を保存 / STATUS: 保存状態・容量 / PERSIST: 永続保存を要求'); await this.offline.storage(); }
     if (menu === 'profiles') print('住人編集', ...residentProfiles(data).map((row, i) => `${i + 1} ${row.handle}`), '番号: 編集する住人');
     if (menu !== 'settings') print('HELP: この案内 / BACK: 一つ戻る / MAIN: MAIN');
@@ -128,7 +132,22 @@ export class TerminalCommands {
   private startCompose(intent: Intent, data: Backup) {
     const authorId = activeHuman(data);
     if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'mail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
-    if ('conference' in intent) {
+    if ('netnews' in intent) {
+      const id = createRecordId();
+      this.composer = new TerminalComposer({ keyword: 'NetNews', name: intent.group }, authorId,
+        intent.parent ? { id: intent.parent.messageId, number: intent.parent.number } : undefined, {
+          print: this.actions.print,
+          save: async (_target, draft) => {
+            const row = await (await this.actions.repository()).createNetNewsArticle({ id, group: intent.group,
+              authorId: draft.authorId, title: draft.title, body: draft.body,
+              ...(intent.parent ? { parentMessageId: intent.parent.messageId } : {}) });
+            // Commit succeeded: even refresh/render failure must consume the draft.
+            try { await this.actions.read(); } catch { /* A later LIST refreshes. */ }
+            try { this.actions.netNewsSaved?.(); } catch { /* The draft is still consumed. */ }
+            return row;
+          },
+        }, 'article', intent.parent ? `Re: ${intent.parent.subject.replace(/^(?:Re:\s*)+/i, '')}`.slice(0, 200) : '');
+    } else if ('conference' in intent) {
       const id = createRecordId();
       this.composer = new TerminalComposer({ keyword: 'DAISIZEN', name: '電子会議室' }, authorId, intent.parent, {
         print: this.actions.print,
@@ -280,15 +299,15 @@ export class TerminalCommands {
         try {
           const parsed: unknown = JSON.parse(text); validateBackup(parsed);
           if (this.confirmation !== waiting) return;
-          this.confirm({ kind: 'import', expected, text }, 'このブラウザー内の全データ（投稿・メール・会員・既読・設定・履歴）をファイルで置き換えます。取り消せません。必要なら先に BACKUP。', '置き換えて復元しますか？ (Y/N)=');
+          this.confirm({ kind: 'import', expected, text }, 'このブラウザー内の全データ（投稿・メール・ローカルNetNews記事・会員・既読・設定・履歴）をファイルで置き換えます。取り消せません。必要なら先に BACKUP。', '置き換えて復元しますか？ (Y/N)=');
         } catch (error) { this.confirmation = undefined; print(`復元できません。${String(error)}`, 'コマンド='); }
       }).catch((error) => { if (this.confirmation === waiting) { this.confirmation = undefined; print(`ファイルを読めません。${String(error)}`); } });
       return true;
     }
     if (command === 'RESET') {
       this.confirm({ kind: 'reset', expected: context(await this.actions.read()) },
-        '投稿・メール・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
-        '最初の10人・66件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
+        '投稿・メール・ローカルNetNews記事・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
+        '最初の10人・66件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
     }
     if (!this.menu && this.actions.mailbox?.()) {
       const data = await this.actions.read(), human = activeHuman(data);
@@ -311,6 +330,20 @@ export class TerminalCommands {
       }
     }
     if (!this.menu) {
+      // Directory errors belong to their navigation screen, not another service.
+      if (this.actions.isNetNewsDirectory?.() && /^(?:WRITE|REPLY)(?: |$)/.test(command)) return false;
+      if (this.actions.netNews?.() && /^(?:WRITE|REPLY)(?: |$)/.test(command)) {
+        const selected = /^REPLY ([1-9]\d*)$/.exec(command);
+        const number = selected ? Number(selected[1]) : undefined;
+        if (command !== 'WRITE' && (!selected || !Number.isSafeInteger(number))) {
+          print('WRITE / REPLY 番号 を入力してください。現在の一覧の記事を指定します。コマンド='); return true;
+        }
+        const data = await this.actions.read(), current = this.actions.netNews!()!;
+        const parent = number === undefined ? undefined : current.articles.find((a) => a.number === number);
+        if (number !== undefined && !parent) print('その番号の記事は現在の一覧にありません。LIST で全記事を表示してください。コマンド=');
+        else this.startCompose({ netnews: true, group: current.group, ...(parent ? { parent } : {}) }, data);
+        return true;
+      }
       if (command === 'WRITE' || /^REPLY \d+$/.test(command)) {
         if (this.actions.isConference?.()) {
           const data = await this.actions.read(), state = conferenceState(data);

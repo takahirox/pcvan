@@ -1,3 +1,6 @@
+import { netNewsState, netNewsGroups, localNetNewsMessageId } from '../netnews';
+import { NETNEWS_SETTING, validateNetNews, validateNetNewsMembers } from './schema';
+import type { LocalNetNewsArticle } from './schema';
 import { CALENDAR_SETTING, initialCalendar } from '../calendar';
 import { conferenceState, starterConference } from '../conference';
 import { CONFERENCE_SETTING, validateConference, validateConferenceMembers } from './schema';
@@ -199,6 +202,7 @@ export class LocalRepository {
         const member = row as Member;
         const content = await this.snapshot(tx);
         validateMailRelations(content.mail ?? [], [...content.members.filter((m) => m.id !== member.id), member]);
+        validateNetNewsMembers(netNewsState(content), [...content.members.filter((m) => m.id !== member.id), member]);
         validateConferenceMembers(conferenceState(content), [...content.members.filter((m) => m.id !== member.id), member]);
         validateOltMembers(oltState(content), [...content.members.filter((m) => m.id !== member.id), member]);
       }
@@ -216,6 +220,10 @@ export class LocalRepository {
       if (store === 'settings' && (row as Records['settings']).id === OLT_SETTING) {
         const state = (row as Records['settings']).value; validateOlt(state);
         validateOltMembers(state, (await this.snapshot(tx)).members);
+      }
+      if (store === 'settings' && (row as Records['settings']).id === NETNEWS_SETTING) {
+        const state = (row as Records['settings']).value; validateNetNews(state);
+        validateNetNewsMembers(state, (await this.snapshot(tx)).members);
       }
       if (store === 'settings' && (row as Records['settings']).id === CONFERENCE_SETTING) {
         const state = (row as Records['settings']).value; validateConference(state);
@@ -242,6 +250,35 @@ export class LocalRepository {
       state.contributions.push(row);
       validateConference(state); validateConferenceMembers(state, content.members);
       await request(tx.objectStore('settings').put({ id: CONFERENCE_SETTING, value: state }));
+      return row;
+    });
+  }
+
+  /** Allocate only after resolving the pinned parent; retries keep their original identity. */
+  createNetNewsArticle(input: Pick<LocalNetNewsArticle, 'id' | 'group' | 'authorId' | 'title' | 'body' | 'parentMessageId'>,
+    now = new Date().toISOString()): Promise<LocalNetNewsArticle> {
+    const draft = structuredClone(input);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const content = await this.snapshot(tx), state = netNewsState(content);
+      const existing = state.contributions.find((a) => a.id === draft.id);
+      if (existing) {
+        if (existing.group !== draft.group || existing.authorId !== draft.authorId || existing.title !== draft.title ||
+            existing.body !== draft.body || existing.parentMessageId !== draft.parentMessageId) invalid('NetNews draft ID is already in use.');
+        return existing;
+      }
+      const group = netNewsGroups.find((g) => g.name === draft.group);
+      if (!group) invalid('Unknown NetNews group.');
+      const parent = draft.parentMessageId === undefined ? undefined :
+        state.contributions.find((a) => a.group === draft.group && a.messageId === draft.parentMessageId) ??
+        group.articles.find((a) => a.messageId === draft.parentMessageId);
+      if (draft.parentMessageId !== undefined && !parent) invalid('Missing same-group NetNews parent.');
+      const prior = parent ? (Array.isArray(parent.references) ? parent.references : parent.references?.split(' ') ?? []) : [];
+      const number = state.nextNumbers[draft.group]!++;
+      const row: LocalNetNewsArticle = { ...draft, number, createdAt: now, origin: 'local-human',
+        messageId: localNetNewsMessageId(draft.group, number), references: parent ? [...prior, parent.messageId] : [] };
+      state.contributions.push(row);
+      validateNetNews(state); validateNetNewsMembers(state, content.members);
+      await request(tx.objectStore('settings').put({ id: NETNEWS_SETTING, value: state }));
       return row;
     });
   }
@@ -416,6 +453,7 @@ export class LocalRepository {
       if (store === 'posts') hasChildren = await referenced('posts', 'replyToPostId', key);
       if (store === 'members') {
         const content = await this.snapshot(tx);
+        hasChildren ||= netNewsState(content).contributions.some((row) => row.authorId === key);
         hasChildren ||= conferenceState(content).contributions.some((row) => row.authorId === key);
         const state = oltState(content);
         hasChildren ||= state.rooms.some((r) => r.lines.some((l) => l.authorId === key) ||

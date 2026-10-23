@@ -1,5 +1,5 @@
 import type { AiActivity, Backup, CommunityWorld } from './storage/schema';
-import type { ConferenceState } from './storage/schema';
+import type { NetNewsState, ConferenceState } from './storage/schema';
 import type { OltState } from './olt-state';
 
 export const CALENDAR_SETTING = 'historical-calendar';
@@ -35,11 +35,13 @@ export function initialCalendar(content: Backup, now: string): HistoricalCalenda
   if (world && !isHistorical(world.createdAt)) return { version: 1, sourceAnchor: world.createdAt };
   const activity = content.settings.find((s) => s.id === 'ai-activity')?.value as unknown as AiActivity | undefined;
   const conference = content.settings.find((s) => s.id === 'daisizen-conference')?.value as unknown as ConferenceState | undefined;
+  const netnews = content.settings.find((s) => s.id === 'netnews-local')?.value as unknown as NetNewsState | undefined;
   const olt = content.settings.find((s) => s.id === 'olt-rooms')?.value as unknown as OltState | undefined;
   const stamps = [world?.createdAt, content.session?.lastLoginAt, content.session?.lastLogoutAt,
     ...content.posts.flatMap((p) => [p.createdAt, p.simulation?.simulatedAt]),
     ...(content.mail ?? []).flatMap((m) => [m.createdAt, m.simulation?.simulatedAt, m.readAt]),
     ...(conference?.contributions.map((r) => r.createdAt) ?? []),
+    ...(netnews?.contributions.map((r) => r.createdAt) ?? []),
     activity?.lastActivityAt, activity?.batch?.from, activity?.batch?.to,
     ...(activity?.batch?.runs.map((r) => r.simulatedAt) ?? []),
     ...(activity?.nextDue ? Object.values(activity.nextDue) : []), olt?.windowAt,
@@ -56,11 +58,12 @@ export function initialCalendar(content: Backup, now: string): HistoricalCalenda
 }
 
 /** Presentation only. No browser timezone, mutation, per-render epoch or year wrapping. */
-export function serviceDate(instant: string, calendar?: HistoricalCalendar, style: 'date' | 'forum' = 'date'): string {
+export function serviceDate(instant: string, calendar?: HistoricalCalendar, style: 'date' | 'forum' | 'netnews' = 'date'): string {
   const source = Date.parse(instant);
   const projected = calendar && !isHistorical(instant)
     ? historicalAnchor(calendar.sourceAnchor) + source - Date.parse(calendar.sourceAnchor) : source;
   const date = new Date(projected + jst).toISOString();
+  if (style === 'netnews') return `${new Date(projected + jst).toUTCString().replace(' GMT', '')} +0900`;
   if (style === 'forum') return `${date.slice(2, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}  ${date.slice(11, 16)}`;
   return `${date.slice(2, 4)}年${date.slice(5, 7)}月${date.slice(8, 10)}日 ${date.slice(11, 19)}`;
 }

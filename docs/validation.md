@@ -1791,3 +1791,75 @@ No real inference, model download, storage migration, identity registry or new
 framework was needed. No push, PR, merge, external comment or deployment was
 performed. No post-merge verification is required; optional dated-transcript,
 native-IME, hardware and subjective historical-layout checks were not performed.
+
+## Durable local NetNews participation (#87)
+
+Validated on 2026-10-24 with Node.js 24.12.0 on macOS. Read the live source Issue
+and repository development/review guidance. The implementation adds browser-local
+human articles and public followups in the two existing example groups, with
+validated transactional storage and the shared composer/calendar/identity policies.
+
+- `npm ci`: passed, zero reported vulnerabilities; no lockfile/dependency changes.
+  The first standalone build attempt preceded installation and failed because
+  `tsc` was unavailable. `npm run build` passed after installation.
+- First focused run,
+  `npm test -- tests/netnews-repository.spec.ts tests/netnews-posting.spec.ts tests/netnews.spec.ts --workers=2`:
+  **6 passed, 6 failed (43.7s)**. Repository/controller checks passed. Test fixes
+  accounted for changed malformed-WRITE guidance, a deliberately extra `Y` after
+  commit being a recordable command, and a second-connection fixture initially
+  opening a different origin's database.
+- Second focused run with the same command: **9 passed, 3 failed (2.9m)**.
+  Remaining test fixes selected the transcript scroll container rather than its
+  text node and opened the Settings maintenance disclosure before its file picker.
+  The original three production reading/isolation journeys passed.
+- Updated focused run,
+  `npm test -- tests/netnews-posting.spec.ts tests/netnews-repository.spec.ts tests/netnews.spec.ts --grep-invert 'production NetNews preserves' --workers=2`:
+  **11 passed (25.9s)**, including TypeScript checking and production build.
+- Final documented `npm test`: **297 passed (3.6m)** with the default eight
+  workers, no failures, retries or skips. Both configured servers ran TypeScript
+  checking and the production build. Existing functional, storage/import/reset,
+  consent, calendar, composition/IME, terminal pacing/skip, mail/conference/OLT
+  and protected-record coverage passed.
+- Reviewed the complete implementation/test/documentation diff against Issue #87.
+  Local Markdown links, heading anchors and code fences in all four changed
+  documentation files pass, as do working-tree and staged `git diff --check`
+  (including the two new test files).
+- Existing Vite large-chunk and Node `NO_COLOR`/`FORCE_COLOR` warnings remain
+  informational. No dependency, lockfile or storage-version change was needed.
+
+Repository checks exercise both groups' initial #4 allocations, concurrent and
+idempotent saves, conflicting IDs, distinct Message-IDs, replies to bundled
+originals/followups and saved local parents, and a multi-generation References
+chain. Invalid authors, text, groups, provenance, counters, timestamps, dangling,
+cyclic, future and cross-group parents/chains are rejected on direct writes and
+restore. Quota failures preserve state/allocation and permit edited retry;
+quota-failed restoration preserves the entire prior world. Member-reference
+safeguards, legacy absence, explicitly empty state, reset and stale connections
+are covered. A command harness pins author/group/parent through independent
+selection changes and consumes committed sends even when refresh/render fails.
+Forum prompt output is identical before/after NetNews contributions; review also
+confirmed mail/OLT prompt builders select their existing service records only.
+
+Production journeys in both groups exercise anonymous reading/registration
+refusal, registration into a pending followup, new articles, review/edit/cancel,
+explicit submission, bundled and local multi-generation parents, Subject edits,
+active-result restrictions, Subject/From searching, immediate complete-list return,
+Settings/About context, literal Japanese/whitespace/blank lines/command-like body,
+headers and downloaded logs, IME title/body/review guards, reload and JSON restore.
+At 320px the input remains visible and scrollback works. Automatic activity is
+paused for protected-world comparisons; successful posting changes only NetNews
+state after registration, and cancelled drafts leave records untouched. These
+journeys observe no external requests or model loading. An independent repository
+connection's committed article becomes readable without a notification/focus
+refresh. Settings import/reset discard open drafts and reset retains bundled
+examples. Existing six article bodies, identities and authored dates remain
+unchanged; shared safe-name/token behavior and durable local Date projection are
+checked, including legacy calendar input and preserved historical timestamps.
+
+Historical source limits and category D choices are documented in the
+[participation research](research/pcvan-1996-1997.md#netnews-local-participation-issue-87),
+README, storage documentation and Settings/About. The RFC, fj appendix and
+November 2 glossary were also readable during implementation; direct opening of
+the October 22 article again failed, so its snippet-only status remains explicit.
+No archival prose/identities, new framework, model download or real inference was
+used. No post-merge verification is required.

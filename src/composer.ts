@@ -15,20 +15,21 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
   private lines: string[] = [];
   private done = false;
   constructor(private target: T, private authorId: string,
-    private parent: Pick<Post, 'id' | 'number'> | undefined, private actions: ComposerActions<T>, private kind: 'post' | 'mail' = 'post', initialTitle = '') {
+    private parent: Pick<Post, 'id' | 'number'> | undefined, private actions: ComposerActions<T>, private kind: 'post' | 'mail' | 'article' = 'post', initialTitle = '') {
     if (initialTitle) { this.title = initialTitle; this.stage = 'body'; }
-    actions.print(parent ? `返信先：#${parent.number}` : (kind === 'mail' ? '新規メール' : '新規発言'), `${additionalSigs.find((sig) => sig.keyword === target.keyword)?.name ?? target.keyword} / ${target.name}`, initialTitle ? `件名：${initialTitle}` : `${this.titleLabel}=`);
+    if (kind === 'article') actions.print('公開記事（私信ではありません）。このブラウザー内だけに保存し、Usenetへ配信しません。');
+    actions.print(parent ? `${kind === 'article' ? '公開フォローアップ先' : '返信先'}：#${parent.number}` : (kind === 'mail' ? '新規メール' : kind === 'article' ? '新規記事' : '新規発言'), `${additionalSigs.find((sig) => sig.keyword === target.keyword)?.name ?? target.keyword} / ${target.name}`, initialTitle ? `件名：${initialTitle}` : `${this.titleLabel}=`);
     if (initialTitle) this.help();
   }
-  private get titleLabel() { return this.kind === 'mail' ? '件名' : 'タイトル'; }
+  private get titleLabel() { return this.kind !== 'post' ? '件名' : 'タイトル'; }
   get active() { return !this.done; }
   private preview() {
     this.stage = 'review';
-    this.actions.print(...(this.kind === 'mail' ? [`宛先：${this.target.name}`] : []), `${this.titleLabel}：${this.title}`, `本文：${this.lines.length}行`,
+    this.actions.print(...(this.kind === 'article' ? [`Newsgroups: ${this.target.name}`, ...(this.parent ? [`公開フォローアップ先：#${this.parent.number}`, `親 Message-ID: ${this.parent.id}`] : [])] : []), ...(this.kind === 'mail' ? [`宛先：${this.target.name}`] : []), `${this.titleLabel}：${this.title}`, `本文：${this.lines.length}行`,
       ...this.lines.map((line, index) => `${index + 1}: ${line}`), this.kind === 'mail' ? '送信しますか？ (Y/N/EDIT)=' : '投稿しますか？ (Y/N/EDIT)=');
   }
   help() {
-    this.actions.print('下書きは保持されています。.CANCEL / CANCEL: 明示的に破棄。BACK / MAIN: 移動せず保持。',
+    this.actions.print(...(this.kind === 'article' ? [`NetNews / ${this.target.name}${this.parent ? ` / 公開フォローアップ先：#${this.parent.number}` : ' / 新規記事'}`] : []), '下書きは保持されています。.CANCEL / CANCEL: 明示的に破棄。BACK / MAIN: 移動せず保持。',
       this.stage === 'title' ? `${this.titleLabel}を入力（1〜200文字）。`
       : this.stage === 'body' ? '本文を1行ずつ入力（全体1〜20000文字）。空行も保存。.END: 確認 / .TEXT 文字: 命令もそのまま本文へ。'
       : this.stage === 'edit' ? 'TITLE 文字 / LINE 番号 文字 / DELETE 番号 / APPEND / REVIEW。空の LINE 番号 は空行に置換。'
@@ -38,7 +39,7 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
     if (this.done) return;
     const command = line.trim().toUpperCase();
     if (['CANCEL', '.CANCEL'].includes(command)) {
-      this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : '投稿を中止しました。コマンド='); return;
+      this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : this.kind === 'article' ? '記事を中止しました。コマンド=' : '投稿を中止しました。コマンド='); return;
     }
     if (['HELP', 'BACK', 'MAIN'].includes(command)) { this.help(); return; }
     if (this.stage === 'title') {
@@ -57,7 +58,7 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
       this.lines.push(bodyLine); this.actions.print('本文='); return;
     }
     if (this.stage === 'review') {
-      if (command === 'N') { this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : '投稿を中止しました。コマンド='); return; }
+      if (command === 'N') { this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : this.kind === 'article' ? '記事を中止しました。コマンド=' : '投稿を中止しました。コマンド='); return; }
       if (command === 'EDIT') { this.stage = 'edit'; this.help(); return; }
       if (command !== 'Y') { this.actions.print('Y / N / EDIT を入力してください。下書きは保持されています。'); return; }
       try {
@@ -65,9 +66,9 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
           body: this.lines.join('\n'), ...(this.parent ? { replyToPostId: this.parent.id } : {}) });
         // Never leave a sendable draft after the transaction commits.
         this.done = true;
-        this.actions.print(this.kind === 'mail' ? `メール #${post.number} を送信しました。SENT / READ ${post.number} で確認できます。` : `発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
+        this.actions.print(this.kind === 'mail' ? `メール #${post.number} を送信しました。SENT / READ ${post.number} で確認できます。` : this.kind === 'article' ? `記事 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。` : `発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
       } catch (error) {
-        this.actions.print(`${this.kind === 'mail' ? 'メール' : '投稿'}を保存できませんでした。入力は残っています。${String(error)}`, 'Y: 再試行 / EDIT: 編集 / N: 中止');
+        this.actions.print(`${this.kind === 'mail' ? 'メール' : this.kind === 'article' ? '記事' : '投稿'}を保存できませんでした。入力は残っています。${String(error)}`, 'Y: 再試行 / EDIT: 編集 / N: 中止');
       }
       return;
     }
