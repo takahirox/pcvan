@@ -1390,3 +1390,41 @@ non-failing. No model download, real inference, new framework or hardware check
 was used. Optional manual readability review was not performed; narrow-width
 journeys are automated. No push, PR, merge, external comment or deployment was
 performed. No post-merge verification is required.
+
+## Separate forum identity and pen name (#71)
+
+Validated on 2026-10-23 after reading the live Issue and repository guidance:
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities.
+- Focused forum/production journey run: **12 passed (18.9s)** before adding the
+  final legacy-import check. A development journey initially assumed IMPORT
+  returned to MAIN; it now explicitly returns from the preserved forum context.
+- Final documented `npm test -- --workers=4`: **257 passed (1.9m)**, with no
+  retries or skips, including TypeScript checking and the production build.
+  An earlier full run passed 256 checks and exposed one remaining obsolete
+  handle-in-parentheses expectation in the cross-SIG journey; that assertion now
+  checks the separate title-line pen name and synthetic token.
+- Focused assertions cover stable original synthetic labels for humans, seeded
+  residents and generated posts, human/resident renames, duplicate handles,
+  reversed member order, UUID/DEMO member IDs, missing authors, unusable names,
+  known DEMO fixtures, optional fields, exact Japanese whitespace and markup.
+- A real IndexedDB legacy import/export/reopen/restore check verifies unchanged
+  source records and backups, with no token fields or seeded content added.
+  Production READ → HANDLE rename → READ → reload/reordered JSON restore checks
+  preserve author IDs, post records, title/body whitespace and read markers.
+  The existing profile editor renames a seeded resident without changing its
+  token; mocked generated posts share their resident's seeded-post token.
+- Existing composition, storage/rollback, consent, scheduling, calendar, mail,
+  conference, OLT, IME, progressive output and terminal regressions pass.
+- Rechecked both linked historical references. Research and About distinguish
+  observed field separation from account interpretation, target-year limits,
+  synthetic token assignment, exact spacing and unresolved nickname behavior.
+  All **43** local Markdown links/anchors in README and research resolve.
+- Reviewed the final implementation, tests and documentation against #71;
+  working-tree and staged `git diff --check` checks pass.
+
+Existing Vite chunk-size and Node color-environment advisories remain
+non-failing. No model download, real inference or new framework was used.
+Optional visual archive comparison was not performed. No push, PR, merge,
+external comment or deployment was performed; no post-merge verification is
+required.

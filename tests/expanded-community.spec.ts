@@ -164,5 +164,6 @@ test('terminal human identity, read/write/reply, reload and scheduled replies wo
   expect(reloaded.posts.filter((p) => p.origin === 'local-human')).toEqual(humans);
   expect(reloaded.readStates).toEqual(saved.readStates);
   await command(page, '13'); await command(page, '4'); await command(page, '1', '投稿一覧');
-  await command(page, 'READ 5', '(巡回する人)');
+  const read = await command(page, 'READ 5', '人間の星　巡回する人');
+  expect(read).toMatch(/★タイトル \(SYN-[0-9A-V]{13}\)/);
 });

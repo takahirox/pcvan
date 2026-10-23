@@ -82,7 +82,12 @@ unsupported. `ABOUT` provides evidence, source URLs and local fiction provenance
 on demand. Historical fixture labels and MAIN mappings are preserved.
 
 In a forum, `LIST` lists numbers and unread/read markers. `READ n` displays the
-exact stored title/body; `返信先：#m` is plain text, followed by typing `READ m`
+stored title/body literally, with one full-width space and the current pen name
+appended to the title line. The parenthesized `SYN-…` token is a stable synthetic
+member label, independent of renames and backup member order. Missing authors
+show `不明` / `名無し`; known DEMO fixtures retain their synthetic tokens.
+This is a [documented reconstruction](docs/research/pcvan-1996-1997.md#forum-identity-and-pen-name-issue-71),
+without authentication. `返信先：#m` is plain text, followed by typing `READ m`
 or `REPLY n`. Reading advances the selected human's per-forum high-water mark.
 It never changes posts or moves the mark backwards. Missing numbers preserve state.
 Dates use the shared historical JST calendar; secondary header numbers have no
@@ -567,7 +572,9 @@ Navigation checks cover every MAIN mapping, the two-column fixture rendering,
 MITI steps, reconstructed Communication bridge, screen-scoped numbers, invalid
 commands/jumps, disconnect/reconnect, and absence of browser navigation.
 Forum checks cover all seven DAISIZEN boards, MITI reading, optional header
-fields, whitespace, gaps, empty/missing/ambiguous forums, and live restore reads.
+fields, literal whitespace/markup, separate identity/pen names, human/resident
+renames, duplicate handles, member order, missing authors, seeded/generated
+reads, reload/backup stability, gaps and empty/missing/ambiguous forums.
 Composition checks cover edit/review/cancel/send, blank drafts, Japanese multiline
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.

@@ -26,6 +26,56 @@ test('production keyboard journey preserves all MAIN mappings, Japanese posts, r
   await noOtherUi(page); expect(requests).toEqual([]); expect(errors).toEqual([]);
 });
 
+test('production READ → HANDLE rename → READ retains synthetic identity through reload and restore', async ({ page }) => {
+  await start(page, '旅の筆名'); await enterForum(page);
+  const initial = await snapshot(page);
+  const seed = initial.posts.find((p) => p.forumId === 'resident-forum:MITI:9' && p.number === 1)!;
+  const resident = initial.members.find((m) => m.id === seed.authorId)!;
+  const read = async (number: number, title: string, handle: string) => {
+    const output = await command(page, `READ ${number}`, '★内容');
+    expect(output).toContain(`${title}　${handle}\n★内容`);
+    const header = output.match(/★タイトル \((SYN-[0-9A-V]{13})\)  [^\n]+/)![0];
+    expect(header).not.toMatch(/fictional-ai:|local-human|runId/);
+    return header;
+  };
+  const seededHeader = await read(1, seed.title, resident.handle);
+  const title = '  和文　ｶﾅ <i>題</i>  ', body = '  <b>文字</b>　。\n\n末尾  ';
+  await post(page, title, body, 'REPLY 1');
+  const before = await snapshot(page), humanPost = before.posts.find((p) => p.number === 17)!;
+  expect(humanPost).toMatchObject({ title, body, replyToPostId: seed.id });
+  const humanHeader = await read(17, title, '旅の筆名');
+  expect(humanHeader).not.toBe(seededHeader);
+  await command(page, 'HANDLE', '旅の筆名');
+  await command(page, 'RENAME 新しい筆名', 'ハンドル名を変更');
+  await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+  expect(await read(17, title, '新しい筆名')).toBe(humanHeader);
+  // Rename the real seeded resident through the existing profile editor.
+  const profiles = (before.settings.find((s) => s.id === 'ai-residents')!.value as unknown as ResidentSettings).profiles;
+  await settings(page, 3); await command(page, 'RESIDENTS', '住人編集');
+  await command(page, String(profiles.findIndex((p) => `fictional-ai:${p.id}` === resident.id) + 1), '未保存');
+  await command(page, '1', 'handle='); await command(page, '住人の新筆名', '未保存');
+  await command(page, 'SAVE', '住人の設定を保存');
+  await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+  expect(await read(1, seed.title, '住人の新筆名')).toBe(seededHeader);
+  const saved = await backup(page);
+  expect(saved.posts).toEqual(before.posts);
+  expect(saved.members).toEqual(before.members.map((m) => ({ ...m, handle: m.id === humanPost.authorId ? '新しい筆名' : m.id === resident.id ? '住人の新筆名' : m.handle })));
+  await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
+  await enterForum(page);
+  expect(await read(17, title, '新しい筆名')).toBe(humanHeader);
+  expect(await read(1, seed.title, '住人の新筆名')).toBe(seededHeader);
+  // Member ordering in old JSON backups has no role in token assignment.
+  await restore(page, { ...saved, members: [...saved.members].reverse() });
+  await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+  expect(await read(17, title, '新しい筆名')).toBe(humanHeader);
+  expect(await read(1, seed.title, '住人の新筆名')).toBe(seededHeader);
+  const restored = await snapshot(page);
+  expect(restored.posts).toEqual(saved.posts); expect(restored.members).toEqual(saved.members);
+  expect(restored.readStates).toEqual(saved.readStates);
+  await expect(page.locator('.output b, .output i')).toHaveCount(0);
+  await noOtherUi(page);
+});
+
 test('production AI recovers a partially committed autonomous batch after tab loss without duplicates', async ({ page, context }) => {
   const startTime = new Date('2026-10-21T00:00:00Z'), returnTime = new Date('2026-10-24T00:00:00Z');
   await page.clock.setFixedTime(startTime); await mockWorker(page, 'interrupt'); await start(page, '旅行者');
@@ -57,6 +107,16 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   expect(recoveredBatch.runs).toEqual(batch.runs.map((run) => ({ ...run, status: 'committed' })));
   expect(new Set(recovered.posts.filter((p) => p.simulation).map((p) => p.body)).size).toBe(2);
   expect(recovered.posts.find((p) => p.id === generated[0]!.id)).toEqual(generated[0]);
+  await enterForum(resumed);
+  const generatedPost = recovered.posts.filter((p) => p.simulation)[0]!;
+  const author = recovered.members.find((m) => m.id === generatedPost.authorId)!;
+  const generatedRead = await command(resumed, `READ ${generatedPost.number}`, '★内容');
+  expect(generatedRead).toContain(`${generatedPost.title}　${author.handle}\n★内容`);
+  const generatedToken = generatedRead.match(/★タイトル \((SYN-[0-9A-V]{13})\)/)![1];
+  const seededPost = recovered.posts.find((p) => p.forumId === generatedPost.forumId && p.authorId === author.id && !p.simulation)!;
+  const seededRead = await command(resumed, `READ ${seededPost.number}`, '★内容');
+  expect(seededRead).toContain(`★タイトル (${generatedToken})`);
+  expect((await snapshot(resumed)).posts).toEqual(recovered.posts);
   await settings(resumed, 3); await command(resumed, 'HELP', 'committed');
   await command(resumed, 'MAIN', 'MAIN'); await command(resumed, 'Q', '接続を終了');
   await command(resumed, 'RECONNECT', '接続中'); await command(resumed, 'HELP', '番号またはコマンド=');

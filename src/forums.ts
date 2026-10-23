@@ -54,18 +54,35 @@ export function forumName(keyword: string, boardNo: number): string {
     : expandedBoards.find((board) => board.keyword === keyword && board.boardNo === boardNo)!.name;
 }
 
-/** Shared fixed-JST calendar; header spacing is reconstructed. */
+// Presentation only: versioned FNV-1a/64 over the full UTF-8 member ID. Never
+// truncate a record key, assign by array order, or write on a read. This is a
+// synthetic label, not authentication or a privacy/security hash.
+function identityToken(member: Member): string {
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of new TextEncoder().encode(`pcvan-forum-v1:${member.id}`)) {
+    hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+  }
+  return `SYN-${hash.toString(32).toUpperCase().padStart(13, '0')}`;
+}
+
+function penName(member?: Member): string {
+  const handle = member?.handle.trim();
+  return handle && handle !== member?.id && !/fictional-ai:|[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(handle)
+    ? handle : '名無し';
+}
+
+/** Shared fixed-JST calendar; title + one full-width space + current pen name. */
 export function renderPost(post: Post, name: string, lineCount?: number, members: readonly Member[] = [], calendar?: HistoricalCalendar): string[] {
   const stamp = serviceDate(post.simulation?.simulatedAt ?? post.createdAt, calendar, 'forum');
-  const handle = members.find((member) => member.id === post.authorId)?.handle.trim();
-  // Never derive a display name from an internal record key. Old snapshots may
-  // lack member data; only the documented demo identifiers stand on their own.
-  const author = handle && !handle.includes('fictional-ai:') ? handle
-    : /^DEMO\d{4}$/.test(post.authorId) ? post.authorId : '名無し';
+  const member = members.find((member) => member.id === post.authorId);
+  // Only known synthetic fixtures have a stand-alone DEMO identity. Missing
+  // imported authors remain explicitly unknown, never newly invented members.
+  const token = member ? identityToken(member)
+    : demoPosts.posts.some((demo) => demo.authorId === post.authorId) ? post.authorId : '不明';
   return [
     `#${post.number}${post.displaySecondNumber === undefined ? '' : `/${post.displaySecondNumber}`}　${name}`,
-    `★タイトル (${author})  ${stamp}${lineCount === undefined ? '' : `  ( ${lineCount})`}`,
-    post.title,
+    `★タイトル (${token})  ${stamp}${lineCount === undefined ? '' : `  ( ${lineCount})`}`,
+    `${post.title}　${penName(member)}`,
     '★内容',
     post.body,
   ];
