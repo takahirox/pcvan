@@ -2,8 +2,8 @@
 
 MAIN `1 電子メール`, MAIN `X 旧電子メール`, and DAISIZEN `MAIL` retain
 separate entry screens and return paths. They project the same local mailbox for
-the selected human member. This shared storage, every mail command, short resident
-address and display layout is a **category D reconstruction**, not a verified
+the selected human member. This shared storage, composition commands, short resident
+addresses and display layout is a **category D reconstruction**, not a verified
 1996–1997 host protocol. See [the research record](research/pcvan-1996-1997.md#electronic-mail-research-issue-52).
 
 ## Terminal commands
@@ -14,20 +14,20 @@ address and display layout is a **category D reconstruction**, not a verified
 | `LIST` | Refresh the current directory or mailbox from IndexedDB. |
 | `MEMBERS` | Associate each available resident's stable short address with their forum/OLT synthetic token and safe current handle. |
 | `READ number` | Read a letter in the current box; mark only that received letter read for its human recipient. |
-| `WRITE address` / `COMPOSE address` | Start a private letter to an existing resident. An omitted address prompts in the same input. |
+| `WRITE address` / `COMPOSE address` | Start a letter to an existing resident or explicit `INET#address`. An omitted address prompts in the same input. |
 | `REPLY number` | Reply to received mail in INBOX, preserving its parent ID and prefilling `Re: subject`. |
 | `HANDLE` | Choose/register the existing local human identity. An unregistered composition resumes after inline registration. |
 | `HELP` / `BACK` / `MAIN` | Redisplay, return to the entry directory/parent, or return to MAIN. During a draft these commands keep it and explain cancellation. |
 
 An address is the exact current resident handle, stable short ID such as
-`hoshimori`, or full local member ID such as `fictional-ai:hoshimori`. No domain,
-PC-VAN-era account format, remote address or other human recipient is accepted.
+`hoshimori`, or full local member ID such as `fictional-ai:hoshimori`. Bare
+Internet addresses, PC-VAN-era account formats and other local human recipients are rejected. Internet destinations require an explicit `INET#` prefix.
 Ambiguous handles require a stable ID. Resident profile edits retain IDs and
 existing conversations. Added SIGs and OLT use the same member IDs
 without creating another identity registry.
 
-Mail lists, both parties in letter headers, and the resolved recipient in new
-and reply drafts show `(SYN-…) handle`, using the unchanged shared forum/OLT
+Resident mail lists, both parties in letter headers, and the resolved recipient
+in new and reply drafts show `(SYN-…) handle`, using the unchanged shared forum/OLT
 identity and safe-name helpers. `MEMBERS` shows `short-address / (SYN-…) handle`;
 the token is a display label, not an address or authentication. Stable addresses
 take precedence over handles, and duplicate handles require a stable address.
@@ -70,7 +70,7 @@ INBOX
 Subject length is 1–200 UTF-16 units; body length is 1–20000, preserving
 Japanese text, indentation, blank lines and trailing spaces. Terminal controls
 and invisible direction controls are rejected. `.END` reviews; only review `Y`
-sends. `N`, `CANCEL` or `.CANCEL` discards. `EDIT` supports `TITLE text`,
+saves the letter. `N`, `CANCEL` or `.CANCEL` discards. `EDIT` supports `TITLE text`,
 `LINE number text`, `DELETE number`, `APPEND`, and `REVIEW`; `.TEXT text` in body
 input inserts command-shaped text literally. IME Enter confirms conversion without
 submitting. A failed transaction keeps the draft editable/retryable; a successful
@@ -83,10 +83,60 @@ when letters belong to other handles or have been deleted. They are not forum
 numbers. Reading displays subject, both parties' tokens and safe handles, the
 shared historical JST date and the reply reference; listings show the
 correspondent, subject and date. INBOX retains its individual unread/read marker.
-Human SENT rows show `既読確認なし` or `既読確認あり`; sent-letter READ
-shows `既読確認：確認なし` or the confirmation's historical JST time.
+Resident-addressed human SENT rows show `既読確認なし` or `既読確認あり`;
+sent-letter READ shows `既読確認：確認なし` or the confirmation's historical JST time.
 Absence means **unknown/unconfirmed**, never proven unread.
 No starter letters or archived/private source material are seeded.
+
+## Browser-local Internet destinations (Issue #93)
+
+From any of the three mail entries, `HELP`/mailbox guidance introduces `INET#`;
+`MEMBERS` and the omitted-address prompt show the original fictional example
+`INET#observer@letters.example.invalid`. This example is not a member or a real
+contact. Use `WRITE INET#Observer.Notes+Autumn@Letters.Example.invalid` or
+`COMPOSE INET#Observer.Notes+Autumn@Letters.Example.invalid`, or enter that
+destination at `宛先=`. The prefix is case-insensitive; the address's spelling and
+case are preserved exactly, without lowercasing, trimming, lookup or normalization.
+An explicit prefix always takes precedence over any resident handle, even when
+its address is invalid. Local stable-address precedence and ambiguous-handle
+rejection remain unchanged.
+
+The accepted **reconstructed ASCII single-address subset** is bounded to 254
+characters, with exactly one `@`. The local part is 1–64 characters: nonempty
+runs of ASCII letters, digits, `_`, `+` and `-`, separated by single dots.
+The domain is at most 253 characters and has at least two dot-separated labels.
+Each label is 1–63 ASCII letters/digits/hyphens, starting and ending in a letter
+or digit; its final label is 2–63 ASCII letters. Empty parts, leading/trailing or
+consecutive dots, whitespace/control characters, Unicode, quoted names, comments,
+angle brackets, IP literals, multiple recipients and other unsupported syntax
+are rejected consistently by composition, repository writes and imports. This is
+not full email-standard support or a historical PC-VAN validation rule.
+
+The existing literal Japanese multiline composer, `.TEXT`, review/`EDIT`, explicit
+`Y` approval and cancellation apply unchanged. Opening and review say that the
+letter saves only in this browser and sends nothing to an email server; success
+uses local-save wording. The destination remains pinned through editing and save
+retry. Failure rolls back both letter and number, keeping the draft retryable;
+committed saves consume the draft even if refresh fails. Concurrent identical
+submissions share one record; changed content or destination with the same draft
+ID fails. Numbering is shared with resident letters and remains monotonic.
+
+SENT and READ display `INET#` plus the original address and truthful local-save
+status. There is no member token, remote delivery/receipt/read evidence, generated
+reply or reply-parent relationship. External letters appear only in their human
+sender's SENT projection, never INBOX or another human's mailbox. They create no
+resident acquaintance, pair memory, generation target or correspondence-limit
+usage; addresses, subjects and bodies stay out of mail/forum/OLT prompts. This
+journey initiates no network request, email lookup, `mailto` handoff or model load.
+
+External addresses and letters survive reload and JSON export/import with the
+rest of mail. Read/drafted text also appears in terminal logs. Unsent drafts are
+not backed up; reset/restore invalidate them across tabs. No inbound Internet
+mail, mailbox migration, remote transport, attachments, delivery simulation or
+multiple recipients are implemented. Historical `INET#` addressing has high
+confidence for November 1996; these controls, limits, local-save status and layout
+are category D product choices. See the [dated evidence and unresolved mailbox
+relationships](research/pcvan-1996-1997.md#outbound-internet-mail-issue-93).
 
 ## Sender-visible recipient confirmation (Issue #89)
 
@@ -154,7 +204,7 @@ routing and context; they cannot guarantee model truthfulness or perfect tone.
 
 ## Privacy, persistence and maintenance
 
-This is original fiction generated and stored entirely within this browser's
+Letters and original resident fiction are stored entirely within this browser's
 local world. Nothing is sent to actual PC-VAN members, other browser users,
 email servers or an external inference API. Model files may be downloaded only
 after authorization. Ordinary reading keeps provenance out of letter headers;
@@ -163,9 +213,9 @@ Settings → Details/About explains the simulation, origins and limitations.
 Private means separated from public forums and unrelated prompt contexts inside
 the simulation. It is **not encryption or isolation from someone with access to
 the same browser profile/device**. Switching local handles changes projections,
-not device access permissions. JSON backups contain all private letters, read
-timestamps and confirmation evidence; terminal logs can contain read/drafted
-letters. Protect exported files accordingly. Browser eviction can erase the
+not device access permissions. JSON backups contain all private letters, including
+external Internet addresses, subjects and bodies, read timestamps and confirmation
+evidence; terminal logs can contain read/drafted letters. Protect exported files accordingly. Browser eviction can erase the
 world; keep backups outside it.
 
 [IndexedDB and JSON backups](local-storage.md#mail-records-and-migration) cover

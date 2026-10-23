@@ -436,14 +436,20 @@ remain in Options. See [OLT behavior](docs/local-ai.md#olt-rooms) and
 
 Mail directories accept `INBOX`, `SENT`, `MEMBERS`, `WRITE address` (or `WRITE`
 then an address), `READ number`, and `REPLY number`. `LIST` refreshes the current
-view. Send to the same ten resident IDs/handles used in SIGs, using the existing
-human handle. Compose subject/body, `.END`, then `EDIT` / `Y` / `N` through the
-single terminal input. Sent and received letters have stable numbers, subjects,
+view. Use the existing human handle to write to the same ten resident IDs/handles
+used in SIGs, or an explicit Internet destination such as
+`WRITE INET#observer@letters.example.invalid` (`COMPOSE` also works). Internet
+letters save only in this browser and send nothing to an email server. Their
+addresses retain spelling/case through review/edit, SENT/READ, reload and backup;
+they create no members, replies, read evidence or resident AI context. See the
+[bounded ASCII address subset](docs/mail.md#browser-local-internet-destinations-issue-93).
+Compose subject/body, `.END`, then `EDIT` / `Y` / `N` through the single terminal
+input. Sent and received letters have stable numbers, subjects,
 historical JST display dates (stored as operational UTC), reply chains and
 per-recipient read markers. Cancelled drafts do not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
 
-Mail lists, both header parties and new/reply recipient confirmation show the
-same stable `(SYN-…)` token used in forums and OLT, separately from the safe
+Resident mail lists, both header parties and new/reply recipient confirmation
+show the same stable `(SYN-…)` token used in forums and OLT, separately from the safe
 current handle. `MEMBERS` matches each available resident's short address to
 that token and name; use the short address for duplicate handles. Tokens are
 display labels, not addresses. Renames, member ordering, reload and JSON restore
@@ -454,9 +460,11 @@ display fields or additional read events are introduced.
 The [mail identity research](docs/research/pcvan-1996-1997.md#mail-identity-and-handles-issue-83)
 records sources inspected 2026-10-24: moderate historical confidence in separate
 IDs/names, low confidence in exact 1996 mail formatting. Placement and refresh
-are category D choices. Local delivery is this app's scope; period `INET#`
-documentation confirms historical Internet mail separately. Settings →
-Details/About carries the source URLs and qualifications.
+are category D choices. The [Internet-mail research](docs/research/pcvan-1996-1997.md#outbound-internet-mail-issue-93)
+records high-confidence November 1996 `INET#` addressing separately from the
+reconstructed local-save journey, address limits and unresolved new/old-mail
+relationships. JSON backups and terminal logs include external letters/addresses.
+Settings → Details/About carries the source URLs and qualifications.
 
 Residents may privately initiate or reply at their scheduled visits after model
 consent, with quiet periods and bounded shared generation budgets. They use only

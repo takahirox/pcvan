@@ -144,3 +144,28 @@ test('directory uses current member names and new/reply drafts pin the resolved 
     expect(result.unchanged).toBe(true);
   }
 });
+
+test('committed external save consumes its pinned draft even when refresh fails', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async (data) => {
+    const cp = '/src/commands.ts';
+    const { TerminalCommands } = await import(cp);
+    const printed: string[] = [], saved: Record<string, unknown>[] = [];
+    const commands = new TerminalCommands({ read: async () => { if (saved.length) throw new Error('refresh'); return data; },
+      print: (...lines: string[]) => printed.push(...lines), mailbox: () => ({ box: 'INBOX', title: 'メール' }),
+      repository: async () => ({ createHumanMail: async (draft: Record<string, unknown>) => { saved.push(draft); return { number: 1 }; } }), ai: {},
+    });
+    await commands.submit('WRITE INET#Case@Letters.example.invalid');
+    data.members.push({ id: 'fictional-ai:hoshimori', handle: 'INET#Case@Letters.example.invalid', actor: 'ai' });
+    await commands.submit('件名'); await commands.submit('本文'); await commands.submit('.END');
+    await commands.submit('EDIT'); await commands.submit('LINE 1 修正本文'); await commands.submit('REVIEW');
+    await commands.submit('Y');
+    // No second save is available after commit, even if a later command cannot refresh.
+    try { await commands.submit('Y'); } catch { /* read remains unavailable */ }
+    return { saved, printed };
+  }, backupFixture());
+  expect(result.saved).toHaveLength(1);
+  expect(result.saved[0]).toMatchObject({ recipient: 'INET#Case@Letters.example.invalid', body: '修正本文' });
+  expect(result.printed.join('\n')).toContain('メール #1 をこのブラウザー内に保存しました');
+  expect(result.printed.join('\n')).not.toContain('保存できませんでした');
+});

@@ -10,9 +10,9 @@ import { OLT_SETTING, oltState, observeOlt, appendOlt, attendance, VISITOR_LEASE
 import type { OltRoom, OltState, OltTurn, RoomId } from '../olt-state';
 import { planOltTurn, commitOltText } from '../ai/olt';
 import {
-  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailResident,
+  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailDestination,
 } from './schema';
-import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, Member, NewPost, Post, Records, Session, Store } from './schema';
+import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailDestination, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
 import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
 import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
@@ -363,7 +363,7 @@ export class LocalRepository {
     });
   }
 
-  /** Resolve an exact local resident address and allocate the number atomically. */
+  /** Resolve a resident or explicit Internet address and allocate the number atomically. */
   createHumanMail(draft: { id: string; senderId: string; recipient: string; subject: string; body: string; replyToMailId?: string }): Promise<Mail> {
     const input = structuredClone(draft);
     return this.transaction(allStores, 'readwrite', async (tx) => {
@@ -374,21 +374,21 @@ export class LocalRepository {
       const sender = content.members.find((m) => m.id === input.senderId);
       if (sender?.actor !== 'human') invalid('Select a local human member.');
       if (input.replyToMailId !== undefined && (typeof input.replyToMailId !== 'string' || !input.replyToMailId.trim())) invalid('Invalid mail reply parent.');
-      const address = input.recipient.trim();
-      const recipient = resolveMailResident(content.members, address);
+      const destination = resolveMailDestination(content.members, input.recipient);
+      if (destination.internetAddress !== undefined && input.replyToMailId !== undefined) invalid('Internet letters cannot be replies.');
       const previous = (content.mail ?? []).find((m) => m.id === input.id);
       if (previous) {
-        if (previous.senderId !== sender.id || previous.recipientId !== recipient.id || previous.subject !== input.subject ||
+        if (previous.senderId !== sender.id || previous.recipientId !== destination.recipientId || previous.internetAddress !== destination.internetAddress || previous.subject !== input.subject ||
             previous.body !== input.body || previous.replyToMailId !== input.replyToMailId) invalid('Mail ID collision.');
         return previous;
       }
-      return this.insertMail(tx, { id: input.id, senderId: sender.id, recipientId: recipient.id,
+      return this.insertMail(tx, { id: input.id, senderId: sender.id, ...destination,
         subject: input.subject, body: input.body, origin: 'local-human',
         ...(input.replyToMailId !== undefined ? { replyToMailId: input.replyToMailId } : {}) });
     }).then((mail) => { this.notifySetupChanged(); return mail; });
   }
 
-  private async insertMail(tx: IDBTransaction, input: Omit<Mail, 'number' | 'createdAt'>): Promise<Mail> {
+  private async insertMail(tx: IDBTransaction, input: Omit<Mail, 'number' | 'createdAt' | 'recipientId' | 'internetAddress'> & MailDestination): Promise<Mail> {
     const content = await this.snapshot(tx);
     const maximum = (content.mail ?? []).reduce((n, m) => Math.max(n, m.number), 0);
     const number = Math.max(maximum + 1, (await request(tx.objectStore('session').get('mail-next-number'))) ?? 1);

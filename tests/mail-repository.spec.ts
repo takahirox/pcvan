@@ -353,3 +353,112 @@ for (const mode of ['recipient', 'parent', 'persona', 'output', 'cancelled', 'fa
     if (mode === 'restore' || mode === 'reset') expect(result.failure).toBe('stale');
   });
 }
+
+test('Internet addresses share strict controller/write/import validation and never resolve to resident handles', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, before = await repo.exportBackup(), senderId = before.members.find((m) => m.actor === 'human')!.id;
+    const cp = '/src/commands.ts', sp = '/src/storage/schema.ts';
+    const { TerminalCommands } = await import(cp) as typeof import('../src/commands');
+    const { validateRecord, resolveMailDestination } = await import(sp) as typeof import('../src/storage/schema');
+    const accepted = ['Observer.Name+Notes_1@Letters.Example.invalid', 'a-b@a.b.example', `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`];
+    const invalid = ['', 'a', '@host.example', 'a@', 'a@@host.example', 'a@localhost', '.a@host.example', 'a.@host.example', 'a..b@host.example',
+      'a@.host.example', 'a@host..example', 'a@-host.example', 'a@host-.example', 'a@host.e', 'a@host.123', 'a@host.example.',
+      'a@host.example,b@host.example', 'a@host.example;b@host.example', 'Name <a@host.example>', '"a"@host.example', 'a(comment)@host.example',
+      '日本@host.example', 'a@日本.example', 'a@[127.0.0.1]', 'a b@host.example', ' a@host.example', 'a@host.example ',
+      'a\t@host.example', 'a@host.example\n', 'a@host.example\r', 'a@host.example\0', 'a\u001b@host.example', 'a\u200b@host.example',
+      `${'a'.repeat(65)}@host.example`, `a@${'b'.repeat(64)}.example`, `${accepted[2]}x`];
+    // Prefixes have priority even over matching resident handles, including invalid forms.
+    await repo.put('members', { id: 'fictional-ai:hoshimori', handle: 'INET#a', actor: 'ai' });
+    const content = await repo.exportBackup();
+    const checks = [];
+    for (const [valid, addresses] of [[true, accepted], [false, invalid]] as const) for (const address of addresses) {
+      const destination = `INET#${address}`, draft = { id: `address-${checks.length}`, senderId, recipient: destination, subject: '検証', body: '本文' };
+      let write = true, record = true;
+      try { await repo.createHumanMail(draft); } catch { write = false; }
+      try { validateRecord('mail', { id: draft.id, number: 1, senderId, internetAddress: address, subject: draft.subject, body: draft.body,
+        origin: 'local-human', createdAt: '2026-10-21T00:00:00.000Z' }); } catch { record = false; }
+      const controller = [];
+      for (const mode of ['WRITE', 'COMPOSE', 'prompt']) {
+        const printed: string[] = [];
+        const commands = new TerminalCommands({ read: async () => content, print: (...lines: string[]) => printed.push(...lines),
+          mailbox: () => ({ box: 'INBOX', title: 'メール' }), ai: {} } as never);
+        if (mode === 'prompt') { await commands.submit('WRITE'); await commands.submit(destination); }
+        else await commands.submit(`${mode} ${destination}`);
+        controller.push(printed.includes('件名='));
+      }
+      checks.push({ valid, write, record, controller });
+    }
+    const letters = await repo.list('mail');
+    return { checks, accepted, letters, destination: resolveMailDestination(content.members, 'inet#Case@Letters.example.invalid') };
+  });
+  for (const check of result.checks) {
+    expect(check.write).toBe(check.valid); expect(check.record).toBe(check.valid);
+    expect(check.controller).toEqual(Array(3).fill(check.valid));
+  }
+  expect(result.letters.map((m) => m.internetAddress)).toEqual(result.accepted);
+  expect(result.letters.every((m) => !Object.hasOwn(m, 'recipientId'))).toBe(true);
+  expect(result.destination).toEqual({ internetAddress: 'Case@Letters.example.invalid' });
+});
+
+test('mixed Internet/resident saves allocate atomically, retry identically, reject forged imports and round-trip without member creation', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, before = await repo.exportBackup(), senderId = before.members.find((m) => m.actor === 'human')!.id;
+    const draft = { id: 'external-1', senderId, recipient: 'INET#Observer+Case@Letters.Example.invalid', subject: '  外への便り  ', body: '  日本語\n\n　ｶﾅ  ' };
+    const rp = '/src/storage/repository.ts';
+    const other = await (await import(rp)).openRepository('mail-world') as LocalRepository;
+    const first = await Promise.all([repo.createHumanMail(draft), other.createHumanMail(draft)]);
+    const concurrent = await Promise.all([repo.createHumanMail({ ...draft, id: 'local', recipient: 'hoshimori' }),
+      other.createHumanMail({ ...draft, id: 'external-2', recipient: 'INET#second@letters.example.invalid' })]);
+    const failures = [];
+    for (const change of [{ body: 'different' }, { recipient: 'INET#observer+Case@Letters.Example.invalid' }, { recipient: 'hoshimori' },
+      { senderId: 'missing' }, { senderId: 'fictional-ai:hoshimori' }, { replyToMailId: 'local' }, { recipientId: 'fictional-ai:hoshimori' }, { simulation: {} }]) {
+      try { await repo.createHumanMail({ ...draft, ...change } as never); failures.push('saved'); } catch (e) { failures.push((e as { code: string }).code); }
+    }
+    const preQuota = await repo.exportBackup(), native = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, key) {
+      if (this.name === 'session' && key === 'mail-next-number') throw new DOMException('quota', 'QuotaExceededError');
+      return key === undefined ? native.call(this, value) : native.call(this, value, key);
+    };
+    try { await repo.createHumanMail({ ...draft, id: 'retry' }); } catch (e) { failures.push((e as { code: string }).code); }
+    finally { IDBObjectStore.prototype.put = native; }
+    const afterQuota = await repo.exportBackup(), next = await repo.createHumanMail({ ...draft, id: 'retry' });
+    await repo.delete('mail', next.id);
+    const afterDelete = await repo.createHumanMail({ ...draft, id: 'after-delete' });
+    const good = await repo.exportBackup(), external = first[0]!;
+    const variants: unknown[] = [
+      { ...external, recipientId: 'fictional-ai:hoshimori' }, { ...external, recipientId: senderId },
+      { ...external, internetAddress: undefined }, { ...external, internetAddress: '' }, { ...external, internetAddress: null },
+      { ...external, internetAddress: 'INET#a@host.example' }, { ...external, internetAddress: 'a@host.example\n' },
+      { ...external, internetAddress: 'a@host.example,b@host.example' }, { ...external, senderId: 'missing' },
+      { ...external, senderId: 'fictional-ai:hoshimori' }, { ...external, origin: 'local-ai:webllm:fixture' },
+      { ...external, readAt: external.createdAt }, { ...external, replyToMailId: 'local' },
+      { ...external, simulation: { runId: external.id, simulatedAt: external.createdAt, fictional: true } },
+      { ...external, recipientConfirmation: { at: external.createdAt, replyMailId: 'local', provenance: 'local-resident-reply-v1' } },
+    ];
+    const imports = [];
+    for (const bad of variants) {
+      try { await repo.replaceFromJson(JSON.stringify({ ...good, mail: good.mail!.map((m) => m.id === external.id ? bad : m) }), { confirmReplace: true }); imports.push('saved'); }
+      catch (e) { imports.push((e as { code: string }).code); }
+      if (JSON.stringify(await repo.exportBackup()) !== JSON.stringify(good)) throw new Error('Invalid import changed world');
+    }
+    let readFailure = '', actorFailure = '';
+    try { await repo.markMailRead(senderId, external.id); } catch (e) { readFailure = (e as { code: string }).code; }
+    try { await repo.put('members', { ...before.members.find((m) => m.id === senderId)!, actor: 'ai' }); } catch (e) { actorFailure = (e as { code: string }).code; }
+    await repo.replaceFromJson(JSON.stringify(good), { confirmReplace: true });
+    const restored = await repo.exportBackup(); repo.close();
+    window.mailRepo = await (await import(rp)).openRepository('mail-world');
+    const reopened = await window.mailRepo.exportBackup();
+    const afterRestore = await window.mailRepo.createHumanMail({ ...draft, id: 'after-restore' });
+    other.close();
+    return { before, first, concurrent, failures, preQuota, afterQuota, next, afterDelete, good, imports, readFailure, actorFailure, restored, reopened, afterRestore };
+  });
+  expect(result.first[0]).toEqual(result.first[1]); expect(result.first[0]!.number).toBe(1);
+  expect(result.concurrent.map((m) => m.number).sort()).toEqual([2, 3]);
+  expect(result.failures).toEqual([...Array(8).fill('validation'), 'quota']);
+  expect(result.preQuota).toEqual(result.afterQuota); expect(result.next.number).toBe(4); expect(result.afterDelete.number).toBe(5);
+  expect(result.imports).toEqual(Array(15).fill('validation'));
+  expect(result.readFailure).toBe('validation'); expect(result.actorFailure).toBe('validation');
+  expect(result.good.members).toEqual(result.before.members); expect(result.good.posts).toEqual(result.before.posts);
+  expect(result.good.forums).toEqual(result.before.forums); expect(result.good.readStates).toEqual(result.before.readStates);
+  expect(result.restored).toEqual(result.good); expect(result.reopened).toEqual(result.good); expect(result.afterRestore.number).toBe(6);
+});

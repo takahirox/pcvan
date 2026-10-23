@@ -5,7 +5,7 @@ import { conferenceState } from './conference';
 import type { Contribution } from './storage/schema';
 import { TerminalOlt } from './olt';
 import type { Backup, Mail, Post, TerminalPreferences } from './storage/schema';
-import { resolveMailResident, validateBackup } from './storage/schema';
+import { resolveMailDestination, validateBackup } from './storage/schema';
 import type { ForumDestination, LocalRepository } from './storage/repository';
 import { ACTIVE_MEMBER_SETTING, createRecordId, residentContext, worldContext as context } from './storage/repository';
 import { activeHuman, forumPosts } from './forums';
@@ -19,7 +19,7 @@ import { models, residentProfiles } from './ai/personas';
 import type { ResidentProfile } from './ai/personas';
 import type { createAiControls } from './ai/controls';
 import { setupContext } from './ai/activity';
-import { mailCorrespondent, mailboxRows, renderMail } from './mail';
+import { mailCorrespondent, mailboxRows, renderMail, internetMailHelp } from './mail';
 import { personaMemberId } from './ai/personas';
 import type { Mailbox } from './sections';
 import { modelDisclosure } from './ai/setup';
@@ -169,17 +169,17 @@ export class TerminalCommands {
         this.mailAddress = true; this.printAddresses(data); this.actions.print('宛先='); return;
       }
       let recipient;
-      try { recipient = resolveMailResident(data.members, intent.recipient); }
-      catch { this.mailAddress = true; this.actions.print('宛先が見つからないか重複しています。MEMBERS の宛先を入力してください。宛先='); return; }
+      try { recipient = resolveMailDestination(data.members, intent.recipient); }
+      catch { this.mailAddress = true; this.actions.print('宛先が見つからないか重複しています。MEMBERS の宛先または有効な INET#address を入力してください。宛先='); return; }
       this.mailAddress = false;
       const id = createRecordId();
-      this.composer = new TerminalComposer({ keyword: 'MAIL', name: mailCorrespondent(recipient) }, authorId, intent.parent, {
+      this.composer = new TerminalComposer({ keyword: 'MAIL', name: recipient.internetAddress !== undefined ? `INET#${recipient.internetAddress}` : mailCorrespondent(data.members.find((m) => m.id === recipient.recipientId)), localMail: recipient.internetAddress !== undefined }, authorId, intent.parent, {
         print: this.actions.print,
         save: async (_target, draft) => {
           const row = await (await this.actions.repository()).createHumanMail({ id, senderId: draft.authorId,
-            recipient: recipient.id, subject: draft.title, body: draft.body,
+            recipient: recipient.internetAddress !== undefined ? `INET#${recipient.internetAddress}` : recipient.recipientId, subject: draft.title, body: draft.body,
             ...(intent.parent ? { replyToMailId: intent.parent.id } : {}) });
-          // Delivery is committed. A failed refresh must never leave a sendable draft.
+          // Saving is committed. A failed refresh must never leave a sendable draft.
           try { await this.actions.read(); } catch { /* A later LIST refreshes. */ }
           return row;
         },
@@ -188,7 +188,7 @@ export class TerminalCommands {
   }
   private printAddresses(data: Backup) {
     this.actions.print('宛先一覧（宛先ID / 会員表示）', ...residentProfiles(data).filter((p) => data.members.some((m) => m.id === personaMemberId(p.id) && m.actor === 'ai'))
-      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'WRITE 宛先（一覧の宛先IDまたはハンドル） / .CANCEL: 中止');
+      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'WRITE 宛先（一覧の宛先IDまたはハンドル） / .CANCEL: 中止', internetMailHelp);
   }
   private confirm(value: Confirmation, ...warning: string[]) {
     this.oslRequest = undefined;
@@ -216,7 +216,7 @@ export class TerminalCommands {
     if (this.mailAddress) {
       if (['CANCEL', '.CANCEL'].includes(command)) { this.mailAddress = false; print('メールを中止しました。コマンド='); }
       else if (['HELP', 'MEMBERS', 'BACK', 'MAIN'].includes(command)) { this.printAddresses(await this.actions.read()); print('宛先='); }
-      else this.startCompose({ mail: true, recipient: line.trim() }, await this.actions.read());
+      else this.startCompose({ mail: true, recipient: line }, await this.actions.read());
       return true;
     }
     if (this.registration) {
@@ -353,8 +353,8 @@ export class TerminalCommands {
     if (!this.menu && this.actions.mailbox?.()) {
       const data = await this.actions.read(), human = activeHuman(data);
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }
-      const write = /^(?:WRITE|COMPOSE)(?: (.*))?$/i.exec(line.trim());
-      if (write) { this.startCompose({ mail: true, recipient: write[1]?.trim() ?? '' }, data); return true; }
+      const write = /^ *(?:WRITE|COMPOSE)(?: ([\s\S]*))?$/i.exec(line);
+      if (write) { this.startCompose({ mail: true, recipient: write[1] ?? '' }, data); return true; }
       const selected = /^(READ|REPLY) ([1-9]\d*)$/.exec(command);
       if (selected) {
         const rows = mailboxRows(data.mail ?? [], human, this.actions.mailbox!()!.box);
