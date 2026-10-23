@@ -17,6 +17,8 @@ import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem }
 import { bizArticles, bizSetLimit, bizHelp, bizKeywordHelp, renderDatabaseDirectory, renderBizSearch, renderBizTitles, renderBizArticle } from './biz';
 import type { BizSet } from './biz';
 import { newsBriefs, renderNewsDirectory, renderNewsHeadlines, renderNewsBrief } from './news';
+import { netNewsGroups, netNewsHelp, netNewsSearchHelp, netNewsResults, renderInternetDirectory, renderNetNewsDirectory, renderNetNewsList, renderNetNewsArticle } from './netnews';
+import type { NetNewsSearch } from './netnews';
 
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
@@ -26,6 +28,7 @@ export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-m
   'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
   'news-directory' | 'news-headlines' | 'news-brief' |
+  'internet-directory' | 'netnews-directory' | 'netnews-list' | 'netnews-article' |
   'database-directory' | 'biz-search' | 'biz-titles' | 'biz-article';
 
 // MAIN's row grouping follows the circa-1996 reproduction; the 44-cell column
@@ -82,6 +85,9 @@ export class PcvanController implements TerminalController {
   private serviceItem = 0;
   private eicItem = 0;
   private newsItem = 0;
+  private netNewsGroup = 0;
+  private netNewsItem = 0;
+  private netNewsSearch: NetNewsSearch | undefined;
   private readonly bizSets: BizSet[] = [];
   private bizZeroKeyword: string | undefined;
   private bizSetNumber = 0;
@@ -123,17 +129,20 @@ export class PcvanController implements TerminalController {
     if (this.currentScreen !== 'main' && this.currentScreen !== 'disconnected') {
       if (command === 'MAIN') {
         this.clearBiz();
+        this.clearNetNews();
         this.parents.length = 0;
         this.currentScreen = 'main';
         return this.render();
       }
       if (command === 'BACK') {
-        // BiZ has a fixed internal path. FIND/SHOW replace the active view and
-        // never push duplicate parents; only entry retains the directory parent.
-        if (this.currentScreen === 'biz-article') this.currentScreen = 'biz-titles';
+        // BiZ and NetNews replace internal reading views without pushing
+        // duplicate parents. BACK restores the corresponding active list.
+        if (this.currentScreen === 'netnews-article') this.currentScreen = 'netnews-list';
+        else if (this.currentScreen === 'biz-article') this.currentScreen = 'biz-titles';
         else if (this.currentScreen === 'biz-titles') this.currentScreen = 'biz-search';
         else {
           if (this.currentScreen === 'biz-search') this.clearBiz();
+          if (this.currentScreen === 'netnews-list') this.clearNetNews();
           this.currentScreen = this.parents.pop() ?? 'main';
         }
         return this.render();
@@ -195,6 +204,20 @@ export class PcvanController implements TerminalController {
         if (Object.hasOwn(mailboxes, command)) { this.mailbox = command as Mailbox; return this.render(); }
         if (command === 'LIST') return this.render();
         return this.invalidCommand('LIST / BACK / MAIN / HELP');
+      case 'internet-directory':
+        if (command === 'LIST') return this.render();
+        if (command === '1') return this.enter('netnews-directory');
+        return this.invalidCommand('1: NetNews / LIST / BACK / MAIN / HELP');
+      case 'netnews-directory':
+        if (command === 'LIST') return this.render();
+        if (command === '1' || command === '2') {
+          this.clearNetNews();
+          this.netNewsGroup = Number(command) - 1;
+          return this.enter('netnews-list');
+        }
+        return this.invalidCommand('1: fj.questions.fj / 2: fj.news.usage / LIST / BACK / MAIN / HELP');
+      case 'netnews-list':
+      case 'netnews-article': return this.handleNetNews(line, command);
       case 'news-directory':
         if (command === 'LIST') return this.render();
         if (command === '1') return this.enter('news-headlines');
@@ -311,6 +334,41 @@ export class PcvanController implements TerminalController {
     this.bizSetNumber = 0; this.bizItem = 0;
   }
 
+  private clearNetNews(): void {
+    this.netNewsGroup = 0; this.netNewsItem = 0; this.netNewsSearch = undefined;
+  }
+
+  private handleNetNews(line: string, command: string): readonly string[] {
+    if (command === 'LIST') {
+      this.netNewsSearch = undefined; this.netNewsItem = 0;
+      this.currentScreen = 'netnews-list';
+      return this.render();
+    }
+    const input = line.trim();
+    if (/^SEARCH(?:\s|$)/i.test(input)) {
+      // Parse the original line: normal command folding would destroy query
+      // spelling and internal whitespace. Every search uses the whole group.
+      const search = /^SEARCH\s+(SUBJECT|FROM)\s+([\s\S]+)$/i.exec(input);
+      const query = search?.[2]?.trim();
+      if (!search || !query) return [netNewsHelp, netNewsSearchHelp, demoPrompt];
+      this.netNewsSearch = { field: search[1]!.toUpperCase() === 'SUBJECT' ? 'Subject' : 'From', query };
+      this.netNewsItem = 0; this.currentScreen = 'netnews-list';
+      return this.render();
+    }
+    const read = /^READ ([1-9]\d*)$/.exec(command);
+    if (read) {
+      const number = Number(read[1]);
+      const article = Number.isSafeInteger(number) && netNewsResults(netNewsGroups[this.netNewsGroup]!, this.netNewsSearch)
+        .find((item) => item.number === number);
+      if (!article) return ['その番号の記事は現在の一覧にありません。HELP で確認するか LIST で全記事を表示してください。', demoPrompt];
+      this.netNewsItem = number;
+      // Details replace one another; their active list remains the sole parent.
+      this.currentScreen = 'netnews-article';
+      return this.render();
+    }
+    return this.invalidCommand(`${netNewsHelp} / BACK / MAIN / HELP`);
+  }
+
   private handleBiz(line: string): readonly string[] {
     const input = line.trim();
     if (/^FIND(?:\s|$)/i.test(input)) {
@@ -397,6 +455,10 @@ export class PcvanController implements TerminalController {
       this.eicItem = 0;
       return [entryText(entry), ...this.enter('environmental-gateway')];
     }
+    if (entry.selector === '7') {
+      this.clearNetNews();
+      return [entryText(entry), ...this.enter('internet-directory')];
+    }
     return [entryText(entry), ...this.enter(entry.selector === '13' ? 'communication'
       : entry.selector === '2' ? 'index' : 'section')];
   }
@@ -440,6 +502,13 @@ export class PcvanController implements TerminalController {
         returnHelp, demoPrompt,
       ];
       case 'news-directory': return [...renderNewsDirectory(), returnHelp, demoPrompt];
+      case 'internet-directory': return [...renderInternetDirectory(), returnHelp, demoPrompt];
+      case 'netnews-directory': return [...renderNetNewsDirectory(), returnHelp, demoPrompt];
+      case 'netnews-list': return [...renderNetNewsList(netNewsGroups[this.netNewsGroup]!, this.netNewsSearch), returnHelp, demoPrompt];
+      case 'netnews-article': {
+        const group = netNewsGroups[this.netNewsGroup]!;
+        return [...renderNetNewsArticle(group, group.articles.find((article) => article.number === this.netNewsItem)!), returnHelp, demoPrompt];
+      }
       case 'news-headlines': return [...renderNewsHeadlines(), returnHelp, demoPrompt];
       case 'news-brief': return [...renderNewsBrief(this.newsItem), returnHelp, demoPrompt];
       case 'database-directory': return [...renderDatabaseDirectory(), returnHelp, demoPrompt];

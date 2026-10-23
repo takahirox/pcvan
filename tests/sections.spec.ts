@@ -3,7 +3,7 @@ import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import { PcvanController } from '../src/navigation';
 import { backupFixture } from './backup-fixture';
 
-const collections = mainMenu.entries.filter((entry) => !['2', '3', '4', '5', '13', 'Q'].includes(entry.selector));
+const collections = mainMenu.entries.filter((entry) => !['2', '3', '4', '5', '7', '13', 'Q'].includes(entry.selector));
 const emptyCounts: Record<string, string> = {
   '1': '受信箱：0件 / 送信済み：0件', X: '受信箱：0件 / 送信済み：0件',
   '9': '商品カタログ：0件',
@@ -36,7 +36,7 @@ test('index links to every other section and preserves the complete return path'
   for (const entry of entries) {
     expect(index.join('\n')).toContain(`${entry.selector.padStart(2)} ${entry.label}`);
     expect(controller.submit(entry.selector).join('\n')).toContain(entry.label);
-    expect(controller.screen).toBe(entry.selector === '13' ? 'communication' : entry.selector === '5' ? 'environmental-gateway' : entry.selector === '4' ? 'database-directory' : entry.selector === '3' ? 'news-directory' : 'section');
+    expect(controller.screen).toBe(entry.selector === '13' ? 'communication' : entry.selector === '7' ? 'internet-directory' : entry.selector === '5' ? 'environmental-gateway' : entry.selector === '4' ? 'database-directory' : entry.selector === '3' ? 'news-directory' : 'section');
     expect(controller.submit('BACK')).toEqual(index);
   }
   for (const command of ['2', 'Q', '0', '22', 'J UNKNOWN', 'FORUMS']) {

@@ -101,6 +101,9 @@ for (const entry of mainMenu.entries) {
     expect(result).toContain(`${entry.selector} ${entry.label}`);
     if (entry.selector === '13') {
       expect(controller.screen).toBe('communication');
+    } else if (entry.selector === '7') {
+      expect(controller.screen).toBe('internet-directory');
+      expect(result).toContain('1 NetNews');
     } else if (entry.selector === '5') {
       expect(controller.screen).toBe('environmental-gateway');
       expect(result).toContain('1 EICネット（別ネットワーク）');

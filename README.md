@@ -173,7 +173,7 @@ live drafts. OLT room history is included as world data.
 | `4` | データベース | Database directory; `1` opens 日経テレコン BiZ |
 | `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
-| `7` | インターネット | Information article list, 0 articles |
+| `7` | インターネット | Internet directory; `1` opens NetNews's two example groups |
 | `8` | コンピュータ | Article list; `SIGS` opens the community directory |
 | `9` | ショッピングモール | Product catalog, 0 products |
 | `10` | 電子出版 | Publication list, 0 publications |
@@ -212,6 +212,40 @@ and Settings → Details/About distinguish early provider evidence, limited
 snippet-supported continuity and the reconstructed selectors, layouts, errors,
 returns and original prose. This is one implemented destination, not a complete
 historical provider directory or authenticated 1996 host interaction.
+
+For NetNews, use `7` → `1 NetNews` → `1 fj.questions.fj` or `2 fj.news.usage`
+→ `READ 1`, `READ 2` or `READ 3`. Each group has three original Japanese articles
+with fictional authors, `.invalid` addresses/identifiers and fixed, authored
+November 4–7, 1996 dates. Full articles include Newsgroups, From, Subject, Date
+and Message-ID; followups include References to an included original article.
+These examples and selected-group carriage are reconstructions, not recovered
+PC-VAN articles or an authenticated directory. Reading/searching is available
+anonymously without AI consent, a model, credentials or external connections.
+
+`SEARCH SUBJECT 質問` and `SEARCH FROM 風枝` search only that header in the
+selected group's complete corpus. Matching is a literal substring with query-end
+whitespace trimmed and Latin case ignored. Display preserves spelling and internal
+whitespace. Regex and Boolean characters/words are treated literally; bodies are
+never searched.
+Each search replaces prior results and reports its field, query and count.
+Numbers stay group-local and stable; `READ number` accepts only active results.
+`HELP` preserves the view/filter; `LIST` clears the filter and opens the group's
+complete list. `BACK` follows article → active list/filter → group directory →
+Internet directory → actual entry parent, including index entry. Repeated reads
+replace details; `MAIN` clears the path and transient search. Invalid input and
+unrelated service commands preserve the view. Global shortcuts and Settings/About
+remain available, returning to the current view.
+
+The bundled corpus stays outside IndexedDB and JSON backups; terminal logs retain
+literal headers and prose. Browsing does not seed or change protected world
+records, consent, scheduling or calendar settings, including restored empty
+collections. Normal session/history and activity lifecycle behavior continues.
+Posting, subscriptions/unread persistence, expiry, crossposting, thread navigation,
+WWW/TELNET/FTP and remote access are outside this implementation subset; this does
+not imply historical 1996 posting was unavailable. The
+[NetNews research record](docs/research/pcvan-1996-1997.md#netnews-reading-and-header-search-issue-81)
+and Settings/About distinguish the 1995 restrictions, 1996 reading/posting report,
+general fj evidence, assumed PC-VAN group carriage and reconstructed controls.
 
 For database retrieval, use `4` → `1` → `FIND パソコン` → `SHOW P1 /1`
 → `SHOW P3 /1 1`. 日経テレコン BiZ searches four short, original, undated Japanese
@@ -626,6 +660,7 @@ it is resolved.
 - `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
   offline/retention panel and build-generated app-shell worker.
 - `src/news.ts`: original fictional briefs and news directory/headline/detail rendering.
+- `src/netnews.ts`: original fixed-date NetNews examples, header matching and group/list/article rendering.
 - `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
 - `tests/`: controller/session checks and browser interaction checks.
 
@@ -662,7 +697,7 @@ Composition checks cover edit/review/cancel/send, blank drafts, Japanese multili
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.
 Section/service checks cover every MAIN and index destination, all five service views,
-mailbox browsing, news providers/headlines/briefs and isolated browsing,
+mailbox browsing, news providers/headlines/briefs, NetNews groups/header searches/articles and isolated browsing,
 BiZ search/sets/titles/articles and fresh visits, empty collections,
 OLT conversation/presence, preserved fixture
 evidence, scoped helpers,
