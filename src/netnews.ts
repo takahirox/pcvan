@@ -97,7 +97,7 @@ export function netNewsResults(group: NetNewsGroup, search?: NetNewsSearch): rea
 }
 
 export function renderInternetDirectory(): string[] {
-  return ['インターネット / サービス一覧', '1 NetNews', '2 TELNET', '1: グループ一覧 / 2: TELNET接続先一覧 / LIST: サービス一覧'];
+  return ['インターネット / サービス一覧', '1 NetNews', '2 TELNET', '3 FTP', '1: グループ一覧 / 2: TELNET接続先一覧 / 3: FTPファイル一覧 / LIST: サービス一覧'];
 }
 
 export function renderNetNewsDirectory(): string[] {

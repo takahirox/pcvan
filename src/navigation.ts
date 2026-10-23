@@ -1,3 +1,4 @@
+import { ftpFiles, renderFtp } from './ftp';
 import { remoteLetters, renderTelnet, telnetControls, telnetHost, telnetPrompt } from './telnet';
 import type { TelnetScreen } from './telnet';
 import { calendarSetting } from './calendar';
@@ -14,7 +15,7 @@ import { mainCollections, serviceCollections, mailboxes, renderCollection } from
 import { mailboxRows, renderMailList, mailHelp } from './mail';
 import type { CollectionKind, Mailbox } from './sections';
 import { categoryItems, serviceCategories, renderServiceDirectory, renderServiceCategory, renderServiceItem } from './service-collections';
-import type { OslDownload, ReadingService } from './service-collections';
+import type { ServiceDownload, ReadingService } from './service-collections';
 import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem } from './eic';
 import { bizArticles, bizSetLimit, bizHelp, bizKeywordHelp, renderDatabaseDirectory, renderBizSearch, renderBizTitles, renderBizArticle } from './biz';
 import type { BizSet } from './biz';
@@ -30,7 +31,7 @@ export type Screen = TelnetScreen | 'main' | 'communication' | 'miti' | 'miti-fo
   'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
   'news-directory' | 'news-headlines' | 'news-brief' |
-  'internet-directory' | 'netnews-directory' | 'netnews-list' | 'netnews-article' |
+  'ftp-list' | 'ftp-preview' | 'internet-directory' | 'netnews-directory' | 'netnews-list' | 'netnews-article' |
   'database-directory' | 'biz-search' | 'biz-titles' | 'biz-article';
 
 // MAIN's row grouping follows the circa-1996 reproduction; the 44-cell column
@@ -90,6 +91,7 @@ export class PcvanController implements TerminalController {
   private netNewsGroup = 0;
   private netNewsItem = 0;
   private telnetItem = 0;
+  private ftpItem = 0;
   private netNewsSearch: NetNewsSearch | undefined;
   private readonly bizSets: BizSet[] = [];
   private bizZeroKeyword: string | undefined;
@@ -124,15 +126,17 @@ export class PcvanController implements TerminalController {
   }
 
   /** Selection and its exact parent stack belong to navigation, not confirmation. */
-  selectOslFile(number: number): OslDownload | null {
-    if (this.readingService !== 'OSL' || !['service-category', 'service-item'].includes(this.currentScreen) ||
-      !Number.isSafeInteger(number) || number < 1) return null;
-    const item = categoryItems('OSL', this.serviceCategory)[number - 1];
+  selectDownload(number: number): ServiceDownload | null {
+    if (!Number.isSafeInteger(number) || number < 1) return null;
+    const items = ['ftp-list', 'ftp-preview'].includes(this.currentScreen) ? ftpFiles
+      : this.readingService === 'OSL' && ['service-category', 'service-item'].includes(this.currentScreen)
+        ? categoryItems('OSL', this.serviceCategory) : [];
+    const item = items[number - 1];
     if (!item?.filename) return null;
     const screen = this.currentScreen, service = this.service, category = this.serviceCategory,
-      selected = this.serviceItem, parents = [...this.parents];
+      selected = this.serviceItem, ftpItem = this.ftpItem, parents = [...this.parents];
     return { filename: item.filename, body: item.body, returnTo: () => {
-      this.currentScreen = screen; this.service = service; this.serviceCategory = category; this.serviceItem = selected;
+      this.ftpItem = ftpItem; this.currentScreen = screen; this.service = service; this.serviceCategory = category; this.serviceItem = selected;
       this.parents.splice(0, this.parents.length, ...parents);
       return this.render();
     } };
@@ -155,6 +159,7 @@ export class PcvanController implements TerminalController {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     if (this.currentScreen !== 'main' && this.currentScreen !== 'disconnected') {
       if (command === 'MAIN') {
+        this.ftpItem = 0;
         this.telnetItem = 0;
         this.clearBiz();
         this.clearNetNews();
@@ -163,9 +168,10 @@ export class PcvanController implements TerminalController {
         return this.render();
       }
       if (command === 'BACK') {
-        // BiZ, NetNews and TELNET replace reading views without pushing
+        // BiZ, FTP, NetNews and TELNET replace reading views without pushing
         // duplicate parents. BACK restores the corresponding active list.
-        if (this.currentScreen === 'telnet-letter') { this.telnetItem = 0; this.currentScreen = 'telnet-mailbox'; }
+        if (this.currentScreen === 'ftp-preview') { this.ftpItem = 0; this.currentScreen = 'ftp-list'; }
+        else if (this.currentScreen === 'telnet-letter') { this.telnetItem = 0; this.currentScreen = 'telnet-mailbox'; }
         else if (this.currentScreen === 'netnews-article') this.currentScreen = 'netnews-list';
         else if (this.currentScreen === 'biz-article') this.currentScreen = 'biz-titles';
         else if (this.currentScreen === 'biz-titles') this.currentScreen = 'biz-search';
@@ -237,7 +243,18 @@ export class PcvanController implements TerminalController {
         if (command === 'LIST') return this.render();
         if (command === '1') return this.enter('netnews-directory');
         if (command === '2') { this.telnetItem = 0; return this.enter('telnet-directory'); }
-        return this.invalidCommand('1: NetNews / 2: TELNET / LIST / BACK / MAIN / HELP');
+        if (command === '3') { this.ftpItem = 0; return this.enter('ftp-list'); }
+        return this.invalidCommand('1: NetNews / 2: TELNET / 3: FTP / LIST / BACK / MAIN / HELP');
+      case 'ftp-list':
+      case 'ftp-preview': {
+        if (command === 'LIST') { this.ftpItem = 0; this.currentScreen = 'ftp-list'; return this.render(); }
+        const read = /^READ ([1-9]\d*)$/.exec(command);
+        const number = read ? Number(read[1]) : 0;
+        if (Number.isSafeInteger(number) && ftpFiles[number - 1]) {
+          this.ftpItem = number - 1; this.currentScreen = 'ftp-preview'; return this.render();
+        }
+        return this.invalidCommand('READ 番号 / DOWNLOAD 番号 / LIST / BACK / MAIN / HELP');
+      }
       case 'telnet-directory':
       case 'telnet-shell':
       case 'telnet-mailbox':
@@ -567,6 +584,8 @@ export class PcvanController implements TerminalController {
       case 'telnet-shell':
       case 'telnet-mailbox':
       case 'telnet-letter': return renderTelnet(this.currentScreen, this.telnetItem);
+      case 'ftp-list': return [...renderFtp(), returnHelp, demoPrompt];
+      case 'ftp-preview': return [...renderFtp(this.ftpItem), returnHelp, demoPrompt];
       case 'internet-directory': return [...renderInternetDirectory(), returnHelp, demoPrompt];
       case 'netnews-directory': return [...renderNetNewsDirectory(), returnHelp, demoPrompt];
       case 'netnews-list': return [...renderNetNewsList(netNewsGroup(this.content, this.netNewsGroup), this.netNewsSearch), returnHelp, demoPrompt];

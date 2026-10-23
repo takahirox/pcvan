@@ -46,7 +46,7 @@ for (const viaIndex of [false, true]) {
       const view = isInternet ? internet : controller.submit('1');
       expect(controller.submit('LIST')).toEqual(view);
       expect(view.join('\n')).not.toMatch(/創作|再構成|https?:/);
-      for (const invalid of directoryErrors) {
+      for (const invalid of directoryErrors.filter((line) => !isInternet || line !== '3')) {
         expect(controller.submit(invalid).join('\n')).toContain('この画面では使えない');
         expect(controller.submit('HELP')).toEqual(view); isolated(controller);
       }
@@ -209,7 +209,7 @@ for (const world of ['registered populated', 'registered empty', 'anonymous empt
     for (const viaIndex of [false, true]) {
       if (viaIndex) await command(page, '2', '索引');
       await command(page, '7', 'インターネット / サービス一覧');
-      await invalids(directoryErrors);
+      await invalids(directoryErrors.filter((line) => line !== '3'));
       await command(page, 'HELP', '1 NetNews');
       await command(page, 'LIST', 'サービス一覧');
       await command(page, '1', 'NetNews / グループ一覧');

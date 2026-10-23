@@ -2,7 +2,7 @@ import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import examples from '../data/pcvan/daisizen-collections.json' with { type: 'json' };
 
 export type ReadingService = 'LIBRARY' | 'OSL';
-export interface OslDownload {
+export interface ServiceDownload {
   filename: string;
   body: string;
   returnTo(): readonly string[];
@@ -25,7 +25,7 @@ export function categoryItems(service: ReadingService, category: number): readon
   return collection[String(category)] ?? [];
 }
 
-function fileMetadata(item: ReadingItem): string[] {
+export function fileMetadata(item: ReadingItem): string[] {
   return [`${item.filename} / ${item.title}`, `用途：${item.purpose}`,
     `日付：${item.date} / サイズ：${new TextEncoder().encode(item.body).byteLength} bytes（UTF-8）`];
 }
