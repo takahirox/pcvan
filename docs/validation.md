@@ -2170,3 +2170,90 @@ native-IME/hardware validation or subsequently recovered historical incoming-mai
 session comparison was used. Those optional checks are not completion gates.
 No required post-merge verification applies. No push, PR, comment, merge or
 external deployment was performed.
+
+## Restricted browser-local FTP acquisition (#99)
+
+Implemented in the assigned worktree on 2026-10-24 after reading live Issue #99
+and the repository's contribution/review guidance. MAIN/index → 7 → 3 now opens
+restricted `info.mac` examples. The two original Macintosh documents share OSL's
+pinned payload, explicit confirmation, single-use browser handoff and existing
+world-replacement fences. No framework, dependency, storage-schema, backup-version,
+transport or real-model work was added.
+
+Validation used Node.js 24.12.0 and the existing Playwright Chromium configuration:
+
+- `npm ci`: passed, 24 packages audited, zero reported vulnerabilities.
+- `npm run build`: passed TypeScript checking and production bundling.
+- Initial focused command,
+  `npm test -- tests/ftp.spec.ts tests/osl-download.spec.ts tests/netnews.spec.ts tests/telnet.spec.ts --workers=3`:
+  **28 passed, 2 failed (3.1m)** with three workers. Both failures were in new FTP
+  tests: the registered mail fixture lacked canonical millisecond timestamps and
+  fictional AI provenance; the same-tab restore assertion expected MAIN instead
+  of the existing OSL behavior (retain browsing view, invalidate approval).
+  Corrected the fixture and assertion without changing product behavior. All
+  existing OSL, NetNews and TELNET checks passed that run.
+- Corrected focused command,
+  `npm test -- tests/ftp.spec.ts tests/osl-download.spec.ts --workers=3`:
+  **13 passed (29.1s)**, no failures, retries or skips. Playwright used two workers
+  for these two files under the requested three-worker limit; configured
+  TypeScript checking and production build passed.
+- Final complete `npm test -- --workers=3`: **360 passed (6.3m)** with three
+  workers, no failures, retries or skips, including configured TypeScript checking
+  and production bundling. All 352 baseline checks and eight added checks pass.
+  Existing functional, storage, consent, composition, NetNews/TELNET, OSL and
+  terminal pacing/skip regressions pass. The default eight-worker run was not
+  repeated; this success does not resolve the earlier eight-worker reliability
+  question recorded under #97/#98.
+- Reviewed the complete implementation/test/documentation diff against #99.
+  All **102 local Markdown links/heading anchors** and fenced blocks across the
+  three changed documents resolve; working-tree and staged `git diff --check`
+  pass, including all new files.
+
+Controller cases cover both actual MAIN/index parents, repeated visits, both
+files and previews, stable numbers, purposes, fictional authored dates and
+independently checked UTF-8 byte counts. Invalid/malformed/unsafe/out-of-range
+input preserves the view. A pinned selection survives independent navigation to
+another file/service and restores the exact parent path. FTP has no forum, mail,
+conference, OLT, TELNET or NetNews composition context. MAIN clears every depth.
+Only eligible OSL and FTP views can select downloads.
+
+The shared command-owner test runs for both OSL and FTP: explicit Y only, empty
+and unrelated input blocked, pending-history exclusion, HELP, cancellation,
+Settings/About returns, concurrent approval consumed before asynchronous work,
+synchronous handoff failure, fresh-request requirement, direct invalidation and
+invalidation during an awaited read. Production tests cover reload, factory reset,
+modern Settings restore of identical JSON and cross-tab replacement of the same
+world, with no pending approval reused. Same-tab restore preserves the bundled
+browsing view while discarding approval, as for OSL; cross-tab replacement reloads.
+
+Anonymous restored-empty and registered production journeys run at 320px with
+automatic activity paused and AI consent disabled. Actual browser downloads match
+`MACDOC.TXT` (413 bytes) and `MACCOMM.TXT` (433 bytes), independently compared to
+Node UTF-8 encoding of the bundled bodies. One acquisition returns to preview,
+one to list. Japanese, indentation, blank lines, literal markup and final LF
+remain exact in preview, log export and download. Cancellation, queued triple Y,
+typed Settings/About with and without approval, modal unsent-input preservation,
+composing-Enter guards at request and approval, keyboard scrolling, visible input
+and parent returns pass. Browser status reports initiation, not completed saving.
+
+IndexedDB snapshots and real JSON backups preserve members, SIGs, forums/posts,
+mail/read timestamps, read markers and all settings, including calendar, consent,
+scheduling, conference and populated retained OLT/NetNews records. Anonymous
+restored community collections stay empty. Bundled bodies and pending selection
+are absent from backups; ordinary session/history behavior continues. Request and
+worker observation finds no external requests, model assets or model workers.
+
+README, Settings/About and the
+[FTP research record](research/pcvan-1996-1997.md#restricted-browser-local-ftp-acquisition-issue-99)
+distinguish the dated historical restriction, moderate-confidence November
+continuity assumption, unknown endpoint mapping and category D controls/examples.
+The four historical source assessments are attributed to the Issue investigation
+of 2026-10-24. Implementation-time HEAD checks returned HTTP 200 for the three
+publisher PDFs; Info-Mac returned HTTP 403, so no new inspection of its content is
+claimed. No new page-image or dated-session comparison was obtained.
+
+The existing Vite optional-WebLLM large-chunk advisory and Node color-environment
+warnings remain informational. Additional browser engines, native IME, hardware,
+real-model and historical-user checks were not run; they are optional. No required
+post-merge verification applies. No push, PR, comment, merge or deployment was
+performed.

@@ -30,28 +30,29 @@ test('OSL selection is scoped, validates safe numbers, pins payload and restores
     const allowed = ['service-category', 'service-item'].includes(nav.screen);
     const view = nav.submit('HELP');
     expect(view.join('\n').includes('DOWNLOAD 番号')).toBe(allowed);
-    expect(!!nav.selectOslFile(1)).toBe(allowed);
+    expect(!!nav.selectDownload(1)).toBe(allowed);
     for (const number of [0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, 2, 99]) {
-      expect(nav.selectOslFile(number)).toBeNull(); expect(nav.submit('HELP')).toEqual(view);
+      expect(nav.selectDownload(number)).toBeNull(); expect(nav.submit('HELP')).toEqual(view);
     }
   }
-  const view = nav.submit('HELP'), file = nav.selectOslFile(1)!;
+  const view = nav.submit('HELP'), file = nav.selectDownload(1)!;
   nav.submit('MAIN'); nav.submit('13'); nav.submit('2'); nav.submit('OSL'); nav.submit('2');
   expect(file.filename).toBe('NOTEINFO.TXT'); expect(file.body).toBe(fixtures['1'][0].body);
   expect(file.returnTo()).toEqual(view);
   expect(nav.submit('BACK').join('\n')).toContain('ファイル一覧：1件');
   expect(nav.submit('BACK').join('\n')).toContain('1 ＳＩＧの道具箱');
   for (const category of [3, 4, 5, 6]) {
-    const empty = nav.submit(String(category)); expect(nav.selectOslFile(1)).toBeNull();
+    const empty = nav.submit(String(category)); expect(nav.selectDownload(1)).toBeNull();
     expect(nav.submit('HELP')).toEqual(empty); nav.submit('BACK');
   }
   nav.submit('BACK'); nav.submit('LIBRARY'); nav.submit('2'); nav.submit('READ 1');
-  expect(nav.selectOslFile(1)).toBeNull(); expect(nav.submit('HELP').join('\n')).not.toContain('DOWNLOAD');
+  expect(nav.selectDownload(1)).toBeNull(); expect(nav.submit('HELP').join('\n')).not.toContain('DOWNLOAD');
 });
 
-test('command owner pins requests, consumes approval once, restores after failure and fences invalidation across awaits', async ({ page }) => {
+for (const service of ['OSL', 'FTP']) {
+test(`${service} command owner pins requests, consumes approval once, restores after failure and fences invalidation across awaits`, async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');
-  const downloads = await page.evaluate(async ({ fixture, invalid }) => {
+  const downloads = await page.evaluate(async ({ fixture, invalid, service }) => {
     const cp = '/src/commands.ts', np = '/src/navigation.ts';
     const { TerminalCommands } = await import(cp);
     const { PcvanController } = await import(np) as typeof import('../src/navigation');
@@ -63,7 +64,7 @@ test('command owner pins requests, consumes approval once, restores after failur
       read: async () => { await readGate; return fixture; }, print: (...lines: string[]) => prints.push(...lines),
       repository: forbidden, destination: forbidden, reset: forbidden, restore: forbidden,
       ai: { stop: forbidden }, navigate: (line: string) => prints.push(...nav.submit(line)),
-      oslDownload: (number: number) => nav.selectOslFile(number),
+      selectDownload: (number: number) => nav.selectDownload(number),
       downloadFile: (body: string, filename: string) => {
         check(commands.recordsHistory, 'approval must be consumed before handoff');
         if (fail) throw new Error('test browser initiation failure');
@@ -76,7 +77,8 @@ test('command owner pins requests, consumes approval once, restores after failur
       return prints.join('\n');
     };
     const enter = (category = 1, preview = false) => {
-      for (const line of ['MAIN', '13', '2', 'OSL', String(category), ...(preview ? ['READ 1'] : [])]) nav.submit(line);
+      const path = service === 'OSL' ? ['13', '2', 'OSL', String(category)] : ['7', '3'];
+      for (const line of ['MAIN', ...path, ...(preview ? [`READ ${service === 'FTP' ? category : 1}`] : [])]) nav.submit(line);
       return nav.submit('HELP').join('\n');
     };
     for (const preview of [false, true]) {
@@ -87,7 +89,7 @@ test('command owner pins requests, consumes approval once, restores after failur
       }
       await submit('  download   1  '); check(!commands.recordsHistory, 'pending approval entered history');
       const explanation = await submit('HELP');
-      check(explanation.includes('NOTEINFO.TXT') && explanation.includes('Y: 取得'), 'missing pinned explanation');
+      check(explanation.includes(service === 'OSL' ? 'NOTEINFO.TXT' : 'MACDOC.TXT') && explanation.includes('Y: 取得'), 'missing pinned explanation');
       for (const line of ['', 'yes', 'Y extra', 'DOWNLOAD 1', 'READ 1', '2', 'LIST', 'WRITE', 'IMPORT', 'RESET', 'STOP', 'HANDLE']) {
         await submit(line); check(!commands.recordsHistory, `escaped request: ${line}`);
         check(await submit('HELP') === explanation, 'selection or explanation changed');
@@ -104,10 +106,10 @@ test('command owner pins requests, consumes approval once, restores after failur
       check(cancel === 'MAIN' ? nav.screen === 'main' : nav.submit('HELP').join('\n') === original, 'cancel lost return');
       await submit('Y'); check(downloads.length === 2, 'cancel reused approval');
     }
-    enter(2); await submit('DOWNLOAD 1'); await submit('SETTINGS'); await submit('BACK');
-    check((await submit('HELP')).includes('HARU96.CSV'), 'Settings lost pending selection');
+    enter(2); await submit(service === 'OSL' ? 'DOWNLOAD 1' : 'DOWNLOAD 2'); await submit('SETTINGS'); await submit('BACK');
+    check((await submit('HELP')).includes(service === 'OSL' ? 'HARU96.CSV' : 'MACCOMM.TXT'), 'Settings lost pending selection');
     await submit('ABOUT'); await submit('BACK');
-    check((await submit('HELP')).includes('HARU96.CSV'), 'About lost pending selection');
+    check((await submit('HELP')).includes(service === 'OSL' ? 'HARU96.CSV' : 'MACCOMM.TXT'), 'About lost pending selection');
     await submit('Y'); check(downloads.length === 3, 'Settings/About caused or blocked handoff');
     const original = enter(1, true); await submit('DOWNLOAD 1'); fail = true;
     check((await submit('Y')).includes('開始できませんでした'), 'failure was not reported'); fail = false;
@@ -122,10 +124,12 @@ test('command owner pins requests, consumes approval once, restores after failur
     await submit('DOWNLOAD 1'); await submit('SETTINGS'); await submit('MAIN'); await submit('Y');
     check(downloads.length === 3 && nav.screen === 'main', 'menu MAIN retained approval');
     return downloads;
-  }, { fixture: backupFixture(), invalid });
-  expect(downloads.map((d) => d.filename)).toEqual(['NOTEINFO.TXT', 'NOTEINFO.TXT', 'HARU96.CSV']);
-  for (const file of downloads) expect(file.body).toBe(fixtures[file.filename === 'NOTEINFO.TXT' ? '1' : '2'][0].body);
+  }, { fixture: backupFixture(), invalid: service === 'OSL' ? invalid : invalid.filter((line) => line !== 'DOWNLOAD 2'), service });
+  const ftp = JSON.parse(await readFile(new URL('../data/pcvan/ftp-examples.json', import.meta.url), 'utf8'));
+  expect(downloads.map((d) => d.filename)).toEqual(service === 'OSL' ? ['NOTEINFO.TXT', 'NOTEINFO.TXT', 'HARU96.CSV'] : ['MACDOC.TXT', 'MACDOC.TXT', 'MACCOMM.TXT']);
+  for (const file of downloads) expect(file.body).toBe(service === 'OSL' ? fixtures[file.filename === 'NOTEINFO.TXT' ? '1' : '2'][0].body : ftp.find((item: { filename: string }) => item.filename === file.filename).body);
 });
+}
 
 for (const handle of [undefined, '取得する人']) {
   test(`production OSL exact downloads, cancellation, IME, Settings and protected records at 320px (${handle ?? 'anonymous'})`, async ({ page }) => {

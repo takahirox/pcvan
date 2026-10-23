@@ -173,7 +173,7 @@ live drafts. OLT room history is included as world data.
 | `4` | データベース | Database directory; `1` opens 日経テレコン BiZ |
 | `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
-| `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo |
+| `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo; `3` opens restricted FTP examples |
 | `8` | コンピュータ | Article list; `SIGS` opens the community directory |
 | `9` | ショッピングモール | Product catalog, 0 products |
 | `10` | 電子出版 | Publication list, 0 publications |
@@ -269,11 +269,40 @@ the durable historical calendar for an English RFC-style `Date` with seconds and
 reconstruction, not recovered PC-VAN session syntax.
 
 Subscriptions/unread persistence, expiry, crossposting, thread navigation,
-WWW/FTP and real remote access are outside this implementation subset. The
+WWW and real remote access are outside this NetNews subset. The
 [NetNews research record](docs/research/pcvan-1996-1997.md#netnews-reading-and-header-search-issue-81)
 and [participation research](docs/research/pcvan-1996-1997.md#netnews-local-participation-issue-87),
 with Settings/About, distinguish the 1995 restrictions, 1996 reading/posting report,
 general fj evidence, assumed PC-VAN group carriage and reconstructed controls.
+
+For restricted browser-local FTP, use MAIN or index `7` → `3 FTP` →
+`READ 1` / `READ 2` → `DOWNLOAD number` → explicit `Y`. The documented restricted
+collection label is `info.mac`; no hostname, credentials or connection sequence
+is implied. Two original Macintosh-oriented documents, `MACDOC.TXT` (document
+handling) and `MACCOMM.TXT` (communications checklist), have fictional authored
+dates of November 1–2, 1996. List and preview show their purposes, dates and exact
+UTF-8 byte counts. Downloads contain the literal bundled body, including Japanese,
+indentation, blank lines, markup and final LF, with no BOM. Browser initiation is
+reported; completed disk saving or remote transfer is not claimed.
+
+`LIST` returns to the full list; `BACK` follows preview → list → Internet → the
+actual MAIN/index parent. `HELP` preserves the current view, `MAIN` clears the
+path. Confirmation accepts only `Y`; `N`, `BACK`, `CANCEL` or `.CANCEL` cancel to
+the pinned view. Settings/About preserve confirmation. Approval is single-use,
+excluded from input history and discarded on reload, restore, reset or another
+tab's world replacement. A failed browser handoff requires a fresh request.
+
+FTP works anonymously without registration, AI consent, model loading or external
+requests. Examples and pending selection stay outside IndexedDB and JSON backups;
+browsing, cancellation and acquisition leave community records and settings alone,
+including restored empty worlds. Ordinary session/history behavior continues.
+Arbitrary servers, network transport, uploads, executable/archive payloads,
+protocol emulation and acquisition-history persistence are outside this subset.
+The examples are authored fixtures, not recovered PC-VAN files or metadata, and
+do not imply historical FTP carried only text. The
+[FTP research record](docs/research/pcvan-1996-1997.md#restricted-browser-local-ftp-acquisition-issue-99)
+and Settings/About explain the dated restriction, assumed November continuity,
+unknown endpoint mapping and reconstructed controls.
 
 For a browser-local outbound TELNET journey, use `7` → `2 TELNET` →
 `OPEN mail.demo.example.invalid` → `MAIL` → `READ 1` or `READ 2`. The single
@@ -784,6 +813,7 @@ it is resolved.
 - `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
   offline/retention panel and build-generated app-shell worker.
 - `src/news.ts`: original fictional briefs and news directory/headline/detail rendering.
+- `src/ftp.ts` and `data/pcvan/ftp-examples.json`: restricted info.mac list/preview and original bundled text files, outside persistence.
 - `src/telnet.ts`: bundled fictional host/account/letters and browser-local TELNET views, outside persistence.
 - `src/netnews.ts`: fixed-date NetNews examples, merged local articles, header matching and group/list/article rendering.
 - `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
@@ -823,7 +853,8 @@ text, reply navigation and missing parents, transactional initialization/numberi
 failed writes, and read markers across members, forums, connections and reloads.
 Section/service checks cover every MAIN and index destination, all five service views,
 mailbox browsing, news providers/headlines/briefs, NetNews groups/header
-searches/articles and isolated browsing, local TELNET login/mail/logout and parent returns,
+searches/articles and isolated browsing, local TELNET login/mail/logout and parent
+returns, restricted FTP previews/exact confirmed downloads,
 BiZ search/sets/titles/articles and fresh visits, empty collections,
 OLT conversation/presence, preserved fixture
 evidence, scoped helpers,

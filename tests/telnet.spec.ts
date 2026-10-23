@@ -20,7 +20,7 @@ function isolated(controller: PcvanController | ConnectionController) {
   expect(controller.isTelnet).toBe(true);
   expect(controller.forum).toBeNull(); expect(controller.mailContext).toBeNull(); expect(controller.netNewsContext).toBeNull();
   expect(controller.isConference).toBe(false); expect(controller.isOlt).toBe(false); expect(controller.needsContent).toBe(false);
-  expect(controller.selectOslFile(1)).toBeNull();
+  expect(controller.selectDownload(1)).toBeNull();
 }
 for (const viaIndex of [false, true]) {
   test(`TELNET controller complete journey and stable ${viaIndex ? 'index' : 'MAIN'} parents`, () => {
