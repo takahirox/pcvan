@@ -9,13 +9,15 @@ import type { ForumDestination } from './storage/repository';
 import { mainCollections, serviceCollections, mailboxes, renderCollection } from './sections';
 import { mailboxRows, renderMailList, mailHelp } from './mail';
 import type { CollectionKind, Mailbox } from './sections';
+import { categoryItems, serviceCategories, renderServiceDirectory, renderServiceCategory, renderServiceItem } from './service-collections';
+import type { ReadingService } from './service-collections';
 
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
-  'index' | 'section' | 'mailbox' | 'community';
+  'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item';
 
 // MAIN's row grouping follows the circa-1996 reproduction; the 44-cell column
 // offset is reconstructed. In this fixture, Japanese/full-width characters and
@@ -67,6 +69,8 @@ export class PcvanController implements TerminalController {
   private forumKeyword = 'DAISIZEN';
   private memberId: string | undefined;
   private service = services[0]!;
+  private serviceCategory = 0;
+  private serviceItem = 0;
   private section = mainMenu.entries[0]!;
   private mailbox: Mailbox = 'INBOX';
   private readonly parents: Screen[] = [];
@@ -133,6 +137,15 @@ export class PcvanController implements TerminalController {
       }
       case 'section':
       case 'daisizen-service': {
+        if (this.readingService) {
+          if (command === 'LIST') return this.render();
+          const category = Number(command);
+          if (/^[1-9]\d*$/.test(command) && serviceCategories(this.readingService)[category - 1]) {
+            this.serviceCategory = category;
+            return this.enter('service-category');
+          }
+          return this.invalidCommand(`1–${serviceCategories(this.readingService).length} / LIST / BACK / MAIN / HELP`);
+        }
         if (command === 'SIGS' && this.currentScreen === 'section' && ['8', '11'].includes(this.section.selector)) return this.enter('communication');
         if (this.collectionKind === 'mail' && Object.hasOwn(mailboxes, command)) {
           this.mailbox = command as Mailbox;
@@ -147,6 +160,23 @@ export class PcvanController implements TerminalController {
         if (Object.hasOwn(mailboxes, command)) { this.mailbox = command as Mailbox; return this.render(); }
         if (command === 'LIST') return this.render();
         return this.invalidCommand('LIST / BACK / MAIN / HELP');
+      case 'service-category':
+      case 'service-item': {
+        if (command === 'LIST') {
+          if (this.currentScreen === 'service-item') this.currentScreen = this.parents.pop()!;
+          return this.render();
+        }
+        const read = /^READ ([1-9]\d*)$/.exec(command);
+        if (read) {
+          const index = Number(read[1]) - 1;
+          if (categoryItems(this.readingService!, this.serviceCategory)[index]) {
+            this.serviceItem = index;
+            return this.currentScreen === 'service-item' ? this.render() : this.enter('service-item');
+          }
+          return ['その番号の項目はありません。LIST で一覧を確認してください。', demoPrompt];
+        }
+        return this.invalidCommand('READ 番号 / LIST / BACK / MAIN / HELP');
+      }
       case 'communication':
         // Bridge selectors are documented in Settings, not historical data.
         if (command === '1') return this.enter('miti');
@@ -167,7 +197,11 @@ export class PcvanController implements TerminalController {
       case 'daisizen': {
         if (command === 'FORUMS') return this.enter('daisizen-forums');
         const service = services.find((section) => section.demo_entry!.input === command);
-        if (service) { this.service = service; return this.enter('daisizen-service'); }
+        if (service) {
+          this.service = service;
+          this.serviceCategory = 0; this.serviceItem = 0;
+          return this.enter('daisizen-service');
+        }
         return this.invalidCommand(`FORUMS / ${services.map((section) => section.demo_entry!.input).join(' / ')} / BACK / MAIN / HELP`);
       }
       case 'daisizen-forums': {
@@ -241,6 +275,12 @@ export class PcvanController implements TerminalController {
       : mainCollections[this.section.selector]!;
   }
 
+  private get readingService(): ReadingService | null {
+    const input = this.service.demo_entry!.input;
+    return ['daisizen-service', 'service-category', 'service-item'].includes(this.currentScreen) &&
+      (input === 'LIBRARY' || input === 'OSL') ? input : null;
+  }
+
   private get collectionTitle(): string {
     return this.currentScreen === 'daisizen-service' ||
       (this.currentScreen === 'mailbox' && this.parents.at(-1) === 'daisizen-service')
@@ -268,6 +308,7 @@ export class PcvanController implements TerminalController {
       ];
       case 'section':
       case 'daisizen-service': if (this.isOlt) return renderOltDirectory({ settings: this.content.settings ?? [] });
+        if (this.readingService) return [this.collectionTitle, ...renderServiceDirectory(this.readingService), returnHelp, demoPrompt];
         return [
         ...(this.collectionKind === 'mail' ? [this.collectionTitle,
           `受信箱：${mailboxRows(this.content.mail ?? [], this.memberId, 'INBOX').length}件 / 送信済み：${mailboxRows(this.content.mail ?? [], this.memberId, 'SENT').length}件`,
@@ -275,6 +316,14 @@ export class PcvanController implements TerminalController {
           : renderCollection(this.collectionTitle, this.collectionKind)),
         ...(this.currentScreen === 'section' && ['8', '11'].includes(this.section.selector) ? ['SIGS: SIG 一覧'] : []),
         'LIST: 一覧を再表示', returnHelp, demoPrompt,
+      ];
+      case 'service-category':
+      case 'service-item': return [
+        `${daisizen.name} / ${this.service.label}`,
+        ...(this.currentScreen === 'service-category'
+          ? renderServiceCategory(this.readingService!, this.serviceCategory)
+          : renderServiceItem(this.readingService!, this.serviceCategory, this.serviceItem)),
+        returnHelp, demoPrompt,
       ];
       case 'mailbox': return [
         `${this.collectionTitle} / ${mailboxes[this.mailbox]}`,
