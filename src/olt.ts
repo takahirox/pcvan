@@ -2,6 +2,7 @@ import { calendarSetting, serviceDate } from './calendar';
 import type { Backup, JsonValue } from './storage/schema';
 import type { LocalRepository } from './storage/repository';
 import { activeHuman } from './forums';
+import { identityToken, penName } from './member-presentation';
 import { OLT_SETTING, attendance, oltState, roomDefinitions } from './olt-state';
 import type { OltLine, OltRoom, RoomId } from './olt-state';
 import { buildOltPrompt } from './ai/olt';
@@ -36,11 +37,15 @@ export class TerminalOlt {
   suspend() { this.task?.abort(); this.task = undefined; }
   private who(room: OltRoom, data: Backup) {
     const ids = attendance(room);
-    return `参加者：${ids.length}人 / ${ids.map((id) => data.members.find((m) => m.id === id)?.handle ?? id).join('、') || '誰もいません'}`;
+    return `参加者：${ids.length}人 / ${ids.map((id) => {
+      const member = data.members.find((m) => m.id === id);
+      return `(${identityToken(member)}) ${penName(member)}`;
+    }).join('、') || '誰もいません'}`;
   }
   private line(line: OltLine, data: Backup) {
-    const name = data.members.find((m) => m.id === line.authorId)?.handle ?? line.authorId;
-    return `${serviceDate(line.createdAt, calendarSetting(data))} ${line.kind === 'say' ? `<${name}> ${line.text}`
+    const member = data.members.find((m) => m.id === line.authorId);
+    const name = penName(member);
+    return `${serviceDate(line.createdAt, calendarSetting(data))} (${identityToken(member)}) ${line.kind === 'say' ? `<${name}> ${line.text}`
       : `* ${name} ${line.kind === 'enter' ? '入室' : '退室'}`}`;
   }
   private show(room: OltRoom, data: Backup, full: boolean) {

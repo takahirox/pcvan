@@ -318,6 +318,23 @@ Inside a room, ordinary lines are speech, including literal `MAIN`, `BACK`,
 `/LEAVE` / `/BACK`, or `/MAIN`. `//text` sends a leading slash literally.
 `/HANDLE` leaves the room for terminal handle registration/selection. The same
 human/resident IDs and current handles are used by forums, mail and OLT.
+Speech, `/LIST`, attendance and member-attributed arrival/departure lines show
+that member's forum `SYN-…` token separately from the current safe handle.
+Renames refresh reread lines; earlier terminal scrollback keeps its original text.
+Unusable names use `名無し`; unresolved members use `不明` / `名無し`, with no
+OLT DEMO exception or saved identity field.
+
+Sources checked 2026-10-24: the
+[1997 judgment reproduction](https://www.law.co.jp/cases/pcvan.htm) distinguishes
+transmitted IDs from optional handles (high transcription confidence, moderate
+historical confidence; original/annex unavailable). The
+[August 1996 forum archive](https://someya.sakura.ne.jp/poem/tansi/tansimain.html)
+independently shows separate fields (high confidence), and the
+[まいとーく description](https://www.vector.co.jp/soft/win95/net/se024554.html)
+describes ID/handle lookup and OLT attendance (release date unresolved).
+November 1996 continuity, token placement, attendance/notices and rename behavior
+are reconstruction choices; commands and exact layout remain unverified.
+See [OLT identity evidence](docs/research/pcvan-1996-1997.md#olt-identity-and-handles-issue-79).
 
 The ten fictional residents may visit, listen, greet, converse and depart according
 to their configured hours and interests. After existing model consent, replies

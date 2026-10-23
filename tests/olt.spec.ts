@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { TerminalOlt } from '../src/olt';
+import { about } from '../src/settings';
+import { renderPost } from '../src/forums';
+import { emptyOlt, appendOlt } from '../src/olt-state';
+import { backupFixture } from './backup-fixture';
 import type { AiActivity } from '../src/storage/schema';
 import type { ResidentSettings } from '../src/ai/personas';
 import type { OltState } from '../src/olt-state';
@@ -84,7 +90,16 @@ test('delayed human-to-resident and resident-to-resident chat preserve input, sh
   expect((data.settings.find((r) => r.id === 'ai-activity')!.value as unknown as AiActivity).batch).toBeNull();
   const count = lines.length; await advance(page, 35); expect((await speech(page)).length).toBeLessThanOrEqual(3);
   expect(count).toBeGreaterThan(0);
-  await command(page, '/WHO', '参加者'); await noOtherUi(page);
+  const replay = await command(page, '/LIST', '日時 JST');
+  const who = await command(page, '/WHO', '参加者');
+  for (const line of lines) {
+    const member = data.members.find((m) => m.id === line.authorId)!;
+    const token = renderPost({ ...data.posts[0]!, authorId: member.id }, '照合', undefined, data.members)[1]!.match(/\((SYN-[0-9A-V]{13})\)/)![1];
+    expect(replay).toContain(`(${token}) <${member.handle}> ${line.text}`);
+    expect(replay).toContain(`(${token}) * ${member.handle} 入室`);
+    expect(who).toContain(`(${token}) ${member.handle}`);
+  }
+  await noOtherUi(page);
   const prompts = await page.evaluate(() => (window as unknown as { journeyWorker: { prompts: Record<string, unknown>[] } }).journeyWorker.prompts);
   expect(prompts.every((p) => p.kind === 'olt' && !Object.hasOwn(p, 'mail'))).toBe(true);
 });
@@ -175,4 +190,152 @@ test('leaving or hiding a tab cancels in-flight inference and never commits its 
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await command(page, '/LEAVE', '退出'); await noOtherUi(page);
+});
+
+test('presentation reuses forum tokens and safe names for every line kind without writes or record mutation', async () => {
+  const data = backupFixture(), original = data.posts[0]!;
+  const roomState = emptyOlt(epoch.toISOString()), night = roomState.rooms[1]!;
+  // Deliberately unresolved presentation fixtures never pass through storage.
+  const ids = ['human', 'ai', 'DEMO0001', 'missing', 'fictional-ai:missing', '<b>key</b>', '01234567-89ab-cdef-0123-456789abcdef', '会員🌌'];
+  data.members.push(...[ids[2]!, ids[6]!, ids[7]!].map((id) => ({ id, handle: '同じ名前', actor: 'human' as const })));
+  data.members.forEach((m) => { m.handle = '  同じ名前  '; });
+  const literal = '  <b>文字</b> fictional-ai:missing <b>key</b> SYN-123  ';
+  for (const id of ids) {
+    night.visitors.push({ clientId: id, memberId: id, until: '2099-01-01T00:00:00.000Z' });
+    for (const kind of ['enter', 'say', 'leave'] as const) appendOlt(night, id, kind, kind === 'say' ? literal : '', kind === 'say' ? 'local-human' : 'local-presence', epoch.getTime());
+  }
+  let printed: string[] = [];
+  const olt = new TerminalOlt({
+    read: async () => data,
+    repository: async () => ({ observeRoom: async () => roomState }) as never,
+    print: (...lines) => printed.push(...lines), navigate: () => {}, isOlt: () => true, ai: {} as never,
+  });
+  const before = structuredClone({ data, roomState });
+  await olt.submit('JOIN 2');
+  const labels = new Set<string>();
+  for (const id of ids) {
+    const member = data.members.find((m) => m.id === id);
+    const token = member ? renderPost({ ...original, authorId: id }, '照合', undefined, data.members)[1]!.match(/\((SYN-[0-9A-V]{13})\)/)![1] : '不明';
+    const name = member ? '同じ名前' : '名無し';
+    if (member) labels.add(token);
+    expect(printed[1]).toContain(`(${token}) ${name}`);
+    expect(printed).toContain(`26年10月21日 22:04:00 (${token}) <${name}> ${literal}`);
+    expect(printed).toContain(`26年10月21日 22:04:00 (${token}) * ${name} 入室`);
+    expect(printed).toContain(`26年10月21日 22:04:00 (${token}) * ${name} 退室`);
+  }
+  expect(labels.size).toBe(data.members.length);
+  expect(printed[1]).toContain('参加者：8人');
+  expect(printed.join('\n')).not.toContain('(DEMO0001)');
+  expect({ data, roomState }).toEqual(before);
+  const initial = [...printed]; printed = [];
+  data.members.reverse(); await olt.submit('/LIST'); expect(printed).toEqual(initial);
+  for (const handle of ['', '　 \t', '\u200b', 'first\nsecond', 'fictional-ai:resident', '01234567-89ab-cdef-0123-456789abcdef', 'human']) {
+    data.members.find((m) => m.id === 'human')!.handle = handle;
+    printed = []; const supplied = structuredClone({ data, roomState });
+    await olt.submit('/LIST');
+    expect(printed[1]).toContain('(SYN-7MFTMGGA7CMOM) 名無し');
+    expect(printed.join('\n')).toContain(`(SYN-7MFTMGGA7CMOM) <名無し> ${literal}`);
+    expect(printed.join('\n')).toContain('(SYN-7MFTMGGA7CMOM) * 名無し 入室');
+    expect(printed.join('\n')).toContain('(SYN-7MFTMGGA7CMOM) * 名無し 退室');
+    expect({ data, roomState }).toEqual(supplied);
+  }
+  data.members.find((m) => m.id === 'ai')!.handle = '住人の新名';
+  printed = []; await olt.submit('/LIST');
+  expect(printed.join('\n')).toContain(`(SYN-1L35INK4123BB) <住人の新名> ${literal}`);
+  expect(printed.join('\n')).toContain('(SYN-1L35INK4123BB) * 住人の新名 退室');
+  data.members.find((m) => m.id === 'human')!.handle = '  <i>新名</i>  ';
+  printed = []; await olt.submit('/LIST');
+  expect(printed.join('\n')).toContain(`(SYN-7MFTMGGA7CMOM) <<i>新名</i>> ${literal}`);
+  printed = []; await olt.submit('/LEAVE'); await olt.submit('WHO 2');
+  expect(printed.join('\n')).toContain('(SYN-7MFTMGGA7CMOM) <i>新名</i>');
+  expect(printed.join('\n')).not.toMatch(/fictional-ai:missing|<b>key<\/b>|DEMO0001/);
+  expect(data.members).toHaveLength(before.data.members.length);
+});
+
+test('production OLT speech → WHO → rename → LIST keeps forum identity through reload/restore at 320px', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await page.setViewportSize({ width: 320, height: 640 });
+  await mockWorker(page, 'ok'); await start(page, '同名の客');
+  const initial = await snapshot(page);
+  const resident = initial.members.find((m) => m.id === 'fictional-ai:hoshimori')!;
+  const human = initial.members.find((m) => m.actor === 'human')!;
+  // Two real members share a handle; existing IDs and profile settings are retained.
+  human.handle = resident.handle;
+  await restore(page, initial); await residents(page, true); await consent(page); await room(page);
+  const token = (id: string) => renderPost({ ...initial.posts[0]!, authorId: id }, '照合', undefined, initial.members)[1]!.match(/\((SYN-[0-9A-V]{13})\)/)![1];
+  const humanToken = token(human.id), residentToken = token(resident.id);
+  expect(humanToken).not.toBe(residentToken);
+  const literal = `  <b 文字 &lt;b&gt; fictional-ai:hoshimori ${human.id} SYN-123  `;
+  // Existing storage rejects complete markup. Keep that contract while checking
+  // literal markup-like speech and full markup through the presentation stub.
+  await command(page, '<b>文字</b>', '制御文字を含まない');
+  const live = await command(page, literal, `(${humanToken}) <${human.handle}> ${literal}`);
+  const who = await command(page, '/WHO', '参加者：3人');
+  for (const label of [`(${humanToken}) ${human.handle}`, `(${residentToken}) ${resident.handle}`]) expect(who).toContain(label);
+  const records = structuredClone((await state(page))!.rooms.find((r) => r.id === 'night')!.lines);
+  await command(page, '/HANDLE', 'ハンドル設定'); await command(page, 'RENAME 新しい客', 'ハンドル名を変更');
+  await command(page, 'BACK', '設定 / SETTINGS'); await command(page, 'BACK', '元の画面');
+  const reread = await command(page, 'JOIN 2', '日時 JST');
+  expect(reread).toContain(`(${humanToken}) <新しい客> ${literal}`);
+  expect(reread).toContain(`(${humanToken}) * 新しい客 入室`);
+  const afterRename = (await state(page))!.rooms.find((r) => r.id === 'night')!.lines;
+  expect(afterRename.slice(0, records.length)).toEqual(records);
+  expect(afterRename.slice(records.length).map((l) => [l.authorId, l.kind])).toEqual([[human.id, 'leave'], [human.id, 'enter']]);
+  const replay = await command(page, '/LIST', '日時 JST');
+  expect(replay).toContain(`(${humanToken}) <新しい客> ${literal}`);
+  expect((await state(page))!.rooms.find((r) => r.id === 'night')!.lines).toEqual(afterRename);
+  expect(await page.locator('.output').textContent()).toContain(live); // Earlier scrollback keeps the old handle.
+  await expect(page.locator('.output b')).toHaveCount(0);
+  const input = page.locator('#command'), log = page.getByRole('log');
+  await input.press('Shift+Tab'); await log.press('ArrowRight');
+  await expect.poll(() => log.evaluate((e) => e.scrollLeft)).toBeGreaterThan(0);
+  await log.press('Tab'); await expect(input).toBeFocused();
+  const bounds = (await input.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await command(page, '/LEAVE', '部屋を退出');
+  expect(await command(page, 'WHO 2', '参加者')).toContain(`(${residentToken}) ${resident.handle}`);
+  const saved = await backup(page);
+  const verify = async () => {
+    await room(page);
+    const output = await command(page, '/LIST', '日時 JST');
+    expect(output).toContain(`(${humanToken}) <新しい客> ${literal}`);
+    expect(output).toContain(`(${humanToken}) * 新しい客 退室`);
+    const stored = (await state(page))!.rooms.find((r) => r.id === 'night')!.lines;
+    for (const line of records) expect(stored.find((l) => l.id === line.id)).toEqual(line);
+    await command(page, '/MAIN', 'MAIN');
+    await enterForum(page); await post(page, 'OLTからの投稿', literal);
+    const own = (await snapshot(page)).posts.filter((p) => p.authorId === human.id).at(-1)!;
+    expect(await command(page, `READ ${own.number}`, '★内容')).toContain(`★タイトル (${humanToken})`);
+    const seed = initial.posts.find((p) => p.authorId === resident.id && p.forumId === own.forumId)!;
+    expect(await command(page, `READ ${seed.number}`, '★内容')).toContain(`★タイトル (${residentToken})`);
+  };
+  await page.reload(); await expect(page.locator('.output')).toContainText('MAIN'); await verify();
+  await restore(page, { ...saved, members: [...saved.members].reverse() }); await verify();
+  const downloading = page.waitForEvent('download'); await command(page, 'LOG', 'ログのダウンロード');
+  const exported = await readFile((await (await downloading).path())!, 'utf8');
+  expect(exported).toContain(`(${humanToken}) <新しい客> ${literal}`);
+  expect(exported).toContain(`★タイトル (${residentToken})`);
+  await noOtherUi(page);
+});
+
+test('anonymous OLT reading preserves zero attendance and never invents an identity', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await start(page); const before = await snapshot(page);
+  await room(page);
+  const who = await command(page, '/WHO', '参加者：0人 / 誰もいません');
+  expect(who).not.toMatch(/SYN-|名無し|不明/);
+  await command(page, '読むだけ', '発言にはハンドルが必要');
+  const replay = await command(page, '/LIST', '日時 JST');
+  expect(replay).not.toMatch(/SYN-|名無し|不明/);
+  const after = await snapshot(page);
+  expect(after.members).toEqual(before.members);
+  expect((await state(page))!.rooms.flatMap((r) => r.lines)).toEqual([]);
+  await command(page, '/LEAVE', '部屋を退出しました。');
+});
+
+test('About discloses OLT identity sources, confidence, continuity and reconstructed placement', () => {
+  const text = about(backupFixture()).join('\n');
+  for (const detail of ['2026-10-24', '1997-12-22', '1994年3月', '1996年11月への継続は中程度',
+    '原本と省略された別紙は未回収', 'トークン位置', '現名の再表示', '公開日は未確認',
+    'https://www.law.co.jp/cases/pcvan.htm', 'https://someya.sakura.ne.jp/poem/tansi/tansimain.html',
+    'https://www.vector.co.jp/soft/win95/net/se024554.html']) expect(text).toContain(detail);
 });

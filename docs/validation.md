@@ -1576,3 +1576,49 @@ Issue #77 and repository development/review instructions:
 Optional subjective visual review, authenticated historical-session comparison
 and physical/native-IME testing were not performed. No push, PR, merge, comment
 or deployment was performed; no post-merge verification is required.
+
+## Separate stable OLT identity and handle (#79)
+
+Validated on 2026-10-24 in the assigned worktree after reading the live open
+Issue #79 and repository development/review guidance:
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities.
+- Focused OLT/forum/calendar development runs preserved the existing regressions.
+  New fixtures initially assumed the forum timestamp format, accepted complete
+  HTML speech, and no presence writes during HANDLE navigation. Those assertions
+  were corrected to preserve the actual OLT timestamp, existing markup validation
+  and ordinary leave/rejoin writes. No production validation was weakened.
+- Final focused presentation/production journey run:
+  `npm test -- tests/olt.spec.ts --grep 'production OLT|presentation reuses' --workers=2`:
+  **2 passed (11.0s)**, with no retries or skips.
+- Final documented `npm test`: **276 passed (1.7m)** using the normal eight-worker
+  configuration and both configured servers. Includes TypeScript checking and
+  production bundling; no failures, retries or skips. All 272 existing checks
+  remain, with four new checks. Existing Vite chunk-size and Node color-environment
+  advisories remain non-failing.
+- Presentation fixtures cover human/resident tokens, duplicate and unusable
+  handles, both renames, full Unicode/UUID/DEMO member IDs, unresolved members,
+  all three line kinds, room/directory attendance and literal markup/key text.
+  Record comparisons verify no projection mutations or invented members. A
+  source comparison confirms the shared algorithm/name rules match the original
+  forum implementation, apart from exports and defensive unknown-member handling.
+- Production checks cover mocked resident speech/attendance and a fake-time
+  speak → WHO → HANDLE rename → LIST → reload/reordered JSON restore journey at
+  320px. Tokens agree with forum READ for human and resident authors. Original
+  attribution/text/timestamps survive; old scrollback retains the old handle.
+  Literal rendering, UTF-8 log export, keyboard scrolling, input focus/viewport
+  bounds, quiet visits and anonymous zero-attendance reading pass. Existing
+  strict invalid-reference restore, atomic storage/reset, privacy, consent,
+  scheduling, cancellation, cross-tab, calendar, IME and forum regressions pass.
+- Rechecked all three linked historical sources. README, research and shared
+  terminal/Settings About disclose access date, confidence, original/annex and
+  release-date limits, continuity assumptions and reconstructed placement. No
+  source explanations enter routine chat. See the
+  [OLT identity research](research/pcvan-1996-1997.md#olt-identity-and-handles-issue-79).
+- Reviewed the complete diff against #79; local Markdown targets/anchors and
+  working-tree/staged whitespace checks pass.
+
+No real inference, model download, storage migration or new tooling was needed.
+Optional additional dated-capture comparison, subjective layout review and
+physical/native-IME checks were not performed. No push, PR, merge, external
+comment or deployment was performed; no post-merge verification is required.
