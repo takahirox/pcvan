@@ -39,7 +39,7 @@ export function initialCalendar(content: Backup, now: string): HistoricalCalenda
   const olt = content.settings.find((s) => s.id === 'olt-rooms')?.value as unknown as OltState | undefined;
   const stamps = [world?.createdAt, content.session?.lastLoginAt, content.session?.lastLogoutAt,
     ...content.posts.flatMap((p) => [p.createdAt, p.simulation?.simulatedAt]),
-    ...(content.mail ?? []).flatMap((m) => [m.createdAt, m.simulation?.simulatedAt, m.readAt]),
+    ...(content.mail ?? []).flatMap((m) => [m.createdAt, m.simulation?.simulatedAt, m.readAt, m.recipientConfirmation?.at]),
     ...(conference?.contributions.map((r) => r.createdAt) ?? []),
     ...(netnews?.contributions.map((r) => r.createdAt) ?? []),
     activity?.lastActivityAt, activity?.batch?.from, activity?.batch?.to,

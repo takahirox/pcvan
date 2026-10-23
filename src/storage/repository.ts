@@ -449,7 +449,10 @@ export class LocalRepository {
         hasChildren = (await request(tx.objectStore('posts').index('forumNumber')
           .count(IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER])))) > 0 || await referenced('readStates', 'forumId', key);
       }
-      if (store === 'mail') hasChildren = await referenced('mail', 'replyToMailId', key);
+      if (store === 'mail') {
+        hasChildren = await referenced('mail', 'replyToMailId', key) ||
+          (await request<Mail[]>(tx.objectStore('mail').getAll())).some((m) => m.recipientConfirmation?.replyMailId === key);
+      }
       if (store === 'posts') hasChildren = await referenced('posts', 'replyToPostId', key);
       if (store === 'members') {
         const content = await this.snapshot(tx);
@@ -753,6 +756,20 @@ export class LocalRepository {
           ...generated, origin: aiOrigin(state.modelId),
           ...(run.mail.replyToMailId ? { replyToMailId: run.mail.replyToMailId } : {}),
           simulation: { runId: id, simulatedAt: run.simulatedAt, fictional: true } });
+        if (run.mail.replyToMailId) {
+          const parent = content.mail!.find((m) => m.id === run.mail!.replyToMailId)!;
+          if (!parent.recipientConfirmation) {
+            // Operational save time, never catch-up time. Clamp a backwards clock
+            // to the parent's creation instant, as with human read markers.
+            const confirmed: Mail = { ...parent, recipientConfirmation: {
+              at: new Date(Math.max(Date.now(), Date.parse(mail.createdAt), Date.parse(parent.createdAt))).toISOString(),
+              replyMailId: mail.id, provenance: 'local-resident-reply-v1',
+            } };
+            validateRecord('mail', confirmed);
+            validateMailRelations([...content.mail!.filter((m) => m.id !== parent.id), confirmed, mail], content.members);
+            await request(tx.objectStore('mail').put(confirmed));
+          }
+        }
         run.status = 'committed'; await this.writeActivity(tx, state); return mail;
       }
       const target = { personaId: run.personaId, forumId: run.forumId!,

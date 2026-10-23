@@ -316,7 +316,7 @@ mail-bearing exports without writing; retain a backup before upgrading.
 | Sig | `id`, `keyword`, `title` | — |
 | Forum | `id`, `sigId`, `boardNo`, `name`, `nextPostNumber` | — |
 | Post | `id`, `forumId`, `number`, `authorId`, `title`, `body`, `createdAt`, `origin` | `displaySecondNumber`, `replyToPostId`, `simulation` |
-| Mail | `id`, `number`, `senderId`, `recipientId`, `subject`, `body`, `createdAt`, `origin` | `replyToMailId`, `readAt`, `simulation` |
+| Mail | `id`, `number`, `senderId`, `recipientId`, `subject`, `body`, `createdAt`, `origin` | `replyToMailId`, `readAt`, `simulation`, `recipientConfirmation` |
 | ReadState | `memberId`, `forumId`, `lastReadNumber` | — |
 | Session | `lastLoginAt`, `lastLogoutAt`, `commandHistory` | — |
 | Setting | `id`, `value` | — |
@@ -405,6 +405,35 @@ any stores, then replaces everything atomically. Existing v1 JSON without `mail`
 imports an empty mailbox; upgrading the v1 database only creates the new empty
 store. Neither migration seeds private mail or alters prior forums/posts.
 See [mail commands and privacy](mail.md).
+
+Issue #89 adds optional `recipientConfirmation: { at, replyMailId,
+provenance: 'local-resident-reply-v1' }` on human-sent mail only. This explicitly
+records a reconstructed confirmation event from a newly committed resident reply,
+separate from human-recipient `readAt`. `at` is canonical operational UTC, no
+earlier than the parent or confirming reply creation times. The referenced reply
+must exist, be a later-numbered generated resident letter, reverse the same
+correspondents and explicitly name this parent. Shape, provenance, timestamps
+and relationships are checked on writes and imports. Unknown/malformed,
+dangling, wrong-direction and cross-correspondent evidence is rejected before
+replacement. Deletion guards protect both parent links and confirming-reply
+references; a confirmed pair is retained until whole-world replacement/reset,
+rather than silently losing evidence through individual deletion.
+
+Only `commitAiRun` writes new evidence, after output/authorization validation and
+duplicate suppression, in the existing world-fenced transaction with reply,
+number allocation and run completion. The first `at` is retained. Operational
+commitment time is clamped to parent/reply creation when the clock moves backward;
+catch-up `simulatedAt` never supplies it. Quota errors and signal aborts before
+completion roll back both evidence and delivery. Existing notifications refresh
+snapshots without printing over terminal input. Rendering is pure.
+
+No IndexedDB or backup version change is needed: older databases/backups without
+the optional field remain valid, including old reply pairs, with no inferred
+backfill. New evidence and exact timestamps survive export/import/reload. Older
+app versions reject the unknown field without replacing data. Reset removes all
+mail/evidence; reset/restore preserve cross-tab and in-flight generation fences.
+The calendar displays `at` using the existing fixed mapping and considers it in
+legacy timestamp fallback; projected strings are never stored.
 
 ## Repeatable checks
 

@@ -43,6 +43,7 @@ export interface Mail {
   id: string; number: number; senderId: string; recipientId: string;
   subject: string; body: string; createdAt: string; origin: string;
   replyToMailId?: string; readAt?: string;
+  recipientConfirmation?: { at: string; replyMailId: string; provenance: 'local-resident-reply-v1' };
   simulation?: { runId: string; simulatedAt: string; fictional: true };
 }
 export interface MailTarget { humanId: string; replyToMailId?: string; publicPostId?: string }
@@ -284,7 +285,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'mail':
       fields(value, ['id', 'number', 'senderId', 'recipientId', 'subject', 'body', 'createdAt', 'origin'],
-        ['replyToMailId', 'readAt', 'simulation']);
+        ['replyToMailId', 'readAt', 'simulation', 'recipientConfirmation']);
       string(value.id); integer(value.number, 1); string(value.senderId); string(value.recipientId);
       string(value.origin); timestamp(value.createdAt);
       if (value.id.length > 256 || value.senderId.length > 128 || value.recipientId.length > 128) invalid('Mail identity is too long.');
@@ -295,6 +296,13 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       }
       if (value.replyToMailId !== undefined) { string(value.replyToMailId); if (value.replyToMailId.length > 256) invalid('Mail reference is too long.'); }
       if (value.readAt !== undefined) { timestamp(value.readAt); if (Date.parse(value.readAt as string) < Date.parse(value.createdAt as string)) invalid('Invalid read time.'); }
+      if (value.recipientConfirmation !== undefined) {
+        fields(value.recipientConfirmation, ['at', 'replyMailId', 'provenance']);
+        const confirmation = value.recipientConfirmation;
+        timestamp(confirmation.at); string(confirmation.replyMailId);
+        if (confirmation.replyMailId.length > 256 || confirmation.provenance !== 'local-resident-reply-v1' ||
+            Date.parse(confirmation.at as string) < Date.parse(value.createdAt as string)) invalid('Invalid recipient confirmation.');
+      }
       if (value.simulation !== undefined) {
         fields(value.simulation, ['runId', 'simulatedAt', 'fictional']);
         timestamp(value.simulation.simulatedAt);
@@ -398,6 +406,15 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
           : !row.origin.startsWith('local-ai:webllm:') || !row.simulation)) invalid('Invalid mail correspondents or provenance.');
     if (numbers.has(row.number)) invalid('Duplicate mail number.');
     numbers.add(row.number);
+    if (row.recipientConfirmation !== undefined) {
+      const confirmation = row.recipientConfirmation;
+      const reply = mail.find((m) => m.id === confirmation.replyMailId);
+      if (sender.actor !== 'human' || !reply?.simulation || !reply.origin.startsWith('local-ai:webllm:') ||
+          reply.replyToMailId !== row.id || reply.senderId !== row.recipientId || reply.recipientId !== row.senderId ||
+          reply.number <= row.number || Date.parse(confirmation.at) < Date.parse(reply.createdAt)) {
+        invalid('Recipient confirmation requires a resident reply to this letter.');
+      }
+    }
     if (row.replyToMailId !== undefined) {
       const parent = mail.find((m) => m.id === row.replyToMailId);
       if (!parent || parent.number >= row.number || parent.senderId !== row.recipientId ||

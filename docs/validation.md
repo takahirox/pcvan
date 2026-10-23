@@ -1863,3 +1863,67 @@ November 2 glossary were also readable during implementation; direct opening of
 the October 22 article again failed, so its snippet-only status remains explicit.
 No archival prose/identities, new framework, model download or real inference was
 used. No post-merge verification is required.
+
+## Conservative sender-visible mail confirmation (#89)
+
+Validated on 2026-10-24 with Node.js 24.12.0 on macOS using the existing
+Playwright Chromium configuration, controlled clocks, real browser IndexedDB
+and mocked inference. No dependency, lockfile, database-version or backup-version
+change was needed.
+
+- `npm ci`: passed, zero reported vulnerabilities.
+- Initial focused repository/presentation run: **7 passed, 17 failed (13.8s)**.
+  The new shared test fixture supplied equal batch endpoints, which existing
+  schema validation correctly rejected. Corrected the fixture's end time.
+- First four-file focused run: **39 passed, 3 failed (55.3s)**. Corrected three
+  test expectations/injections: an installed clock advances before being fixed,
+  existing pause reconciliation withdraws retained runs, and a quota injection
+  must allow the runner to persist its subsequent failed status. No product
+  change was needed for these failures.
+- Corrected focused run,
+  `npm test -- tests/mail-repository.spec.ts tests/mail-presentation.spec.ts tests/mail-autonomy.spec.ts tests/mail.spec.ts --workers=2`:
+  **42 passed (51.6s)**, including TypeScript checking and production build.
+- Final documented `npm test`: **317 passed (3.5m)** with the default eight
+  workers, no failures, retries or skips. The configured servers ran TypeScript
+  checking and the production build. This includes the final concise
+  `既読確認なし` / `既読確認あり` labels and strengthened protected-record and
+  public-work assertions. Existing functional, storage, consent, calendar,
+  composition/IME, terminal, mail, conference, OLT and other-service suites pass.
+- Reviewed the full implementation/test/documentation diff against Issue #89;
+  58 local Markdown links and their heading anchors, fenced blocks across the
+  four changed documents, and working/staged `git diff --check` pass.
+- Existing Vite large-chunk and Node `NO_COLOR`/`FORCE_COLOR` warnings remain
+  informational. No post-merge verification is required.
+
+Repository coverage checks the selected parent against another letter included
+in bounded prompt context; exact preservation of literal text, identities,
+creation/simulation dates, forums, posts, other settings and all mail apart from
+the intended parent metadata/new reply; concurrent/idempotent commitment;
+immutable first timestamps; duplicate-parent suppression with and without old
+evidence; backwards-clock clamping; strict evidence shape, canonical timestamps,
+provenance and same-correspondent reply references; protected deletion;
+invalid-import atomicity; old backup compatibility without backfill; and exact
+reload/export/restore timestamps. Invalid routing/output, cancelled/failed/pending
+runs, withdrawn consent, resident pause, quota failure, pre-abort, abort after
+the parent write, and reset/restore stale connections leave no new confirmation.
+Rollback also preserves number allocation. Existing tests reset a confirmed world
+and retain individual human-recipient read markers and replacement fences.
+
+Production keyboard journeys use all three entry routes: MAIN `1`, MAIN `X` and
+SIG `MAIL`. They exercise WRITE/review/send, SENT/READ unconfirmed, scheduled
+authorized mocked reply commitment, confirmed SENT/READ with projected time,
+human INBOX read marking, reload and JSON backup/restore. Background reply
+commitment preserves an active draft, IME composition, terminal input and printed
+output. Existing identity/name/return-context, consent and save-budget journeys
+remain covered. Planning, prompt construction, public activity and resident
+initiation leave unrelated letters unconfirmed.
+
+The [mail contract](mail.md#sender-visible-recipient-confirmation-issue-89),
+[schema/storage documentation](local-storage.md#mail-records-and-migration),
+[historical research](research/pcvan-1996-1997.md#sender-visible-mail-confirmation-issue-89)
+and Settings/About describe the accepted category D event, unknown
+reading-without-reply case, source URLs, inspection date, confidence and limits.
+All three historical sources were readable in text during implementation;
+screenshots of the cited PDF pages failed, and no fresh page-image/layout check
+is claimed. Native IME, subjective historical layout, hardware and real-model
+checks were not run; these are optional, and no model was downloaded.

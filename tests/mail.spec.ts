@@ -54,15 +54,18 @@ for (const route of [
       await command(page, 'Y', `メール #${index + 2} を送信`);
     }
     const sent = await command(page, 'SENT', 'メール一覧：2件');
+    expect(sent.match(/既読確認なし/g)).toHaveLength(2); expect(sent).not.toContain('未読');
     for (const [index, label] of labels.entries()) {
       expect(sent).toContain(`#${index + 2}   同じ件名 ${index}   / ${label} /`);
       const read = await command(page, `READ ${index + 2}`, '★内容');
       expect(read).toContain(`差出人：(${humanToken}) 同名`); expect(read).toContain(`宛先：${label}`);
       expect(read).toContain('  編集した本文  \n');
+      expect(read).toContain('既読確認：確認なし');
     }
     const beforeRead = await snapshot(page);
     expect(beforeRead.mail!.filter((m) => m.senderId === human.id).sort((a, b) => a.number - b.number).map((m) => m.recipientId)).toEqual(residents.map((m) => m.id));
     expect(beforeRead.mail!.filter((m) => m.senderId === human.id).every((m) => m.readAt === undefined)).toBe(true);
+    expect(beforeRead.mail!.every((m) => m.recipientConfirmation === undefined)).toBe(true);
     expect(beforeRead.members).toEqual(initial.members.sort((a, b) => a.id < b.id ? -1 : 1));
     await command(page, 'INBOX', '[未読]');
     const received = await command(page, 'READ 1', '★内容');

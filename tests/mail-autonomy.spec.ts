@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { command, start, snapshot, enterForum, post, noOtherUi } from './terminal-helpers';
+import { command, start, snapshot, enterForum, post, noOtherUi, backup, restore } from './terminal-helpers';
+import { calendarSetting, serviceDate } from '../src/calendar';
 import { epoch, hour, lifestyles, consent } from './autonomy-helpers';
 import { mockWorker } from './ai-helpers';
 import { random } from '../src/ai/activity';
@@ -28,44 +29,61 @@ async function mailVisits(page: Page) {
       for (const row of rows) tx.objectStore('settings').put(row); tx.oncomplete = () => resolve(); }); db.close();
   }, [activity, residents]);
 }
-async function send(page: Page) {
-  await command(page, '1', '電子メール'); await command(page, 'WRITE hoshimori', '件名=');
+async function send(page: Page, steps = ['1']) {
+  for (const step of steps) await command(page, step, 'コマンド=');
+  await command(page, 'WRITE hoshimori', '件名=');
   await command(page, '夜空の観察', '本文'); await command(page, 'あの星を見つけました。', '本文=');
   await command(page, '.END', '送信しますか'); await command(page, 'Y', 'メール #1');
 }
 const incoming = async (page: Page) => (await snapshot(page)).mail!.filter((m) => m.simulation);
 
-test('consented timer replies privately in character, leaves the input untouched, preserves public capacity, and deduplicates reopen', async ({ page, context }) => {
-  await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '星を見る人');
-  await send(page); await mailVisits(page); await consent(page);
-  await page.clock.fastForward(20 * 60_000); expect(await incoming(page)).toEqual([]);
-  await command(page, 'WRITE kusabue', '件名='); await page.locator('#command').fill('変換中の件名');
-  await page.locator('#command').dispatchEvent('compositionstart'); const output = await page.locator('.output').textContent();
-  await page.clock.fastForward(41 * 60_000);
-  await expect.poll(async () => (await incoming(page)).length).toBe(1);
-  const letter = (await incoming(page))[0]!, data = await snapshot(page);
-  expect(letter).toMatchObject({ senderId: 'fictional-ai:hoshimori', recipientId: data.members.find((m) => m.actor === 'human')!.id, replyToMailId: data.mail![0]!.id });
-  expect(letter.readAt).toBeUndefined(); expect(Date.parse(letter.simulation!.simulatedAt) - Date.parse(data.mail![0]!.createdAt)).toBeGreaterThanOrEqual(20 * 60_000);
-  expect(await page.locator('.output').textContent()).toBe(output); await expect(page.locator('#command')).toHaveValue('変換中の件名');
-  await page.locator('#command').dispatchEvent('compositionend'); await command(page, '.CANCEL', 'メールを中止');
-  await command(page, 'INBOX', '[未読]'); const reading = await command(page, `READ ${letter.number}`, '星見のお便り');
-  expect(reading).not.toMatch(/fictional|\bAI\b|創作|シミュレーション/);
-  await command(page, 'LIST', '[既読]');
-  await command(page, `REPLY ${letter.number}`, `返信先：#${letter.number}`);
-  await command(page, 'また観察してみます。', '本文='); await command(page, '.END', '送信しますか');
-  await command(page, 'Y', 'メール #3'); await command(page, 'SENT', 'RE#2');
-  await command(page, 'READ 3', '返信先：#2'); await noOtherUi(page);
-  await page.clock.fastForward(hour);
-  await expect.poll(async () => (await snapshot(page)).posts.filter((p) => p.simulation).length).toBeGreaterThan(0);
-  const before = await snapshot(page); await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
-  await command(page, '1', '電子メール'); await command(page, 'INBOX', '[既読]');
-  expect((await snapshot(page)).mail).toEqual(before.mail);
-  // A second tab reads the same inbox and marker without acquiring a model lease.
-  const other = await context.newPage(); await other.clock.install({ time: new Date(epoch.getTime() + 2 * hour) }); await mockWorker(other, 'ok');
-  await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
-  await command(other, 'X', '旧電子メール'); await command(other, 'INBOX', '[既読]');
-  await command(other, `READ ${letter.number}`, '★内容'); expect((await snapshot(other)).mail).toEqual(before.mail);
-});
+for (const route of [{ name: 'MAIN 1', steps: ['1'] }, { name: 'MAIN X', steps: ['X'] }, { name: 'SIG MAIL', steps: ['13', '2', 'MAIL'] }]) {
+  test(`${route.name}: consented reply confirms only its parent, preserves draft/IME and public capacity, and survives reload/restore`, async ({ page, context }) => {
+    await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '星を見る人');
+    await send(page, route.steps);
+    expect(await command(page, 'SENT', '[既読確認なし]')).not.toContain('未読');
+    expect(await command(page, 'READ 1', '既読確認：確認なし')).not.toContain('未読');
+    const unconfirmed = (await snapshot(page)).mail![0]!;
+    await mailVisits(page); await consent(page);
+    await page.clock.fastForward(20 * 60_000); expect(await incoming(page)).toEqual([]);
+    await command(page, 'WRITE kusabue', '件名='); await page.locator('#command').fill('変換中の件名');
+    await page.locator('#command').dispatchEvent('compositionstart'); const output = await page.locator('.output').textContent();
+    await page.clock.fastForward(41 * 60_000);
+    await expect.poll(async () => (await incoming(page)).length).toBe(1);
+    const letter = (await incoming(page))[0]!, data = await snapshot(page);
+    expect(letter).toMatchObject({ senderId: 'fictional-ai:hoshimori', recipientId: data.members.find((m) => m.actor === 'human')!.id, replyToMailId: data.mail![0]!.id });
+    expect(letter.readAt).toBeUndefined(); expect(Date.parse(letter.simulation!.simulatedAt) - Date.parse(data.mail![0]!.createdAt)).toBeGreaterThanOrEqual(20 * 60_000);
+    const parent = data.mail!.find((m) => m.id === unconfirmed.id)!;
+    expect(parent).toEqual({ ...unconfirmed, recipientConfirmation: { at: expect.any(String), replyMailId: letter.id, provenance: 'local-resident-reply-v1' } });
+    expect(Date.parse(parent.recipientConfirmation!.at)).toBeGreaterThanOrEqual(Date.parse(letter.createdAt));
+    const confirmation = `既読確認：${serviceDate(parent.recipientConfirmation!.at, calendarSetting(data))} (JST)`;
+    expect(await page.locator('.output').textContent()).toBe(output); await expect(page.locator('#command')).toHaveValue('変換中の件名');
+    await page.locator('#command').dispatchEvent('compositionend'); await command(page, '.CANCEL', 'メールを中止');
+    await command(page, 'SENT', '[既読確認あり]'); await command(page, 'READ 1', confirmation);
+    await command(page, 'INBOX', '[未読]'); const reading = await command(page, `READ ${letter.number}`, '星見のお便り');
+    expect(reading).not.toMatch(/fictional|\bAI\b|創作|シミュレーション/);
+    await command(page, 'LIST', '[既読]');
+    await command(page, `REPLY ${letter.number}`, `返信先：#${letter.number}`);
+    await command(page, 'また観察してみます。', '本文='); await command(page, '.END', '送信しますか');
+    await command(page, 'Y', 'メール #3'); await command(page, 'SENT', 'RE#2');
+    await command(page, 'READ 3', '返信先：#2'); await noOtherUi(page);
+    await page.clock.fastForward(hour);
+    await expect.poll(async () => (await snapshot(page)).posts.filter((p) => p.simulation).length).toBeGreaterThan(0);
+    const before = await snapshot(page); await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
+    await command(page, '1', '電子メール'); await command(page, 'INBOX', '[既読]');
+    expect((await snapshot(page)).mail).toEqual(before.mail);
+    // A second tab reads the same inbox and marker without acquiring a model lease.
+    const other = await context.newPage(); await other.clock.install({ time: new Date(epoch.getTime() + 2 * hour) }); await mockWorker(other, 'ok');
+    await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
+    await command(other, 'X', '旧電子メール'); await command(other, 'INBOX', '[既読]');
+    await command(other, `READ ${letter.number}`, '★内容'); expect((await snapshot(other)).mail).toEqual(before.mail);
+    const saved = await backup(page);
+    await restore(page, saved);
+    for (const step of route.steps) await command(page, step, 'コマンド=');
+    await command(page, 'SENT', '[既読確認あり]'); await command(page, 'READ 1', confirmation);
+    expect((await snapshot(page)).mail).toEqual(saved.mail);
+  });
+}
 
 test('a direct SIG acquaintance can autonomously initiate mail with the same member ID and public history', async ({ page }) => {
   await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, 'SIGの知人');
@@ -77,6 +95,7 @@ test('a direct SIG acquaintance can autonomously initiate mail with the same mem
   await expect.poll(async () => (await incoming(page)).length).toBe(1);
   const letter = (await incoming(page))[0]!;
   expect(letter.senderId).toBe(parent.authorId); expect(letter.recipientId).toBe(humanPost.authorId); expect(letter.replyToMailId).toBeUndefined();
+  expect((await snapshot(page)).mail!.every((m) => !m.recipientConfirmation)).toBe(true);
   const prompts = await page.evaluate(() => (window as unknown as { journeyWorker: { prompts: Record<string, unknown>[] } }).journeyWorker.prompts);
   expect(prompts.find((p) => p.kind === 'mail')?.publicFollowUp).toMatchObject({ title: '観察のお礼' });
 });
@@ -87,6 +106,7 @@ for (const mode of ['unopened', 'unsupported'] as const) {
     if (mode === 'unsupported') await page.addInitScript(() => { Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true }); });
     await start(page, '読む人'); await send(page); await mailVisits(page); await page.clock.fastForward(3 * hour);
     expect(await incoming(page)).toEqual([]);
+    expect((await snapshot(page)).mail!.every((m) => !m.recipientConfirmation)).toBe(true);
     expect(await page.evaluate(() => (window as unknown as { journeyWorker: { loads: number } }).journeyWorker.loads)).toBe(0);
     await command(page, 'SENT', '夜空の観察'); await command(page, 'READ 1', 'あの星を見つけました。');
   });
@@ -134,6 +154,7 @@ for (const mode of ['invalid', 'failure'] as const) {
     }).toBe(true);
     await page.clock.fastForward(3 * hour);
     expect(await incoming(page)).toEqual([]);
+    expect((await snapshot(page)).mail!.every((m) => !m.recipientConfirmation)).toBe(true);
     expect(await page.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)).toBe(1);
     await command(page, 'SENT', '夜空の観察'); await command(page, 'READ 1', 'あの星を見つけました。');
   });
@@ -160,6 +181,7 @@ test('deterministic catch-up bounds mail without displacing all public work, and
   expect(result.a.batch!.runs.some((r) => !r.mail)).toBe(true);
   expect(result.a.batch!.runs.every((r) => Date.parse(r.simulatedAt) >= Date.parse(result.now) - 72 * hour)).toBe(true);
   expect(result.pause.batch).toBeNull(); expect(result.noConsent.batch).toBeNull();
+  expect((await snapshot(page)).mail!.every((m) => !m.recipientConfirmation)).toBe(true);
 });
 
 test('separate timer batches reserve forum saves until the six-hour mail allowance renews', async ({ page }) => {
@@ -230,6 +252,9 @@ test('separate timer batches reserve forum saves until the six-hour mail allowan
   const saved = ticks[3]!.saved;
   expect(saved.mail!.filter((m) => m.simulation)).toHaveLength(2);
   expect(saved.posts.filter((p) => p.simulation)).toHaveLength(2);
+  expect(saved.mail!.filter((m) => m.recipientConfirmation).map((m) => m.id).sort()).toEqual(['letter:hoshimori', 'letter:kusabue']);
+  // The public runs leave the other two human letters unconfirmed.
+  expect(saved.mail!.filter((m) => m.senderId.startsWith('fictional-ai:')).every((m) => !m.recipientConfirmation)).toBe(true);
 
   const renewed = await page.evaluate(async ({ saved, epoch }) => {
     const ap = '/src/ai/activity.ts', pp = '/src/ai/personas.ts';
@@ -259,11 +284,14 @@ test('scheduled mail quota failure rolls back delivery and run completion; expli
   await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '再試行する人');
   await send(page); await mailVisits(page); await consent(page);
   await page.evaluate(() => {
-    const native = IDBObjectStore.prototype.add;
-    IDBObjectStore.prototype.add = function (value, key) {
-      if (this.name === 'mail') throw new DOMException('quota', 'QuotaExceededError');
+    const native = IDBObjectStore.prototype.put;
+    let attempted = false;
+    IDBObjectStore.prototype.put = function (value, key) {
+      if (this.name === 'mail' && value.recipientConfirmation) attempted = true;
+      if (attempted && this.name === 'settings' && value.id === 'ai-activity' &&
+          value.value.batch?.runs.some((r: { status: string }) => r.status === 'committed')) throw new DOMException('quota', 'QuotaExceededError');
       return key === undefined ? native.call(this, value) : native.call(this, value, key);
-    }; Object.assign(window, { restoreMailWrites: () => { IDBObjectStore.prototype.add = native; } });
+    }; Object.assign(window, { restoreMailWrites: () => { IDBObjectStore.prototype.put = native; }, confirmationAttempted: () => attempted });
   });
   await page.clock.fastForward(61 * 60_000);
   await expect.poll(async () => {
@@ -273,9 +301,14 @@ test('scheduled mail quota failure rolls back delivery and run completion; expli
   const failed = (await snapshot(page)).settings.find((r) => r.id === 'ai-activity')!.value as unknown as AiActivity;
   const id = failed.batch!.runs.find((r) => r.mail)!.id;
   expect(await incoming(page)).toEqual([]);
+  expect(await page.evaluate(() => (window as unknown as { confirmationAttempted(): boolean }).confirmationAttempted())).toBe(true);
+  expect((await snapshot(page)).mail!.every((m) => !m.recipientConfirmation)).toBe(true);
   await page.evaluate(() => (window as unknown as { restoreMailWrites(): void }).restoreMailWrites());
   await command(page, 'SETTINGS', '設定 / SETTINGS'); await command(page, '3', 'モデル・活動・住人'); await command(page, 'RETRY');
   await expect.poll(async () => (await incoming(page)).length).toBe(1);
   expect((await incoming(page))[0]!).toMatchObject({ id, number: 2 });
+  const confirmed = (await snapshot(page)).mail!.find((m) => m.number === 1)!.recipientConfirmation;
+  expect(confirmed).toMatchObject({ replyMailId: id, provenance: 'local-resident-reply-v1' });
   await command(page, 'RETRY'); expect(await incoming(page)).toHaveLength(1);
+  expect((await snapshot(page)).mail!.find((m) => m.number === 1)!.recipientConfirmation).toEqual(confirmed);
 });

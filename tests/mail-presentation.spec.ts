@@ -5,6 +5,31 @@ import { renderPost } from '../src/forums';
 import { validateBackup } from '../src/storage/schema';
 import type { Mail, Member } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
+import { serviceDate } from '../src/calendar';
+
+test('sent status means unknown until confirmation and projects the durable commitment instant without changing content', () => {
+  const members: Member[] = [{ id: 'human', handle: '手紙の主', actor: 'human' },
+    { id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' }];
+  const calendar = { version: 1 as const, sourceAnchor: '2026-10-21T00:00:00.000Z' };
+  const parent: Mail = { id: 'parent', number: 1, senderId: 'human', recipientId: members[1]!.id,
+    subject: '  星の便り  ', body: '  日本語\n\n　ｶﾅ  ', createdAt: calendar.sourceAnchor, origin: 'local-human' };
+  const confirmed: Mail = { ...parent, recipientConfirmation: { at: '2026-10-22T02:03:04.000Z',
+    replyMailId: 'reply', provenance: 'local-resident-reply-v1' } };
+  for (const row of [parent, confirmed]) {
+    const before = structuredClone(row);
+    const list = renderMailList([row], members, 'human', 'SENT', calendar).join('\n');
+    const detail = renderMail(row, members, [row], calendar);
+    expect(list).toContain(row.recipientConfirmation ? '[既読確認あり]' : '[既読確認なし]');
+    expect(detail).toContain(row.recipientConfirmation
+      ? `既読確認：${serviceDate(row.recipientConfirmation.at, calendar)} (JST)` : '既読確認：確認なし');
+    expect(detail).toContain(`件名：${parent.subject}`); expect(detail).toContain(parent.body);
+    expect([...detail, list].join('\n')).not.toMatch(/未読|local-resident|replyMailId|2026/);
+    expect(row).toEqual(before);
+  }
+  const incoming: Mail = { ...parent, id: 'reply', number: 2, senderId: members[1]!.id, recipientId: 'human', replyToMailId: 'parent' };
+  expect(renderMail(incoming, members, [parent, incoming], calendar).join('\n')).not.toContain('既読確認');
+  expect(renderMailList([incoming], members, 'human', 'INBOX', calendar).join('\n')).toContain('[未読]');
+});
 
 test('mail parties share forum tokens, refresh safe names and preserve literal content and source records', () => {
   const data = backupFixture();
