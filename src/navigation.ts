@@ -17,8 +17,10 @@ export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-m
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
   'index' | 'section' | 'mailbox' | 'community';
 
-// Layout is reconstructed. The fixture's CJK labels occupy two terminal cells
-// per character; ASCII occupies one. Padding never changes the label itself.
+// MAIN's row grouping follows the circa-1996 reproduction; the 44-cell column
+// offset is reconstructed. In this fixture, Japanese/full-width characters and
+// stars occupy two cells; ASCII (including normalized label spaces) occupies one.
+// Padding never changes the label itself.
 function padColumn(text: string, width: number): string {
   const cells = Array.from(text).reduce((sum, character) => sum + (character.charCodeAt(0) <= 0x7e ? 1 : 2), 0);
   return text + ' '.repeat(Math.max(2, width - cells));
@@ -28,19 +30,23 @@ function entryText(entry: { selector: string; label: string }): string {
   return `${entry.selector.padStart(2)} ${entry.label}`;
 }
 
+// Historical display only: fixture selectors and accepted input remain ASCII.
+function mainEntryText(entry: { selector: string; label: string }): string {
+  const selector = entry.selector.replace(/[0-9A-Z]/g, (character) => String.fromCharCode(character.charCodeAt(0) + 0xfee0));
+  return `${selector.padStart(2, '　')}．${entry.label}`;
+}
+
 function renderMain(): string[] {
-  const numbered = mainMenu.entries.filter((entry) => /^\d+$/.test(entry.selector));
-  const half = Math.ceil(numbered.length / 2);
-  const left = numbered.slice(0, half);
-  const right = numbered.slice(half);
-  const rows = left.map((entry, index) => {
-    const other = right[index];
-    return other ? padColumn(entryText(entry), 44) + entryText(other) : entryText(entry);
-  });
+  // Consecutive pairs 1/2 through 21/X, followed by standalone Q.
+  const rows: string[] = [];
+  for (let index = 0; index < mainMenu.entries.length; index += 2) {
+    const entry = mainEntryText(mainMenu.entries[index]!);
+    const other = mainMenu.entries[index + 1];
+    rows.push(other ? padColumn(entry, 44) + mainEntryText(other) : entry);
+  }
   return [
-    'MAIN',
+    '　＝＝＝ＰＣ－ＶＡＮ＝＝＝ (MAIN)',
     ...rows,
-    ...mainMenu.entries.filter((entry) => !/^\d+$/.test(entry.selector)).map(entryText),
     `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
     'HELP: メニューを表示 / SETTINGS: 設定 / HANDLE: 利用者 / ABOUT: 来歴 / LOG: ログ保存',
     mainMenu.prompt.text,

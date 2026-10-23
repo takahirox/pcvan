@@ -1087,3 +1087,40 @@ retained both SIG and OLT navigation imports. No new transport was implemented.
 
 Real-model quality, native-device checks, subjective walkthrough and deployment
 remain unperformed. No required post-merge verification applies.
+
+## Issue #57 — MAIN row grouping and display conventions (2026-10-23)
+
+Read the live open Issue and development/review guidance. MAIN now uses the
+selected reproduction's consecutive pairs through 21/X, standalone Q, PC-VAN
+banner with `(MAIN)`, and full-width selectors/periods. Fixture labels, ASCII
+inputs, all destinations, other screens and browser-local safeguards are preserved.
+Research and fixture metadata distinguish supported grouping/typography from
+reconstructed padding and unresolved historical geometry/date applicability.
+
+- `npm ci` and `npx playwright install chromium`: passed; zero reported dependency
+  vulnerabilities. No model weights were downloaded.
+- Final `npm test -- --workers=4`: **208 passed (1.0m)**, no retries or skips, using
+  the normal configuration and ports. Includes TypeScript checking and the
+  production build; the existing optional WebLLM chunk-size advisory remains.
+- Explicit assertions cover all eleven row pairs, Q, every fixture label once,
+  banner/selector punctuation, display-cell alignment, helpers and final prompt.
+  Production journeys verify identical MAIN text on initial entry, HELP/MAIN/BACK,
+  return from a service via BACK/MAIN and Q/reconnect at 320px and 1280px, plus
+  narrow keyboard horizontal scrolling, literal spacing and usable input.
+  Existing mapping, MITI, storage, consent, IME/history, pacing and terminal
+  regressions pass unchanged apart from the obsolete bare-heading assertion.
+- The initial focused run had 32 passes/two failures in new assertions omitting
+  the command echo's leading newline. An intermediate full run had 206 passes/
+  two failures because the new reconnect assertions omitted the existing
+  connection greeting. Corrected only those expectations; the final full run
+  above passed.
+- Rechecked the Paradise Army HTML, JIRCAS PDF text and institutional catalog.
+  The source links resolve; the catalog required direct HTML retrieval after
+  browser fetch failed. Sixteen local Markdown links/anchors in the changed
+  research and validation documents pass. Reviewed the final diff and checked
+  working-tree and staged whitespace.
+
+Optional automated screenshot comparison, native hardware/IME testing and further
+dated capture research were not performed. Exact historical cell offsets, terminal
+width and unchanged 1997 availability remain unverified. No push, PR, merge,
+external comment or deployment was performed; no post-merge verification is required.

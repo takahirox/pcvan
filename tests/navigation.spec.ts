@@ -2,31 +2,95 @@ import { expect, test } from '@playwright/test';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { PcvanController } from '../src/navigation';
+import { command, start } from './terminal-helpers';
 
 const { miti } = sigEvidence;
 
-test('MAIN renders the entire menu with two numbered columns and X/Q', () => {
+const mainBanner = '　＝＝＝ＰＣ－ＶＡＮ＝＝＝ (MAIN)';
+const expectedPairs = [
+  ['　１．電子メール', '　２．索引'],
+  ['　３．ニュース', '　４．データベース'],
+  ['　５．公共情報と政治', '　６．ビジネス'],
+  ['　７．インターネット', '　８．コンピュータ'],
+  ['　９．ショッピングモール', '１０．電子出版'],
+  ['１１．趣味', '１２．生活'],
+  ['１３．コミュニケーション', '１４．ＰＣ－ＶＡＮ利用情報（無料）'],
+  ['１５．☆★☆ おすすめ ☆★☆', '１６．☆★☆ わかばマーク ☆★☆'],
+  ['１７．ＢＩＧＬＯＢＥガイド', '１８．インターサイト'],
+  ['１９．ＢＩＧＬＯＢＥイベント（無料）', '２０．ＢＩＧＬＯＢＥ情報誌ご案内'],
+  ['２１．オリンピック特設コーナー', '　Ｘ．旧電子メール'],
+];
+
+function expectMain(lines: readonly string[]) {
+  expect(lines[0]).toBe(mainBanner);
+  const rows = lines.slice(1, 13);
+  expect(rows).toHaveLength(12);
+  const rightOffsets = expectedPairs.map((pair, index) => {
+    const row = rows[index]!;
+    expect(row.split(/ {2,}/)).toEqual(pair);
+    const prefix = row.slice(0, row.indexOf(pair[1]!));
+    // Japanese display cells, rather than UTF-16 length, determine alignment.
+    return [...prefix].reduce((cells, character) => cells + (/^[ -~]$/.test(character) ? 1 : 2), 0);
+  });
+  expect(new Set(rightOffsets).size).toBe(1);
+  expect(rows[11]).toBe('　Ｑ．終了');
+  const entries = rows.flatMap((row) => row.split(/ {2,}/));
+  expect(entries).toHaveLength(mainMenu.entries.length);
+  for (const entry of mainMenu.entries) {
+    expect(entries.filter((text) => text.endsWith(`．${entry.label}`))).toHaveLength(1);
+  }
+  expect(lines.slice(13)).toEqual([
+    'J MITI: 未知の世界へ',
+    'HELP: メニューを表示 / SETTINGS: 設定 / HANDLE: 利用者 / ABOUT: 来歴 / LOG: ログ保存',
+    mainMenu.prompt.text,
+  ]);
+}
+
+test('MAIN reproduces consecutive pairs, banner and display selectors with aligned columns', () => {
   const controller = new PcvanController();
-  const output = controller.welcome.join('\n');
   expect(mainMenu.entries.map((entry) => entry.selector)).toEqual([
     ...Array.from({ length: 21 }, (_, index) => String(index + 1)), 'X', 'Q',
   ]);
-  for (const entry of mainMenu.entries) {
-    expect(output).toContain(`${entry.selector.padStart(2)} ${entry.label}`);
-  }
-  // The first ten rows have two intact, ordered numbered entries; row 11
-  // contains the unpaired item. X/Q are separate from the numbered columns.
-  const rows = controller.welcome.filter((line) => /^\s*\d+ /.test(line));
-  expect(rows).toHaveLength(11);
-  for (let index = 0; index < 10; index += 1) {
-    const left = mainMenu.entries[index]!;
-    const right = mainMenu.entries[index + 11]!;
-    expect(rows[index]).toMatch(new RegExp(`^${left.selector.padStart(2)} ${left.label} {2,}${right.selector.padStart(2)} ${right.label}$`));
-  }
-  expect(rows[10]).toBe('11 趣味');
-  expect(controller.welcome.at(-1)).toBe(mainMenu.prompt.text);
-  expect(output).not.toContain('ＳＩＧ'); // No labels from the older MAIN variant.
+  expectMain(controller.welcome);
+  for (const input of ['HELP', 'MAIN', 'BACK']) expect(controller.submit(input)).toEqual(controller.welcome);
+  expect(controller.welcome.join('\n')).not.toContain('ＳＩＧ'); // No labels from the older MAIN variant.
 });
+
+for (const width of [320, 1280]) {
+  test(`MAIN presentation survives HELP, service returns and reconnect at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    await start(page);
+    const output = page.locator('.output');
+    const input = page.getByRole('textbox', { name: 'コマンド' });
+    const log = page.getByRole('log');
+    const text = (await output.textContent())!;
+    const initial = text.slice(text.indexOf(mainBanner), text.indexOf(mainMenu.prompt.text) + mainMenu.prompt.text.length);
+    expectMain(initial.split('\n'));
+    await expect(output).toHaveCSS('white-space', 'pre');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (width === 320) {
+      expect(await log.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+      await input.press('Shift+Tab');
+      await log.press('ArrowRight');
+      await expect.poll(() => log.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      await log.press('Tab');
+    }
+    await expect(input).toBeFocused();
+    for (const line of ['HELP', 'MAIN', 'BACK']) {
+      expect(await command(page, line, mainMenu.prompt.text)).toBe(`\n> ${line}\n${initial}`);
+    }
+    for (const line of ['BACK', 'MAIN']) {
+      const service = await command(page, '3', 'コマンド=');
+      expect(service).toContain(' 3 ニュース'); // Other screens retain ASCII formatting.
+      expect(service).not.toContain('３．');
+      expect(await command(page, line, mainMenu.prompt.text)).toBe(`\n> ${line}\n${initial}`);
+    }
+    await command(page, 'Q', 'RECONNECT');
+    expect(await command(page, 'RECONNECT', mainMenu.prompt.text)).toBe(`\n> RECONNECT\nPC-VAN 接続中…\n${initial}`);
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue('');
+  });
+}
 
 for (const entry of mainMenu.entries) {
   test(`MAIN ${entry.selector} preserves the fixture mapping and has a safe result`, () => {

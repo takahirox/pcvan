@@ -5,7 +5,7 @@
   "status": "provisional",
   "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm",
   "scope": "Retrospective MAIN transcription, not an original screen capture or the separate undated NEC variant.",
-  "normalization": "Selectors use ASCII; decorative gaps in labels 15/16 use single spaces. Screen column layout is not specified.",
+  "normalization": "Canonical selectors use ASCII; MAIN displays full-width selectors with full-width periods. Decorative gaps in labels 15/16 use single spaces. The reproduction shows consecutive row pairs 1/2 through 21/X, standalone Q, and the PC-VAN banner with (MAIN). Exact padding, terminal width and line-break geometry are reconstructed.",
   "prompt": {
     "text": "番号またはコマンド=",
     "status": "provisional",
