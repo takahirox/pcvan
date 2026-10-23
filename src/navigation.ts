@@ -1,3 +1,5 @@
+import { remoteLetters, renderTelnet, telnetControls, telnetHost, telnetPrompt } from './telnet';
+import type { TelnetScreen } from './telnet';
 import { calendarSetting } from './calendar';
 import { conferenceState, conferenceHelp, renderConference, renderContribution } from './conference';
 import { additionalSigs, boardCulture } from './communities';
@@ -23,7 +25,7 @@ import type { NetNewsSearch } from './netnews';
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
 
-export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
+export type Screen = TelnetScreen | 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
   'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
@@ -87,6 +89,7 @@ export class PcvanController implements TerminalController {
   private newsItem = 0;
   private netNewsGroup = 0;
   private netNewsItem = 0;
+  private telnetItem = 0;
   private netNewsSearch: NetNewsSearch | undefined;
   private readonly bizSets: BizSet[] = [];
   private bizZeroKeyword: string | undefined;
@@ -111,6 +114,8 @@ export class PcvanController implements TerminalController {
     return (['section', 'daisizen-service', 'mailbox'].includes(this.currentScreen) && this.collectionKind === 'mail')
       ? { box: this.currentScreen === 'mailbox' ? this.mailbox : 'INBOX', title: this.collectionTitle } : null;
   }
+
+  get isTelnet(): boolean { return this.currentScreen.startsWith('telnet-'); }
 
   get netNewsContext() {
     if (!['netnews-list', 'netnews-article'].includes(this.currentScreen)) return null;
@@ -150,6 +155,7 @@ export class PcvanController implements TerminalController {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     if (this.currentScreen !== 'main' && this.currentScreen !== 'disconnected') {
       if (command === 'MAIN') {
+        this.telnetItem = 0;
         this.clearBiz();
         this.clearNetNews();
         this.parents.length = 0;
@@ -157,9 +163,10 @@ export class PcvanController implements TerminalController {
         return this.render();
       }
       if (command === 'BACK') {
-        // BiZ and NetNews replace internal reading views without pushing
+        // BiZ, NetNews and TELNET replace reading views without pushing
         // duplicate parents. BACK restores the corresponding active list.
-        if (this.currentScreen === 'netnews-article') this.currentScreen = 'netnews-list';
+        if (this.currentScreen === 'telnet-letter') { this.telnetItem = 0; this.currentScreen = 'telnet-mailbox'; }
+        else if (this.currentScreen === 'netnews-article') this.currentScreen = 'netnews-list';
         else if (this.currentScreen === 'biz-article') this.currentScreen = 'biz-titles';
         else if (this.currentScreen === 'biz-titles') this.currentScreen = 'biz-search';
         else {
@@ -229,7 +236,12 @@ export class PcvanController implements TerminalController {
       case 'internet-directory':
         if (command === 'LIST') return this.render();
         if (command === '1') return this.enter('netnews-directory');
-        return this.invalidCommand('1: NetNews / LIST / BACK / MAIN / HELP');
+        if (command === '2') { this.telnetItem = 0; return this.enter('telnet-directory'); }
+        return this.invalidCommand('1: NetNews / 2: TELNET / LIST / BACK / MAIN / HELP');
+      case 'telnet-directory':
+      case 'telnet-shell':
+      case 'telnet-mailbox':
+      case 'telnet-letter': return this.handleTelnet(this.currentScreen, command);
       case 'netnews-directory':
         if (command === 'LIST') return this.render();
         if (command === '1' || command === '2') {
@@ -349,6 +361,33 @@ export class PcvanController implements TerminalController {
         if (command === 'RECONNECT') return this.enter('main');
         return ['接続は終了しています。RECONNECT で再接続してください。'];
     }
+  }
+
+  private handleTelnet(screen: TelnetScreen, command: string): readonly string[] {
+    if (screen === 'telnet-directory') {
+      if (command === 'LIST') return this.render();
+      if (command === `OPEN ${telnetHost.toUpperCase()}`) return this.enter('telnet-shell');
+    } else {
+      if (command === 'LOGOUT') {
+        this.telnetItem = 0;
+        while (this.parents.length && this.parents.at(-1) !== 'telnet-directory') this.parents.pop();
+        this.currentScreen = this.parents.pop()!;
+        return ['リモートデモを終了しました。PC-VANの接続は継続しています。', ...this.render()];
+      }
+      if (screen === 'telnet-shell') {
+        if (command === 'MAIL') return this.enter('telnet-mailbox');
+      } else {
+        if (command === 'LIST') {
+          this.telnetItem = 0; this.currentScreen = 'telnet-mailbox'; return this.render();
+        }
+        const read = /^READ ([1-9]\d*)$/.exec(command);
+        const number = read ? Number(read[1]) : 0;
+        if (Number.isSafeInteger(number) && remoteLetters.some((letter) => letter.number === number)) {
+          this.telnetItem = number; this.currentScreen = 'telnet-letter'; return this.render();
+        }
+      }
+    }
+    return ['このTELNETデモ画面では使えないコマンド・接続先・番号です。', telnetControls(screen), telnetPrompt(screen)];
   }
 
   private clearBiz(): void {
@@ -524,6 +563,10 @@ export class PcvanController implements TerminalController {
         returnHelp, demoPrompt,
       ];
       case 'news-directory': return [...renderNewsDirectory(), returnHelp, demoPrompt];
+      case 'telnet-directory':
+      case 'telnet-shell':
+      case 'telnet-mailbox':
+      case 'telnet-letter': return renderTelnet(this.currentScreen, this.telnetItem);
       case 'internet-directory': return [...renderInternetDirectory(), returnHelp, demoPrompt];
       case 'netnews-directory': return [...renderNetNewsDirectory(), returnHelp, demoPrompt];
       case 'netnews-list': return [...renderNetNewsList(netNewsGroup(this.content, this.netNewsGroup), this.netNewsSearch), returnHelp, demoPrompt];
