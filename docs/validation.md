@@ -1224,3 +1224,32 @@ sequence applicability remains reconstructed as documented in the
 [entry research](research/pcvan-1996-1997.md#staged-session-entry-issue-61).
 No push, PR, merge, external comment or deployment was performed. No post-merge
 verification is required.
+
+## Shared late-1996 resident setting (#63)
+
+Validation on 2026-10-23 in the assigned worktree, after reading the live open
+Issue and repository development/review guidance:
+
+- `npm ci`: passed, 24 packages audited, zero reported vulnerabilities.
+- Focused `npx playwright test tests/ai-generation.spec.ts --workers=2`:
+  **5 passed (6.6s)**, including two new cases inspecting all three prompt builders
+  with distinct residents and contrasting computer/social board cultures.
+- Documented `npm test`: **234 passed (1.1m)**, no retries or skips, using the
+  normal production/source-module server configuration and ports. Includes
+  TypeScript checking and the production build. Existing optional WebLLM
+  chunk-size and environment color advisories remain non-failing.
+- Prompt checks cover shared trusted system guidance despite modern references
+  and attempted year/role changes in profiles, board names and excerpts; fixed
+  identity/output schemas; bounded context; archive and private-context exclusions;
+  ordered OLT author/kind/text without absolute timestamps; and unchanged source
+  records dated in 2026. Existing consent, scheduling/budgets, cancellation,
+  cross-tab arbitration, backup/reset, mail/OLT privacy and terminal/IME tests pass.
+- Rechecked the four linked period/community sources. Eighteen local Markdown
+  links/anchors in the research and local-AI documents pass. Reviewed the final
+  diff; working-tree and staged whitespace checks pass.
+
+No real model weights were downloaded, and optional real-model sampling was not
+performed. These checks establish prompt construction and existing lifecycle
+behavior, not model obedience or historical authenticity. Stored/displayed dates
+and scheduling retain their existing behavior. No push, PR, merge, external
+comment or deployment was performed; no post-merge verification is required.

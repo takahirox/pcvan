@@ -6,6 +6,38 @@ represent historical PC-VAN members or real connected users. The modern Settings
 dialog is outside the simulated service; the model cannot change historical
 fixtures, menus or command semantics.
 
+## Conversational setting
+
+Forum posts, private letters and OLT turns share system guidance placing residents
+in **late-1996 PC-VAN**, without inventing an exact session day. This is a
+reconstructed knowledge horizon: ordinary technology and known outcomes should
+fit the period, while contemporary internet, homepage and web-search discussion
+remains possible according to each resident's interests and experience. Modern
+user references invite a natural response to the subject or a useful question
+about an unfamiliar term; they do not move residents into a modern setting.
+Profiles, handles, board names, excerpts and dates cannot override this guidance.
+Personalities, occupations, interests, affinities, board cultures and each
+service's purpose still shape natural Japanese contributions, without historical
+lectures, forced nostalgia, required catchphrases or provenance announcements.
+
+Storage timestamps, displayed dates, scheduling, retention and elapsed-time
+calculations keep their existing actual-date behavior (including existing
+`simulatedAt` display rules). This is not a historical presentation calendar.
+OLT inference receives ordered author/kind/text excerpts without absolute event
+timestamps; persisted events and terminal readback retain their dates. Shared
+setting instructions add no access to other boards or private correspondence.
+No stored or user-authored text is rewritten or filtered for period keywords.
+
+The [research and source assessment](research/pcvan-1996-1997.md#resident-conversational-setting-issue-63),
+inspected 2026-10-23, records period NEC/Yahoo and newsletter evidence alongside
+later community accounts. Confidence is high in contemporary web availability,
+moderate in conversational plausibility, and unverified for real-model adherence.
+Source-module tests inspect all three prompts with differing residents/board
+cultures, modern references, role/year-changing instructions and 2026 records.
+They establish prompt construction, bounded context and source immutability,
+not model obedience or historical authenticity. Routine terminal output contains
+no new research commentary.
+
 ## Setup and controls
 
 Open **設定 / Options → AIモデル・活動**, or click the neutral **AIモデルの準備**

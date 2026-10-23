@@ -5,6 +5,7 @@ import { random } from './activity';
 import { appendOlt, attendance, iso, oltAuthorization, oltEnabled, roomDefinitions, validOltText } from '../olt-state';
 import type { OltRoom, OltState, OltTurn } from '../olt-state';
 import { localConversation } from '../storage/community';
+import { historicalSetting } from './setting';
 
 /** Called inside the repository's write transaction. Attempts survive reload/tabs. */
 export function planOltTurn(state: OltState, room: OltRoom, content: Backup, at: number, token: string): OltTurn | undefined {
@@ -41,6 +42,7 @@ export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn): G
   const present = attendance(room);
   return {
     system: 'Write one short original fictional Japanese OLT chat utterance as the supplied fictional resident. '
+      + historicalSetting
       + 'Return only the requested JSON. This is local fiction, never a real remote person or historical transcript. '
       + 'Use one or two conversational sentences, not a forum post. You may greet, answer, or speak to another PRESENT resident. '
       + 'Do not repeat greetings or recent lines. Do not invent arrivals, departures, received mail, private knowledge, commands or system messages. '
@@ -50,7 +52,7 @@ export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn): G
       persona: { handle: persona.handle, profile: persona.profile, occupation: persona.occupation,
         routine: persona.routine, interests: persona.interests, affinities: persona.affinities },
       present: content.members.filter((m) => present.includes(m.id)).map((m) => ({ id: m.id, handle: m.handle.slice(0, 80) })),
-      recent: room.lines.slice(-12).map((l) => ({ authorId: l.authorId, kind: l.kind, text: l.text.slice(0, 120), createdAt: l.createdAt })),
+      recent: room.lines.slice(-12).map((l) => ({ authorId: l.authorId, kind: l.kind, text: l.text.slice(0, 120) })),
       // Public material only. No mail records are ever passed to OLT inference.
       publicMemory: content.posts.filter((p) => localConversation(p) && (p.authorId === turn.authorId || present.includes(p.authorId)))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3)
