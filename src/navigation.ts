@@ -16,6 +16,7 @@ import type { ReadingService } from './service-collections';
 import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem } from './eic';
 import { bizArticles, bizSetLimit, bizHelp, bizKeywordHelp, renderDatabaseDirectory, renderBizSearch, renderBizTitles, renderBizArticle } from './biz';
 import type { BizSet } from './biz';
+import { newsBriefs, renderNewsDirectory, renderNewsHeadlines, renderNewsBrief } from './news';
 
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
@@ -24,6 +25,7 @@ export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-m
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
   'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
+  'news-directory' | 'news-headlines' | 'news-brief' |
   'database-directory' | 'biz-search' | 'biz-titles' | 'biz-article';
 
 // MAIN's row grouping follows the circa-1996 reproduction; the 44-cell column
@@ -79,6 +81,7 @@ export class PcvanController implements TerminalController {
   private serviceCategory = 0;
   private serviceItem = 0;
   private eicItem = 0;
+  private newsItem = 0;
   private readonly bizSets: BizSet[] = [];
   private bizZeroKeyword: string | undefined;
   private bizSetNumber = 0;
@@ -192,6 +195,27 @@ export class PcvanController implements TerminalController {
         if (Object.hasOwn(mailboxes, command)) { this.mailbox = command as Mailbox; return this.render(); }
         if (command === 'LIST') return this.render();
         return this.invalidCommand('LIST / BACK / MAIN / HELP');
+      case 'news-directory':
+        if (command === 'LIST') return this.render();
+        if (command === '1') return this.enter('news-headlines');
+        return this.invalidCommand('1: 時事通信ニュース / LIST / BACK / MAIN / HELP');
+      case 'news-headlines':
+      case 'news-brief': {
+        if (command === 'LIST') {
+          if (this.currentScreen === 'news-brief') this.currentScreen = this.parents.pop()!;
+          return this.render();
+        }
+        const read = /^READ ([1-9]\d*)$/.exec(command);
+        if (read) {
+          const number = Number(read[1]);
+          if (Number.isSafeInteger(number) && newsBriefs[number - 1]) {
+            this.newsItem = number - 1;
+            return this.currentScreen === 'news-brief' ? this.render() : this.enter('news-brief');
+          }
+          return ['その番号のニュースはありません。LIST で見出し一覧を確認してください。', demoPrompt];
+        }
+        return this.invalidCommand('READ 番号 / LIST / BACK / MAIN / HELP');
+      }
       case 'database-directory':
         if (command === 'LIST') return this.render();
         if (command === '1') { this.clearBiz(); return this.enter('biz-search'); }
@@ -364,6 +388,10 @@ export class PcvanController implements TerminalController {
 
   private openSection(entry: typeof mainMenu.entries[number]): readonly string[] {
     this.section = entry;
+    if (entry.selector === '3') {
+      this.newsItem = 0;
+      return [entryText(entry), ...this.enter('news-directory')];
+    }
     if (entry.selector === '4') return [entryText(entry), ...this.enter('database-directory')];
     if (entry.selector === '5') {
       this.eicItem = 0;
@@ -411,6 +439,9 @@ export class PcvanController implements TerminalController {
         `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
         returnHelp, demoPrompt,
       ];
+      case 'news-directory': return [...renderNewsDirectory(), returnHelp, demoPrompt];
+      case 'news-headlines': return [...renderNewsHeadlines(), returnHelp, demoPrompt];
+      case 'news-brief': return [...renderNewsBrief(this.newsItem), returnHelp, demoPrompt];
       case 'database-directory': return [...renderDatabaseDirectory(), returnHelp, demoPrompt];
       case 'biz-search': return [...renderBizSearch(this.bizSets, this.bizZeroKeyword), returnHelp, demoPrompt];
       case 'biz-titles': return [...renderBizTitles(this.bizSets[this.bizSetNumber - 1]!, this.bizSetNumber), returnHelp, demoPrompt];
