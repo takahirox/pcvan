@@ -326,6 +326,18 @@ intentionally empty conferences stay empty and accept their first human contribu
 No attendance or AI generation is attached to the conference. Topic organization,
 commands and content are reconstruction; see [conference evidence](docs/research/pcvan-1996-1997.md#retained-electronic-conference-issue-65).
 
+Conference `READ` separates the author's stable synthetic `(SYN-…)` identity
+from their safe current pen name in the existing `発言者：` line. It uses the
+same identity as forums, mail and OLT, distinguishes duplicate handles, and
+survives renames, member reordering, reload and JSON restore. Rereading shows
+the current name; earlier scrollback and stored contributions stay unchanged.
+Unusable names show `名無し`; unresolved authors show `(不明) 名無し`, with no
+conference DEMO exception. This adds no stored fields or writes on reads.
+Sources inspected 2026-10-24 support distinct ID/name concepts with moderate
+historical confidence; exact conference geometry has low confidence. Token
+generation, author-line placement, delimiters and current-name refresh are
+reconstruction; see [conference identity evidence and source limits](docs/research/pcvan-1996-1997.md#conference-identity-and-handles-issue-85).
+
 `OLT` opens a local chat room directory. `FORUMS` retains
 boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
 posting, reply and unread behavior. A saved empty board stays empty.

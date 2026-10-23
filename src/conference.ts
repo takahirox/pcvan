@@ -1,5 +1,6 @@
 import { serviceDate } from './calendar';
 import type { HistoricalCalendar } from './calendar';
+import { identityToken, penName } from './member-presentation';
 import type { Backup, ConferenceState, Contribution, Member } from './storage/schema';
 import { CONFERENCE_ID, CONFERENCE_SETTING } from './storage/schema';
 
@@ -20,8 +21,9 @@ export function renderConference(content: { settings?: Backup['settings'] }): st
 }
 export function renderContribution(row: Contribution, state: ConferenceState, members: readonly Member[], calendar?: HistoricalCalendar): string[] {
   const parent = state.contributions.find((p) => p.id === row.replyToPostId);
+  const member = members.find((m) => m.id === row.authorId);
   return [conferenceTitle, `#${row.number} ${row.title}`,
-    `発言者：${members.find((m) => m.id === row.authorId)?.handle ?? '名無し'} / ${serviceDate(row.createdAt, calendar)} (JST)`,
+    `発言者：(${identityToken(member)}) ${penName(member)} / ${serviceDate(row.createdAt, calendar)} (JST)`,
     ...(parent ? [`返信先：#${parent.number}`] : []), '★内容', row.body, conferenceHelp, 'コマンド='];
 }
 
