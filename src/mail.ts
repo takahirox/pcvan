@@ -16,12 +16,14 @@ export function mailboxRows(mail: readonly Mail[], humanId: string | undefined, 
 export function renderMailList(mail: readonly Mail[], members: readonly Member[], humanId: string | undefined, box: Mailbox, calendar?: HistoricalCalendar): string[] {
   const rows = mailboxRows(mail, humanId, box);
   return [`メール一覧：${rows.length}件`, ...(!rows.length ? ['現在、メールはありません。'] : rows.map((m) =>
-    `#${m.number} ${m.subject} / ${mailCorrespondent(members.find((p) => p.id === (box === 'INBOX' ? m.senderId : m.recipientId)))} / ${serviceDate(m.simulation?.simulatedAt ?? m.createdAt, calendar)}${box === 'INBOX' ? ` [${m.readAt ? '既読' : '未読'}]` : ''}${m.replyToMailId ? ` RE#${mail.find((p) => p.id === m.replyToMailId)?.number ?? '?'}` : ''}`)), mailHelp];
+    `#${m.number} ${m.subject} / ${mailCorrespondent(members.find((p) => p.id === (box === 'INBOX' ? m.senderId : m.recipientId)))} / ${serviceDate(m.simulation?.simulatedAt ?? m.createdAt, calendar)} [${box === 'INBOX' ? (m.readAt ? '既読' : '未読') : (m.recipientConfirmation ? '既読確認あり' : '既読確認なし')}]${m.replyToMailId ? ` RE#${mail.find((p) => p.id === m.replyToMailId)?.number ?? '?'}` : ''}`)), mailHelp];
 }
 export function renderMail(mail: Mail, members: readonly Member[], all: readonly Mail[], calendar?: HistoricalCalendar): string[] {
   const name = (id: string) => mailCorrespondent(members.find((m) => m.id === id));
   return [`メール #${mail.number}`, `差出人：${name(mail.senderId)}`, `宛先：${name(mail.recipientId)}`,
     `日時：${serviceDate(mail.simulation?.simulatedAt ?? mail.createdAt, calendar)} (JST)`, `件名：${mail.subject}`,
+    ...(members.some((m) => m.id === mail.senderId && m.actor === 'human') ? [mail.recipientConfirmation
+      ? `既読確認：${serviceDate(mail.recipientConfirmation.at, calendar)} (JST)` : '既読確認：確認なし'] : []),
     ...(mail.replyToMailId ? [`返信先：#${all.find((m) => m.id === mail.replyToMailId)?.number ?? '?'}`] : []),
     '★内容', mail.body, mailHelp, 'BACK: 戻る / MAIN: MAIN / HELP: 案内', 'コマンド='];
 }

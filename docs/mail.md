@@ -82,8 +82,42 @@ Numbers are stable, ascending local mail numbers shared across boxes, with gaps
 when letters belong to other handles or have been deleted. They are not forum
 numbers. Reading displays subject, both parties' tokens and safe handles, the
 shared historical JST date and the reply reference; listings show the
-correspondent, subject, date and individual unread/read marker.
+correspondent, subject and date. INBOX retains its individual unread/read marker.
+Human SENT rows show `既読確認なし` or `既読確認あり`; sent-letter READ
+shows `既読確認：確認なし` or the confirmation's historical JST time.
+Absence means **unknown/unconfirmed**, never proven unread.
 No starter letters or archived/private source material are seeded.
+
+## Sender-visible recipient confirmation (Issue #89)
+
+A newly committed, validated and currently authorized resident reply confirms
+only its explicit parent letter. This is a conservative **category D fictional
+event**, not a recovered PC-VAN read-event mechanism. Planning, bounded prompt
+excerpts, incidental context letters, public follow-ups, initiation, rendering
+and reading without replying establish no confirmation. A reply does not prove
+that the model examined every line. There is no independent reading scheduler.
+
+The first confirmation stores its operational commitment timestamp, reconstruction
+provenance and confirming reply ID atomically with the reply, number allocation
+and completed run. A backwards clock is clamped to at least the parent's creation
+time (and the new reply's creation time). It never uses catch-up `simulatedAt`.
+The existing calendar projects this instant for display; no 1996 string is saved.
+Retries, concurrent commits, duplicate-parent suppression, reload and restore
+do not refresh it. Older reply pairs remain unconfirmed without backfilling.
+Invalid/failed/cancelled work, consent withdrawal, pause, stale worlds, quota
+failure and abort before transaction completion create no new evidence.
+Human-recipient `readAt` remains separate and unchanged.
+
+Sources inspected 2026-10-24 support the capability, with limits: the
+[NEC office account, March 1993, p. 231](https://www.jstage.jst.go.jp/article/jkg/43/3/43_KJ00002959297/_pdf/-char/ja)
+documents checking when a recipient read sent mail (high confidence for 1993;
+moderate confidence in continuity into late 1996). The
+[Windows 95 client-author description](https://www.vector.co.jp/soft/win95/net/se024554.html)
+independently lists checking sent-mail reading (high confidence in the statement;
+release date and target-year applicability unresolved). Neither supplies a
+target-year host sequence. Labels, placement and reply-commit timing are
+reconstructed. The earlier retention policy is not adopted. See the
+[research record](research/pcvan-1996-1997.md#sender-visible-mail-confirmation-issue-89).
 
 ## Resident activity and context
 
@@ -129,9 +163,10 @@ Settings → Details/About explains the simulation, origins and limitations.
 Private means separated from public forums and unrelated prompt contexts inside
 the simulation. It is **not encryption or isolation from someone with access to
 the same browser profile/device**. Switching local handles changes projections,
-not device access permissions. JSON backups contain all private letters and read
-timestamps; terminal logs can contain read/drafted letters. Protect exported files
-accordingly. Browser eviction can erase the world; keep backups outside it.
+not device access permissions. JSON backups contain all private letters, read
+timestamps and confirmation evidence; terminal logs can contain read/drafted
+letters. Protect exported files accordingly. Browser eviction can erase the
+world; keep backups outside it.
 
 [IndexedDB and JSON backups](local-storage.md#mail-records-and-migration) cover
 atomic sends, parent/member validation, monotonic numbering, read markers,
