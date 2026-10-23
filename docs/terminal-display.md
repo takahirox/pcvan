@@ -73,11 +73,24 @@ separates evidence from reconstructed formatting.
 ## Output pacing and export
 
 `OutputRenderer` retains the complete accepted logical text separately from the
-painted stream. It spends UTF-8 grapheme costs at nominal bps/10 bytes per second,
-paints batches once per frame and bounds pending work. It never splits Japanese
-characters, combining clusters or joined emoji. Escape, a new submitted line or a
-speed change reveals earlier text. This is a perception simulation, not a modem
-connection or historical encoding emulation.
+painted stream. A limited Shift-JIS-oriented approximation sums one timing unit
+per ASCII code point (including LF), half-width kana/punctuation U+FF61–U+FF9F,
+yen U+00A5 and overline U+203E; every remaining code point costs two. Thus
+`A=1`, `ｶ=1`, `日=2`, `あ=2`, `カ=2`, Japanese punctuation/full-width space=2,
+and empty text costs zero. The two-unit modern fallback applies even to
+supplementary characters and combining marks: `😀=2`, `e\u0301=3` and
+`👩🏽‍💻=8`. It never tests exact Shift-JIS representability, transcodes, replaces
+or normalizes transcript text.
+
+Nominal bps/10 remains the timing-unit budget per second. At nominal 300, fresh
+streams reveal 30 ASCII or half-width kana characters, or 15 repeated `日`, in
+one second. Each complete grapheme waits for its summed cost, preserving Japanese
+characters, combining clusters and joined emoji. Painting stays batched once per
+frame; pending work is bounded separately by UTF-16 string length. Escape, a new
+submitted line or a speed change reveals earlier text. These are reconstruction
+choices for perceived arrival timing, not exact wire bytes, CRLF framing,
+compression, host delays or measured modem throughput. See the
+[historical evidence and fallback policy](research/pcvan-1996-1997.md#japanese-character-pacing-issue-73).
 
 `LOG` downloads all accepted transcript text, including output waiting for paint,
 as UTF-8 with exact line breaks. It includes submitted draft lines but excludes

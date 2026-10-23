@@ -1,5 +1,6 @@
 import { command, start, settings, backup } from './terminal-helpers';
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 test.use({ reducedMotion: 'no-preference' });
 
@@ -7,7 +8,7 @@ test('controlled frames preserve graphemes, exact spacing, asynchronous append o
   await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async () => {
     const path = '/src/output-renderer.ts';
-    const { OutputRenderer, MAX_PENDING_UNITS, displayCost } = await import(path);
+    const { OutputRenderer, MAX_PENDING_UNITS } = await import(path);
     let now = 0;
     let id = 0;
     const frames = new Map<number, FrameRequestCallback>();
@@ -28,7 +29,7 @@ test('controlled frames preserve graphemes, exact spacing, asynchronous append o
       const first = ' A日本語　ｶﾅ e\u0301 👩🏽‍💻 <b>文字</b>  \n\n末尾\n';
       renderer.append(first);
       const before = { visible, logical: renderer.text, announcements: [...announcements] };
-      frame(100); // Three byte credits: space + A, but not half of 日.
+      frame(100); // Three timing units: space + A, but not half of 日.
       const partial = visible;
       await Promise.resolve();
       renderer.append('非同期 AI', 'reconnect');
@@ -54,8 +55,40 @@ test('controlled frames preserve graphemes, exact spacing, asynchronous append o
         const item = new OutputRenderer(speed, (text: string) => { painted += text; }, () => {}, () => {});
         item.append('a'.repeat(2000)); frame(1000); modes[speed] = painted.length; item.reveal();
       }
-      return { before, partial, during, complete, later, instant, bounded, oversized, modes,
-        costs: ['a', '\n', '日', 'ｶ', '😀', 'e\u0301', '👩🏽‍💻'].map(displayCost), first };
+      const rates: Record<string, number> = {};
+      for (const character of ['A', 'ｶ', '日']) {
+        let painted = '';
+        const item = new OutputRenderer('300', (text: string) => { painted += text; }, () => {}, () => {});
+        item.append(character.repeat(100)); frame(1000); rates[character] = painted.length; item.reveal();
+      }
+      let mixed = '';
+      const mixedRenderer = new OutputRenderer('300', (text: string) => { mixed += text; }, () => {}, () => {});
+      mixedRenderer.append('A日B');
+      frame(50); const mixedPartial = mixed; // 1.5 units: A, then wait for 日's full two units.
+      frame(50); const mixedJapanese = mixed;
+      frame(50); const mixedComplete = { visible: mixed, logical: mixedRenderer.text, frames: frames.size };
+      const clusters = [];
+      for (const [text, wait] of [['e\u0301', 50], ['😀', 50], ['👩🏽‍💻', 250]] as const) {
+        let painted = '';
+        const announced: string[] = [];
+        const pending: boolean[] = [];
+        const item = new OutputRenderer('300', (value: string) => { painted += value; },
+          (value: boolean) => pending.push(value), (value: string) => announced.push(value));
+        item.append(text); frame(wait); // Insufficient credit for the complete grapheme.
+        const waiting = { visible: painted, logical: item.text, announced: [...announced] };
+        frame(50);
+        clusters.push({ text, waiting, visible: painted, logical: item.text, announced, pending, frames: frames.size });
+      }
+      // Two-unit Japanese timing must not trigger the independent UTF-16 backlog bound.
+      let queued = '';
+      const queueRenderer = new OutputRenderer('300', (text: string) => { queued += text; }, () => {}, () => {});
+      queueRenderer.append('日'.repeat(MAX_PENDING_UNITS / 2));
+      queueRenderer.append('日'.repeat(MAX_PENDING_UNITS / 2 - 1)); // Includes the separating LF.
+      const atBound = { visible: queued, length: queueRenderer.text.length, frames: frames.size };
+      queueRenderer.append(''); // One more LF crosses the string-length bound and drains everything.
+      const overBound = { complete: queued === queueRenderer.text, frames: frames.size };
+      return { before, partial, during, complete, later, instant, bounded, oversized, modes, rates,
+        mixedPartial, mixedJapanese, mixedComplete, clusters, atBound, overBound, first };
     } finally {
       window.requestAnimationFrame = original.raf; window.cancelAnimationFrame = original.cancel; performance.now = original.now;
     }
@@ -72,11 +105,63 @@ test('controlled frames preserve graphemes, exact spacing, asynchronous append o
   expect(result.bounded).toEqual({ visible: true, frames: 0 });
   expect(result.oversized).toEqual({ visible: true, frames: 0 });
   expect(result.modes).toEqual({ '300': 30, '1200': 120, '2400': 240, '9600': 960 });
-  expect(result.costs).toEqual([1, 1, 3, 3, 4, 3, 15]);
+  expect(result.rates).toEqual({ A: 30, 'ｶ': 30, '日': 15 });
+  expect(result.mixedPartial).toBe('A');
+  expect(result.mixedJapanese).toBe('A日');
+  expect(result.mixedComplete).toEqual({ visible: 'A日B', logical: 'A日B', frames: 0 });
+  for (const cluster of result.clusters) {
+    expect(cluster.waiting).toEqual({ visible: '', logical: cluster.text, announced: [] });
+    expect(cluster).toMatchObject({ visible: cluster.text, logical: cluster.text,
+      announced: [cluster.text], pending: [true, false], frames: 0 });
+  }
+  expect(result.atBound).toEqual({ visible: '', length: 65_536, frames: 1 });
+  expect(result.overBound).toEqual({ complete: true, frames: 0 });
 });
 
+test('display costs use the limited Shift-JIS approximation with a two-unit Unicode fallback', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const costs = await page.evaluate(async () => {
+    const path = '/src/output-renderer.ts';
+    const { displayCost } = await import(path);
+    return Object.fromEntries(['', 'A', '\n', '\u007f', '\u0080', 'ｶ', '\uff60', '\uff61', '\uff9f', '\uffa0',
+      '日', 'あ', 'カ', '。', '、', '　', '¥', '‾', '😀', 'e\u0301', '👩🏽‍💻', 'A日ｶ\n'].map((text) => [text, displayCost(text)]));
+  });
+  expect(costs).toEqual({ '': 0, A: 1, '\n': 1, '\u007f': 1, '\u0080': 2, 'ｶ': 1,
+    '\uff60': 2, '\uff61': 1, '\uff9f': 1, '\uffa0': 2,
+    '日': 2, 'あ': 2, 'カ': 2, '。': 2, '、': 2, '　': 2, '¥': 1, '‾': 1,
+    '😀': 2, 'e\u0301': 3, '👩🏽‍💻': 8, 'A日ｶ\n': 5 });
+});
 
-test('terminal speed/theme/effects persist and Escape drains byte-paced output without changing the draft', async ({ page }) => {
+test('UTF-8 log download includes accepted unpainted Unicode and excludes the unsent draft', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const downloading = page.waitForEvent('download');
+  const result = await page.evaluate(async () => {
+    const terminalPath = '/src/terminal.ts';
+    const controlsPath = '/src/storage/controls.ts';
+    const { mountTerminal } = await import(terminalPath);
+    const { downloadText } = await import(controlsPath);
+    const root = document.createElement('div');
+    document.body.append(root);
+    const original = window.requestAnimationFrame;
+    window.requestAnimationFrame = () => 1; // Accept text without allowing a paint frame.
+    try {
+      const terminal = mountTerminal(root, { submit() {}, previous: () => '', next: () => '' });
+      terminal.setPreferences({ version: 1, theme: 'white', speed: '300', effects: false });
+      const text = ' 日本語　ｶﾅ ¥‾ e\u0301 👩🏽‍💻 <b>文字</b>  \n\n末尾\n';
+      terminal.append(text);
+      root.querySelector('input')!.value = '未送信';
+      downloadText(terminal.logText(), 'terminal');
+      return { text, painted: root.querySelector('.output')!.textContent, logical: terminal.logText() };
+    } finally { window.requestAnimationFrame = original; }
+  });
+  const text = await readFile((await (await downloading).path())!, 'utf8');
+  expect(result.painted).toBe('');
+  expect(result.logical).toBe(result.text);
+  expect(text).toBe(result.text);
+  expect(text).not.toContain('未送信');
+});
+
+test('terminal speed/theme/effects persist and Escape drains paced output without changing the draft', async ({ page }) => {
   await start(page); await settings(page, 1);
   await command(page, 'THEME amber', '表示設定を保存');
   await command(page, 'EFFECTS ON', '表示設定を保存');
