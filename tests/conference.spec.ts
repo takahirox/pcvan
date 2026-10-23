@@ -1,9 +1,14 @@
 import { serviceDate, calendarSetting } from '../src/calendar';
 import { expect, test } from '@playwright/test';
 import { PcvanController } from '../src/navigation';
-import { conferenceState, starterConference } from '../src/conference';
+import { conferenceHelp, conferenceState, conferenceTitle, renderConference, renderContribution, starterConference } from '../src/conference';
+import { identityToken } from '../src/member-presentation';
+import { renderPost } from '../src/forums';
+import { renderMail } from '../src/mail';
+import { validateBackup } from '../src/storage/schema';
+import type { AiActivity, Member } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
-import { command, start, post, snapshot, backup, restore, noOtherUi } from './terminal-helpers';
+import { command, start, post, snapshot, backup, restore, noOtherUi, settings } from './terminal-helpers';
 import type { Page } from '@playwright/test';
 
 async function enter(page: Page) {
@@ -11,6 +16,91 @@ async function enter(page: Page) {
   await command(page, '2', 'DAISIZEN');
   await command(page, 'CONFERENCE', '電子会議室');
 }
+
+test('conference author identity matches shared service tokens, refreshes names and preserves literal records and controller output', () => {
+  const data = backupFixture(), state = starterConference('2026-10-23T12:00:00.000Z');
+  data.members.push({ id: 'fictional-ai:kusabue', handle: '同名', actor: 'ai' },
+    { id: 'fictional-ai:komadori', handle: '同名', actor: 'ai' },
+    { id: 'DEMO0001', handle: '同名', actor: 'human' }, { id: '会員🌌', handle: '同名', actor: 'human' },
+    { id: '01234567-89ab-cdef-0123-456789abcdef', handle: '同名', actor: 'human' });
+  data.members.forEach((m) => { m.handle = '  同名  '; });
+  const literal = '  日本語　ｶﾅ <b>文字</b> fictional-ai:missing SYN-123  ';
+  state.contributions.forEach((row) => { row.title = literal; row.body = `${literal}\n\n　末尾  `; });
+  Object.assign(state.contributions[2]!, { authorId: 'human', origin: 'local-human', createdAt: '1996-11-24T01:02:03.000Z' });
+  data.settings.push({ id: 'daisizen-conference', value: state as never },
+    { id: 'historical-calendar', value: { version: 1, sourceAnchor: '2026-10-23T12:00:00.000Z' } });
+  validateBackup(data);
+  const controller = new PcvanController(), calendar = calendarSetting(data);
+  const list = renderConference(data), tokens = new Set<string>();
+  // Full IDs, including Unicode, UUID and resolved DEMO members, use the same
+  // shared identity namespace as forums, mail and OLT.
+  for (const member of [...data.members]) {
+    const row = { ...state.contributions[1]!, authorId: member.id };
+    const before = structuredClone({ data, row });
+    const token = identityToken(member); tokens.add(token);
+    const detail = renderContribution(row, state, data.members, calendar);
+    expect(detail).toEqual([conferenceTitle, `#2 ${literal}`,
+      `発言者：(${token}) 同名 / ${serviceDate(row.createdAt, calendar)} (JST)`,
+      '返信先：#1', '★内容', row.body, conferenceHelp, 'コマンド=']);
+    expect(renderPost({ ...data.posts[0]!, authorId: member.id }, '照合', undefined, data.members)[1]).toContain(`(${token})`);
+    expect(renderMail({ id: 'letter', number: 1, senderId: member.id, recipientId: 'human', subject: literal,
+      body: literal, createdAt: row.createdAt, origin: 'local-human' }, data.members, [])[1]).toBe(`差出人：(${token}) 同名`);
+    expect({ data, row }).toEqual(before);
+    data.members.reverse();
+    expect(renderContribution(row, state, data.members, calendar)).toEqual(detail);
+  }
+  expect(tokens.size).toBe(data.members.length);
+  const records = structuredClone(state), oldDetails = state.contributions.map((row) => renderContribution(row, state, data.members, calendar));
+  expect(oldDetails[2]![2]).toBe('発言者：(SYN-7MFTMGGA7CMOM) 同名 / 96年11月24日 10:02:03 (JST)');
+  for (const renamed of [false, true]) {
+    if (renamed) {
+      for (const member of data.members) member.handle = member.actor === 'human' ? '  <i>人間の新名</i>  ' : '住人の新名';
+      data.members.reverse();
+    }
+    const before = structuredClone(data);
+    controller.setContent(data); controller.submit('MAIN'); controller.submit('13'); controller.submit('2');
+    expect(controller.submit('CONFERENCE')).toEqual(list);
+    for (const row of state.contributions) {
+      const member = data.members.find((m) => m.id === row.authorId)!;
+      const detail = controller.submit(`READ ${row.number}`);
+      expect(detail).toEqual(renderContribution(row, state, data.members, calendar));
+      expect(detail[2]).toBe(`発言者：(${identityToken(member)}) ${renamed ? member.actor === 'human' ? '<i>人間の新名</i>' : '住人の新名' : '同名'} / ${serviceDate(row.createdAt, calendar)} (JST)`);
+      expect(detail.filter((_, i) => i !== 2)).toEqual(oldDetails[row.number - 1]!.filter((_, i) => i !== 2));
+    }
+    expect(data).toEqual(before); expect(state).toEqual(records);
+  }
+  expect(oldDetails.every((lines) => lines[2]!.includes(' 同名 / '))).toBe(true);
+});
+
+test('conference safe-name and unknown-author fallbacks apply only to attribution and retain strict import validation', () => {
+  const state = starterConference('2026-10-23T12:00:00.000Z'), row = state.contributions[1]!;
+  row.title = '  fictional-ai:missing <b>題</b>  '; row.body = '  名無し\n\n不明 <b>本文</b>  ';
+  const member: Member = { id: row.authorId, handle: '同名', actor: 'ai' };
+  const normal = renderContribution(row, state, [member]);
+  for (const handle of ['', '　 \t', '\u200b', 'first\nsecond', 'first\u001bsecond', 'first\u2028second',
+    'fictional-ai:resident', '01234567-89ab-cdef-0123-456789abcdef', member.id]) {
+    member.handle = handle;
+    const before = structuredClone({ state, member });
+    const detail = renderContribution(row, state, [member]);
+    expect(detail[2]).toBe(`発言者：(${identityToken(member)}) 名無し / 26年10月23日 19:00:00 (JST)`);
+    expect(detail.filter((_, i) => i !== 2)).toEqual(normal.filter((_, i) => i !== 2));
+    expect({ state, member }).toEqual(before);
+  }
+  // Missing references are tested only at the renderer boundary, including the
+  // forum-only DEMO fixture exception that conference attribution must not use.
+  for (const authorId of ['missing', 'fictional-ai:missing', '<b>key</b>', 'DEMO0001', '01234567-89ab-cdef-0123-456789abcdef']) {
+    const missing = { ...row, authorId }, before = structuredClone({ state, missing });
+    expect(renderContribution(missing, state, [member])[2]).toBe('発言者：(不明) 名無し / 26年10月23日 19:00:00 (JST)');
+    expect(renderContribution(missing, state, [member]).filter((_, i) => i !== 2)).toEqual(normal.filter((_, i) => i !== 2));
+    expect({ state, missing }).toEqual(before);
+  }
+  const data = backupFixture();
+  data.members.push({ id: 'fictional-ai:kusabue', handle: '草笛', actor: 'ai' }, member);
+  data.settings.push({ id: 'daisizen-conference', value: starterConference('2026-10-23T12:00:00.000Z') as never });
+  member.handle = 'こまどり'; validateBackup(data);
+  data.members = data.members.filter((m) => m.id !== member.id);
+  expect(() => validateBackup(data)).toThrow('Invalid conference author/provenance.');
+});
 
 test('conference controller reads retained contributions and keeps list context isolated from all other services', () => {
   const controller = new PcvanController(), data = backupFixture();
@@ -37,6 +127,92 @@ test('conference controller reads retained contributions and keeps list context 
   controller.submit('13'); controller.submit('2');
   expect(controller.submit('CONFERENCE').join('\n')).toContain('最初の発言');
   expect(controller.submit('READ 1').join('\n')).toContain('その番号の発言はありません');
+});
+
+test('production conference identity survives duplicate names, human contributions/replies, both renames and reload/reordered restore', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-24T02:00:00.000Z'));
+  await page.setViewportSize({ width: 320, height: 640 });
+  const remote: string[] = [];
+  page.on('request', (r) => { if (!r.url().startsWith('http://127.0.0.1:14373/')) remote.push(r.url()); });
+  await start(page, '同名');
+  const fixture = await snapshot(page), human = fixture.members.find((m) => m.actor === 'human')!;
+  const residents = ['hoshimori', 'kusabue'].map((id) => fixture.members.find((m) => m.id === `fictional-ai:${id}`)!);
+  residents.forEach((m) => { m.handle = '同名'; });
+  const humanToken = identityToken(human), residentTokens = residents.map(identityToken);
+  expect(new Set([humanToken, ...residentTokens]).size).toBe(3);
+  const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
+  activity.maxPosts = 0; activity.consent = false;
+  const state = conferenceState(fixture), literal = '  日本語　ｶﾅ <b>草</b> fictional-ai:missing SYN-123  ';
+  state.contributions.forEach((row, i) => {
+    row.authorId = residents[i % 2]!.id; row.title = literal; row.body = `${literal}\n\n　末尾  `;
+  });
+  fixture.settings.find((s) => s.id === 'daisizen-conference')!.value = state as never;
+  validateBackup(fixture); await restore(page, fixture);
+  const protectedRecords = (data: typeof fixture) => ({ members: data.members, sigs: data.sigs, forums: data.forums,
+    posts: data.posts, mail: data.mail, readStates: data.readStates, settings: data.settings });
+  await enter(page);
+  const beforeRead = await snapshot(page), oldReads: string[] = [];
+  for (const [i, token] of residentTokens.entries()) {
+    const row = state.contributions[i]!;
+    const detail = await command(page, `READ ${row.number}`, row.body);
+    expect(detail).toContain(`発言者：(${token}) 同名 / ${serviceDate(row.createdAt, calendarSetting(beforeRead))} (JST)`);
+    if (i === 1) expect(detail).toContain('返信先：#1');
+    oldReads.push(detail);
+  }
+  expect(protectedRecords(await snapshot(page))).toEqual(protectedRecords(beforeRead));
+  await post(page, '  人間の題  ', literal);
+  await post(page, '  返信の題  ', `${literal}\n\n　結び  `, 'REPLY 2');
+  const written = await backup(page), writtenState = conferenceState(written);
+  expect(writtenState.contributions.slice(0, 3)).toEqual(state.contributions);
+  expect(writtenState.contributions.slice(3)).toMatchObject([
+    { number: 4, authorId: human.id, title: '  人間の題  ', body: literal, origin: 'local-human' },
+    { number: 5, authorId: human.id, title: '  返信の題  ', body: `${literal}\n\n　結び  `,
+      replyToPostId: state.contributions[1]!.id, origin: 'local-human' },
+  ]);
+  const unrelated = (data: typeof fixture) => ({ ...protectedRecords(data), settings: data.settings.filter((s) => s.id !== 'daisizen-conference') });
+  expect(unrelated(written)).toEqual(unrelated(beforeRead));
+  const verify = async (renamed: boolean) => {
+    const before = await snapshot(page);
+    const labels = new Map([[human.id, `(${humanToken}) ${renamed ? '人間の新名' : '同名'}`],
+      [residents[0]!.id, `(${residentTokens[0]}) ${renamed ? '住人の新名' : '同名'}`],
+      [residents[1]!.id, `(${residentTokens[1]}) 同名`]]);
+    await command(page, 'LIST', '発言一覧：5件');
+    for (const row of writtenState.contributions) {
+      const detail = await command(page, `READ ${row.number}`, row.body);
+      expect(detail).toContain(`発言者：${labels.get(row.authorId)} / ${serviceDate(row.createdAt, calendarSetting(before))} (JST)`);
+      expect(detail).toContain(`#${row.number} ${row.title}`);
+      if (row.replyToPostId) expect(detail).toContain(`返信先：#${writtenState.contributions.find((p) => p.id === row.replyToPostId)!.number}`);
+    }
+    expect(conferenceState(await snapshot(page))).toEqual(writtenState);
+    expect(protectedRecords(await snapshot(page))).toEqual(protectedRecords(before));
+  };
+  await verify(false);
+  await command(page, 'HANDLE', 'ハンドル設定'); await command(page, 'RENAME 人間の新名', 'ハンドル名を変更');
+  await settings(page, 3); await command(page, 'RESIDENTS', '住人編集'); await command(page, '1', '住人の編集');
+  await command(page, '1', 'handle='); await command(page, '住人の新名', '住人の編集');
+  await command(page, 'SAVE', '住人の設定を保存'); await command(page, 'MAIN', 'MAIN'); await enter(page);
+  await verify(true);
+  for (const detail of oldReads) expect(await page.locator('.output').textContent()).toContain(detail);
+  const renamed = await backup(page);
+  for (const key of ['sigs', 'forums', 'posts', 'mail', 'readStates'] as const) expect(renamed[key]).toEqual(written[key]);
+  // Cross-service forum reads resolve the same retained author IDs to the same tokens.
+  await command(page, 'BACK', 'FORUMS:');
+  for (const [i, member] of residents.entries()) {
+    await command(page, 'FORUMS', 'フォーラム');
+    const boardNo = i === 0 ? 5 : 1;
+    await command(page, String(boardNo), '投稿一覧');
+    const sig = renamed.sigs.find((s) => s.keyword === 'DAISIZEN')!;
+    const forum = renamed.forums.find((f) => f.sigId === sig.id && f.boardNo === boardNo)!;
+    const row = renamed.posts.find((p) => p.authorId === member.id && p.forumId === forum.id)!;
+    expect(await command(page, `READ ${row.number}`, '★内容')).toContain(`★タイトル (${residentTokens[i]})`);
+    await command(page, 'BACK', 'フォーラム'); await command(page, 'BACK', 'FORUMS:');
+  }
+  await command(page, 'MAIN', 'MAIN');
+  await page.reload(); await expect(page.locator('.output')).toContainText('MAIN'); await enter(page); await verify(true);
+  await restore(page, { ...renamed, members: [...renamed.members].reverse() });
+  await command(page, 'MAIN', 'MAIN'); await enter(page); await verify(true);
+  expect(protectedRecords(await backup(page))).toEqual(protectedRecords(renamed));
+  await expect(page.locator('.output b')).toHaveCount(0); await noOtherUi(page); expect(remote).toEqual([]);
 });
 
 test('production anonymous read → registration → reply/edit → save → list/read → return/reload and JSON round-trip', async ({ page }) => {

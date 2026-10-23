@@ -1731,3 +1731,63 @@ Validation performed for this change:
 
 No post-merge verification is required. Optional dated-transcript, native-IME,
 hardware and subjective historical-layout comparison are not completion gates.
+
+## Stable conference author identity (#85)
+
+Implemented in the assigned worktree on 2026-10-24 after reading the live open
+Issue and repository development/review guidance. Conference READ now resolves
+the existing member once and uses the unchanged shared identity/name helpers
+in its existing author line. No token algorithm, namespace, schema, stored
+record, list, composition or other service behavior changes.
+
+Validation performed for this change:
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities. Existing
+  Chromium was available; no browser installation or model download was needed.
+- Initial focused command:
+  `npm test -- tests/conference.spec.ts tests/conference-repository.spec.ts --workers=2`:
+  **10 passed, 1 failed (26.6s)**. The new production journey incorrectly assumed
+  both residents had forum posts on board 1. Corrected that test fixture lookup
+  to use each resident's existing board; no application validation was weakened.
+- Focused corrected journey:
+  `npm test -- tests/conference.spec.ts --grep 'production conference identity' --workers=1`:
+  **1 passed (11.8s)**, with no retries or skips.
+- Final documented `npm test`: **290 passed (2.8m)** using eight workers and
+  both configured servers, including TypeScript checking and production bundling.
+  No failures, retries or skips. All 287 existing checks remain, with three new
+  checks. Existing functional, storage/import/reset, consent, composition and
+  cancellation, failed-save retry, IME, literal rendering, scrolling and terminal
+  pacing/skip regressions pass. The existing Vite chunk-size advisory and Node
+  color-environment warnings remain non-fatal.
+- Two renderer/controller checks cover duplicate human/resident handles,
+  cross-service tokens, both renames, reversed members, Unicode/UUID/DEMO IDs,
+  safe-name and unresolved-author fallbacks, absence of the forum DEMO exception,
+  literal Japanese/markup/whitespace, date/reply output and unchanged input
+  records. Missing references are exercised directly at the renderer boundary;
+  a valid backup with an author subsequently removed still fails validation.
+- The production keyboard journey runs at 320px with fixed time, automatic
+  activity paused and consent disabled. A valid deterministic fixture exercises
+  conference entry → same-handle resident READ → human WRITE and REPLY → READ →
+  human/resident rename → reread → reload → reordered-member JSON restore →
+  reread. Tokens match actual forum READ headers. Old scrollback retains the
+  original names. Contribution data stays intact, and presentation-only reads
+  preserve members, SIGs, forums, posts, mail, read markers and every setting.
+  Legitimate sends, renames, forum read markers and normal session/history
+  bookkeeping remain allowed. No external request is observed; literal markup
+  remains text and the terminal retains keyboard input focus.
+- Reopened all four linked historical-source URLs on 2026-10-24. The course
+  archive, memorial and client description were readable; the earlier conference
+  archive lead still returned HTTP 502. README and shared Settings/About explain
+  source dates, confidence and limits, and distinguish the observed ID/name
+  concept from reconstructed token generation, author-line placement, delimiters
+  and current-name refresh. See the
+  [conference identity research](research/pcvan-1996-1997.md#conference-identity-and-handles-issue-85).
+- Reviewed the complete application, test and documentation diff against #85.
+  All **73** local Markdown links/anchors across README, research and this
+  validation record resolve. `git diff --check` and staged
+  `git diff --cached --check` pass.
+
+No real inference, model download, storage migration, identity registry or new
+framework was needed. No push, PR, merge, external comment or deployment was
+performed. No post-merge verification is required; optional dated-transcript,
+native-IME, hardware and subjective historical-layout checks were not performed.
