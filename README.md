@@ -52,8 +52,8 @@ from character reveal speed, including Instant/reduced-motion display. Escape or
 a submitted command skips the rest. The optional local handle invitation runs
 only at this handoff under its existing first-use rules.
 
-Entry, forums, mail, conference and OLT share a durable historical display
-calendar in fixed JST. A fresh world starts in the fictional week of November
+Entry, forums, mail, conference, OLT and local NetNews articles share a durable
+historical display calendar in fixed JST. A fresh world starts in the fictional week of November
 18–24, 1996 and advances with elapsed operational time, including into 1997.
 Stored timestamps and scheduling remain operational UTC; modern Settings shows
 actual session times. Only `Q` records a logout; reload without `Q` never invents
@@ -240,11 +240,39 @@ The bundled corpus stays outside IndexedDB and JSON backups; terminal logs retai
 literal headers and prose. Browsing does not seed or change protected world
 records, consent, scheduling or calendar settings, including restored empty
 collections. Normal session/history and activity lifecycle behavior continues.
-Posting, subscriptions/unread persistence, expiry, crossposting, thread navigation,
-WWW/TELNET/FTP and remote access are outside this implementation subset; this does
-not imply historical 1996 posting was unavailable. The
+
+`WRITE` starts a new public article; `REPLY number` follows up an article in the
+active results (also from its detail). Posting asks for an existing local human
+handle or registration, independently of AI consent. These articles stay in this
+browser and are never delivered to Usenet; they are distinct from private mail.
+The composer pins group, author and parent Message-ID. Enter a subject and literal
+body lines, `.END` to review the group/parent, `EDIT` to revise, then explicit `Y`
+to save or `N`/`CANCEL` to discard. `.TEXT` escapes command-like body text;
+BACK/MAIN preserve the owned draft. Followups default to one `Re:` prefix and
+retain the parent's References followed by its Message-ID, even after subject
+editing. Successful submission opens the complete group list; cancellation keeps
+the prior filter/view.
+
+Only local contributions and allocation/reference metadata are backed up in
+optional setting `netnews-local`. Numbers start at 4 independently in each group;
+Message-IDs stay unique across groups. Transactions allocate and save atomically,
+with idempotent draft retries and no consumed number on failure. Restores validate
+human authors, same-group earlier parents and complete reference chains before
+replacement. Older backups without the setting mean no local contributions.
+Factory reset removes local articles and retains all six bundled examples;
+import/reset invalidates open drafts. See [storage details](docs/local-storage.md#netnews-persistence).
+Local From uses the current safe pen name plus the shared stable identity token,
+lowercased, at `members.example.invalid`; no real email address is requested or
+raw member key displayed. Local operational UTC timestamps are projected through
+the durable historical calendar for an English RFC-style `Date` with seconds and
+`+0900`. The address, format, commands, editor and local persistence are category D
+reconstruction, not recovered PC-VAN session syntax.
+
+Subscriptions/unread persistence, expiry, crossposting, thread navigation,
+WWW/TELNET/FTP and remote access are outside this implementation subset. The
 [NetNews research record](docs/research/pcvan-1996-1997.md#netnews-reading-and-header-search-issue-81)
-and Settings/About distinguish the 1995 restrictions, 1996 reading/posting report,
+and [participation research](docs/research/pcvan-1996-1997.md#netnews-local-participation-issue-87),
+with Settings/About, distinguish the 1995 restrictions, 1996 reading/posting report,
 general fj evidence, assumed PC-VAN group carriage and reconstructed controls.
 
 For database retrieval, use `4` → `1` → `FIND パソコン` → `SHOW P1 /1`
@@ -688,7 +716,7 @@ it is resolved.
 - `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
   offline/retention panel and build-generated app-shell worker.
 - `src/news.ts`: original fictional briefs and news directory/headline/detail rendering.
-- `src/netnews.ts`: original fixed-date NetNews examples, header matching and group/list/article rendering.
+- `src/netnews.ts`: fixed-date NetNews examples, merged local articles, header matching and group/list/article rendering.
 - `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
 - `tests/`: controller/session checks and browser interaction checks.
 

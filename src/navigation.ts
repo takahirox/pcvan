@@ -17,7 +17,7 @@ import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem }
 import { bizArticles, bizSetLimit, bizHelp, bizKeywordHelp, renderDatabaseDirectory, renderBizSearch, renderBizTitles, renderBizArticle } from './biz';
 import type { BizSet } from './biz';
 import { newsBriefs, renderNewsDirectory, renderNewsHeadlines, renderNewsBrief } from './news';
-import { netNewsGroups, netNewsHelp, netNewsSearchHelp, netNewsResults, renderInternetDirectory, renderNetNewsDirectory, renderNetNewsList, renderNetNewsArticle } from './netnews';
+import { netNewsGroup, netNewsGroups, netNewsHelp, netNewsSearchHelp, netNewsResults, renderInternetDirectory, renderNetNewsDirectory, renderNetNewsList, renderNetNewsArticle } from './netnews';
 import type { NetNewsSearch } from './netnews';
 
 const { miti, daisizen } = sigEvidence;
@@ -112,12 +112,19 @@ export class PcvanController implements TerminalController {
       ? { box: this.currentScreen === 'mailbox' ? this.mailbox : 'INBOX', title: this.collectionTitle } : null;
   }
 
+  get netNewsContext() {
+    if (!['netnews-list', 'netnews-article'].includes(this.currentScreen)) return null;
+    const group = netNewsGroup(this.content, this.netNewsGroup);
+    return { group: group.name, articles: netNewsResults(group, this.netNewsSearch) };
+  }
+
   get isConference(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'CONFERENCE'; }
 
   get isOlt(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'OLT'; }
 
   get needsContent(): boolean {
-    return this.isConference || this.isOlt || !!this.mailContext || ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
+    return this.isConference || this.isOlt || !!this.mailContext ||
+      ['netnews-directory', 'netnews-list', 'netnews-article', 'miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
   }
 
   get screen(): Screen {
@@ -358,7 +365,7 @@ export class PcvanController implements TerminalController {
     const read = /^READ ([1-9]\d*)$/.exec(command);
     if (read) {
       const number = Number(read[1]);
-      const article = Number.isSafeInteger(number) && netNewsResults(netNewsGroups[this.netNewsGroup]!, this.netNewsSearch)
+      const article = Number.isSafeInteger(number) && netNewsResults(netNewsGroup(this.content, this.netNewsGroup), this.netNewsSearch)
         .find((item) => item.number === number);
       if (!article) return ['その番号の記事は現在の一覧にありません。HELP で確認するか LIST で全記事を表示してください。', demoPrompt];
       this.netNewsItem = number;
@@ -504,10 +511,11 @@ export class PcvanController implements TerminalController {
       case 'news-directory': return [...renderNewsDirectory(), returnHelp, demoPrompt];
       case 'internet-directory': return [...renderInternetDirectory(), returnHelp, demoPrompt];
       case 'netnews-directory': return [...renderNetNewsDirectory(), returnHelp, demoPrompt];
-      case 'netnews-list': return [...renderNetNewsList(netNewsGroups[this.netNewsGroup]!, this.netNewsSearch), returnHelp, demoPrompt];
+      case 'netnews-list': return [...renderNetNewsList(netNewsGroup(this.content, this.netNewsGroup), this.netNewsSearch), returnHelp, demoPrompt];
       case 'netnews-article': {
-        const group = netNewsGroups[this.netNewsGroup]!;
-        return [...renderNetNewsArticle(group, group.articles.find((article) => article.number === this.netNewsItem)!), returnHelp, demoPrompt];
+        const group = netNewsGroup(this.content, this.netNewsGroup);
+        const article = group.articles.find((article) => article.number === this.netNewsItem);
+        return [...(article ? renderNetNewsArticle(group, article) : renderNetNewsList(group, this.netNewsSearch)), returnHelp, demoPrompt];
       }
       case 'news-headlines': return [...renderNewsHeadlines(), returnHelp, demoPrompt];
       case 'news-brief': return [...renderNewsBrief(this.newsItem), returnHelp, demoPrompt];

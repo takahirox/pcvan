@@ -41,8 +41,8 @@ these application data controls are outside the historical service.
 ## Factory reset
 
 Settings → ローカルデータ・保守 → **初期状態に戻す** explains irreversible
-deletion of members, posts, mail, read markers, resident edits, preferences, AI consent/
-deferral, history and live drafts. **先に JSON を保存** exports before approval.
+deletion of members, posts, mail, local NetNews articles, read markers, resident
+edits, preferences, AI consent/deferral, history and live drafts. **先に JSON を保存** exports before approval.
 Only the explicit reset confirmation executes deletion; 中止 or closing preserves
 the world. Errors remain in Settings. `RESET` / typed `Y` remains an optional
 shortcut to the same reset method.
@@ -515,8 +515,8 @@ instant. Existing operational `community-world.createdAt` takes priority and is
 never overwritten by calendar initialization. For a legacy document without a
 usable operational world marker, the deterministic fallback is the earliest
 operational timestamp among post/mail creation and simulation times, mail read
-times, conference contributions, session login/logout, AI activity watermark,
-batch endpoints and runs (including pending runs), next-due values, and OLT
+times, conference contributions, local NetNews creation, session login/logout,
+AI activity watermark, batch endpoints and runs (including pending runs), next-due values, and OLT
 window/observation/due/lease/line times. Arbitrary settings, text, titles and
 fixture date strings are not scanned. The same dated backup therefore derives
 the same mapping at different restoration times. Import initializes atomically
@@ -544,3 +544,44 @@ restoration retains an existing mapping exactly. Authored dates, user text and
 OSL date-only metadata are never translated. Modern Settings retains actual UTC
 session times and raw provenance. The epoch, JST policy and non-forum layouts
 are disclosed reconstructions; see the [research record](research/pcvan-1996-1997.md#shared-historical-calendar-issue-67).
+
+## NetNews persistence
+
+Issue #87 adds optional version-1 setting `netnews-local` within the existing
+IndexedDB v2 / JSON v1 storage. It contains `nextNumbers` for exactly
+`fj.questions.fj` and `fj.news.usage`, and local `contributions` only. Six bundled
+examples and authored dates remain application assets, outside backups. Absent
+state in older/imported worlds means empty local contributions. Reading never
+writes this setting, seeds communities or re-anchors the historical calendar.
+
+Each article stores its draft `id`, `group`, group-local `number`, human `authorId`,
+`title` (1–200), multiline `body` (1–20000), canonical operational UTC `createdAt`,
+`origin: local-human`, `messageId`, complete ordered `references` and optional
+`parentMessageId`. Text uses the established composer bounds and control-character
+restrictions. `createNetNewsArticle` uses one world-fenced readwrite transaction:
+resolve the parent by Message-ID against bundled or local same-group articles,
+allocate the next group number (initially 4), validate and save. Draft-ID retries
+return the committed article only for identical inputs; conflicts fail. A failed
+validation/quota transaction leaves no article or consumed allocation. Screen
+refresh errors after commit do not leave a sendable duplicate draft.
+
+Validation applies to direct writes and JSON restore, including exact known group
+counters, sequential unique numbers and identities, canonical timestamps, human
+authors/provenance, earlier same-group parents (number and timestamp), and exact
+inherited References plus the immediate parent. It rejects dangling, cyclic,
+future and cross-group chains before replacement. Member deletion/actor changes
+cannot invalidate authors. Restore replacement and quota rollback remain atomic.
+Import/reset fences stale connections and invalidates owned drafts. Factory reset
+removes local articles and keeps the bundled six. Browsing/cancellation changes no
+other world records; normal registration and session/history bookkeeping applies.
+
+`<local.GROUP.NUMBER@netnews.example.invalid>` identifies a local article across
+both groups, independently of subject and raw member/draft keys. From is the
+shared `penName` plus lowercased `identityToken` at `members.example.invalid`.
+Names refresh on reads; addresses, attribution and IDs survive reorder/reload and
+backup roundtrip. No real email is requested. Local Date uses the existing durable
+historical projection, formatted as `Sat, 23 Nov 1996 11:00:00 +0900`. It never
+rewrites operational timestamps or bundled dates; legacy calendar initialization
+also considers local NetNews creation timestamps. These display/identity policies
+are reconstruction. NetNews is excluded from resident inference/planning contexts;
+no consent, credentials, external request or network delivery is introduced.
