@@ -1680,3 +1680,54 @@ Optional physical/native-IME tests, authenticated historical-session comparison
 and subjective screenshot matching were not performed. No push, PR, merge,
 external comment or deployment was performed; no post-merge verification is
 required.
+
+## Stable mail correspondent identity (#83)
+
+Implemented Issue #83 in the assigned worktree, following the development and
+review guidance. The unchanged shared token/name helpers now render INBOX/SENT
+correspondents, both READ parties, new/reply draft opening and review, and MEMBERS
+alongside each available resident's existing short address. No routing, storage,
+identity algorithm, namespace, schema or read lifecycle changed.
+
+Validation performed for this change:
+
+- Added two focused presentation/controller checks for cross-service token
+  matching, duplicate handles, safe-name and unresolved-reference fallbacks,
+  absence of the forum DEMO exception, literal Japanese/markup/whitespace,
+  timestamp preservation, source immutability, member reordering and failed
+  import validation. New/reply draft checks rename both parties after resolution,
+  edit after a simulated save failure, retry with the same ID/recipient and
+  confirm the original recipient label remains visible.
+- Added three production keyboard journeys, one each for MAIN `1`, MAIN `X`
+  and SIG `MAIL`. Each uses two existing residents with duplicate handles and
+  a valid received-letter fixture: MEMBERS → stable-address WRITE → review/EDIT
+  → send → SENT/READ, plus received READ → REPLY → recipient review/send.
+  They verify ambiguous-handle and display-token address rejection, both header
+  parties, ordinary human read marking with no resident-read events, unchanged
+  mail records after human/resident renames, entry/return contexts, reload and
+  JSON restore with reversed member ordering. No external request is observed;
+  no real inference, model download, GPU or remote delivery is used.
+- Updated the three obsolete handle-only assertions while retaining existing
+  IME, quota rollback/retry, idempotent send, cancellation, offline, import/reset,
+  consent, private-context and activity tests.
+- `npm ci` succeeded (24 packages audited, no vulnerabilities). Initial targeted
+  validation exposed test-only assumptions about IndexedDB key ordering and
+  the command controller's Vite browser environment. Corrected both; the targeted
+  rerun passed all four affected checks.
+- Reopened all four historical source URLs on 2026-10-24. PDF text was readable;
+  page-image requests for both PDFs failed. README, mail documentation, research
+  and Settings/About distinguish observed ID/name concepts from reconstructed
+  token placement, delimiters, short addresses and current-name refresh, and
+  acknowledge historical Internet mail separately. See
+  [mail identity research](research/pcvan-1996-1997.md#mail-identity-and-handles-issue-83).
+- Final documented `npm test`: **287 passed (2.7m)**, with no failed or
+  skipped checks. Its Playwright web-server setup completed TypeScript checking
+  and production bundling before testing production assets. The existing Vite
+  chunk-size advisory and environment color warnings remain non-fatal.
+- Reviewed the complete application, test and documentation diff against Issue
+  #83. All **74** local Markdown links/anchors across README, mail documentation,
+  research and this validation record resolve. `git diff --check` and staged
+  `git diff --cached --check` pass, including the new presentation test file.
+
+No post-merge verification is required. Optional dated-transcript, native-IME,
+hardware and subjective historical-layout comparison are not completion gates.

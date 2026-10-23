@@ -17,7 +17,7 @@ import { models, residentProfiles } from './ai/personas';
 import type { ResidentProfile } from './ai/personas';
 import type { createAiControls } from './ai/controls';
 import { setupContext } from './ai/activity';
-import { mailboxRows, renderMail } from './mail';
+import { mailCorrespondent, mailboxRows, renderMail } from './mail';
 import { personaMemberId } from './ai/personas';
 import type { Mailbox } from './sections';
 import { modelDisclosure } from './ai/setup';
@@ -147,7 +147,7 @@ export class TerminalCommands {
       catch { this.mailAddress = true; this.actions.print('宛先が見つからないか重複しています。MEMBERS の宛先を入力してください。宛先='); return; }
       this.mailAddress = false;
       const id = createRecordId();
-      this.composer = new TerminalComposer({ keyword: 'MAIL', name: recipient.handle }, authorId, intent.parent, {
+      this.composer = new TerminalComposer({ keyword: 'MAIL', name: mailCorrespondent(recipient) }, authorId, intent.parent, {
         print: this.actions.print,
         save: async (_target, draft) => {
           const row = await (await this.actions.repository()).createHumanMail({ id, senderId: draft.authorId,
@@ -161,8 +161,8 @@ export class TerminalCommands {
     } else this.composer = new TerminalComposer(intent.target, authorId, intent.parent, this.actions);
   }
   private printAddresses(data: Backup) {
-    this.actions.print('宛先一覧', ...residentProfiles(data).filter((p) => data.members.some((m) => m.id === personaMemberId(p.id) && m.actor === 'ai'))
-      .map((p) => `${p.id} / ${p.handle}`), 'WRITE 宛先（一覧のIDまたはハンドル） / .CANCEL: 中止');
+    this.actions.print('宛先一覧（宛先ID / 会員表示）', ...residentProfiles(data).filter((p) => data.members.some((m) => m.id === personaMemberId(p.id) && m.actor === 'ai'))
+      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'WRITE 宛先（一覧の宛先IDまたはハンドル） / .CANCEL: 中止');
   }
   private confirm(value: Confirmation, ...warning: string[]) {
     this.confirmation = value;

@@ -12,7 +12,7 @@ address and display layout is a **category D reconstruction**, not a verified
 | --- | --- |
 | `INBOX` / `SENT` | Select the received/sent projection; switching boxes preserves the entry context. |
 | `LIST` | Refresh the current directory or mailbox from IndexedDB. |
-| `MEMBERS` | List the ten familiar residents' stable short addresses and current handles. |
+| `MEMBERS` | Associate each available resident's stable short address with their forum/OLT synthetic token and safe current handle. |
 | `READ number` | Read a letter in the current box; mark only that received letter read for its human recipient. |
 | `WRITE address` / `COMPOSE address` | Start a private letter to an existing resident. An omitted address prompts in the same input. |
 | `REPLY number` | Reply to received mail in INBOX, preserving its parent ID and prefilling `Re: subject`. |
@@ -25,6 +25,29 @@ PC-VAN-era account format, remote address or other human recipient is accepted.
 Ambiguous handles require a stable ID. Resident profile edits retain IDs and
 existing conversations. Added SIGs and OLT use the same member IDs
 without creating another identity registry.
+
+Mail lists, both parties in letter headers, and the resolved recipient in new
+and reply drafts show `(SYN-…) handle`, using the unchanged shared forum/OLT
+identity and safe-name helpers. `MEMBERS` shows `short-address / (SYN-…) handle`;
+the token is a display label, not an address or authentication. Stable addresses
+take precedence over handles, and duplicate handles require a stable address.
+This makes same-name correspondents distinguishable across all three mail routes.
+
+Tokens depend only on the complete member ID, surviving human/resident renames,
+member ordering, reload and JSON restore. Re-rendered lists and details use the
+current safe name; existing scrollback stays as printed. Drafts retain the
+recipient ID and display label selected at creation through review, editing and
+save retry. Unusable names show `名無し`; unresolved renderer references show
+`(不明) 名無し`, without the forum-only DEMO exception. Invalid reference imports
+still fail validation. Display calculation adds no writes or stored fields and
+does not mark resident recipients as having read mail.
+
+This extension is a [category D reconstruction](research/pcvan-1996-1997.md#mail-identity-and-handles-issue-83).
+Sources inspected 2026-10-24 support an identity/name distinction with moderate
+historical confidence, not a recovered 1996 header. Token placement, delimiters,
+short addresses and current-name refresh are product choices. The local-only
+scope does not imply that historical PC-VAN lacked Internet mail; November 1996
+documentation separately describes its `INET#` addressing.
 
 ```text
 1
@@ -57,9 +80,9 @@ in-memory transcript and a downloaded terminal log. Reload discards unsent draft
 
 Numbers are stable, ascending local mail numbers shared across boxes, with gaps
 when letters belong to other handles or have been deleted. They are not forum
-numbers. Reading displays subject, both handles, the shared historical JST date
-and the reply reference;
-listings show the correspondent, subject, date and individual unread/read marker.
+numbers. Reading displays subject, both parties' tokens and safe handles, the
+shared historical JST date and the reply reference; listings show the
+correspondent, subject, date and individual unread/read marker.
 No starter letters or archived/private source material are seeded.
 
 ## Resident activity and context

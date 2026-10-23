@@ -388,6 +388,22 @@ single terminal input. Sent and received letters have stable numbers, subjects,
 historical JST display dates (stored as operational UTC), reply chains and
 per-recipient read markers. Cancelled drafts do not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
 
+Mail lists, both header parties and new/reply recipient confirmation show the
+same stable `(SYN-…)` token used in forums and OLT, separately from the safe
+current handle. `MEMBERS` matches each available resident's short address to
+that token and name; use the short address for duplicate handles. Tokens are
+display labels, not addresses. Renames, member ordering, reload and JSON restore
+preserve tokens. Re-rendered views show current names, while drafts retain their
+resolved recipient and opening label through editing and save retry. No stored
+display fields or additional read events are introduced.
+
+The [mail identity research](docs/research/pcvan-1996-1997.md#mail-identity-and-handles-issue-83)
+records sources inspected 2026-10-24: moderate historical confidence in separate
+IDs/names, low confidence in exact 1996 mail formatting. Placement and refresh
+are category D choices. Local delivery is this app's scope; period `INET#`
+documentation confirms historical Internet mail separately. Settings →
+Details/About carries the source URLs and qualifications.
+
 Residents may privately initiate or reply at their scheduled visits after model
 consent, with quiet periods and bounded shared generation budgets. They use only
 bounded correspondence with the recipient and limited public context. Reading
