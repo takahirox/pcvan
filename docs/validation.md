@@ -1471,3 +1471,58 @@ non-failing. No real inference, model download, encoding dependency or storage
 migration was used. Optional subjective pacing, historical hardware and native
 IME observation were not performed. No push, PR, merge, external comment or
 deployment was performed; no post-merge verification is required.
+
+## Telecon BiZ database retrieval (#75)
+
+Validated on 2026-10-23 in the assigned worktree after reading the live open
+Issue and repository development/review guidance:
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities. Existing
+  Chromium was reused; no browser installation or model download was needed.
+- `npm run build`: passed TypeScript checking and production bundling.
+- Focused `npx playwright test tests/biz.spec.ts tests/sections.spec.ts tests/navigation.spec.ts --workers=4`:
+  **61 passed (25.9s)**, with no failures, retries or skips.
+- Documented `npm test`: **266 passed (1.3m)** using the normal eight-worker
+  configuration and both configured servers. Includes TypeScript checking and
+  the production build. No application checks failed, retried or skipped.
+  Existing Vite chunk-size and Node color-environment advisories remain
+  non-failing. The obsolete MAIN 4 empty-collection check is replaced by BiZ
+  coverage; all other destination and existing regression coverage is retained.
+- Controller checks cover zero/single/multiple matches, all four full articles,
+  case-insensitive commands and Latin matching with preserved query spelling,
+  retained earlier sets, repeated searches, the 20-set limit without eviction,
+  zero hits at capacity, malformed syntax and invalid/unsafe/out-of-range
+  numbers. Invalid requests and HELP preserve views/results. Direct/index
+  entry, every MAIN depth, repeated FIND/SHOW without duplicate parents,
+  set-relative article selection/returns, fresh re-entry, independent controller
+  state and absent forum/mail/conference/OLT contexts are checked.
+- Production journeys with and without a handle run at 320px against built
+  assets. They cover direct/index parents, all articles, retained/repeated sets,
+  limits, invalid commands, FIND IME confirmation, terminal Settings/About and
+  modal Details returns with an unsent Japanese draft, literal article/query
+  markup, keyboard horizontal scrolling, usable input and UTF-8 terminal logs.
+  Simulated IME events exercise the existing guards; native hardware IME testing
+  remains optional and unperformed.
+- With automatic activity paused and consent disabled, snapshot and exported
+  backup comparisons preserve members, SIGs, forums, posts, mail, read markers
+  and every setting, including conference/OLT, consent and historical calendar.
+  The anonymous fixture restores an empty world; browsing does not repopulate
+  it. Normal session/history updates remain allowed and verified. Articles and
+  result sets stay outside storage/backups. Both journeys observed no remote
+  requests. Existing storage/import/reset, composition, mail/OLT, consent,
+  calendar, IME, terminal pacing/skip and offline regressions pass.
+- Rechecked the five historical PDF source URLs and extracted text. The 1995
+  report's page-image retries for PDF pages 72 and 75 both returned internal
+  errors, so no page-image inspection is claimed. README, research and on-demand
+  About distinguish documented earlier semantics from moderate-confidence
+  November 1996 continuity and authored matching, layouts, spacing, lifecycle,
+  limits and return controls. All four articles are original undated fiction.
+- Reviewed the complete implementation, tests and documentation against #75.
+  All **58** local Markdown links/anchors across README, research and this
+  validation record resolve. Working-tree and staged whitespace checks pass.
+
+No framework, storage migration, real inference, model download, remote service,
+credentials or billing was added. Optional RUKIT manual research, historical
+session comparison and physical-device validation were not performed. No push,
+PR, merge, external comment or deployment was performed; no post-merge
+verification is required.

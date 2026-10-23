@@ -170,7 +170,7 @@ live drafts. OLT room history is included as world data.
 | `1` | 電子メール | Mailbox directory: inbox and sent, each 0 messages |
 | `2` | 索引 | Numbered routes to every other MAIN section and `J MITI` |
 | `3` | ニュース | Article list, 0 articles |
-| `4` | データベース | Database list, 0 entries |
+| `4` | データベース | Database directory; `1` opens 日経テレコン BiZ |
 | `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
 | `7` | インターネット | Information article list, 0 articles |
@@ -190,6 +190,42 @@ live drafts. OLT room history is included as world data.
 | `21` | オリンピック特設コーナー | Article list, 0 articles |
 | `X` | 旧電子メール | Separate legacy entry to the same local mailbox |
 | `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
+
+For database retrieval, use `4` → `1` → `FIND パソコン` → `SHOW P1 /1`
+→ `SHOW P3 /1 1`. 日経テレコン BiZ searches four short, original, undated Japanese
+example articles suited to late 1996, never recovered reporting or prose attributed
+to a newspaper. No handle, AI, credentials, remote connection or billing is involved.
+
+`FIND keyword` accepts one whitespace-free literal substring of a title or body;
+Latin matching ignores case and the displayed query keeps its entered spelling.
+Command words ignore case; whitespace between fields is normalized. Boolean words
+(`AND`, `OR`, `NOT`), set references, expressions using `()&|=+*?"/`, multiple
+keywords, date/media conditions and extra arguments receive guidance. No stemming,
+tokenization, wildcard expansion or regular expressions are performed.
+`FIND 通信` finds two articles, `FIND 省エネルギー` one, and `FIND 雪だるま` none.
+Successful searches create `/1`, `/2`, etc., including repeated queries. Earlier
+sets keep their original order and meaning. Zero hits create no set. Each visit
+retains at most 20 successful sets; at capacity, existing sets remain available.
+Leave for the database directory with `BACK` and select `1` to start fresh.
+
+`SHOW P1 /n` lists that set's numbered titles; `SHOW P3 /n item` reads the full
+article at that position in that set. Invalid syntax, absent sets and invalid or
+out-of-range numbers preserve the active view and results. `HELP` redisplays it.
+`BACK` follows article → that set's titles → search/results → directory → actual
+entry parent, including `2 索引` → `4`; `MAIN` clears the path. Repeated FIND/SHOW
+replace views without adding parents. Leaving BiZ clears all its transient sets.
+Articles and sets stay outside IndexedDB and backups; browsing leaves community,
+mail, conference/OLT, consent, read markers and calendar records untouched.
+Normal session/history bookkeeping continues. Settings/About returns to the same
+view. Queries and article markup remain literal terminal text, also in `LOG`.
+
+The 1993 gateway evidence and 1995 FIND/SHOW semantics support this
+[qualified reconstruction](docs/research/pcvan-1996-1997.md#telecon-biz-database-retrieval-issue-75).
+Continuity into November 1996 is a moderate-confidence inference. Placement,
+selectors, prompts, spacing normalization, matching, set lifecycle/limit and return
+controls are authored choices, not authenticated host behavior or historical
+limits. Source scope, failed PDF page-image access and limitations are available
+in Settings → Details/About. No later Telecon21 web interface is imported.
 
 For environmental information, use `5` → `1` → `READ 1` or `READ 2`.
 EICネット (EIC NET) is a separate destination reached through the gateway,
@@ -550,6 +586,7 @@ it is resolved.
   IndexedDB version 2 adds the mail store without rewriting prior posts.
 - `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
   offline/retention panel and build-generated app-shell worker.
+- `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
 - `tests/`: controller/session checks and browser interaction checks.
 
 ## Validation
@@ -585,7 +622,8 @@ Composition checks cover edit/review/cancel/send, blank drafts, Japanese multili
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.
 Section/service checks cover every MAIN and index destination, all five service views,
-mailbox browsing, empty collections, OLT conversation/presence, preserved fixture
+mailbox browsing, BiZ search/sets/titles/articles and fresh visits, empty collections,
+OLT conversation/presence, preserved fixture
 evidence, scoped helpers,
 unsupported input, return paths, offline keyboard use without network requests,
 and unchanged local content after visiting services and returning to forums.
