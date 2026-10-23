@@ -104,6 +104,9 @@ for (const entry of mainMenu.entries) {
     } else if (entry.selector === '5') {
       expect(controller.screen).toBe('environmental-gateway');
       expect(result).toContain('1 EICネット（別ネットワーク）');
+    } else if (entry.selector === '4') {
+      expect(controller.screen).toBe('database-directory');
+      expect(result).toContain('1 日経テレコン BiZ');
     } else if (entry.selector === 'Q') {
       expect(controller.screen).toBe('disconnected');
       expect(result).toContain('RECONNECT');

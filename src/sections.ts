@@ -1,9 +1,9 @@
 // Browser-local collection views, not historical submenu transcriptions. Names
 // and selectors in the historical fixtures remain the navigation authority.
-export type CollectionKind = 'mail' | 'articles' | 'databases' | 'catalog' | 'publications' | 'files' | 'room' | 'conference';
+export type CollectionKind = 'mail' | 'articles' | 'catalog' | 'publications' | 'files' | 'room' | 'conference';
 
 export const mainCollections: Record<string, CollectionKind> = {
-  '1': 'mail', '3': 'articles', '4': 'databases',
+  '1': 'mail', '3': 'articles',
   '6': 'articles', '7': 'articles', '8': 'articles', '9': 'catalog',
   '10': 'publications', '11': 'articles', '12': 'articles',
   '14': 'articles', '15': 'articles', '16': 'articles', '17': 'articles',
@@ -20,7 +20,6 @@ export type Mailbox = keyof typeof mailboxes;
 
 const emptyLists = {
   articles: ['記事一覧：0件', 'まだ記事がありません。'],
-  databases: ['データベース一覧：0件', 'まだデータベースがありません。'],
   catalog: ['商品カタログ：0件', 'まだ商品がありません。'],
   publications: ['刊行物一覧：0件', 'まだ刊行物がありません。'],
   files: ['ファイル一覧：0件', 'まだファイルがありません。'],

@@ -14,6 +14,8 @@ import type { CollectionKind, Mailbox } from './sections';
 import { categoryItems, serviceCategories, renderServiceDirectory, renderServiceCategory, renderServiceItem } from './service-collections';
 import type { ReadingService } from './service-collections';
 import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem } from './eic';
+import { bizArticles, bizSetLimit, bizHelp, bizKeywordHelp, renderDatabaseDirectory, renderBizSearch, renderBizTitles, renderBizArticle } from './biz';
+import type { BizSet } from './biz';
 
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
@@ -21,7 +23,8 @@ const services = daisizen.sections.filter((section) => section.demo_entry);
 export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
   'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
-  'environmental-gateway' | 'eic-list' | 'eic-item';
+  'environmental-gateway' | 'eic-list' | 'eic-item' |
+  'database-directory' | 'biz-search' | 'biz-titles' | 'biz-article';
 
 // MAIN's row grouping follows the circa-1996 reproduction; the 44-cell column
 // offset is reconstructed. In this fixture, Japanese/full-width characters and
@@ -76,6 +79,10 @@ export class PcvanController implements TerminalController {
   private serviceCategory = 0;
   private serviceItem = 0;
   private eicItem = 0;
+  private readonly bizSets: BizSet[] = [];
+  private bizZeroKeyword: string | undefined;
+  private bizSetNumber = 0;
+  private bizItem = 0;
   private section = mainMenu.entries[0]!;
   private mailbox: Mailbox = 'INBOX';
   private readonly parents: Screen[] = [];
@@ -112,12 +119,20 @@ export class PcvanController implements TerminalController {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     if (this.currentScreen !== 'main' && this.currentScreen !== 'disconnected') {
       if (command === 'MAIN') {
+        this.clearBiz();
         this.parents.length = 0;
         this.currentScreen = 'main';
         return this.render();
       }
       if (command === 'BACK') {
-        this.currentScreen = this.parents.pop() ?? 'main';
+        // BiZ has a fixed internal path. FIND/SHOW replace the active view and
+        // never push duplicate parents; only entry retains the directory parent.
+        if (this.currentScreen === 'biz-article') this.currentScreen = 'biz-titles';
+        else if (this.currentScreen === 'biz-titles') this.currentScreen = 'biz-search';
+        else {
+          if (this.currentScreen === 'biz-search') this.clearBiz();
+          this.currentScreen = this.parents.pop() ?? 'main';
+        }
         return this.render();
       }
       if (command === 'HELP') return this.render();
@@ -177,6 +192,13 @@ export class PcvanController implements TerminalController {
         if (Object.hasOwn(mailboxes, command)) { this.mailbox = command as Mailbox; return this.render(); }
         if (command === 'LIST') return this.render();
         return this.invalidCommand('LIST / BACK / MAIN / HELP');
+      case 'database-directory':
+        if (command === 'LIST') return this.render();
+        if (command === '1') { this.clearBiz(); return this.enter('biz-search'); }
+        return this.invalidCommand('1: 日経テレコン BiZ / LIST / BACK / MAIN / HELP');
+      case 'biz-search':
+      case 'biz-titles':
+      case 'biz-article': return this.handleBiz(line);
       case 'environmental-gateway':
         if (command === 'LIST') return this.render();
         if (command === '1') return this.enter('eic-list');
@@ -260,6 +282,46 @@ export class PcvanController implements TerminalController {
     }
   }
 
+  private clearBiz(): void {
+    this.bizSets.length = 0; this.bizZeroKeyword = undefined;
+    this.bizSetNumber = 0; this.bizItem = 0;
+  }
+
+  private handleBiz(line: string): readonly string[] {
+    const input = line.trim();
+    if (/^FIND(?:\s|$)/i.test(input)) {
+      const find = /^FIND\s+(\S+)$/i.exec(input);
+      const keyword = find?.[1];
+      if (!keyword || /^(?:AND|OR|NOT)$/i.test(keyword) || /[()&|=+*?"/]/.test(keyword)) {
+        return [bizKeywordHelp, bizHelp, demoPrompt];
+      }
+      const folded = keyword.toLowerCase();
+      const articles = bizArticles.filter((article) =>
+        `${article.title}\n${article.body}`.toLowerCase().includes(folded));
+      if (articles.length && this.bizSets.length >= bizSetLimit) {
+        return ['検索集合は20件までです。既存の集合は残っています。BACK で検索→一覧へ戻り、1 で入り直してください。', demoPrompt];
+      }
+      if (articles.length) this.bizSets.push({ keyword, articles });
+      this.bizZeroKeyword = articles.length ? undefined : keyword;
+      this.currentScreen = 'biz-search';
+      return this.render();
+    }
+    const show = /^SHOW P(1|3) \/([1-9]\d*)(?: ([1-9]\d*))?$/i.exec(input.replace(/\s+/g, ' '));
+    if (show && (show[1] === '1' ? show[3] === undefined : show[3] !== undefined)) {
+      const number = Number(show[2]), item = Number(show[3]);
+      const set = Number.isSafeInteger(number) ? this.bizSets[number - 1] : undefined;
+      if (!set) return ['その検索集合はありません。HELP で現在の画面を確認してください。', bizHelp, demoPrompt];
+      if (show[1] === '3' && (!Number.isSafeInteger(item) || !set.articles[item - 1])) {
+        return ['その番号の記事はありません。SHOW P1 /番号 で見出しを確認してください。', bizHelp, demoPrompt];
+      }
+      this.bizSetNumber = number;
+      this.bizItem = show[1] === '3' ? item : 0;
+      this.currentScreen = show[1] === '1' ? 'biz-titles' : 'biz-article';
+      return this.render();
+    }
+    return this.invalidCommand(`${bizHelp} / BACK / MAIN / HELP`);
+  }
+
   private handleForum(command: string, keyword: string, boardNo: number): readonly string[] {
     if (command === 'LIST') return this.render();
     const read = /^READ ([1-9]\d*)$/.exec(command);
@@ -302,6 +364,7 @@ export class PcvanController implements TerminalController {
 
   private openSection(entry: typeof mainMenu.entries[number]): readonly string[] {
     this.section = entry;
+    if (entry.selector === '4') return [entryText(entry), ...this.enter('database-directory')];
     if (entry.selector === '5') {
       this.eicItem = 0;
       return [entryText(entry), ...this.enter('environmental-gateway')];
@@ -348,6 +411,10 @@ export class PcvanController implements TerminalController {
         `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
         returnHelp, demoPrompt,
       ];
+      case 'database-directory': return [...renderDatabaseDirectory(), returnHelp, demoPrompt];
+      case 'biz-search': return [...renderBizSearch(this.bizSets, this.bizZeroKeyword), returnHelp, demoPrompt];
+      case 'biz-titles': return [...renderBizTitles(this.bizSets[this.bizSetNumber - 1]!, this.bizSetNumber), returnHelp, demoPrompt];
+      case 'biz-article': return [...renderBizArticle(this.bizSets[this.bizSetNumber - 1]!, this.bizSetNumber, this.bizItem), returnHelp, demoPrompt];
       case 'environmental-gateway': return [...renderEnvironmentalGateway(), returnHelp, demoPrompt];
       case 'eic-list': return [...renderEicList(), returnHelp, demoPrompt];
       case 'eic-item': return [...renderEicItem(this.eicItem), returnHelp, demoPrompt];
