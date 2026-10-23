@@ -1,3 +1,4 @@
+import { calendarSetting } from './calendar';
 import { conferenceState } from './conference';
 import type { Contribution } from './storage/schema';
 import { TerminalOlt } from './olt';
@@ -304,7 +305,7 @@ export class TerminalCommands {
           else this.startCompose({ mail: true, recipient: mail.senderId, parent: mail }, data);
         } else {
           if (mail.recipientId === human) await (await this.actions.repository()).markMailRead(human!, mail.id);
-          print(...renderMail(mail, data.members, data.mail ?? []));
+          print(...renderMail(mail, data.members, data.mail ?? [], calendarSetting(data)));
         }
         return true;
       }

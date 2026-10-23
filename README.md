@@ -52,9 +52,12 @@ from character reveal speed, including Instant/reduced-motion display. Escape or
 a submitted command skips the rest. The optional local handle invitation runs
 only at this handoff under its existing first-use rules.
 
-Session dates remain actual browser-session timestamps in UTC, never silently
-changed to 1996. Only `Q` records a logout; a fresh world or reload without `Q`
-does not invent one. A historical display calendar is separate work. The
+Entry, forums, mail, conference and OLT share a durable historical display
+calendar in fixed JST. A fresh world starts in the fictional week of November
+18–24, 1996 and advances with elapsed operational time, including into 1997.
+Stored timestamps and scheduling remain operational UTC; modern Settings shows
+actual session times. Only `Q` records a logout; reload without `Q` never invents
+one. See the [calendar/import policy](docs/local-storage.md#historical-display-calendar-issue-67). The
 [entry research](docs/research/pcvan-1996-1997.md#staged-session-entry-issue-61)
 records the 1995-04-02 excerpt published 2010-09-22 (contents: high confidence;
 independent authenticity/adjacent-year applicability: moderate), the undated
@@ -82,8 +85,8 @@ In a forum, `LIST` lists numbers and unread/read markers. `READ n` displays the
 exact stored title/body; `返信先：#m` is plain text, followed by typing `READ m`
 or `REPLY n`. Reading advances the selected human's per-forum high-water mark.
 It never changes posts or moves the mark backwards. Missing numbers preserve state.
-Dates are UTC; secondary header numbers have no assigned meaning and the uncertain
-historical line-count field is omitted.
+Dates use the shared historical JST calendar; secondary header numbers have no
+assigned meaning and the uncertain historical line-count field is omitted.
 
 Compose entirely through the same input:
 
@@ -253,8 +256,8 @@ then an address), `READ number`, and `REPLY number`. `LIST` refreshes the curren
 view. Send to the same ten resident IDs/handles used in SIGs, using the existing
 human handle. Compose subject/body, `.END`, then `EDIT` / `Y` / `N` through the
 single terminal input. Sent and received letters have stable numbers, subjects,
-UTC timestamps, reply chains and per-recipient read markers. Cancelled drafts do
-not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
+historical JST display dates (stored as operational UTC), reply chains and
+per-recipient read markers. Cancelled drafts do not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
 
 Residents may privately initiate or reply at their scheduled visits after model
 consent, with quiet periods and bounded shared generation budgets. They use only

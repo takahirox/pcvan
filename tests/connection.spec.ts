@@ -1,3 +1,4 @@
+import { serviceDate, calendarSetting } from '../src/calendar';
 import { command, start, backup, snapshot } from './terminal-helpers';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
@@ -8,7 +9,7 @@ const stages = ['PC-VAN 接続中', 'PC-VAN / パーソナル通信サービス'
   '前回使用終了:', 'プロファイル修正: N', 'ようこそ PC-VAN へ。', '＝＝＝ＰＣ－ＶＡＮ＝＝＝ (MAIN)'];
 const count = (text: string, part: string) => text.split(part).length - 1;
 
-test('entry advances in order using actual session dates and completes idempotently', () => {
+test('entry advances in order using fixed JST session dates and completes idempotently', () => {
   const controller = new ConnectionController();
   const saved = { lastLoginAt: '2026-10-23T01:02:03.000Z', lastLogoutAt: '2026-10-22T04:05:06.000Z', commandHistory: [] };
   controller.setSession(saved);
@@ -16,8 +17,8 @@ test('entry advances in order using actual session dates and completes idempoten
   for (let i = 0; i < 6; i++) output.push(...controller.advanceConnection());
   const text = output.join('\n');
   expect(stages.map((stage) => text.indexOf(stage))).toEqual([...stages.map((stage) => text.indexOf(stage))].sort((a, b) => a - b));
-  expect(text).toContain(`前回使用終了: ${saved.lastLogoutAt} (UTC)`);
-  expect(text).toContain(`今回使用開始: ${saved.lastLoginAt} (UTC)`);
+  expect(text).toContain(`前回使用終了: ${serviceDate(saved.lastLogoutAt)} (JST)`);
+  expect(text).toContain(`今回使用開始: ${serviceDate(saved.lastLoginAt)} (JST)`);
   expect(output.slice(-new PcvanController().welcome.length)).toEqual(new PcvanController().welcome);
   expect(controller.screen).toBe('main');
   expect(controller.advanceConnection()).toEqual([]);
@@ -45,7 +46,7 @@ test('missing previous logout is explicit, never inferred from an earlier login'
   const controller = new ConnectionController();
   controller.setSession({ lastLoginAt: '2026-10-23T00:00:00.000Z', lastLogoutAt: null, commandHistory: [] });
   controller.advanceConnection(); controller.advanceConnection();
-  expect(controller.advanceConnection()).toEqual(['前回使用終了: 記録なし (UTC)', '今回使用開始: 2026-10-23T00:00:00.000Z (UTC)']);
+  expect(controller.advanceConnection()).toEqual(['前回使用終了: 記録なし (JST)', '今回使用開始: 26年10月23日 09:00:00 (JST)']);
 });
 
 test('fresh entry reaches MAIN naturally with one separate handle invitation and no credential request', async ({ page }) => {
@@ -66,8 +67,8 @@ test('fresh entry reaches MAIN naturally with one separate handle invitation and
   const data = await snapshot(page);
   expect(data.members.filter((m) => m.actor === 'human')).toEqual([]);
   expect(data.session!.lastLogoutAt).toBeNull();
-  expect(text).toContain(`今回使用開始: ${data.session!.lastLoginAt} (UTC)`);
-  expect(text).toContain('前回使用終了: 記録なし (UTC)');
+  expect(text).toContain(`今回使用開始: ${serviceDate(data.session!.lastLoginAt!, calendarSetting(data))} (JST)`);
+  expect(text).toContain('前回使用終了: 記録なし (JST)');
   await input.press('Escape'); await input.press('Escape');
   await command(page, 'Y', 'ハンドル名=');
   await input.press('Escape');
@@ -80,15 +81,15 @@ test('returning entry and repeated reconnect use saved logout dates without fabr
   const first = await snapshot(page);
   await page.reload(); await expect(page.locator('.output')).toContainText(stages[6]!);
   expect((await snapshot(page)).session!.lastLogoutAt).toBeNull();
-  expect((await page.locator('.output').textContent())!).toContain('前回使用終了: 記録なし (UTC)');
+  expect((await page.locator('.output').textContent())!).toContain('前回使用終了: 記録なし (JST)');
   for (let i = 0; i < 2; i++) {
     await command(page, 'Q', '接続を終了');
     // BACKUP queues behind the logout write, without reconnecting.
     const ended = await backup(page);
     const text = await command(page, 'RECONNECT', '番号またはコマンド=');
     const data = await snapshot(page);
-    expect(text).toContain(`前回使用終了: ${ended.session!.lastLogoutAt} (UTC)`);
-    expect(text).toContain(`今回使用開始: ${data.session!.lastLoginAt} (UTC)`);
+    expect(text).toContain(`前回使用終了: ${serviceDate(ended.session!.lastLogoutAt!, calendarSetting(ended))} (JST)`);
+    expect(text).toContain(`今回使用開始: ${serviceDate(data.session!.lastLoginAt!, calendarSetting(data))} (JST)`);
     expect(count(text, stages[6]!)).toBe(1);
     expect(text).not.toContain('ハンドル名を登録しますか');
     expect(data.members).toEqual(first.members);
@@ -202,7 +203,7 @@ for (const skip of [false, true]) {
     expect(count(text, stages[6]!)).toBe(1);
     expect(count(text, 'ハンドル名を登録しますか')).toBe(1);
     if (skip) expect(text).not.toContain('デモID:');
-    else expect(text).toContain(`今回使用開始: ${data.session!.lastLoginAt} (UTC)`);
+    else expect(text).toContain(`今回使用開始: ${serviceDate(data.session!.lastLoginAt!, calendarSetting(data))} (JST)`);
   });
 }
 

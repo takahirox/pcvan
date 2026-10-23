@@ -1,3 +1,4 @@
+import { CALENDAR_SETTING, initialCalendar } from '../calendar';
 import { conferenceState, starterConference } from '../conference';
 import { CONFERENCE_SETTING, validateConference, validateConferenceMembers } from './schema';
 import type { Contribution } from './schema';
@@ -189,6 +190,11 @@ export class LocalRepository {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!['members', 'sigs', 'forums', 'readStates', 'settings'].includes(store)) invalid('This store does not support put.');
       validateRecord(store, row);
+      if (store === 'settings' && (row as Records['settings']).id === CALENDAR_SETTING) {
+        const existing = await request(tx.objectStore('settings').get(CALENDAR_SETTING));
+        if (existing && existing.value.sourceAnchor !== ((row as Records['settings']).value as { sourceAnchor: string }).sourceAnchor)
+          invalid('The world calendar can only be replaced by import or reset.');
+      }
       if (store === 'members') {
         const member = row as Member;
         const content = await this.snapshot(tx);
@@ -395,6 +401,7 @@ export class LocalRepository {
 
   delete<S extends Store>(store: S, key: Key<S>): Promise<void> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (store === 'settings' && key === CALENDAR_SETTING) invalid('The world calendar can only be removed by import or reset.');
       const referenced = async (table: Store, index: string, match: IDBValidKey) =>
         (await request(tx.objectStore(table).index(index).count(match))) > 0;
       let hasChildren = false;
@@ -461,6 +468,13 @@ export class LocalRepository {
     });
   }
 
+  private async initializeCalendar(tx: IDBTransaction, content: Backup, now: string): Promise<void> {
+    if (content.settings.some((s) => s.id === CALENDAR_SETTING)) return;
+    const row = { id: CALENDAR_SETTING, value: initialCalendar(content, now) as unknown as JsonValue };
+    validateRecord('settings', row);
+    await request(tx.objectStore('settings').add(row));
+  }
+
   private async readActivity(tx: IDBTransaction, now: string): Promise<AiActivity> {
     const settings = tx.objectStore('settings');
     const row: Records['settings'] | undefined = await request(settings.get(ACTIVITY_SETTING));
@@ -468,6 +482,7 @@ export class LocalRepository {
     validateActivity(state);
     const migrated = migrateActivity(state);
     const content = await this.snapshot(tx);
+    await this.initializeCalendar(tx, content, now);
     if (!content.settings.some((r) => r.id === WORLD_SETTING)) {
       const imported = await request(tx.objectStore('session').get('imported'));
       const pristine = !imported && content.session === null && stores.every((store) => !(content[store] ?? []).length);
@@ -839,6 +854,7 @@ export class LocalRepository {
           await request(tx.objectStore(store).add(restored));
         }
       }
+      await this.initializeCalendar(tx, backup, new Date().toISOString());
       if (backup.session !== null) await request(tx.objectStore('session').put(backup.session, 'current'));
       await request(tx.objectStore('session').put(true, 'imported'));
       await request(tx.objectStore('session').put(generation, 'world-generation'));

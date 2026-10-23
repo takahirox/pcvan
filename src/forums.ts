@@ -1,3 +1,5 @@
+import { serviceDate } from './calendar';
+import type { HistoricalCalendar } from './calendar';
 import { expandedBoards } from './communities';
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import demoPosts from '../data/pcvan/demo-posts.json' with { type: 'json' };
@@ -52,10 +54,9 @@ export function forumName(keyword: string, boardNo: number): string {
     : expandedBoards.find((board) => board.keyword === keyword && board.boardNo === boardNo)!.name;
 }
 
-/** UTC keeps the stored date stable across browsers; spacing is reconstructed. */
-export function renderPost(post: Post, name: string, lineCount?: number, members: readonly Member[] = []): string[] {
-  const date = new Date(post.simulation?.simulatedAt ?? post.createdAt).toISOString();
-  const stamp = `${date.slice(2, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}  ${date.slice(11, 16)}`;
+/** Shared fixed-JST calendar; header spacing is reconstructed. */
+export function renderPost(post: Post, name: string, lineCount?: number, members: readonly Member[] = [], calendar?: HistoricalCalendar): string[] {
+  const stamp = serviceDate(post.simulation?.simulatedAt ?? post.createdAt, calendar, 'forum');
   const handle = members.find((member) => member.id === post.authorId)?.handle.trim();
   // Never derive a display name from an internal record key. Old snapshots may
   // lack member data; only the documented demo identifiers stand on their own.

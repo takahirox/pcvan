@@ -1,7 +1,14 @@
 import { expect, test } from '@playwright/test';
 import type { Backup } from '../src/storage/schema';
 import type { LocalRepository } from '../src/storage/repository';
-import { backupFixture } from './backup-fixture';
+import { backupFixture as legacyFixture } from './backup-fixture';
+
+// These CRUD round-trips use initialized backups; calendar.spec covers migration.
+function backupFixture() {
+  const data = legacyFixture();
+  data.settings.unshift({ id: 'historical-calendar', value: { version: 1, sourceAnchor: '2026-10-20T01:00:00.000Z' } });
+  return data;
+}
 
 declare global {
   interface Window {

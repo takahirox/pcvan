@@ -1299,3 +1299,47 @@ performed. These checks establish prompt construction and existing lifecycle
 behavior, not model obedience or historical authenticity. Stored/displayed dates
 and scheduling retain their existing behavior. No push, PR, merge, external
 comment or deployment was performed; no post-merge verification is required.
+
+## Stable historical service calendar (#67)
+
+Validation on 2026-10-23 in the assigned worktree, after reading the live open
+Issue and repository development/review guidance:
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities.
+- Calendar-focused `npm test -- tests/calendar.spec.ts --workers=1`:
+  **7 passed (32.1s)**, including TypeScript checking and the production build.
+- Final `npm test -- --workers=4`: **249 passed (1.8m)**, with no failures,
+  retries or skips. This includes TypeScript checking, production assets and the
+  repository-module Vite server. All 242 existing checks remain in the suite.
+- Development runs caught an unsupported model ID in the new pending-run fixture;
+  it now uses a supported ID with a stub result, without loading a model. A live
+  source edit also interrupted a Settings journey during an earlier run. The
+  focused rerun passed that Settings check, and the final full run passed both.
+- Independent literal expectations cover one controlled instant across entry,
+  forum, mail lists/details, conference and live/replayed OLT; older catch-up
+  event times; JST midnight; month/year rollover; a valid leap-day input;
+  historical canonical instants; missing logout; and literal date-like text.
+- Production journeys in Asia/Tokyo and America/Los_Angeles at 320px cover forum
+  contribution/reading, local mail, conference and OLT, reload without Q,
+  backup/restore, and another tab. Existing records retain their displayed dates
+  while operational timestamps remain unchanged. Normal reads/session/OLT
+  activity may still update their usual state.
+- Repository and production import checks cover dated legacy and historical-only
+  backups restored under different clocks, operational world provenance reuse,
+  deterministic historical-only surrogate anchors, pending runs predating
+  initialization, strict metadata validation, immutable mapping, calendar-write
+  quota rollback, concurrent initialization and reset with a fresh mapping.
+  Existing atomic-import, stale-world, empty-world, consent, scheduling, retention,
+  composition/IME, scrolling, progressive output and skip regressions pass.
+- Rechecked the preserved 1995 login excerpt and author-preserved course archive,
+  including its 1996-08-07 header. Research/About disclose confidence, fictional
+  epoch, fixed JST, legacy assumptions and operational/display-time separation.
+- Reviewed the complete staged implementation, tests and documentation against
+  Issue #67. Local Markdown targets/anchors resolve; `git diff --check` and
+  `git diff --cached --check` pass, including new files.
+
+The existing Vite large-chunk and Node color-environment advisories remain
+non-failing. No model download, real inference, new framework or hardware check
+was used. Optional manual readability review was not performed; narrow-width
+journeys are automated. No push, PR, merge, external comment or deployment was
+performed. No post-merge verification is required.

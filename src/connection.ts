@@ -1,3 +1,5 @@
+import { calendarSetting, serviceDate } from './calendar';
+import type { HistoricalCalendar } from './calendar';
 import type { TerminalController } from './controller';
 import { PcvanController } from './navigation';
 import type { ForumContent } from './forums';
@@ -12,6 +14,7 @@ export class ConnectionController implements TerminalController {
   private readonly navigation = new PcvanController();
   private connecting = true;
   private stage = 0;
+  private calendar: HistoricalCalendar | undefined;
   private session: Session | null = null;
   readonly welcome = greeting;
 
@@ -19,7 +22,7 @@ export class ConnectionController implements TerminalController {
 
   get needsContent(): boolean { return this.navigation.needsContent; }
 
-  setContent(content: ForumContent): void { this.navigation.setContent(content); }
+  setContent(content: ForumContent): void { this.calendar = calendarSetting(content); this.navigation.setContent(content); }
   setMemberId(id: string | undefined): void { this.navigation.setMemberId(id); }
   get isConference() { return this.navigation.isConference; }
   get isOlt() { return this.navigation.isOlt; }
@@ -34,8 +37,8 @@ export class ConnectionController implements TerminalController {
       case 1: return ['PC-VAN / パーソナル通信サービス'];
       case 2: return ['デモID: LOCAL-DEMO（架空・自動表示）', 'パスワード: ［入力・認証なし］'];
       case 3: return [
-        `前回使用終了: ${this.session?.lastLogoutAt ?? '記録なし'} (UTC)`,
-        `今回使用開始: ${this.session?.lastLoginAt ?? '記録なし'} (UTC)`,
+        `前回使用終了: ${this.session?.lastLogoutAt ? serviceDate(this.session.lastLogoutAt, this.calendar) : '記録なし'} (JST)`,
+        `今回使用開始: ${this.session?.lastLoginAt ? serviceDate(this.session.lastLoginAt, this.calendar) : '記録なし'} (JST)`,
       ];
       case 4: return ['プロファイル修正: N（自動・変更しません）'];
       case 5: return ['ようこそ PC-VAN へ。掲示板の話題をゆっくりお楽しみください。'];
