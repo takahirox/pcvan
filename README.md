@@ -338,8 +338,22 @@ service directory → SIG; `MAIN` clears that path. These controls and all examp
 are reconstructed. Category labels/order follow an undated memorial and remain
 provisional for 1996. OSL dates are fictional 1996 simulation dates; sizes count
 the preview body's UTF-8 bytes (LF, no BOM), not historical transmission bytes.
-No files execute or transfer, and browsing does not change community records or
-require a handle. See [collection provenance](docs/research/pcvan-1996-1997.md#library-and-osl-browsing-issue-59).
+From an OSL category listing or preview, `DOWNLOAD number` selects a file in
+that category. Confirm with `Y` to request a browser download of `NOTEINFO.TXT`
+or `HARU96.CSV` under its catalog filename; the payload is the exact bundled
+body, including its final LF. `HELP` repeats the filename, byte count and controls.
+Empty/invalid input cannot approve; `N`, `BACK` or `CANCEL` cancels into the same
+view, and `MAIN` cancels into MAIN. Success or initiation failure consumes approval
+and returns to the requesting view; another attempt needs a fresh request.
+Settings/About remain available; the Options modal preserves unsent input.
+Approval is temporary and discarded on reload, restore or reset. The browser
+controls saving; the app reports only the handoff, not disk-save completion.
+Acquisition needs no handle, AI, account or network access and leaves community
+records unchanged. Nothing executes or uploads. Commands, confirmation and browser
+handoff are modern reconstruction, with historical encodings, protocols, rates,
+charges and exact host prompts unresolved. See
+[acquisition provenance](docs/research/pcvan-1996-1997.md#browser-local-osl-acquisition-issue-91)
+and [collection provenance](docs/research/pcvan-1996-1997.md#library-and-osl-browsing-issue-59).
 
 `CONFERENCE` opens a retained electronic conference, separate from forums and OLT.
 Use `LIST` / `HELP` for contributions, `READ number` for a body, `WRITE` for a new
@@ -456,7 +470,7 @@ work throughout; `BACK` from a mailbox returns to its own entry directory. The
 index uses MAIN selectors except `2` and `Q`. `Q` remains scoped to MAIN, without
 single-letter `B`/`M` aliases. Commands, mailbox sharing and layouts are reconstructed
 conveniences, not verified historical sequences. There is no remote mail delivery,
-shopping transaction, file transfer, internet gateway or multi-user chat. Opening
+shopping transaction, remote file transfer, internet gateway or multi-user chat. Opening
 these screens loads no model and makes no network calls. Settings → Details/About
 provides local fiction provenance and historical uncertainty on demand.
 

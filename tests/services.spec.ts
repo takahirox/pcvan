@@ -90,7 +90,7 @@ for (const service of ['LIBRARY', 'OSL'] as const) {
       expect(listing[1]).toBe(label);
       expect(controller.submit('HELP')).toEqual(listing);
       expect(controller.submit('LIST')).toEqual(listing);
-      for (const invalid of ['0', '1', '99', 'READ 0', 'READ -1', 'READ 1.5', 'READ 9007199254740993', 'WRITE', 'REPLY 1', 'INBOX', 'JOIN 1', 'UPLOAD file', 'DOWNLOAD 1', 'LIBRARY', 'OSL']) {
+      for (const invalid of ['0', '1', '99', 'READ 0', 'READ -1', 'READ 1.5', 'READ 9007199254740993', 'WRITE', 'REPLY 1', 'INBOX', 'JOIN 1', 'UPLOAD file', 'DOWNLOAD 2', 'LIBRARY', 'OSL']) {
         expect(controller.submit(invalid).join('\n')).toMatch(/READ 番号|LIST/);
         expect(controller.submit('HELP')).toEqual(listing);
       }
@@ -189,7 +189,7 @@ for (const handle of [undefined, '読む人']) {
           await command(page, 'BACK', items[0]!.body.split('\n')[0]);
           await command(page, 'ABOUT', 'UTF-8（BOMなし、改行LF）');
           await command(page, 'BACK', items[0]!.body.split('\n')[0]);
-          for (const invalid of ['WRITE', 'REPLY 1', 'COMPOSE someone', 'INBOX', 'JOIN 1', 'DOWNLOAD 1', 'UPLOAD file']) {
+          for (const invalid of ['WRITE', 'REPLY 1', 'COMPOSE someone', 'INBOX', 'JOIN 1', ...(service === 'LIBRARY' ? ['DOWNLOAD 1'] : ['DOWNLOAD 2']), 'UPLOAD file']) {
             await command(page, invalid, /^(WRITE|REPLY)/.test(invalid) ? '投稿先の掲示板' : 'この画面では使えない');
           }
           await command(page, 'HELP', items[0]!.body.split('\n')[0]);

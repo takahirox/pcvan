@@ -2,6 +2,12 @@ import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import examples from '../data/pcvan/daisizen-collections.json' with { type: 'json' };
 
 export type ReadingService = 'LIBRARY' | 'OSL';
+export interface OslDownload {
+  filename: string;
+  body: string;
+  returnTo(): readonly string[];
+}
+
 export interface ReadingItem {
   title: string;
   body: string;
@@ -37,6 +43,7 @@ export function renderServiceCategory(service: ReadingService, category: number)
       ? [`#${index + 1} ${item.title}`]
       : [`#${index + 1} ${fileMetadata(item)[0]}`, ...fileMetadata(item).slice(1)])
       : [service === 'LIBRARY' ? 'まだ記事がありません。' : 'まだファイルがありません。']),
+    ...(service === 'OSL' ? ['DOWNLOAD 番号: ファイル取得'] : []),
     'READ 番号: 閲覧 / LIST: 一覧 / BACK: 分類一覧'];
 }
 
@@ -45,5 +52,6 @@ export function renderServiceItem(service: ReadingService, category: number, ind
   return [serviceCategories(service)[category - 1]!,
     ...(service === 'LIBRARY' ? [`#${index + 1} ${item.title}`]
       : [`#${index + 1}`, ...fileMetadata(item), 'テキストプレビュー']),
-    ...item.body.split('\n'), 'LIST / BACK: 一覧に戻る'];
+    ...item.body.split('\n'),
+    ...(service === 'OSL' ? ['DOWNLOAD 番号: ファイル取得'] : []), 'LIST / BACK: 一覧に戻る'];
 }

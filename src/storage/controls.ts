@@ -1,12 +1,21 @@
 /** Native browser actions are invoked only by an explicit application action. */
 export function downloadText(text: string, kind: 'backup' | 'terminal') {
-  const url = URL.createObjectURL(new Blob([text], { type: kind === 'backup' ? 'application/json' : 'text/plain;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `pcvan-${kind}-${new Date().toISOString().replaceAll(':', '-')}.${kind === 'backup' ? 'json' : 'txt'}`;
-  link.hidden = true;
-  document.body.append(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadFile(text, `pcvan-${kind}-${new Date().toISOString().replaceAll(':', '-')}.${kind === 'backup' ? 'json' : 'txt'}`,
+    kind === 'backup' ? 'application/json' : 'text/plain;charset=utf-8');
+}
+
+/** Preserve the catalog filename and exact UTF-8 body, including its final LF. */
+export function downloadFile(text: string, filename: string, type = 'text/plain;charset=utf-8') {
+  const url = URL.createObjectURL(new Blob([new TextEncoder().encode(text)], { type }));
+  let link: HTMLAnchorElement | undefined;
+  try {
+    link = document.createElement('a');
+    link.href = url; link.download = filename; link.hidden = true;
+    document.body.append(link); link.click();
+  } finally {
+    link?.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 }
 
 export function chooseBackup(focusRoot: ParentNode = document): Promise<string | null> {
