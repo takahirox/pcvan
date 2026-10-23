@@ -169,7 +169,7 @@ live drafts. OLT room history is included as world data.
 | --- | --- | --- |
 | `1` | 電子メール | Mailbox directory: inbox and sent, each 0 messages |
 | `2` | 索引 | Numbered routes to every other MAIN section and `J MITI` |
-| `3` | ニュース | Article list, 0 articles |
+| `3` | ニュース | Provider directory; `1` opens 時事通信ニュース with three briefs |
 | `4` | データベース | Database directory; `1` opens 日経テレコン BiZ |
 | `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
@@ -190,6 +190,28 @@ live drafts. OLT room history is included as world data.
 | `21` | オリンピック特設コーナー | Article list, 0 articles |
 | `X` | 旧電子メール | Separate legacy entry to the same local mailbox |
 | `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
+
+For news, use `3` → `1 時事通信ニュース` → `READ 1`, `READ 2` or `READ 3`.
+The three short, original Japanese briefs describe fictional places and events
+suited to late 1996. They are undated fiction, not authentic 時事通信 reports,
+recovered reporting or a live feed. No handle, AI or external service is needed.
+`HELP` redisplays the current view. `LIST` repeats the directory/headlines or
+returns a brief to its headlines. `BACK` follows brief → headlines → provider
+directory → actual entry parent, including `2 索引` → `3`; `MAIN` clears the path.
+Reading another brief replaces the detail without adding parents; re-entry starts
+at the directory. Invalid selectors, read numbers and unrelated service commands
+preserve the view. Existing application shortcuts, including Settings/About and
+`LOG`, remain available and return to the current brief.
+
+News content stays in application code, outside IndexedDB and backups. Browsing
+leaves community, mail, read markers, conference/OLT, consent, AI scheduling and
+calendar settings unchanged, including restored empty worlds. Ordinary session
+and command-history recording continues; briefs are included in terminal logs.
+The [news research record](docs/research/pcvan-1996-1997.md#news-reading-issue-77)
+and Settings → Details/About distinguish early provider evidence, limited
+snippet-supported continuity and the reconstructed selectors, layouts, errors,
+returns and original prose. This is one implemented destination, not a complete
+historical provider directory or authenticated 1996 host interaction.
 
 For database retrieval, use `4` → `1` → `FIND パソコン` → `SHOW P1 /1`
 → `SHOW P3 /1 1`. 日経テレコン BiZ searches four short, original, undated Japanese
@@ -586,6 +608,7 @@ it is resolved.
   IndexedDB version 2 adds the mail store without rewriting prior posts.
 - `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
   offline/retention panel and build-generated app-shell worker.
+- `src/news.ts`: original fictional briefs and news directory/headline/detail rendering.
 - `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
 - `tests/`: controller/session checks and browser interaction checks.
 
@@ -622,7 +645,8 @@ Composition checks cover edit/review/cancel/send, blank drafts, Japanese multili
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.
 Section/service checks cover every MAIN and index destination, all five service views,
-mailbox browsing, BiZ search/sets/titles/articles and fresh visits, empty collections,
+mailbox browsing, news providers/headlines/briefs and isolated browsing,
+BiZ search/sets/titles/articles and fresh visits, empty collections,
 OLT conversation/presence, preserved fixture
 evidence, scoped helpers,
 unsupported input, return paths, offline keyboard use without network requests,

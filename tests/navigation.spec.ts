@@ -104,6 +104,9 @@ for (const entry of mainMenu.entries) {
     } else if (entry.selector === '5') {
       expect(controller.screen).toBe('environmental-gateway');
       expect(result).toContain('1 EICネット（別ネットワーク）');
+    } else if (entry.selector === '3') {
+      expect(controller.screen).toBe('news-directory');
+      expect(result).toContain('1 時事通信ニュース');
     } else if (entry.selector === '4') {
       expect(controller.screen).toBe('database-directory');
       expect(result).toContain('1 日経テレコン BiZ');
@@ -121,7 +124,7 @@ for (const entry of mainMenu.entries) {
 test('the documented MITI sequence uses each screen’s own numeric mapping', () => {
   const controller = new PcvanController();
   expect(controller.submit('3').join('\n')).toContain('ニュース');
-  expect(controller.screen).toBe('section');
+  expect(controller.screen).toBe('news-directory');
   controller.submit('BACK');
   for (const [index, step] of miti.steps.entries()) {
     const output = controller.submit(step.input).join('\n');

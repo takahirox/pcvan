@@ -1526,3 +1526,53 @@ credentials or billing was added. Optional RUKIT manual research, historical
 session comparison and physical-device validation were not performed. No push,
 PR, merge, external comment or deployment was performed; no post-merge
 verification is required.
+
+## News reading from MAIN 3 (#77)
+
+Validated on 2026-10-24 in the assigned worktree after reading the live open
+Issue #77 and repository development/review instructions:
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities. Existing
+  Chromium was available; no browser installation or model download was needed.
+- `npm test -- tests/news.spec.ts tests/navigation.spec.ts tests/sections.spec.ts`:
+  **59 passed (58.2s)** using three workers. Both configured servers started;
+  TypeScript checking and the production build passed.
+- Documented `npm test`: **272 passed (1.4m)** using the normal eight-worker
+  configuration and both configured servers, including TypeScript checking and
+  production bundling. No failures, retries or skips in either run. Existing
+  Vite chunk-size and Node color-environment advisories remain non-failing.
+- Controller checks cover all three complete briefs, normalized command case
+  and whitespace, malformed/unsafe/out-of-range read numbers, invalid provider
+  selectors, contextual service errors and unchanged views after errors/HELP.
+  LIST, BACK, direct/index parents, MAIN at each depth, repeated reads/visits,
+  independent controllers and transitions from other services are checked.
+  Every news view has no forum, mailbox, conference, OLT or content-load context.
+- Production browser journeys run at 320px in registered populated, registered
+  restored-empty and anonymous restored-empty worlds. They exercise each full
+  brief, errors at every news depth, direct/index returns, repeated/replaced
+  reads, fresh visits and MAIN at every depth. Terminal Settings/About returns
+  to each brief; modal Details preserves an unsent Japanese draft and focus.
+  Simulated composition events guard READ submission. Literal `<照会中>` remains
+  text, all briefs appear in the downloaded log, input fits the viewport and
+  long output remains keyboard-scrollable without widening the document.
+- Automatic activity is paused and model consent disabled in each restored
+  fixture. Before/after IndexedDB snapshots and exported backups preserve
+  members, SIGs, forums, posts, mail, read markers and every setting, including
+  conference/OLT, consent, activity scheduling and calendar settings. Empty
+  collections remain empty. Brief bodies stay outside backups; ordinary command
+  history continues. All three journeys observe zero external requests.
+- Existing functional, storage/import/reset, consent, historical-calendar,
+  composition/IME, offline, terminal pacing/skip and service regressions pass.
+  No real-model execution was needed; existing inference stubs remain in use.
+- README, research and on-demand About record the supplied Issue research's
+  2026-10-24 inspection date, source URLs, historical scope, confidence and access
+  limits. Earlier provider evidence and snippet-only continuity remain separate
+  from authored controls, layouts, errors, returns and original undated fiction.
+  No new historical source inspection or successful page-image access is claimed.
+- Reviewed the complete diff against #77. All **60** local Markdown links and
+  heading anchors across README, research and this validation record resolve.
+  Working-tree and staged whitespace checks pass.
+
+Optional subjective visual review, authenticated historical-session comparison
+and physical/native-IME testing were not performed. No push, PR, merge, comment
+or deployment was performed; no post-merge verification is required.
