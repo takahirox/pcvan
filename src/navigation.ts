@@ -13,13 +13,15 @@ import { mailboxRows, renderMailList, mailHelp } from './mail';
 import type { CollectionKind, Mailbox } from './sections';
 import { categoryItems, serviceCategories, renderServiceDirectory, renderServiceCategory, renderServiceItem } from './service-collections';
 import type { ReadingService } from './service-collections';
+import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem } from './eic';
 
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
-  'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item';
+  'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
+  'environmental-gateway' | 'eic-list' | 'eic-item';
 
 // MAIN's row grouping follows the circa-1996 reproduction; the 44-cell column
 // offset is reconstructed. In this fixture, Japanese/full-width characters and
@@ -73,6 +75,7 @@ export class PcvanController implements TerminalController {
   private service = services[0]!;
   private serviceCategory = 0;
   private serviceItem = 0;
+  private eicItem = 0;
   private section = mainMenu.entries[0]!;
   private mailbox: Mailbox = 'INBOX';
   private readonly parents: Screen[] = [];
@@ -174,6 +177,27 @@ export class PcvanController implements TerminalController {
         if (Object.hasOwn(mailboxes, command)) { this.mailbox = command as Mailbox; return this.render(); }
         if (command === 'LIST') return this.render();
         return this.invalidCommand('LIST / BACK / MAIN / HELP');
+      case 'environmental-gateway':
+        if (command === 'LIST') return this.render();
+        if (command === '1') return this.enter('eic-list');
+        return this.invalidCommand('1: EICネット / LIST / BACK / MAIN / HELP');
+      case 'eic-list':
+      case 'eic-item': {
+        if (command === 'LIST') {
+          if (this.currentScreen === 'eic-item') this.currentScreen = this.parents.pop()!;
+          return this.render();
+        }
+        const read = /^READ ([1-9]\d*)$/.exec(command);
+        if (read) {
+          const index = Number(read[1]) - 1;
+          if (eicReadings[index]) {
+            this.eicItem = index;
+            return this.currentScreen === 'eic-item' ? this.render() : this.enter('eic-item');
+          }
+          return ['その番号の記事はありません。LIST で記事一覧を確認してください。', demoPrompt];
+        }
+        return this.invalidCommand('READ 番号 / LIST / BACK / MAIN / HELP');
+      }
       case 'service-category':
       case 'service-item': {
         if (command === 'LIST') {
@@ -278,6 +302,10 @@ export class PcvanController implements TerminalController {
 
   private openSection(entry: typeof mainMenu.entries[number]): readonly string[] {
     this.section = entry;
+    if (entry.selector === '5') {
+      this.eicItem = 0;
+      return [entryText(entry), ...this.enter('environmental-gateway')];
+    }
     return [entryText(entry), ...this.enter(entry.selector === '13' ? 'communication'
       : entry.selector === '2' ? 'index' : 'section')];
   }
@@ -320,6 +348,9 @@ export class PcvanController implements TerminalController {
         `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
         returnHelp, demoPrompt,
       ];
+      case 'environmental-gateway': return [...renderEnvironmentalGateway(), returnHelp, demoPrompt];
+      case 'eic-list': return [...renderEicList(), returnHelp, demoPrompt];
+      case 'eic-item': return [...renderEicItem(this.eicItem), returnHelp, demoPrompt];
       case 'section':
       case 'daisizen-service': if (this.isConference) return renderConference(this.content);
         if (this.isOlt) return renderOltDirectory({ settings: this.content.settings ?? [] });

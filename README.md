@@ -166,7 +166,7 @@ live drafts. OLT room history is included as world data.
 | `2` | 索引 | Numbered routes to every other MAIN section and `J MITI` |
 | `3` | ニュース | Article list, 0 articles |
 | `4` | データベース | Database list, 0 entries |
-| `5` | 公共情報と政治 | Article list, 0 articles |
+| `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
 | `7` | インターネット | Information article list, 0 articles |
 | `8` | コンピュータ | Article list; `SIGS` opens the community directory |
@@ -185,6 +185,21 @@ live drafts. OLT room history is included as world data.
 | `21` | オリンピック特設コーナー | Article list, 0 articles |
 | `X` | 旧電子メール | Separate legacy entry to the same local mailbox |
 | `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
+
+For environmental information, use `5` → `1` → `READ 1` or `READ 2`.
+EICネット (EIC NET) is a separate destination reached through the gateway,
+with two short, original Japanese readings about finding reference material and
+keeping a nature-observation notebook. `HELP` preserves the current view;
+`LIST` repeats the directory/list or returns from an article to its list.
+`BACK` follows article → EIC NET list → gateway → actual parent (MAIN or index);
+`MAIN` clears the path. Browsing needs no handle, AI or external connection and
+does not change community records. Gateway availability and information purposes
+are evidenced; MAIN 5 placement, selectors, layouts and controls are reconstructed.
+The undated readings are illustrative fiction, not archived articles or official
+announcements. Settings → Details/About and the
+[EIC NET research record](docs/research/pcvan-1996-1997.md#eic-net-environmental-information-issue-69)
+provide source dates, confidence and unresolved chronology, including the 1997
+confirmation that text operation continued alongside the web service.
 
 At DAISIZEN (`13` → `2`), `MAIL` opens its own mailbox directory,
 `LIBRARY` opens five reading categories and `OSL` opens six file categories.

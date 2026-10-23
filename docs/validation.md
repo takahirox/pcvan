@@ -1,3 +1,50 @@
+# Issue #69: environmental gateway and EIC NET readings
+
+Validated on 2026-10-23 with Node.js 24.12.0 on macOS.
+
+- `npm ci`: passed, zero reported vulnerabilities; no dependency/lockfile changes.
+- `npm test -- tests/eic.spec.ts tests/sections.spec.ts`: **30 passed** in
+  18.1 seconds, including TypeScript checking and the production build.
+- Initial `npm test`: **253 passed, 1 failed**. The remaining MAIN mapping test
+  in `tests/navigation.spec.ts` still expected MAIN 5's old empty collection.
+  Updated that obsolete expectation to the separately identified EIC gateway.
+- Final `npm test`: **254 passed** in 1.2 minutes, with no failures, retries or
+  skips. The configured servers performed TypeScript checking and the production
+  build; all existing functional, storage/import/reset, consent, shared-calendar,
+  composition/IME, scrolling and progressive-output/skip checks passed.
+- Reviewed the final diff against Issue #69. Local Markdown targets/heading
+  anchors and balanced code fences in README, research and this record pass;
+  `git diff --check` and the staged whitespace check include the new files.
+- Existing Vite large-chunk and Node `NO_COLOR`/`FORCE_COLOR` warnings remain
+  informational. No new test framework, model download or real inference was used.
+
+Six focused checks cover both original Japanese readings, every new controller
+depth, direct/index entry and actual parents, LIST/HELP/BACK/MAIN, switching
+articles, repeated visits and prior service contexts. Invalid selectors, malformed
+and missing read numbers and unrelated service commands preserve their views.
+The new views expose no forum, mailbox, conference or OLT participation context.
+
+Two production browser journeys at 320×640 exercise every reading through direct
+and index routes, invalid commands including WRITE/REPLY, mail composition and
+room-entry attempts, Settings/About return to the current article, modal draft
+and focus preservation, literal text, input/page bounds and terminal-log inclusion.
+A fixed operational clock and explicitly paused automatic activity make protected
+record comparisons deterministic. Anonymous browsing uses a restored world with
+empty members/SIGs/forums/posts/mail/read markers/conference; registered browsing
+retains the seeded community. Both preserve all protected collections and settings
+(including conference/OLT records, consent and historical calendar), while normal
+command history continues. No external requests were observed in either journey.
+
+The three readable HTML research sources were rechecked; the biodiversity PDF
+remains snippet-only evidence from the Issue research, with extraction/image
+limitations retained. About and the
+[research record](research/pcvan-1996-1997.md#eic-net-environmental-information-issue-69)
+distinguish evidenced purposes/gateway availability from reconstructed placement,
+controls and undated fiction, retain chronology uncertainty, and record continued
+text operation alongside the web service in January 1997. No persistence,
+migration or storage-schema changes were made. Optional visual/historical
+screenshot comparison was not performed; no post-merge verification is required.
+
 # Issue #65: retained DAISIZEN conference contributions
 
 Validated on 2026-10-23 with Node.js 24.12.0 on macOS.

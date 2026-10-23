@@ -3,7 +3,7 @@
 export type CollectionKind = 'mail' | 'articles' | 'databases' | 'catalog' | 'publications' | 'files' | 'room' | 'conference';
 
 export const mainCollections: Record<string, CollectionKind> = {
-  '1': 'mail', '3': 'articles', '4': 'databases', '5': 'articles',
+  '1': 'mail', '3': 'articles', '4': 'databases',
   '6': 'articles', '7': 'articles', '8': 'articles', '9': 'catalog',
   '10': 'publications', '11': 'articles', '12': 'articles',
   '14': 'articles', '15': 'articles', '16': 'articles', '17': 'articles',
