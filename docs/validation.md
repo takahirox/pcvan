@@ -1927,3 +1927,70 @@ All three historical sources were readable in text during implementation;
 screenshots of the cited PDF pages failed, and no fresh page-image/layout check
 is claimed. Native IME, subjective historical layout, hardware and real-model
 checks were not run; these are optional, and no model was downloaded.
+
+## Confirmed browser-local OSL acquisition (#91)
+
+Validated on 2026-10-24 with Node.js 24.12.0 on macOS using the existing
+Playwright Chromium configuration. Read the live Issue and repository
+contribution/review guidance before implementation. No dependency, lockfile,
+storage-schema, backup-version or bundled-content change was needed.
+
+- `npm ci`: passed; 24 packages audited, zero reported vulnerabilities.
+- `npm run build`: passed TypeScript checking and production bundling.
+- Initial focused run,
+  `npm test -- tests/osl-download.spec.ts tests/services.spec.ts --workers=2`:
+  **14 passed, 3 failed (4.2m)**. Two new tests dispatched synthetic keydown
+  events, which do not trigger the terminal form's native submission; corrected
+  them to submit the actual form for the rapid queued-confirmation check. The
+  third expected restore status in a dialog that correctly closes on success;
+  corrected it to assert closure. No application validation was weakened.
+- Corrected focused run with the same command: **17 passed (21.5s)**, with no
+  failures, retries or skips, including TypeScript checking and production build.
+- Final documented `npm test`: **322 passed (3.7m)** using the default eight
+  workers, with no failures, retries or skips. Both configured servers ran;
+  TypeScript checking and production bundling passed. All existing functional,
+  storage/import/reset, consent, calendar, composition/IME, terminal pacing/skip,
+  mail, conference, OLT and other-service regression checks passed.
+- Reviewed the complete implementation, test and documentation diff against #91.
+  All **83** local Markdown links/heading anchors and fenced blocks across README,
+  research and this record pass. Working-tree and staged `git diff --check` pass,
+  including the new test file. Existing Vite chunk-size and Node color-environment
+  advisories remain non-failing.
+
+New controller coverage checks OSL-only scope, every invalid number class,
+malformed/trailing input, empty categories, exact payload selection, pinned file
+and navigation parents despite an independent selection change, HELP, cancellation
+and MAIN/re-entry. Invalid/empty confirmation cannot enter another command owner.
+Approval is consumed before the await and browser action, including concurrent
+Y, synchronous browser failure, invalidation and invalidation during the read.
+Settings/About retain the request; MAIN from Settings or its handle-registration
+excursion cancels it.
+
+Production journeys with and without a handle run at 320px with fixed time,
+automatic activity paused and consent disabled. Actual browser download events
+supply both suggested filenames and filesystem bytes, independently compared with
+the bundled JSON fixtures via Node UTF-8 encoding. NOTEINFO.TXT and HARU96.CSV
+match exactly, including final LF and no BOM. Both category and preview returns,
+invalid commands, HELP, all cancellation controls, queued repeated confirmation,
+IME acquisition/approval guards, modal unsent-input/scrollback preservation,
+typed Settings/About, synchronous initiation failure, reload, modal restore and
+reset pass. Non-acquisition operations emit no OSL download events, and the
+journeys observe no external requests. Literal Japanese terminal output remains
+text, and the input stays visible and focused.
+
+IndexedDB snapshots and actual JSON exports preserve members, SIGs, forums,
+posts, mail (including real fixture recipient-confirmation evidence and individual
+read timestamps), read markers and all settings, including conference, activity,
+consent and calendar state. An anonymous restored world stays empty. Catalog
+bodies and pending approval remain absent from backups; ordinary command history
+may continue. No real inference, model download or new framework was used.
+
+README, shared Settings/About/Details and the
+[acquisition research](research/pcvan-1996-1997.md#browser-local-osl-acquisition-issue-91)
+distinguish modern DOWNLOAD/Y/browser conventions from historical evidence.
+Three linked primary HTML sources were readable again; indexed catalog excerpts
+were readable but direct opening failed, and CROCUS remained inaccessible.
+Earlier failed research paths and unresolved dates/encoding/protocols/charges
+remain explicit. Optional native IME, other browser engines, dated-session and
+historical-user observations were not performed. No post-merge verification is
+required. No push, PR, merge, external comment or deployment was performed.

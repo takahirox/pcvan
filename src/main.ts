@@ -173,6 +173,7 @@ const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   isNetNewsDirectory: () => ['internet-directory', 'netnews-directory'].includes(controller.screen),
+  oslDownload: (number: number) => controller.selectOslFile(number),
   netNews: () => controller.netNewsContext, netNewsSaved: () => navigate('LIST'),
   isConference: () => controller.isConference, isOlt: () => controller.isOlt, destination: () => controller.forum, mailbox: () => controller.mailContext, ai,
   preferences: () => terminal.preferences, applyPreferences: terminal.setPreferences,

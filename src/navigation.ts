@@ -12,7 +12,7 @@ import { mainCollections, serviceCollections, mailboxes, renderCollection } from
 import { mailboxRows, renderMailList, mailHelp } from './mail';
 import type { CollectionKind, Mailbox } from './sections';
 import { categoryItems, serviceCategories, renderServiceDirectory, renderServiceCategory, renderServiceItem } from './service-collections';
-import type { ReadingService } from './service-collections';
+import type { OslDownload, ReadingService } from './service-collections';
 import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem } from './eic';
 import { bizArticles, bizSetLimit, bizHelp, bizKeywordHelp, renderDatabaseDirectory, renderBizSearch, renderBizTitles, renderBizArticle } from './biz';
 import type { BizSet } from './biz';
@@ -116,6 +116,21 @@ export class PcvanController implements TerminalController {
     if (!['netnews-list', 'netnews-article'].includes(this.currentScreen)) return null;
     const group = netNewsGroup(this.content, this.netNewsGroup);
     return { group: group.name, articles: netNewsResults(group, this.netNewsSearch) };
+  }
+
+  /** Selection and its exact parent stack belong to navigation, not confirmation. */
+  selectOslFile(number: number): OslDownload | null {
+    if (this.readingService !== 'OSL' || !['service-category', 'service-item'].includes(this.currentScreen) ||
+      !Number.isSafeInteger(number) || number < 1) return null;
+    const item = categoryItems('OSL', this.serviceCategory)[number - 1];
+    if (!item?.filename) return null;
+    const screen = this.currentScreen, service = this.service, category = this.serviceCategory,
+      selected = this.serviceItem, parents = [...this.parents];
+    return { filename: item.filename, body: item.body, returnTo: () => {
+      this.currentScreen = screen; this.service = service; this.serviceCategory = category; this.serviceItem = selected;
+      this.parents.splice(0, this.parents.length, ...parents);
+      return this.render();
+    } };
   }
 
   get isConference(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'CONFERENCE'; }
@@ -289,7 +304,7 @@ export class PcvanController implements TerminalController {
           }
           return ['その番号の項目はありません。LIST で一覧を確認してください。', demoPrompt];
         }
-        return this.invalidCommand('READ 番号 / LIST / BACK / MAIN / HELP');
+        return this.invalidCommand(`${this.readingService === 'OSL' ? 'DOWNLOAD 番号 / ' : ''}READ 番号 / LIST / BACK / MAIN / HELP`);
       }
       case 'communication':
         // Bridge selectors are documented in Settings, not historical data.

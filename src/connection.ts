@@ -24,6 +24,7 @@ export class ConnectionController implements TerminalController {
 
   setContent(content: ForumContent): void { this.calendar = calendarSetting(content); this.navigation.setContent(content); }
   setMemberId(id: string | undefined): void { this.navigation.setMemberId(id); }
+  selectOslFile(number: number) { return this.navigation.selectOslFile(number); }
   get netNewsContext() { return this.navigation.netNewsContext; }
   get isConference() { return this.navigation.isConference; }
   get isOlt() { return this.navigation.isOlt; }
