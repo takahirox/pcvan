@@ -1,6 +1,7 @@
 import type { LocalRepository } from '../storage/repository';
 import type { AiActivity, AiRun, Backup } from '../storage/schema';
 import { ACTIVITY_SETTING, MAX_SESSION_POSTS } from './activity';
+import { buildMailPrompt } from './mail';
 import { buildPrompt } from './generation';
 import type { LocalLlmAdapter } from './generation';
 import { residentProfiles } from './personas';
@@ -34,12 +35,13 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
         current = undefined; continue;
       }
       signal.throwIfAborted();
-      const request = { personaId: current.personaId, forumId: current.forumId,
+      const request = { personaId: current.personaId, forumId: current.forumId!,
         ...(current.replyToPostId === undefined ? {} : { replyToPostId: current.replyToPostId }) };
       const context = { ...snapshot, posts: snapshot.posts.filter((post) =>
-        Date.parse(post.simulation?.simulatedAt ?? post.createdAt) <= Date.parse(current!.simulatedAt)) };
+        Date.parse(post.simulation?.simulatedAt ?? post.createdAt) <= Date.parse(current!.simulatedAt)),
+        mail: (snapshot.mail ?? []).filter((m) => Date.parse(m.simulation?.simulatedAt ?? m.createdAt) <= Date.parse(current!.simulatedAt)) };
       budget.attempts++;
-      const raw = await engine.generate(buildPrompt(context, request), signal);
+      const raw = await engine.generate(current.mail ? buildMailPrompt(context, current.personaId, current.mail) : buildPrompt(context, request), signal);
       signal.throwIfAborted();
       const post = await actions.commitAiRun(current.id, raw, signal);
       if (post) budget.committed++;

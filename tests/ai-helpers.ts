@@ -6,7 +6,7 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
     const visitKey = 'pcvan-test-worker-visit';
     const visit = Number(localStorage.getItem(visitKey) ?? 0) + 1;
     localStorage.setItem(visitKey, String(visit));
-    const stats = { generations: 0, loads: 0 };
+    const stats = { generations: 0, loads: 0, prompts: [] as Record<string, unknown>[] };
     Object.assign(window, { journeyWorker: stats });
     class MockWorker {
       onmessage?: (event: MessageEvent) => void;
@@ -19,7 +19,12 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           if (mode === 'interrupt' && stats.generations === 2) return;
           if (mode === 'failure') { queueMicrotask(() => this.onerror?.()); return; }
           const data = JSON.parse(message.content.request.messages[1]!.content);
-          const raw = mode === 'invalid' ? '{}' : JSON.stringify({
+          stats.prompts.push(data);
+          const raw = mode === 'invalid' ? '{}' : data.kind === 'mail' ? JSON.stringify({
+            personaId: data.personaId, recipientId: data.recipientId,
+            ...(data.replyToMailId ? { replyToMailId: data.replyToMailId } : {}),
+            subject: '星見のお便り', body: `お便りありがとう。夜空を見上げました。${data.personaId}/${visit}/${stats.generations}`,
+          }) : JSON.stringify({
             personaId: data.personaId, forumId: data.forumId,
             ...(data.replyToPostId ? { replyToPostId: data.replyToPostId } : {}),
             title: '架空の旅だより', body: `これは創作の活動です。${data.personaId}/${visit}/${stats.generations}`,

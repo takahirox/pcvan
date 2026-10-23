@@ -3,7 +3,7 @@ import type { Backup } from '../src/storage/schema';
 // Synthetic data, including allocation gaps and fields with no historical interpretation.
 export function backupFixture(): Backup {
   return {
-    format: 'pcvan-local', version: 1,
+    format: 'pcvan-local', version: 1, mail: [],
     members: [{ id: 'ai', handle: 'AI', actor: 'ai' }, { id: 'human', handle: '人間', actor: 'human' }],
     sigs: [{ id: 'sig', keyword: 'LOCAL', title: '個人の世界' }],
     forums: [

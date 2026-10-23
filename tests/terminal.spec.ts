@@ -15,7 +15,7 @@ test('starts without services and submits Japanese text as plain text with exact
   const line = 'echo   日本語：ＡＢＣ　。、 ｶﾀｶﾅ <b>文字</b>  ';
   await input.fill(line);
   await input.press('Enter');
-  expect(await output.textContent()).toContain(`> ${line}\n`);
+  await expect.poll(() => output.textContent()).toContain(`> ${line}\n`);
   await expect(output.locator('b')).toHaveCount(0);
   await expect(input).toHaveValue('');
   await expect(input).toBeFocused();

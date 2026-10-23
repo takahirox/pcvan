@@ -36,7 +36,7 @@ PC-VAN service participation uses only the transcript and persistent command inp
 The compact **設定 / Options** button in the header opens the modern application
 Settings dialog for display, AI, local data, offline storage and technical help.
 It is outside the simulated service; handle registration, navigation, reading and
-posting remain terminal-only. Type a line and press Enter. `HELP` describes the current screen. Japanese IME
+posting and mail remain terminal-only. Type a line and press Enter. `HELP` describes the current screen. Japanese IME
 confirmation never submits. Escape reveals queued output and skips the 1.2-second
 connection presentation; it does not cancel drafts or approve confirmations.
 
@@ -131,7 +131,7 @@ and Tab returns to input. Literal HTML is never interpreted. `LOG` includes
 accepted text still awaiting display, but excludes the unsent input. Export before
 reloading; JSON backups contain world data/history, not the transcript or live drafts.
 
-## Menu destinations and empty collections
+## Menu destinations and collections
 
 | MAIN selector | Destination | Initial view |
 | --- | --- | --- |
@@ -156,7 +156,7 @@ reloading; JSON backups contain world data/history, not the transcript or live d
 | `19` | ＢＩＧＬＯＢＥイベント（無料） | Article list, 0 articles |
 | `20` | ＢＩＧＬＯＢＥ情報誌ご案内 | Publication list, 0 publications |
 | `21` | オリンピック特設コーナー | Article list, 0 articles |
-| `X` | 旧電子メール | Separate legacy mailbox directory, 0 messages |
+| `X` | 旧電子メール | Separate legacy entry to the same local mailbox |
 | `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
 
 At DAISIZEN (`13` → `2`), `MAIL` opens its own mailbox directory,
@@ -165,22 +165,29 @@ At DAISIZEN (`13` → `2`), `MAIL` opens its own mailbox directory,
 boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
 posting, reply and unread behavior. A saved empty board stays empty.
 
-All new collections are read-only and empty: counts describe this browser's
-simulated collection, **not historical service activity**. Lists state what is
-missing and accept `LIST` to redisplay. Mail directories accept `INBOX` and
-`SENT`; inside either mailbox, `LIST` shows its empty message list and `BACK`
-returns to that mailbox directory. `HELP`, `BACK` and `MAIN` work throughout the
-hierarchy. The index uses the MAIN selectors except `2` (itself) and `Q`; `BACK`
-from an indexed section returns to the index. `Q` remains scoped to MAIN.
-There are no single-letter `B`/`M` aliases. These commands and collection layouts
-are UI conveniences, not verified historic menu sequences.
+Mail directories accept `INBOX`, `SENT`, `MEMBERS`, `WRITE address` (or `WRITE`
+then an address), `READ number`, and `REPLY number`. `LIST` refreshes the current
+view. Send to the same ten resident IDs/handles used in SIGs, using the existing
+human handle. Compose subject/body, `.END`, then `EDIT` / `Y` / `N` through the
+single terminal input. Sent and received letters have stable numbers, subjects,
+UTC timestamps, reply chains and per-recipient read markers. Cancelled drafts do
+not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
 
-There is no mail delivery, shopping transaction, file upload/download, internet
-gateway or multi-user chat connection, and no fake remote content or participants.
-Opening these screens makes no network calls, changes no stored content and
-loads no model. Existing local forum posts/settings, JSON backup/restore and
-explicitly enabled local AI remain available. `ABOUT` explains these limits, the empty counts and historical uncertainty
-on demand; ordinary screens keep only their content and navigation.
+Residents may privately initiate or reply at their scheduled visits after model
+consent, with quiet periods and bounded shared generation budgets. They use only
+bounded correspondence with the recipient and limited public context. Reading
+and human sending need no model, GPU or network. Letters stay in IndexedDB and
+JSON backups. Private within this fictional world does not mean encryption or
+isolation from anyone using the same browser profile/device.
+
+Other service collections remain empty and read-only. `HELP`, `BACK` and `MAIN`
+work throughout; `BACK` from a mailbox returns to its own entry directory. The
+index uses MAIN selectors except `2` and `Q`. `Q` remains scoped to MAIN, without
+single-letter `B`/`M` aliases. Commands, mailbox sharing and layouts are reconstructed
+conveniences, not verified historical sequences. There is no remote mail delivery,
+shopping transaction, file transfer, internet gateway or multi-user chat. Opening
+these screens loads no model and makes no network calls. Settings → Details/About
+provides local fiction provenance and historical uncertainty on demand.
 
 ## Terminal appearance and output speed
 
@@ -295,7 +302,7 @@ Changing the origin/profile, clearing site data, private browsing, or browser
 eviction may make data unavailable. Keep downloaded backups outside the browser.
 To start over, use Settings → ローカルデータ・保守 → **初期状態に戻す**.
 The warning offers **先に JSON を保存** and requires explicit confirmation before
-it irreversibly deletes local posts, members, read
+it irreversibly deletes local posts, mail, members, read
 markers, resident edits, AI activity/consent, display preferences and history.
 中止 or closing preserves them. `RESET` remains a typed shortcut with its own
 explicit `Y` confirmation.
@@ -409,6 +416,8 @@ it is resolved.
   the JSON fixtures, without combining historical menu variants. `screen` is a
   read-only state identifier; `main.ts` wires it through `ConnectionController`
   to the terminal.
+- `src/mail.ts`, `src/ai/mail.ts`: mailbox projections, letter rendering, scheduled
+  private actions and correspondent-scoped prompts/validation. See [mail](docs/mail.md).
 - `src/forums.ts`: resolves evidence-backed boards to repository posts or original
   demo fixtures, and renders headers without trimming or reflowing post text.
 - `src/commands.ts`: terminal prompt ownership, handles, legacy settings shortcuts and confirmations.
@@ -419,7 +428,8 @@ it is resolved.
 - `src/ai/`: ten editable fictional residents, deterministic scheduling, bounded generation and validation,
   optional settings/inspection controls and the lazy WebLLM worker adapter.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
-  controls. Composition and reading use the existing v1 backup schema.
+  controls. Composition and reading use the v1 backup envelope with an additive mail array;
+  IndexedDB version 2 adds the mail store without rewriting prior posts.
 - `src/offline/controls.ts`, `vite.config.ts`, `scripts/service-worker.js`:
   offline/retention panel and build-generated app-shell worker.
 - `tests/`: controller/session checks and browser interaction checks.
@@ -466,7 +476,10 @@ model consent/progress/cancellation/failures, ten profile editors, native JSON
 export/import/reset, stale confirmations and offline/storage controls.
 Renderer tests retain controlled UTF-8 timing/grapheme/queue checks. Repository
 and scheduler suites cover transactional rollback, references, deterministic
-resident plans, budgets and concurrent commits.
+resident plans, budgets and concurrent commits. Mail suites cover all terminal routes,
+IME/edit/cancel/retry, private replies and public follow-ups via mocked WebLLM,
+context isolation, individual read markers, two-tab delivery, offline reading,
+old database/backup migration, transactional rollback and reset fences.
 See [the implementation validation record](docs/validation.md) for commands
 actually run and browser checks not performed.
 

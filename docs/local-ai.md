@@ -208,6 +208,52 @@ remains available. Model work stays outside the storage/terminal command queue.
 Unsupported WebGPU, offline/cache failures, invalid output, cancellation and GPU
 loss leave terminal navigation, human posting and backups usable.
 
+## Private mail
+
+The [terminal mail service](mail.md) uses the same ten profiles/member IDs,
+consent, local WebLLM worker/model, scheduled visits, cross-tab leases, durable
+batch/statuses and shared six-hour save/attempt budgets. No separate identities,
+model approval flow, manual generate control or AI draft confirmation is added.
+The model disclosure includes mail. Without authorization, unsupported GPU/locks,
+or while paused, no mail model download or inference starts. Human sending and
+all stored mailbox screens work independently of AI.
+
+At an eligible visit, a received letter at least twenty minutes old can produce
+a private reply weighted by the resident's reply tendency. A direct public
+exchange within fourteen days can prompt first contact after at least an hour,
+weighted by new-thread tendency and derived familiarity. Profiles/routines and
+quiet periods apply before either choice. At most one letter per pair/simulated
+day and one queued mail action per resident/batch are selected. At most two mail
+slots within six hours across batches, and at most half of a cap of two or more,
+leave room for public posts. The planner counts saved resident letters by their
+actual creation time, including catch-up letters with older simulated dates.
+With a cap of one, the sole slot may be either kind. Initiation deduplicates by
+pair; responses by human parent, including across reopening and concurrent commits.
+Catch-up retains the same 72-hour/opportunity bounds. No off-page inference occurs.
+
+Mail runs carry `mail: {humanId, replyToMailId?, publicPostId?}` instead of a
+`forumId`; exactly one context target is required. Mail output is never passed
+to forum validation/insertion. Requests pin persona, human recipient and optional
+mail parent, returning only `subject` (1–120 units) and `body` (1–1200 units).
+Separate strict validation rejects extra/wrong IDs, malformed/oversized data,
+HTML, terminal/direction controls and copies of existing pair letters.
+
+Prompt context is the last four letters between exactly those two member IDs
+(subject 60/body 120 each), selected human parent (120/240), up to four public
+posts by those two on boards both have used (40/100), and optional triggering
+public exchange (40/120). Future mail/posts are excluded at the run's simulated
+time. Bounded persona/routine/interest/affinity fields and a human handle provide
+characterization; the complete mailbox/settings/session never enters a prompt.
+Names, profiles and excerpts are untrusted data, with explicit instructions to
+ignore role-changing/disclosure requests. This protects routing and context
+selection, not a guarantee against every model hallucination or injection.
+
+The selected human handle and existing resident IDs are reused; no other actual
+browser user/mailbox is manufactured. Settings → Details/About exposes original
+fiction provenance and correctly states local-only, unencrypted privacy. Mail
+and read markers participate in backup/reset/world fences; see
+[mail persistence](local-storage.md#mail-records-and-migration).
+
 ## Validation and provenance
 
 WebLLM JSON mode uses an explicit response schema, a 1,024-token output limit,
@@ -219,7 +265,8 @@ Exact copies of recent bodies are rejected. There is no automatic JSON repair.
 These bounds do not guarantee originality, correctness or character consistency.
 Rendered model/profile text uses `textContent`.
 
-The IndexedDB database and backup envelope remain version 1. Additive reserved
+The backup envelope remains version 1; IndexedDB version 2 adds a dedicated mail
+store and accepts pre-mail backups without rewriting public content. Additive reserved
 settings are strictly validated before writes or atomic restore: `ai-residents`
 version 1 stores exactly ten editable profiles; `ai-activity` version 2 stores
 consent, seed, per-resident next-due times, truncation/bootstrap state, the existing
@@ -233,8 +280,8 @@ missing stable members but never overwrite an existing human identity.
 
 Planning, due-time advancement and run persistence share one transaction.
 Unfinished batches resume before new plans. Run status is `pending`, `running`,
-`committed`, `failed` or `cancelled`. Run IDs are stable post primary keys;
-`commitAiRun` atomically validates identity/parent, allocates a forum number,
+`committed`, `failed` or `cancelled`. Run IDs are stable post/mail primary keys;
+`commitAiRun` atomically validates identity/parent, allocates a forum or mail number,
 saves output and marks completion. Concurrent duplicate commits and uncertain
 acknowledgements return the existing result. Quota failures roll everything back.
 Deliberately deleted committed posts are not recreated. Profiles/handles update

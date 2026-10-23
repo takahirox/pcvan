@@ -1,4 +1,4 @@
-import { personas, RESIDENTS_SETTING } from '../ai/personas';
+import { personas, personaMemberId, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentSettings } from '../ai/personas';
 export interface Member { id: string; handle: string; actor: 'human' | 'ai' }
 export interface Sig { id: string; keyword: string; title: string }
@@ -16,10 +16,17 @@ export interface Post {
   origin: string;
   simulation?: { runId: string; simulatedAt: string; fictional: true };
 }
+export interface Mail {
+  id: string; number: number; senderId: string; recipientId: string;
+  subject: string; body: string; createdAt: string; origin: string;
+  replyToMailId?: string; readAt?: string;
+  simulation?: { runId: string; simulatedAt: string; fictional: true };
+}
+export interface MailTarget { humanId: string; replyToMailId?: string; publicPostId?: string }
 export type AiRunStatus = 'pending' | 'running' | 'committed' | 'failed' | 'cancelled';
 export interface AiRun {
-  id: string; personaId: string; forumId: string; replyToPostId?: string;
-  simulatedAt: string; status: AiRunStatus;
+  id: string; personaId: string; forumId?: string; replyToPostId?: string;
+  simulatedAt: string; status: AiRunStatus; mail?: MailTarget;
 }
 export interface AiBatch { id: string; from: string; to: string; modelId: string; runs: AiRun[] }
 export interface AiActivity {
@@ -53,6 +60,7 @@ export interface Records {
   sigs: Sig;
   forums: Forum;
   posts: Post;
+  mail: Mail;
   readStates: ReadState;
   settings: Setting;
 }
@@ -66,6 +74,7 @@ export interface Backup {
   sigs: Sig[];
   forums: Forum[];
   posts: Post[];
+  mail?: Mail[];
   readStates: ReadState[];
   session: Session | null;
   settings: Setting[];
@@ -146,8 +155,17 @@ export function validateActivity(value: unknown): asserts value is AiActivity {
       !Array.isArray(batch.runs) || batch.runs.length > 12) invalid('Invalid AI activity batch.');
   const ids = new Set<string>();
   for (const run of batch.runs as unknown[]) {
-    fields(run, ['id', 'personaId', 'forumId', 'simulatedAt', 'status'], ['replyToPostId']);
-    string(run.id); string(run.personaId); string(run.forumId); timestamp(run.simulatedAt);
+    fields(run, ['id', 'personaId', 'simulatedAt', 'status'], ['forumId', 'replyToPostId', 'mail']);
+    if (run.mail !== undefined) {
+      fields(run.mail, ['humanId'], ['replyToMailId', 'publicPostId']);
+      string(run.mail.humanId);
+      if (run.mail.replyToMailId !== undefined) string(run.mail.replyToMailId);
+      if (run.mail.publicPostId !== undefined) string(run.mail.publicPostId);
+      if (run.replyToPostId !== undefined || (!!run.mail.replyToMailId === !!run.mail.publicPostId)) invalid('Expected one mail context.');
+    }
+    string(run.id); string(run.personaId); timestamp(run.simulatedAt);
+    if (run.mail === undefined) string(run.forumId);
+    else if (run.forumId !== undefined) invalid('Mail cannot target a forum.');
     if (!personas.some((p) => p.id === run.personaId)) invalid('Unknown AI resident.');
     if (Object.hasOwn(run, 'replyToPostId')) string(run.replyToPostId);
     if (ids.has(run.id) || !(run.id as string).startsWith(`${batch.id}:`) ||
@@ -241,6 +259,26 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
             !(value.origin as string).startsWith('local-ai:webllm:')) invalid('Expected a stable fictional AI run and time.');
       }
       break;
+    case 'mail':
+      fields(value, ['id', 'number', 'senderId', 'recipientId', 'subject', 'body', 'createdAt', 'origin'],
+        ['replyToMailId', 'readAt', 'simulation']);
+      string(value.id); integer(value.number, 1); string(value.senderId); string(value.recipientId);
+      string(value.origin); timestamp(value.createdAt);
+      if (value.id.length > 256 || value.senderId.length > 128 || value.recipientId.length > 128) invalid('Mail identity is too long.');
+      for (const [key, max] of [['subject', 200], ['body', 20000]] as const) {
+        string(value[key]);
+        if (value[key].length > max || /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/.test(value[key]) ||
+            (key === 'subject' && value[key].includes('\n'))) invalid('Invalid mail text.');
+      }
+      if (value.replyToMailId !== undefined) { string(value.replyToMailId); if (value.replyToMailId.length > 256) invalid('Mail reference is too long.'); }
+      if (value.readAt !== undefined) { timestamp(value.readAt); if (Date.parse(value.readAt as string) < Date.parse(value.createdAt as string)) invalid('Invalid read time.'); }
+      if (value.simulation !== undefined) {
+        fields(value.simulation, ['runId', 'simulatedAt', 'fictional']);
+        timestamp(value.simulation.simulatedAt);
+        if (value.simulation.runId !== value.id || value.simulation.fictional !== true ||
+            !(value.origin as string).startsWith('local-ai:webllm:')) invalid('Invalid mail simulation.');
+      }
+      break;
     case 'readStates':
       fields(value, ['memberId', 'forumId', 'lastReadNumber']);
       string(value.memberId); string(value.forumId); integer(value.lastReadNumber, 0);
@@ -263,14 +301,14 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
   }
 }
 
-export const stores = ['members', 'sigs', 'forums', 'posts', 'readStates', 'settings'] as const;
+export const stores = ['members', 'sigs', 'forums', 'posts', 'mail', 'readStates', 'settings'] as const;
 
 // Validation is pure: no database is opened or modified here.
 export function validateBackup(value: unknown): asserts value is Backup {
-  fields(value, ['format', 'version', ...stores, 'session']);
+  fields(value, ['format', 'version', ...stores.filter((s) => s !== 'mail'), 'session'], ['mail']);
   if (value.format !== 'pcvan-local' || value.version !== 1) invalid('Unsupported backup format or version.');
   for (const store of stores) {
-    const rows: unknown = value[store];
+    const rows: unknown = store === 'mail' && !Object.hasOwn(value, store) ? [] : value[store];
     if (!Array.isArray(rows)) invalid(`Expected ${store} array.`);
     const keys = new Set<string>();
     for (const row of rows as unknown[]) {
@@ -302,7 +340,39 @@ export function validateBackup(value: unknown): asserts value is Backup {
       }
     }
   }
+  validateMailRelations(backup.mail ?? [], backup.members);
   for (const read of backup.readStates) {
     if (!members.has(read.memberId) || !forums.has(read.forumId)) invalid('Read state references a missing member or forum.');
   }
+}
+
+/** Validate projections and parents against the same world, for imports and sends. */
+export function validateMailRelations(mail: readonly Mail[], members: readonly Member[]): void {
+  const numbers = new Set<number>();
+  for (const row of mail) {
+    const sender = members.find((m) => m.id === row.senderId);
+    const recipient = members.find((m) => m.id === row.recipientId);
+    const resident = sender?.actor === 'ai' ? sender : recipient;
+    if (!sender || !recipient || sender.actor === recipient.actor ||
+        !personas.some((p) => `fictional-ai:${p.id}` === resident?.id) ||
+        (row.readAt !== undefined && recipient.actor !== 'human') ||
+        (sender.actor === 'human' ? row.origin !== 'local-human' || row.simulation !== undefined
+          : !row.origin.startsWith('local-ai:webllm:') || !row.simulation)) invalid('Invalid mail correspondents or provenance.');
+    if (numbers.has(row.number)) invalid('Duplicate mail number.');
+    numbers.add(row.number);
+    if (row.replyToMailId !== undefined) {
+      const parent = mail.find((m) => m.id === row.replyToMailId);
+      if (!parent || parent.number >= row.number || parent.senderId !== row.recipientId ||
+          parent.recipientId !== row.senderId) invalid('Mail replies require an earlier letter from the correspondent.');
+    }
+  }
+}
+
+/** Stable local addresses take precedence over potentially ambiguous handles. */
+export function resolveMailResident(members: readonly Member[], address: string): Member {
+  const residents = members.filter((m) => m.actor === 'ai' && personas.some((p) => personaMemberId(p.id) === m.id));
+  const byId = residents.filter((m) => m.id === address || m.id === personaMemberId(address));
+  const matches = byId.length ? byId : residents.filter((m) => m.handle === address);
+  if (matches.length !== 1) invalid('宛先の住人が見つからないか、ハンドルが重複しています。MEMBERS の宛先を使ってください。');
+  return matches[0]!;
 }

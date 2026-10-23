@@ -1,7 +1,7 @@
-import type { Backup, Post, TerminalPreferences } from './storage/schema';
-import { validateBackup } from './storage/schema';
+import type { Backup, Mail, Post, TerminalPreferences } from './storage/schema';
+import { resolveMailResident, validateBackup } from './storage/schema';
 import type { ForumDestination, LocalRepository } from './storage/repository';
-import { ACTIVE_MEMBER_SETTING, residentContext, worldContext as context } from './storage/repository';
+import { ACTIVE_MEMBER_SETTING, createRecordId, residentContext, worldContext as context } from './storage/repository';
 import { activeHuman, forumPosts } from './forums';
 import { TerminalComposer } from './composer';
 import type { ComposeDraft } from './composer';
@@ -13,11 +13,14 @@ import { models, residentProfiles } from './ai/personas';
 import type { ResidentProfile } from './ai/personas';
 import type { createAiControls } from './ai/controls';
 import { setupContext } from './ai/activity';
+import { mailboxRows, renderMail } from './mail';
+import { personaMemberId } from './ai/personas';
+import type { Mailbox } from './sections';
 import { modelDisclosure } from './ai/setup';
 import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
-type Intent = { target: ForumDestination; parent?: Post };
+type Intent = { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
@@ -26,6 +29,7 @@ export interface CommandActions {
   print(...lines: string[]): void;
   navigate(line: string): void;
   destination(): ForumDestination | null;
+  mailbox?(): { box: Mailbox; title: string } | null;
   save(target: ForumDestination, draft: ComposeDraft): Promise<Post>;
   restore(text: string, expectedContext: string): Promise<void>;
   reset(expectedContext: string): Promise<void>;
@@ -49,7 +53,8 @@ export class TerminalCommands {
   private menu: Menu | null = null;
   private registration: 'offer' | 'name' | null = null;
   private intent: Intent | undefined;
-  private composer: TerminalComposer | undefined;
+  private composer: TerminalComposer | TerminalComposer<{ keyword: string; name: string }> | undefined;
+  private mailAddress = false;
   private confirmation: Confirmation | undefined;
   private detailReturns: (Menu | null)[] = [];
   private selectedModel: string = models[0].id;
@@ -63,12 +68,12 @@ export class TerminalCommands {
     this.settings = createSettingsActions(actions);
   }
   applicationOutput(kind: 'ai' | 'offline') {
-    return !this.composer?.active && !this.registration && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
+    return !this.composer?.active && !this.mailAddress && !this.registration && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
   }
-  get recordsHistory() { return !this.composer?.active && !this.registration && !this.confirmation && !this.profile; }
+  get recordsHistory() { return !this.composer?.active && !this.mailAddress && !this.registration && !this.confirmation && !this.profile; }
   invalidate() {
-    const active = this.composer?.active || this.registration || this.confirmation || this.profile;
-    this.composer = undefined; this.registration = null; this.intent = undefined;
+    const active = this.composer?.active || this.mailAddress || this.registration || this.confirmation || this.profile;
+    this.composer = undefined; this.mailAddress = false; this.registration = null; this.intent = undefined;
     this.confirmation = undefined; this.profile = undefined; this.field = undefined; this.menu = null;
     this.detailReturns = [];
     if (active) this.actions.print('別の操作で世界が変更されました。入力を中止しました。現在のデータから操作し直してください。コマンド=');
@@ -105,7 +110,7 @@ export class TerminalCommands {
         'AUTO 0〜12: 6時間の自動投稿上限（0で休止）/ RETRY: 未完了を再試行 / RESIDENTS: 住人編集');
     }
     if (menu === 'storage') print('JSON バックアップ・復元・初期化', 'BACKUP: JSON 保存 / IMPORT: ファイル選択・置換確認 / RESET: 初期状態に戻す',
-      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・既読・設定・履歴を含みます。モデルと端末キャッシュは含みません。外部に保存してください。');
+      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・メール・既読・設定・履歴を含みます。モデルと端末キャッシュは含みません。外部に保存してください。');
     if (menu === 'offline') { print('オフライン・容量', 'CACHE: 端末を保存 / STATUS: 保存状態・容量 / PERSIST: 永続保存を要求'); await this.offline.storage(); }
     if (menu === 'profiles') print('住人編集', ...residentProfiles(data).map((row, i) => `${i + 1} ${row.handle}`), '番号: 編集する住人');
     if (menu !== 'settings') print('HELP: この案内 / BACK: 一つ戻る / MAIN: MAIN');
@@ -113,8 +118,32 @@ export class TerminalCommands {
   }
   private startCompose(intent: Intent, data: Backup) {
     const authorId = activeHuman(data);
-    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print('投稿にはハンドルが必要です。登録しますか？ (Y/N/SKIP)='); return; }
-    this.composer = new TerminalComposer(intent.target, authorId, intent.parent, this.actions);
+    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'mail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
+    if ('mail' in intent) {
+      if (!intent.recipient) {
+        this.mailAddress = true; this.printAddresses(data); this.actions.print('宛先='); return;
+      }
+      let recipient;
+      try { recipient = resolveMailResident(data.members, intent.recipient); }
+      catch { this.mailAddress = true; this.actions.print('宛先が見つからないか重複しています。MEMBERS の宛先を入力してください。宛先='); return; }
+      this.mailAddress = false;
+      const id = createRecordId();
+      this.composer = new TerminalComposer({ keyword: 'MAIL', name: recipient.handle }, authorId, intent.parent, {
+        print: this.actions.print,
+        save: async (_target, draft) => {
+          const row = await (await this.actions.repository()).createHumanMail({ id, senderId: draft.authorId,
+            recipient: recipient.id, subject: draft.title, body: draft.body,
+            ...(intent.parent ? { replyToMailId: intent.parent.id } : {}) });
+          // Delivery is committed. A failed refresh must never leave a sendable draft.
+          try { await this.actions.read(); } catch { /* A later LIST refreshes. */ }
+          return row;
+        },
+      }, 'mail', intent.parent ? `Re: ${intent.parent.subject.replace(/^(Re: )+/i, '')}`.slice(0, 200) : '');
+    } else this.composer = new TerminalComposer(intent.target, authorId, intent.parent, this.actions);
+  }
+  private printAddresses(data: Backup) {
+    this.actions.print('宛先一覧', ...residentProfiles(data).filter((p) => data.members.some((m) => m.id === personaMemberId(p.id) && m.actor === 'ai'))
+      .map((p) => `${p.id} / ${p.handle}`), 'WRITE 宛先（一覧のIDまたはハンドル） / .CANCEL: 中止');
   }
   private confirm(value: Confirmation, ...warning: string[]) {
     this.confirmation = value;
@@ -128,6 +157,12 @@ export class TerminalCommands {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     const print = this.actions.print;
     if (this.composer?.active) { await this.composer.submit(line); return true; }
+    if (this.mailAddress) {
+      if (['CANCEL', '.CANCEL'].includes(command)) { this.mailAddress = false; print('メールを中止しました。コマンド='); }
+      else if (['HELP', 'MEMBERS', 'BACK', 'MAIN'].includes(command)) { this.printAddresses(await this.actions.read()); print('宛先='); }
+      else this.startCompose({ mail: true, recipient: line.trim() }, await this.actions.read());
+      return true;
+    }
     if (this.registration) {
       if (['N', 'SKIP', 'CANCEL', '.CANCEL', 'BACK', 'MAIN'].includes(command)) {
         this.registration = null; this.intent = undefined; print('登録を中止しました。読むだけでも利用できます。');
@@ -222,15 +257,35 @@ export class TerminalCommands {
         try {
           const parsed: unknown = JSON.parse(text); validateBackup(parsed);
           if (this.confirmation !== waiting) return;
-          this.confirm({ kind: 'import', expected, text }, 'このブラウザー内の全データ（投稿・会員・既読・設定・履歴）をファイルで置き換えます。取り消せません。必要なら先に BACKUP。', '置き換えて復元しますか？ (Y/N)=');
+          this.confirm({ kind: 'import', expected, text }, 'このブラウザー内の全データ（投稿・メール・会員・既読・設定・履歴）をファイルで置き換えます。取り消せません。必要なら先に BACKUP。', '置き換えて復元しますか？ (Y/N)=');
         } catch (error) { this.confirmation = undefined; print(`復元できません。${String(error)}`, 'コマンド='); }
       }).catch((error) => { if (this.confirmation === waiting) { this.confirmation = undefined; print(`ファイルを読めません。${String(error)}`); } });
       return true;
     }
     if (command === 'RESET') {
       this.confirm({ kind: 'reset', expected: context(await this.actions.read()) },
-        '投稿・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
+        '投稿・メール・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
         '最初の10人・30件の投稿を準備し、他のタブも再読み込みします。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
+    }
+    if (!this.menu && this.actions.mailbox?.()) {
+      const data = await this.actions.read(), human = activeHuman(data);
+      if (command === 'MEMBERS') { this.printAddresses(data); return true; }
+      const write = /^(?:WRITE|COMPOSE)(?: (.*))?$/i.exec(line.trim());
+      if (write) { this.startCompose({ mail: true, recipient: write[1]?.trim() ?? '' }, data); return true; }
+      const selected = /^(READ|REPLY) ([1-9]\d*)$/.exec(command);
+      if (selected) {
+        const rows = mailboxRows(data.mail ?? [], human, this.actions.mailbox!()!.box);
+        const mail = rows.find((m) => m.number === Number(selected[2]));
+        if (!mail) { print('その番号のメールはこの箱にありません。INBOX / SENT / LIST で確認してください。'); return true; }
+        if (selected[1] === 'REPLY') {
+          if (mail.recipientId !== human) print('受信したメールに返信してください。INBOX / REPLY 番号');
+          else this.startCompose({ mail: true, recipient: mail.senderId, parent: mail }, data);
+        } else {
+          if (mail.recipientId === human) await (await this.actions.repository()).markMailRead(human!, mail.id);
+          print(...renderMail(mail, data.members, data.mail ?? []));
+        }
+        return true;
+      }
     }
     if (!this.menu) {
       if (command === 'WRITE' || /^REPLY \d+$/.test(command)) {

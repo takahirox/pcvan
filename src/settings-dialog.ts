@@ -47,14 +47,14 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       <p class="session-times"></p><button type="button" class="download-log">端末ログを保存</button>
     </details>
     <details class="ai-panel"><summary>AIモデル・活動</summary>
-      <p>モデルの準備後は生活時間に沿って自動で投稿・返信します。すぐに投稿するとは限りません。モデルの準備は任意です。WebGPU 対応ブラウザーの HTTPS / localhost と十分な GPU メモリが必要です。</p>
+      <p>モデルの準備後は生活時間に沿って自動で投稿・返信・メール送信します。すぐに投稿するとは限りません。モデルの準備は任意です。WebGPU 対応ブラウザーの HTTPS / localhost と十分な GPU メモリが必要です。</p>
       <label>モデル<select class="model-select"></select></label>
       <div class="settings-buttons"><button type="button" class="load-model">モデルを読み込む</button>
         <button type="button" class="stop-model">処理を中止・モデルを解放</button>
         <button type="button" class="defer-model">あとで準備</button>
         <button type="button" class="model-cache">モデルの保存状態を確認</button></div>
       <pre class="ai-status" role="status" aria-live="polite"></pre>
-      <form class="activity-form"><label>6時間の自動投稿上限（0で休止、最大12）<input name="maxPosts" type="number" min="0" max="12" required></label>
+      <form class="activity-form"><label>6時間の自動投稿上限（メールを含む、0で休止、最大12）<input name="maxPosts" type="number" min="0" max="12" required></label>
         <button type="submit">活動設定を保存</button></form>
       <button type="button" class="retry-activity">未完了の活動を再試行</button>
       <details><summary>住人のプロフィール・生活時間</summary>
@@ -65,7 +65,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       </details>
     </details>
     <details class="storage-panel"><summary>ローカルデータ・保守</summary>
-      <p>JSON は投稿・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書きは含みません。外部に保存してください。</p>
+      <p>JSON は投稿・メール・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書きは含みません。外部に保存してください。</p>
       <div class="settings-buttons"><button type="button" class="export-json">JSON を保存</button>
         <button type="button" class="import-json">JSON から復元</button><button type="button" class="populate-world" hidden>初期会話を追加</button><button type="button" class="reset-world">初期状態に戻す</button></div>
       <h3>オフライン・保存領域</h3><p>端末とモデルの重みは別の保存です。端末の保存ではモデルを取得しません。</p>
@@ -247,7 +247,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     const latest = await actions.read();
     if (accepted !== epoch || !dialog.open) return;
     if (worldContext(latest) !== expected) throw new Error('世界や設定が変わりました。ファイルを選び直してください。');
-    confirm('world', content, ['投稿・会員・既読・設定・履歴をこの JSON で置き換えます。取り消せません。',
+    confirm('world', content, ['投稿・メール・会員・既読・設定・履歴をこの JSON で置き換えます。取り消せません。',
       '未送信の下書きも失われます。必要なら先に JSON を保存してください。', 'モデルの重み・端末キャッシュは保持します。'], async () => {
       await actions.run(() => actions.restore(text, expected));
       close();
@@ -264,7 +264,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
   click('.reset-world', async () => {
     const accepted = epoch, content = await actions.read(), expected = worldContext(content);
     if (accepted !== epoch) return;
-    confirm('world', content, ['投稿・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴・未送信の下書きを削除します。取り消せません。',
+    confirm('world', content, ['投稿・メール・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴・未送信の下書きを削除します。取り消せません。',
       '必要なら先に JSON を保存してください。最初の10人・30件の投稿を準備し、他のタブも再読み込みします。',
       'モデルの重み・端末キャッシュは保持します。AI には再同意が必要です。'], () => actions.run(() => actions.reset(expected)), '初期状態に戻す');
   });

@@ -70,13 +70,15 @@ for (const route of [['1'], ['X'], ['13', '2', 'MAIL']]) {
       expect(controller.forum).toBeNull();
       expect(controller.submit('HELP')).toEqual(mailbox);
       expect(controller.submit('LIST')).toEqual(mailbox);
-      for (const invalid of ['INBOX', 'SENT', 'READ 1', 'SEND hello', 'Q']) {
+      for (const invalid of ['READ 1', 'SEND hello', 'Q']) {
         expect(controller.submit(invalid).join('\n')).toContain('この画面では使えない');
         expect(controller.submit('HELP')).toEqual(mailbox);
       }
       expect(controller.submit('BACK')).toEqual(directory);
     }
     controller.submit('INBOX');
+    expect(controller.submit('SENT')[0]).toBe(`${directory[0]} / 送信済み`);
+    expect(controller.submit('INBOX')[0]).toBe(`${directory[0]} / 受信箱`);
     expect(controller.submit('MAIN')).toEqual(controller.welcome);
     controller.submit('1'); controller.submit('BACK');
     expect(controller.screen).toBe('main');
