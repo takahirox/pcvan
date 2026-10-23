@@ -169,3 +169,20 @@ test('committed external save consumes its pinned draft even when refresh fails'
   expect(result.printed.join('\n')).toContain('メール #1 をこのブラウザー内に保存しました');
   expect(result.printed.join('\n')).not.toContain('保存できませんでした');
 });
+
+test('incoming external sender has its own address, sample label, recipient and date without a synthetic sender', () => {
+  const members: Member[] = [{ id: 'human', handle: '秋の読者', actor: 'human' }];
+  const calendar = { version: 1 as const, sourceAnchor: '2026-10-21T00:00:00.000Z' };
+  const letter: Mail = { id: 'sample', number: 1, senderInternetAddress: 'observer@letters.example.invalid', recipientId: 'human',
+    subject: '  秋の夜  ', body: '  本文\n\n　ｶﾅ  ', createdAt: calendar.sourceAnchor, origin: 'local-sample:internet-letter-v1' };
+  const before = structuredClone(letter);
+  const list = renderMailList([letter], members, 'human', 'INBOX', calendar).join('\n');
+  expect(list).toContain('observer@letters.example.invalid'); expect(list).toContain('宛先：(SYN-'); expect(list).toContain('秋の読者');
+  expect(list).toContain('[未読]'); expect(list).toContain('創作サンプル'); expect(list).toContain('96年');
+  const detail = renderMail(letter, members, [letter], calendar);
+  expect(detail[1]).toBe('差出人：observer@letters.example.invalid'); expect(detail[2]).toContain('秋の読者');
+  expect(detail).toContain(`件名：${letter.subject}`); expect(detail).toContain(letter.body);
+  expect(detail.join('\n')).toContain('実際のネットワーク受信ではありません');
+  expect(detail.join('\n')).not.toMatch(/不明|既読確認/); expect(letter).toEqual(before);
+  expect(renderMailList([letter], members, 'other', 'INBOX', calendar)[0]).toBe('メール一覧：0件');
+});

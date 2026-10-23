@@ -12,14 +12,14 @@ import { planOltTurn, commitOltText } from '../ai/olt';
 import {
   invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailDestination,
 } from './schema';
-import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailDestination, Member, NewPost, Post, Records, Session, Store } from './schema';
+import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailIdentity, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
 import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
 import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
 import { expandedBoards, additionalSigs } from '../communities';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
-import { WORLD_SETTING } from './schema';
+import { WORLD_SETTING, INTERNET_SAMPLE_ORIGIN } from './schema';
 import { canPopulateCommunity, communityBoards, communityPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
 import { validateMailGeneration } from '../ai/mail';
 import { postInput, validateGeneration } from '../ai/generation';
@@ -375,7 +375,6 @@ export class LocalRepository {
       if (sender?.actor !== 'human') invalid('Select a local human member.');
       if (input.replyToMailId !== undefined && (typeof input.replyToMailId !== 'string' || !input.replyToMailId.trim())) invalid('Invalid mail reply parent.');
       const destination = resolveMailDestination(content.members, input.recipient);
-      if (destination.internetAddress !== undefined && input.replyToMailId !== undefined) invalid('Internet letters cannot be replies.');
       const previous = (content.mail ?? []).find((m) => m.id === input.id);
       if (previous) {
         if (previous.senderId !== sender.id || previous.recipientId !== destination.recipientId || previous.internetAddress !== destination.internetAddress || previous.subject !== input.subject ||
@@ -388,7 +387,23 @@ export class LocalRepository {
     }).then((mail) => { this.notifySetupChanged(); return mail; });
   }
 
-  private async insertMail(tx: IDBTransaction, input: Omit<Mail, 'number' | 'createdAt' | 'recipientId' | 'internetAddress'> & MailDestination): Promise<Mail> {
+  /** Explicit Settings demonstration; concurrent retries find the same stored sample. */
+  loadInternetSample(recipientId: string, expected?: string): Promise<Mail> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const content = await this.snapshot(tx);
+      if (expected !== undefined && worldContext(content) !== expected) throw new RepositoryError('stale', '世界や設定が変わりました。確認し直してください。');
+      if (!content.members.some((m) => m.id === recipientId && m.actor === 'human')) invalid('Select an existing human recipient.');
+      const previous = (content.mail ?? []).find((m) => m.recipientId === recipientId && m.origin === INTERNET_SAMPLE_ORIGIN);
+      if (previous) return previous;
+      const id = `internet-sample-v1:${recipientId}`;
+      if ((content.mail ?? []).some((m) => m.id === id)) invalid('Mail ID collision.');
+      return this.insertMail(tx, { id, recipientId,
+        senderInternetAddress: 'observer@letters.example.invalid', origin: INTERNET_SAMPLE_ORIGIN,
+        subject: '秋の夜の散歩', body: 'こんにちは。\n近所の古本屋で星座の本を見つけました。昨夜は散歩の途中で、冬の星を少し探してみました。\n\n週末はラジオを聴きながら、今年の写真を整理するつもりです。そちらではどんな秋を過ごしていますか。' });
+    }).then((mail) => { this.notifySetupChanged(); return mail; });
+  }
+
+  private async insertMail(tx: IDBTransaction, input: Omit<Mail, 'number' | 'createdAt' | keyof MailIdentity> & MailIdentity): Promise<Mail> {
     const content = await this.snapshot(tx);
     const maximum = (content.mail ?? []).reduce((n, m) => Math.max(n, m.number), 0);
     const number = Math.max(maximum + 1, (await request(tx.objectStore('session').get('mail-next-number'))) ?? 1);

@@ -3,6 +3,8 @@ import { validateBackup } from './storage/schema';
 import { worldContext, residentContext } from './storage/repository';
 import type { CommandActions } from './commands';
 import { profileFields, profileLabels } from './commands';
+import { activeHuman } from './forums';
+import { mailCorrespondent } from './mail';
 import { about, keyboardHelp } from './settings';
 import { models, residentProfiles } from './ai/personas';
 import type { ResidentProfile } from './ai/personas';
@@ -63,6 +65,10 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
           <p>配列はカンマ区切り。親しさは JSON。保存時に範囲・内容を検証します。</p>
           <button type="submit">住人の設定を保存</button><button type="button" class="cancel-resident">変更を破棄</button></form>
       </details>
+    </details>
+    <details class="mail-sample-panel"><summary>Internetメールの創作サンプル</summary>
+      <p>選択中の人間会員に、架空の差出人 observer@letters.example.invalid からの手紙を1通だけローカルに追加します。実際の受信や外部接続はありません。返信も明示した場合だけブラウザー内に保存し、外部へ送信しません。同じ会員への追加は繰り返しても1通です。</p>
+      <p class="mail-sample-recipient"></p><button type="button" class="load-mail-sample">創作メールをローカルに追加</button>
     </details>
     <details class="storage-panel"><summary>ローカルデータ・保守</summary>
       <p>JSON は投稿・メール（INET#外部宛先・手紙を含む）・ローカルNetNews記事・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書きは含みません。外部に保存してください。</p>
@@ -134,6 +140,9 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     const activity = content.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined;
     cue.hidden = !!activity?.consent || !!activity?.setupDeferred;
     query('.populate-world').hidden = !canPopulateCommunity(content);
+    const recipient = content.members.find((m) => m.id === activeHuman(content));
+    query('.mail-sample-recipient').textContent = recipient ? `追加先：${mailCorrespondent(recipient)}` :
+      '人間会員が未登録です。端末の HANDLE で登録、または既存のハンドルを選択してから追加してください。';
     if (!dialog.open) return;
     if (confirmation && (confirmationKind === 'model' ? setupContext(content) : worldContext(content)) !== confirmationContext) {
       clearConfirmation(); message('世界や設定が変わりました。現在の設定から確認し直してください。');
@@ -252,6 +261,17 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       await actions.run(() => actions.restore(text, expected));
       close();
     }, '置き換えて復元する');
+  });
+  click('.load-mail-sample', async () => {
+    const accepted = epoch, content = await actions.read(), recipientId = activeHuman(content);
+    if (accepted !== epoch || !dialog.open) return;
+    if (!recipientId) { message('端末の HANDLE で人間会員を登録・選択してください。会員は自動作成しません。'); return; }
+    const expected = worldContext(content);
+    confirm('world', content, [`追加先：${mailCorrespondent(content.members.find((m) => m.id === recipientId))}`,
+      '架空のInternetメールを1通だけローカルに追加します。実際の受信ではありません。JSON と表示した端末ログにも含まれます。'], async () => {
+      await actions.run(async () => { await (await actions.repository()).loadInternetSample(recipientId, expected); });
+      refresh(await actions.read()); message('創作メールをローカルに追加しました（既存なら重複しません）。端末の MAIN 1 / MAIN X / SIG MAIL → INBOX で読めます。');
+    }, '創作メールを追加する');
   });
   click('.populate-world', async () => {
     const accepted = epoch, content = await actions.read();

@@ -297,3 +297,94 @@ for (const operation of ['reset', 'restore'] as const) {
     expect((await snapshot(page)).mail).toEqual([]);
   });
 }
+
+for (const route of [
+  { name: 'MAIN 1', steps: ['1'], title: '電子メール', parent: 'ＰＣ－ＶＡＮ' },
+  { name: 'MAIN X', steps: ['X'], title: '旧電子メール', parent: 'ＰＣ－ＶＡＮ' },
+  { name: 'SIG MAIL', steps: ['13', '2', 'MAIL'], title: '電子メール', parent: '大自然' },
+]) {
+  test(`${route.name}: Settings Internet sample → INBOX → literal reply/edit/retry → local save and JSON round-trip`, async ({ page }) => {
+    const requests: string[] = []; page.on('request', (r) => requests.push(r.url()));
+    await start(page, '秋の読者');
+    await settings(page, 3); await command(page, 'AUTO 0', '自動投稿を休止しました'); await command(page, 'MAIN', 'MAIN');
+    const initial = await snapshot(page), human = initial.members.find((m) => m.actor === 'human')!;
+    const modal = page.getByRole('dialog', { name: '設定 / Options', exact: true });
+    const load = async () => {
+      await page.getByRole('button', { name: '設定 / Options', exact: true }).click();
+      const summary = modal.locator('.mail-sample-panel > summary');
+      if (!await modal.locator('.load-mail-sample').isVisible()) await summary.click();
+      await expect(modal.locator('.mail-sample-recipient')).toContainText('秋の読者');
+      await modal.locator('.load-mail-sample').focus(); await page.keyboard.press('Enter');
+      await expect(modal.locator('.confirmation-copy')).toContainText('実際の受信ではありません');
+      await expect(modal.locator('.confirm-action')).toBeFocused(); await page.keyboard.press('Enter');
+      await expect(modal.locator('.settings-message')).toContainText('創作メールをローカルに追加しました');
+      await modal.locator('.close-settings').click();
+    };
+    await load(); await load();
+    const loaded = await snapshot(page); expect(loaded.mail).toHaveLength(1);
+    const sample = loaded.mail![0]!, address = sample.senderInternetAddress!;
+    const enter = async () => {
+      await command(page, 'MAIN', 'MAIN');
+      for (const step of route.steps) await command(page, step, 'コマンド=');
+    };
+    await enter();
+    const list = await command(page, 'INBOX', '[未読]');
+    expect(list).toContain(address); expect(list).toContain('創作サンプル'); expect(list).toContain('秋の読者');
+    const read = await command(page, 'READ 1', '★内容');
+    expect(read).toContain(`差出人：${address}`); expect(read).toContain(`宛先：(${identityToken(human)}) 秋の読者`);
+    expect(read).toContain(sample.body); expect(read).toContain('実際のネットワーク受信ではありません');
+    expect(read).toMatch(/日時：96年/);
+    await command(page, 'LIST', '[既読]');
+    // Cancellation at each applicable stage never adds a letter.
+    for (const stage of ['body', 'review', 'edit']) {
+      await command(page, 'REPLY 1', '本文を1行ずつ');
+      if (stage !== 'body') { await command(page, '中止の返事', '本文='); await command(page, '.END', 'このブラウザー内に保存しますか'); }
+      if (stage === 'edit') await command(page, 'EDIT', 'LINE 番号');
+      await command(page, stage === 'review' ? 'N' : '.CANCEL', 'メールを中止');
+    }
+    expect((await snapshot(page)).mail).toHaveLength(1);
+    expect(await command(page, 'REPLY 1', '本文を1行ずつ')).toContain(`INET#${address}`);
+    await command(page, '  秋のお返事　ｶﾅ <b>文字</b>  ', '本文='); await command(page, '', '本文=');
+    await command(page, '.TEXT MAIN', '本文=');
+    expect(await command(page, '.END', 'このブラウザー内に保存しますか')).toContain(`宛先：INET#${address}`);
+    await command(page, 'EDIT', 'LINE 番号'); await command(page, 'LINE 3   EDIT  ', '本文を変更');
+    expect(await command(page, 'REVIEW', 'このブラウザー内に保存しますか')).toContain(`宛先：INET#${address}`);
+    await page.evaluate(() => {
+      const native = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (value, key) {
+        if (this.name === 'session' && key === 'mail-next-number') throw new DOMException('quota', 'QuotaExceededError');
+        return key === undefined ? native.call(this, value) : native.call(this, value, key);
+      }; Object.assign(window, { restoreReplyPut: () => { IDBObjectStore.prototype.put = native; } });
+    });
+    await command(page, 'Y', '入力は残っています'); expect((await snapshot(page)).mail).toHaveLength(1);
+    await page.evaluate(() => (window as unknown as { restoreReplyPut(): void }).restoreReplyPut());
+    await command(page, 'Y', 'メール #2 をこのブラウザー内に保存しました');
+    await command(page, 'Y', 'この画面では使えない');
+    const verify = async () => {
+      expect(await command(page, 'SENT', '[ブラウザー内保存・外部送信なし]')).toContain(`INET#${address}`);
+      const detail = await command(page, 'READ 2', '返信先：#1');
+      expect(detail).toContain(`宛先：INET#${address}`); expect(detail).toContain('メールサーバーへ送信していません');
+      expect(detail).toContain('  秋のお返事　ｶﾅ <b>文字</b>  \n\n  EDIT  '); expect(detail).not.toContain('既読確認');
+      await command(page, 'INBOX', '[既読]'); await command(page, 'READ 1', '★内容');
+      await command(page, 'BACK', route.title); await command(page, 'BACK', route.parent);
+    };
+    await verify(); const saved = await backup(page);
+    expect(saved.mail).toHaveLength(2);
+    expect(saved.mail!.find((m) => m.number === 2)).toMatchObject({ internetAddress: address, replyToMailId: sample.id });
+    expect(saved.mail!.find((m) => m.number === 1)).toMatchObject({ ...sample, readAt: expect.any(String) });
+    for (const key of ['members', 'posts', 'forums', 'sigs', 'readStates'] as const) expect(saved[key]).toEqual(initial[key]);
+    const protectedSettings = (data: typeof saved) => data.settings.map((s) => s.id === 'ai-activity' ?
+      { ...s, value: { ...(s.value as object), lastActivityAt: null } } : s);
+    expect(protectedSettings(saved)).toEqual(protectedSettings(initial));
+    await page.reload(); await expect(page.locator('.output')).toContainText('MAIN'); await enter(); await verify();
+    await restore(page, saved); await enter(); await verify(); expect((await snapshot(page)).mail).toEqual(saved.mail);
+    await command(page, 'HANDLE', 'ハンドル設定'); await command(page, 'NEW', 'ハンドル名='); await command(page, '別の読者', '登録しました');
+    await enter(); await command(page, 'INBOX', 'メール一覧：0件');
+    await command(page, 'READ 1', 'その番号のメールはこの箱にありません');
+    await command(page, 'REPLY 1', 'その番号のメールはこの箱にありません');
+    await command(page, 'SENT', 'メール一覧：0件'); await command(page, 'READ 2', 'その番号のメールはこの箱にありません');
+    await noOtherUi(page); await expect(page.locator('.output b')).toHaveCount(0);
+    expect(requests.filter((url) => !url.startsWith('http://127.0.0.1:14373/'))).toEqual([]);
+    expect(requests.filter((url) => /webllm|model|mailto:|letters\.example/i.test(url))).toEqual([]);
+  });
+}

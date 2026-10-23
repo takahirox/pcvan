@@ -462,3 +462,165 @@ test('mixed Internet/resident saves allocate atomically, retry identically, reje
   expect(result.good.forums).toEqual(result.before.forums); expect(result.good.readStates).toEqual(result.before.readStates);
   expect(result.restored).toEqual(result.good); expect(result.reopened).toEqual(result.good); expect(result.afterRestore.number).toBe(6);
 });
+
+test('opt-in Internet samples and replies are atomic, isolated, idempotent and survive JSON/reopen', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, before = await repo.exportBackup();
+    const human = before.members.find((m) => m.actor === 'human')!;
+    const rp = '/src/storage/repository.ts', mp = '/src/ai/mail.ts';
+    const other = await (await import(rp)).openRepository('mail-world') as LocalRepository;
+    const first = await Promise.all([repo.loadInternetSample(human.id), other.loadInternetSample(human.id)]);
+    const second = await repo.createHumanMember('別の読者');
+    const another = await other.loadInternetSample(second.id);
+    let isolation = '';
+    try { await repo.markMailRead(second.id, first[0]!.id); } catch (e) { isolation = (e as { code: string }).code; }
+    await repo.markMailRead(human.id, first[0]!.id);
+    const draft = { id: 'external-reply', senderId: human.id, recipient: `INET#${first[0]!.senderInternetAddress}`,
+      subject: 'Re: 秋の夜の散歩', body: '  日本語\n\nY\n　ｶﾅ  ', replyToMailId: first[0]!.id };
+    const replies = await Promise.all([repo.createHumanMail(draft), other.createHumanMail(draft)]);
+    let collision = '';
+    try { await repo.createHumanMail({ ...draft, body: 'changed' }); } catch (e) { collision = (e as { code: string }).code; }
+    const good = await repo.exportBackup();
+    const { pairMail, buildMailPrompt } = await import(mp) as typeof import('../src/ai/mail');
+    const pair = pairMail(good, 'fictional-ai:hoshimori', human.id);
+    const targets = [];
+    for (const letter of [first[0]!, replies[0]!]) {
+      try { buildMailPrompt(good, 'hoshimori', { humanId: human.id, replyToMailId: letter.id }); targets.push('accepted'); }
+      catch { targets.push('rejected'); }
+    }
+    await repo.replaceFromJson(await repo.exportJson(), { confirmReplace: true });
+    const restored = await repo.exportBackup(); repo.close(); other.close();
+    window.mailRepo = await (await import(rp)).openRepository('mail-world');
+    const reopened = await window.mailRepo.exportBackup();
+    const again = await window.mailRepo.loadInternetSample(human.id);
+    return { before, first, another, isolation, replies, collision, good, restored, reopened, again, pair, targets };
+  });
+  expect(result.before.mail).toEqual([]);
+  expect(result.first[0]).toEqual(result.first[1]); expect(result.first[0]!.number).toBe(1);
+  expect(result.first[0]).toMatchObject({ senderInternetAddress: 'observer@letters.example.invalid', origin: 'local-sample:internet-letter-v1' });
+  expect(Object.hasOwn(result.first[0]!, 'senderId')).toBe(false);
+  expect(result.another.number).toBe(2); expect(result.isolation).toBe('validation');
+  expect(result.replies[0]).toEqual(result.replies[1]); expect(result.replies[0]!.number).toBe(3);
+  expect(result.collision).toBe('validation'); expect(result.pair).toEqual([]); expect(result.targets).toEqual(['rejected', 'rejected']);
+  expect(result.good.settings.filter((s) => s.id !== 'active-human-member')).toEqual(result.before.settings.filter((s) => s.id !== 'active-human-member'));
+  for (const key of ['posts', 'forums', 'sigs', 'readStates'] as const) expect(result.good[key]).toEqual(result.before[key]);
+  expect(result.good.mail!.every((m) => !m.simulation && !m.recipientConfirmation)).toBe(true);
+  expect(result.good.mail!.filter((m) => m.readAt).map((m) => m.id)).toEqual([result.first[0]!.id]);
+  expect(result.restored).toEqual(result.good); expect(result.reopened).toEqual(result.good);
+  expect(result.again).toEqual(result.good.mail!.find((m) => m.id === result.first[0]!.id));
+});
+
+test('incoming Internet schema and reply relationships reject forged imports and writes without changing the world', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, content = await repo.exportBackup(), human = content.members.find((m) => m.actor === 'human')!;
+    const sample = await repo.loadInternetSample(human.id), second = await repo.createHumanMember('別人');
+    const another = await repo.loadInternetSample(second.id);
+    const local = await repo.createHumanMail({ id: 'resident-parent', senderId: human.id, recipient: 'hoshimori', subject: '内', body: '内' });
+    const draft = { id: 'reply', senderId: human.id, recipient: `INET#${sample.senderInternetAddress}`, subject: 'Re: 秋', body: '返事', replyToMailId: sample.id };
+    const reply = await repo.createHumanMail(draft), good = await repo.exportBackup();
+    const variants: unknown[] = [
+      { ...sample, senderId: human.id }, { ...sample, internetAddress: sample.senderInternetAddress },
+      { ...sample, senderInternetAddress: undefined }, { ...sample, senderInternetAddress: '' }, { ...sample, senderInternetAddress: null },
+      { ...sample, senderInternetAddress: 'a@host.example\n' }, { ...sample, senderInternetAddress: 'a'.repeat(255) },
+      { ...sample, senderInternetAddress: 'a@host.example,b@host.example' }, { ...sample, senderInternetAddress: '日本@host.example' },
+      { ...sample, recipientId: 'missing' }, { ...sample, recipientId: undefined }, { ...sample, recipientId: 'fictional-ai:hoshimori' },
+      { ...sample, origin: 'local-human' }, { ...sample, origin: 'local-ai:webllm:fixture' }, { ...sample, unknown: true },
+      { ...sample, replyToMailId: local.id }, { ...sample, body: '\u001b[2J' }, { ...sample, subject: 'two\nlines' },
+      { ...sample, body: 'a'.repeat(20001) }, { ...sample, subject: 'a'.repeat(201) },
+      { ...sample, simulation: { runId: sample.id, simulatedAt: sample.createdAt, fictional: true } },
+      { ...sample, recipientConfirmation: { at: sample.createdAt, replyMailId: reply.id, provenance: 'local-resident-reply-v1' } },
+    ];
+    const cases = variants.map((bad) => ({ ...good, mail: good.mail!.map((m) => m.id === sample.id ? bad : m) }));
+    for (const change of [{ replyToMailId: 'missing' }, { replyToMailId: another.id }, { replyToMailId: local.id },
+      { replyToMailId: reply.id }, { number: sample.number }, { internetAddress: 'other@letters.example.invalid' },
+      { senderId: second.id }, { createdAt: '2026-10-20T00:00:00.000Z' }]) {
+      cases.push({ ...good, mail: good.mail!.map((m) => m.id === reply.id ? { ...m, ...change } : m) });
+    }
+    cases.push({ ...good, mail: [...good.mail!, { ...sample, id: 'duplicate-sample', number: 99 }] });
+    const failures = [];
+    for (const bad of cases) {
+      try { await repo.replaceFromJson(JSON.stringify(bad), { confirmReplace: true }); failures.push('saved'); }
+      catch (e) { failures.push((e as { code: string }).code); }
+      if (JSON.stringify(await repo.exportBackup()) !== JSON.stringify(good)) throw new Error('Rejected import changed world');
+    }
+    const writes = [];
+    for (const change of [{ replyToMailId: 'missing' }, { replyToMailId: another.id }, { replyToMailId: local.id },
+      { replyToMailId: reply.id }, { recipient: 'INET#other@letters.example.invalid' }, { senderId: second.id }, { recipient: 'hoshimori' }]) {
+      try { await repo.createHumanMail({ ...draft, id: 'bad', ...change }); writes.push('saved'); }
+      catch (e) { writes.push((e as { code: string }).code); }
+    }
+    for (const recipient of ['missing', 'fictional-ai:hoshimori']) {
+      try { await repo.loadInternetSample(recipient); writes.push('saved'); } catch (e) { writes.push((e as { code: string }).code); }
+    }
+    let deletion = '', actor = '';
+    try { await repo.delete('mail', sample.id); } catch (e) { deletion = (e as { code: string }).code; }
+    try { await repo.put('members', { ...human, actor: 'ai' }); } catch (e) { actor = (e as { code: string }).code; }
+    return { failures, writes, deletion, actor, good, after: await repo.exportBackup() };
+  });
+  expect(result.failures).toEqual(Array(31).fill('validation')); expect(result.writes).toEqual(Array(9).fill('validation'));
+  expect(result.deletion).toBe('validation'); expect(result.actor).toBe('validation'); expect(result.after).toEqual(result.good);
+});
+
+for (const operation of ['sample', 'reply'] as const) {
+  test(`Internet ${operation} quota/abort rollback keeps numbering and reset/restore fences reject stale actions`, async ({ page }) => {
+    const result = await page.evaluate(async (operation) => {
+      const repo = window.mailRepo, human = (await repo.list('members')).find((m) => m.actor === 'human')!;
+      const parent = operation === 'reply' ? await repo.loadInternetSample(human.id) : undefined;
+      const save = () => parent ? repo.createHumanMail({ id: 'reply', senderId: human.id, recipient: `INET#${parent.senderInternetAddress}`,
+        subject: 'Re: 秋', body: '返事', replyToMailId: parent.id }) : repo.loadInternetSample(human.id);
+      const before = await repo.exportBackup(), native = IDBObjectStore.prototype.put, failures = [];
+      for (const mode of ['quota', 'abort']) {
+        IDBObjectStore.prototype.put = function (value, key) {
+          if (this.name === 'session' && key === 'mail-next-number') {
+            if (mode === 'quota') throw new DOMException('quota', 'QuotaExceededError');
+            this.transaction.abort();
+          }
+          return key === undefined ? native.call(this, value) : native.call(this, value, key);
+        };
+        try { await save(); failures.push('saved'); } catch (e) { failures.push((e as { code: string }).code); }
+        finally { IDBObjectStore.prototype.put = native; }
+        if (JSON.stringify(await repo.exportBackup()) !== JSON.stringify(before)) throw new Error('Failed save changed world');
+      }
+      const next = await save(), rp = '/src/storage/repository.ts';
+      const stale = await (await import(rp)).openRepository('mail-world') as LocalRepository;
+      const good = await repo.exportBackup();
+      // Replacement deliberately retains the same JSON world; the private generation still fences it.
+      await repo.replaceFromJson(JSON.stringify(good), { confirmReplace: true });
+      let staleRestore = '', staleReset = '';
+      try { await stale.loadInternetSample(human.id); } catch (e) { staleRestore = (e as { code: string }).code; }
+      const stale2 = await (await import(rp)).openRepository('mail-world') as LocalRepository;
+      await repo.resetWorld({ confirmReset: true });
+      try { await stale2.loadInternetSample(human.id); } catch (e) { staleReset = (e as { code: string }).code; }
+      const reset = await repo.exportBackup();
+      // Old backups without mail restore empty and remain empty on reopening.
+      const legacy = { ...good }; delete legacy.mail;
+      await repo.replaceFromJson(JSON.stringify(legacy), { confirmReplace: true });
+      repo.close(); stale.close(); stale2.close();
+      window.mailRepo = await (await import(rp)).openRepository('mail-world');
+      return { failures, before, next, staleRestore, staleReset, reset, legacy: await window.mailRepo.exportBackup() };
+    }, operation);
+    expect(result.failures[0]).toBe('quota'); expect(result.failures[1]).not.toBe('saved');
+    expect(result.next.number).toBe(result.before.mail!.length + 1);
+    expect(result.staleRestore).toBe('stale'); expect(result.staleReset).toBe('stale');
+    expect(result.reset.mail).toEqual([]); expect(result.legacy.mail).toEqual([]);
+  });
+}
+
+test('sample IDs reject collisions, mixed sample/resident allocation stays monotonic and stale confirmation rolls back', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, human = (await repo.list('members')).find((m) => m.actor === 'human')!;
+    const draft = { id: `internet-sample-v1:${human.id}`, senderId: human.id, recipient: 'hoshimori', subject: '衝突', body: '元の手紙' };
+    await repo.createHumanMail(draft);
+    const before = await repo.exportBackup(); let collision = '';
+    try { await repo.loadInternetSample(human.id); } catch (e) { collision = (e as { code: string }).code; }
+    const after = await repo.exportBackup(); await repo.delete('mail', draft.id);
+    const rp = '/src/storage/repository.ts', other = await (await import(rp)).openRepository('mail-world') as LocalRepository;
+    const mixed = await Promise.all([repo.loadInternetSample(human.id), other.createHumanMail({ ...draft, id: 'mixed-resident' })]);
+    const beforeStale = await repo.exportBackup(); let stale = '';
+    try { await repo.loadInternetSample(human.id, 'old-world-context'); } catch (e) { stale = (e as { code: string }).code; }
+    other.close(); return { collision, before, after, mixed, stale, beforeStale, afterStale: await repo.exportBackup() };
+  });
+  expect(result.collision).toBe('validation'); expect(result.after).toEqual(result.before);
+  expect(result.mixed.map((m) => m.number).sort()).toEqual([2, 3]);
+  expect(result.stale).toBe('stale'); expect(result.afterStale).toEqual(result.beforeStale);
+});

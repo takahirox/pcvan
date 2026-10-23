@@ -2108,3 +2108,65 @@ No real model, additional browser engine, native IME/hardware check or recovered
 outbound historical session comparison was used. Those optional checks are not
 completion gates. No required post-merge verification applies. No push, PR,
 comment, merge or deployment was performed.
+
+## Issue #97 — opt-in incoming Internet mail and local replies (2026-10-24)
+
+Implemented the [Issue #97 contract](mail.md#opt-in-incoming-internet-sample-and-replies-issue-97)
+against the assigned worktree. Modern Settings explicitly adds one fictional
+incoming letter per existing selected human. External sender identity and
+fictional provenance stay in the existing mail/JSON architecture; replies pin
+that address and the earlier incoming parent through the existing literal editor
+and explicit browser-local save. The three entry/return contexts are retained.
+
+Validation performed:
+
+- `npm ci`: completed, zero reported vulnerabilities. An initial build before
+  installing dependencies could not find `tsc`; installation resolved this.
+- `npm run build`: passed configured TypeScript checking and production bundling.
+- `npm test -- tests/mail-repository.spec.ts tests/mail.spec.ts tests/mail-presentation.spec.ts`:
+  **46 passed (1.8m)**, including all three new production keyboard journeys.
+- `npm test -- tests/settings-dialog.spec.ts tests/mail-autonomy.spec.ts tests/mail-repository.spec.ts`:
+  **59 passed (1.1m)**, including subsequent collision, Settings and prompt-boundary
+  coverage. No test failures occurred in either focused run.
+- Initial full `npm test` (default eight workers): **347 passed, 5 failed
+  (4.8m)**. Three existing news journeys exceeded their 30-second test timeout;
+  the existing MAIN X resident-mail reload check waited five seconds for MAIN
+  while the connection stages were still advancing. An existing NetNews
+  restored-empty-world comparison found resident member records had returned
+  during its long journey. These observations alone do not establish root cause.
+  The full suite was rerun with three workers to assess concurrency sensitivity,
+  without changing assertions, timeouts, test selection or application behavior.
+- Final complete `npm test -- --workers=3`: **352 passed (5.8m)**, including
+  configured TypeScript checking/production bundling, all 340 baseline checks and
+  all 12 added checks. All five initially failing checks passed in this run.
+  Lower concurrency passed the complete unchanged suite; it does not establish
+  that the default eight-worker run is reliable in this environment.
+- Reviewed the complete implementation/test/documentation diff against #97.
+  All **118 local Markdown links/heading anchors** across the five changed
+  documents resolve. Working-tree and staged whitespace checks pass.
+
+The new checks cover absent/selected/different humans, opt-in loading and
+cancellation, repeated/concurrent insertion and saves, ID collisions, shared
+monotonic numbering, quota/abort rollback without partial records or consumed
+numbers, strict malformed/forged imports, parent routing, recipient isolation,
+read markers, literal Japanese/whitespace/blank lines/command-shaped text,
+review/EDIT/cancellation and failure retry, committed-draft consumption,
+SENT/READ, reload/JSON round-trip and legacy/pre-mail compatibility. Reset/restore
+invalidate pending Settings actions and reviewed replies across tabs, including
+replacement with identical JSON at the repository fence. Empty restored mailboxes
+stay empty after reload.
+
+With activity paused, the production journeys compare members, SIGs, forums,
+posts, public read states and settings while allowing intended mail/read updates
+and existing session/activity bookkeeping. No resident simulation or recipient
+confirmation is fabricated. Deterministic context checks compare resident
+scheduling and mail/forum/OLT prompts with and without both external directions;
+external targets are rejected and pair memory stays unchanged. Request observation
+finds no external/model/address-lookup/mailto requests caused by the journey.
+
+The build emits the existing large-chunk advisory; Node also reports the existing
+NO_COLOR/FORCE_COLOR warning. No real model, additional browser engine,
+native-IME/hardware validation or subsequently recovered historical incoming-mail
+session comparison was used. Those optional checks are not completion gates.
+No required post-merge verification applies. No push, PR, comment, merge or
+external deployment was performed.

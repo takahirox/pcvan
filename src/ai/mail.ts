@@ -9,7 +9,7 @@ import { historicalSetting } from './setting';
 
 const time = (m: Mail) => Date.parse(m.simulation?.simulatedAt ?? m.createdAt);
 export function pairMail(content: Backup, residentId: string, humanId: string): Mail[] {
-  return (content.mail ?? []).filter((m) => m.internetAddress === undefined && ((m.senderId === residentId && m.recipientId === humanId) ||
+  return (content.mail ?? []).filter((m) => m.internetAddress === undefined && m.senderInternetAddress === undefined && ((m.senderId === residentId && m.recipientId === humanId) ||
     (m.senderId === humanId && m.recipientId === residentId))).sort((a, b) => a.number - b.number);
 }
 

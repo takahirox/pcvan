@@ -331,23 +331,27 @@ test('Internet letters create no resident acquaintance, targets, pair memory or 
     const planned = scheduleActivity(before, state, now);
     const letter = await repo.createHumanMail({ id: 'external-private-letter', senderId: human.id,
       recipient: 'INET#EXTERNAL_ADDRESS@letters.example.invalid', subject: 'EXTERNAL_SUBJECT', body: 'EXTERNAL_BODY 日本語' });
+    const sample = await repo.loadInternetSample(human.id);
+    const reply = await repo.createHumanMail({ id: 'external-private-reply', senderId: human.id,
+      recipient: `INET#${sample.senderInternetAddress}`, subject: 'EXTERNAL_REPLY_SUBJECT', body: 'EXTERNAL_REPLY_BODY', replyToMailId: sample.id });
     const externalOnly = await repo.exportBackup(), externalPlan = scheduleActivity(externalOnly, state, now);
     const parent = await repo.createHumanMail({ id: 'resident-parent', senderId: human.id, recipient: 'hoshimori', subject: '住人の件名', body: '住人だけの本文' });
-    const content = await repo.exportBackup(), without = { ...content, mail: content.mail!.filter((m) => m.id !== letter.id) };
+    const content = await repo.exportBackup(), without = { ...content, mail: content.mail!.filter((m) => m.internetAddress === undefined && m.senderInternetAddress === undefined) };
     const target = { humanId: human.id, replyToMailId: parent.id }, room = emptyOlt(new Date().toISOString()).rooms[0]!;
     const turn = { id: 'olt-turn', authorId: 'fictional-ai:hoshimori', modelId: activity.modelId, context: '', until: now };
     const forum = content.forums.find((f) => content.posts.some((p) => p.forumId === f.id))!;
     const request = { personaId: 'hoshimori', forumId: forum.id };
     const prompts = [buildMailPrompt(content, 'hoshimori', target), buildPrompt(content, request), buildOltPrompt(content, room, turn)];
     const privateFree = [buildMailPrompt(without, 'hoshimori', target), buildPrompt(without, request), buildOltPrompt(without, room, turn)];
-    let forgedTarget = false;
-    try { buildMailPrompt(content, 'hoshimori', { humanId: human.id, replyToMailId: letter.id }); } catch { forgedTarget = true; }
+    const forgedTargets = [letter, sample, reply].map((row) => {
+      try { buildMailPrompt(content, 'hoshimori', { humanId: human.id, replyToMailId: row.id }); return false; } catch { return true; }
+    });
     const pairs = pairMail(content, 'fictional-ai:hoshimori', human.id);
-    repo.close(); return { planned, externalPlan, prompts, privateFree, forgedTarget, pairs, parent, before, externalOnly };
+    repo.close(); return { planned, externalPlan, prompts, privateFree, forgedTargets, pairs, parent, before, externalOnly };
   });
   expect(result.planned).toEqual(result.externalPlan);
   expect(result.externalPlan.batch!.runs.every((r) => !r.mail)).toBe(true);
   expect(result.prompts).toEqual(result.privateFree); expect(JSON.stringify(result.prompts)).not.toMatch(/EXTERNAL_ADDRESS|EXTERNAL_SUBJECT|EXTERNAL_BODY/);
-  expect(result.forgedTarget).toBe(true); expect(result.pairs).toEqual([result.parent]);
+  expect(result.forgedTargets).toEqual([true, true, true]); expect(result.pairs).toEqual([result.parent]);
   expect({ ...result.externalOnly, mail: [] }).toEqual(result.before);
 });

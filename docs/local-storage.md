@@ -316,7 +316,8 @@ mail-bearing exports without writing; retain a backup before upgrading.
 | Sig | `id`, `keyword`, `title` | — |
 | Forum | `id`, `sigId`, `boardNo`, `name`, `nextPostNumber` | — |
 | Post | `id`, `forumId`, `number`, `authorId`, `title`, `body`, `createdAt`, `origin` | `displaySecondNumber`, `replyToPostId`, `simulation` |
-| Mail | `id`, `number`, `senderId`, exactly one of `recipientId` / `internetAddress`, `subject`, `body`, `createdAt`, `origin` | Resident mail only: `replyToMailId`, `readAt`, `simulation`, `recipientConfirmation` |
+| Resident/outgoing mail | `id`, `number`, `senderId`, exactly one of `recipientId` / `internetAddress`, `subject`, `body`, `createdAt`, `origin` | `replyToMailId`; resident mail only: `readAt`, `simulation`, `recipientConfirmation` |
+| Incoming Internet sample | `id`, `number`, `senderInternetAddress`, `recipientId`, `subject`, `body`, `createdAt`, `origin: 'local-sample:internet-letter-v1'` | `readAt` |
 | ReadState | `memberId`, `forumId`, `lastReadNumber` | — |
 | Session | `lastLoginAt`, `lastLogoutAt`, `commandHistory` | — |
 | Setting | `id`, `value` | — |
@@ -411,22 +412,48 @@ Issue #93 extends the same store/JSON v1 shape with exactly one of `recipientId`
 or `internetAddress`. The latter stores the raw ASCII address without `INET#`,
 preserving spelling/case; there is no external member record, index or secondary
 mailbox. The [bounded address subset](mail.md#browser-local-internet-destinations-issue-93)
-is shared by commands, writes and imports. An external letter must have an
+is shared by commands, writes and imports. An outgoing external letter must have an
 existing human sender and `local-human` origin, and cannot carry `recipientId`,
-`readAt`, `replyToMailId`, `simulation` or `recipientConfirmation`. Contradictory,
-malformed and forged variants fail before any import replacement or write. Local
+`readAt`, `simulation` or `recipientConfirmation`. An optional reply parent must
+be an earlier incoming letter to that sender from the same exact external address.
+Contradictory, malformed and forged variants fail before any import replacement or write. Local
 resident correspondence, parent reversal and confirmation validation are retained.
-External letters cannot be reply targets or acquire recipient read markers.
+Outgoing external letters cannot be reply targets or acquire recipient read markers.
 
 The existing atomic insert/counter transaction, ID collision checks and world
 fences cover both kinds. Same-ID retries compare destination kind and exact address
 as well as sender/content/parent. Failure leaves no letter or consumed number.
-External letters enter only their sender's SENT projection; resident pair memory
+Outgoing external letters enter only their sender's SENT projection; resident pair memory
 explicitly excludes them. They do not consume resident generation budgets. JSON
 and logs include external addresses and letter content, with the same unencrypted
 local privacy limits. Old backups remain valid; older app versions reject the new
 field without replacing data. No database/backup version bump or mailbox migration
 is needed for this additive destination shape.
+
+Issue #97 adds the incoming identity alternative: `senderInternetAddress` plus an
+existing human `recipientId`, with no `senderId` or outgoing `internetAddress`.
+The same bounded address validation applies. Its required `origin` is exactly
+`local-sample:internet-letter-v1`, explicit fictional-sample provenance; resident
+simulation, recipient confirmation and incoming reply-parent fields are rejected.
+Unknown fields and contradictory identities fail strict validation. At most one
+sample per recipient is accepted, including imports. The sender index naturally
+omits these records; the recipient, number and parent indexes remain unchanged.
+No database upgrade, external-member registry or second mailbox is needed.
+
+`loadInternetSample(recipientId, expectedContext?)` is called only by the explicit
+Settings action. In one existing transaction it checks the world/recipient,
+returns an existing sample (preserving its read marker), or inserts the fixed
+original fixture with a stable per-recipient ID and shared monotonic number.
+Conflicting IDs fail; quota/abort rolls back the letter and counter. The Settings
+confirmation pins the recipient and world context, and the existing private
+generation fence rejects suspended cross-tab actions after reset/restore.
+Human external replies use `createHumanMail` unchanged except for validating the
+incoming parent: earlier number, no later creation time, same human and exact
+address.
+Resident replies explicitly reject external parents. Both directions are excluded
+from resident pair memory and generation targets. Backups preserve addresses,
+provenance, parent and read marker; legacy outbound-only and pre-mail backups stay
+valid. Older app versions reject the added incoming shape without replacing data.
 
 Issue #89 adds optional `recipientConfirmation: { at, replyMailId,
 provenance: 'local-resident-reply-v1' }` on human-sent mail only. This explicitly
