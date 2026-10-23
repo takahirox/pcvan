@@ -76,10 +76,12 @@ private letters. Silence, failed generation and long delays are possible.
 Mail shares the consent, worker, model lease, per-resident due times, persisted
 batch, 72-hour catch-up bound, six-hour save cap and twelve-attempt budget of
 [local AI](local-ai.md#private-mail). At most two mail actions, and at most half
-the cap when the cap is two or more, enter a batch; a cap of one permits either
+the cap when the cap is two or more, may be saved within six hours across batches;
+recently saved resident letters reduce the next batch's mail allowance, including
+catch-up letters with older simulated dates. A cap of one permits either
 kind of action. At most one queued letter per resident per batch and one letter
 per pair per simulated day are planned. First contact is one per pair; replies
-deduplicate by parent. Mail cannot consume every slot of a multi-action batch.
+deduplicate by parent. Mail leaves save capacity for public posts when the cap is two or more.
 
 Prompts contain only bounded mail between the two correspondents (last four
 letters plus a selected received target) and up to four public posts authored by

@@ -224,7 +224,9 @@ exchange within fourteen days can prompt first contact after at least an hour,
 weighted by new-thread tendency and derived familiarity. Profiles/routines and
 quiet periods apply before either choice. At most one letter per pair/simulated
 day and one queued mail action per resident/batch are selected. At most two mail
-slots, and at most half of a cap of two or more, leave room for public posts.
+slots within six hours across batches, and at most half of a cap of two or more,
+leave room for public posts. The planner counts saved resident letters by their
+actual creation time, including catch-up letters with older simulated dates.
 With a cap of one, the sole slot may be either kind. Initiation deduplicates by
 pair; responses by human parent, including across reopening and concurrent commits.
 Catch-up retains the same 72-hour/opportunity bounds. No off-page inference occurs.

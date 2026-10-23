@@ -102,8 +102,13 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
   opportunities.sort((a, b) => a.at - b.at || a.profile.id.localeCompare(b.profile.id));
   const id = `residents:${state.lastActivityAt}:${timestamp}`;
   const runs: AiRun[] = [];
+  // Reserve public capacity across timer ticks, not just within this batch.
+  // Catch-up letters spend today's allowance when saved, regardless of simulated age.
+  const recentMail = (content.mail ?? []).filter((mail) => mail.simulation &&
+    Date.parse(mail.createdAt) > to - 6 * HOUR).length;
+  const mailLimit = Math.max(0, Math.min(2, Math.max(1, Math.floor(state.maxPosts / 2))) - recentMail);
   for (const { profile, at } of opportunities) {
-    const action = chooseAction(content, profile, at, state.seed!, runs, Math.min(2, Math.max(1, Math.floor(state.maxPosts / 2))));
+    const action = chooseAction(content, profile, at, state.seed!, runs, mailLimit);
     if (!action) continue;
     if (runs.length >= Math.min(state.maxPosts, MAX_SESSION_POSTS)) { truncated = true; continue; }
     runs.push({ ...action, id: `${id}:${profile.id}:${Math.floor(at)}`, simulatedAt: new Date(at).toISOString(), status: 'pending' });
