@@ -35,7 +35,7 @@ test('recalls commands, restores the draft, and does not submit during IME compo
   const input = page.getByRole('textbox', { name: 'コマンド' });
   await input.fill('help');
   await input.press('Enter');
-  await expect.poll(() => page.locator('.output').textContent()).toContain('> help\nMAIN\n');
+  await expect.poll(() => page.locator('.output').textContent()).toContain('> help\n　＝＝＝ＰＣ－ＶＡＮ＝＝＝ (MAIN)\n');
   await input.fill('echo ｶﾅ');
   await input.press('Enter');
   // History is accepted by the serialized command queue, before its response.
