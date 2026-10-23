@@ -9,7 +9,7 @@ export interface ComposerActions<T = ForumDestination> {
 }
 
 /** A draft owns the terminal until an explicit send or cancellation. */
-export class TerminalComposer<T extends { keyword: string; name: string } = ForumDestination> {
+export class TerminalComposer<T extends { keyword: string; name: string; localMail?: boolean } = ForumDestination> {
   private stage: 'title' | 'body' | 'review' | 'edit' = 'title';
   private title = '';
   private lines: string[] = [];
@@ -17,6 +17,7 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
   constructor(private target: T, private authorId: string,
     private parent: Pick<Post, 'id' | 'number'> | undefined, private actions: ComposerActions<T>, private kind: 'post' | 'mail' | 'article' = 'post', initialTitle = '') {
     if (initialTitle) { this.title = initialTitle; this.stage = 'body'; }
+    if (kind === 'mail' && target.localMail) actions.print('このブラウザー内だけに保存します。メールサーバーへ送信しません。');
     if (kind === 'article') actions.print('公開記事（私信ではありません）。このブラウザー内だけに保存し、Usenetへ配信しません。');
     actions.print(parent ? `${kind === 'article' ? '公開フォローアップ先' : '返信先'}：#${parent.number}` : (kind === 'mail' ? '新規メール' : kind === 'article' ? '新規記事' : '新規発言'), `${additionalSigs.find((sig) => sig.keyword === target.keyword)?.name ?? target.keyword} / ${target.name}`, initialTitle ? `件名：${initialTitle}` : `${this.titleLabel}=`);
     if (initialTitle) this.help();
@@ -26,7 +27,7 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
   private preview() {
     this.stage = 'review';
     this.actions.print(...(this.kind === 'article' ? [`Newsgroups: ${this.target.name}`, ...(this.parent ? [`公開フォローアップ先：#${this.parent.number}`, `親 Message-ID: ${this.parent.id}`] : [])] : []), ...(this.kind === 'mail' ? [`宛先：${this.target.name}`] : []), `${this.titleLabel}：${this.title}`, `本文：${this.lines.length}行`,
-      ...this.lines.map((line, index) => `${index + 1}: ${line}`), this.kind === 'mail' ? '送信しますか？ (Y/N/EDIT)=' : '投稿しますか？ (Y/N/EDIT)=');
+      ...this.lines.map((line, index) => `${index + 1}: ${line}`), this.kind === 'mail' ? (this.target.localMail ? 'このブラウザー内に保存しますか？ メールサーバーへ送信しません。 (Y/N/EDIT)=' : '送信しますか？ (Y/N/EDIT)=') : '投稿しますか？ (Y/N/EDIT)=');
   }
   help() {
     this.actions.print(...(this.kind === 'article' ? [`NetNews / ${this.target.name}${this.parent ? ` / 公開フォローアップ先：#${this.parent.number}` : ' / 新規記事'}`] : []), '下書きは保持されています。.CANCEL / CANCEL: 明示的に破棄。BACK / MAIN: 移動せず保持。',
@@ -66,7 +67,7 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
           body: this.lines.join('\n'), ...(this.parent ? { replyToPostId: this.parent.id } : {}) });
         // Never leave a sendable draft after the transaction commits.
         this.done = true;
-        this.actions.print(this.kind === 'mail' ? `メール #${post.number} を送信しました。SENT / READ ${post.number} で確認できます。` : this.kind === 'article' ? `記事 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。` : `発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
+        this.actions.print(this.kind === 'mail' ? (this.target.localMail ? `メール #${post.number} をこのブラウザー内に保存しました。メールサーバーへ送信していません。SENT / READ ${post.number} で確認できます。` : `メール #${post.number} を送信しました。SENT / READ ${post.number} で確認できます。`) : this.kind === 'article' ? `記事 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。` : `発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
       } catch (error) {
         this.actions.print(`${this.kind === 'mail' ? 'メール' : this.kind === 'article' ? '記事' : '投稿'}を保存できませんでした。入力は残っています。${String(error)}`, 'Y: 再試行 / EDIT: 編集 / N: 中止');
       }

@@ -312,3 +312,42 @@ test('scheduled mail quota failure rolls back delivery and run completion; expli
   await command(page, 'RETRY'); expect(await incoming(page)).toHaveLength(1);
   expect((await snapshot(page)).mail!.find((m) => m.number === 1)!.recipientConfirmation).toEqual(confirmed);
 });
+
+test('Internet letters create no resident acquaintance, targets, pair memory or forum/OLT prompt content', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async () => {
+    const rp = '/src/storage/repository.ts', mp = '/src/ai/mail.ts', ap = '/src/ai/activity.ts';
+    const gp = '/src/ai/generation.ts', op = '/src/ai/olt.ts', os = '/src/olt-state.ts';
+    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
+    const { pairMail, buildMailPrompt } = await import(mp) as typeof import('../src/ai/mail');
+    const { scheduleActivity } = await import(ap) as typeof import('../src/ai/activity');
+    const { buildPrompt } = await import(gp) as typeof import('../src/ai/generation');
+    const { buildOltPrompt } = await import(op) as typeof import('../src/ai/olt');
+    const { emptyOlt } = await import(os) as typeof import('../src/olt-state');
+    const repo = await openRepository('external-private');
+    const activity = await repo.openActivity(), human = await repo.createHumanMember('文脈の人');
+    const before = await repo.exportBackup(), now = new Date(Date.now() + 48 * 3_600_000).toISOString();
+    const state = { ...activity, consent: true, maxPosts: 12 };
+    const planned = scheduleActivity(before, state, now);
+    const letter = await repo.createHumanMail({ id: 'external-private-letter', senderId: human.id,
+      recipient: 'INET#EXTERNAL_ADDRESS@letters.example.invalid', subject: 'EXTERNAL_SUBJECT', body: 'EXTERNAL_BODY 日本語' });
+    const externalOnly = await repo.exportBackup(), externalPlan = scheduleActivity(externalOnly, state, now);
+    const parent = await repo.createHumanMail({ id: 'resident-parent', senderId: human.id, recipient: 'hoshimori', subject: '住人の件名', body: '住人だけの本文' });
+    const content = await repo.exportBackup(), without = { ...content, mail: content.mail!.filter((m) => m.id !== letter.id) };
+    const target = { humanId: human.id, replyToMailId: parent.id }, room = emptyOlt(new Date().toISOString()).rooms[0]!;
+    const turn = { id: 'olt-turn', authorId: 'fictional-ai:hoshimori', modelId: activity.modelId, context: '', until: now };
+    const forum = content.forums.find((f) => content.posts.some((p) => p.forumId === f.id))!;
+    const request = { personaId: 'hoshimori', forumId: forum.id };
+    const prompts = [buildMailPrompt(content, 'hoshimori', target), buildPrompt(content, request), buildOltPrompt(content, room, turn)];
+    const privateFree = [buildMailPrompt(without, 'hoshimori', target), buildPrompt(without, request), buildOltPrompt(without, room, turn)];
+    let forgedTarget = false;
+    try { buildMailPrompt(content, 'hoshimori', { humanId: human.id, replyToMailId: letter.id }); } catch { forgedTarget = true; }
+    const pairs = pairMail(content, 'fictional-ai:hoshimori', human.id);
+    repo.close(); return { planned, externalPlan, prompts, privateFree, forgedTarget, pairs, parent, before, externalOnly };
+  });
+  expect(result.planned).toEqual(result.externalPlan);
+  expect(result.externalPlan.batch!.runs.every((r) => !r.mail)).toBe(true);
+  expect(result.prompts).toEqual(result.privateFree); expect(JSON.stringify(result.prompts)).not.toMatch(/EXTERNAL_ADDRESS|EXTERNAL_SUBJECT|EXTERNAL_BODY/);
+  expect(result.forgedTarget).toBe(true); expect(result.pairs).toEqual([result.parent]);
+  expect({ ...result.externalOnly, mail: [] }).toEqual(result.before);
+});

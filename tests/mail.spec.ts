@@ -196,3 +196,104 @@ test('stored mail is usable without GPU, survives offline reload/backup/import a
   await command(other, 'SKIP'); await command(other, 'Y', 'この画面では使えない');
   expect((await snapshot(page)).mail).toEqual([]);
 });
+
+for (const route of [
+  { name: 'MAIN 1', steps: ['1'], title: '電子メール', parent: 'ＰＣ－ＶＡＮ', mode: 'WRITE' },
+  { name: 'MAIN X', steps: ['X'], title: '旧電子メール', parent: 'ＰＣ－ＶＡＮ', mode: 'COMPOSE' },
+  { name: 'SIG MAIL', steps: ['13', '2', 'MAIL'], title: '電子メール', parent: '大自然', mode: 'prompt' },
+]) {
+  test(`${route.name}: Internet letter stays literal and local through IME, edit, retry, SENT/READ, reload and backup`, async ({ page }) => {
+    const requests: string[] = [];
+    page.on('request', (r) => requests.push(r.url()));
+    await start(page, '外への手紙');
+    const initial = await snapshot(page), address = 'Observer.Notes+Autumn@Letters.Example.invalid';
+    const enter = async () => {
+      await command(page, 'MAIN', 'MAIN');
+      for (const step of route.steps) await command(page, step, 'コマンド=');
+    };
+    await enter();
+    expect(await command(page, 'MEMBERS', 'INET#observer@letters.example.invalid')).toContain('メールサーバーへ送信しません');
+    if (route.mode === 'prompt') { await command(page, 'WRITE', '宛先='); await command(page, `INET#${address}`, '件名='); }
+    else await command(page, `${route.mode} INET#${address}`, '件名=');
+    await expect(page.locator('.output')).toContainText('このブラウザー内だけに保存します');
+    const input = page.locator('#command');
+    await input.fill('  秋の便り  '); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+    await expect(input).toHaveValue('  秋の便り  '); expect((await snapshot(page)).mail).toEqual([]);
+    await input.dispatchEvent('compositionend'); await input.press('Enter');
+    await expect(page.locator('.output')).toContainText('本文を1行ずつ');
+    await command(page, '  日本語の一行目　ｶﾅ <b>文字</b>  ', '本文='); await command(page, '', '本文=');
+    await command(page, '.TEXT MAIN', '本文=');
+    const review = await command(page, '.END', 'このブラウザー内に保存しますか');
+    expect(review).toContain(`宛先：INET#${address}`); expect(review).toContain('メールサーバーへ送信しません');
+    await command(page, 'EDIT', 'LINE 番号'); await command(page, 'TITLE   編集した便り  ', '件名を変更');
+    await command(page, 'LINE 3   二行目を編集  ', '本文を変更');
+    expect(await command(page, 'REVIEW', 'このブラウザー内に保存しますか')).toContain(`宛先：INET#${address}`);
+    await input.fill('Y'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+    expect((await snapshot(page)).mail).toEqual([]); await input.dispatchEvent('compositionend');
+    await page.evaluate(() => {
+      const native = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (value, key) {
+        if (this.name === 'session' && key === 'mail-next-number') throw new DOMException('quota', 'QuotaExceededError');
+        return key === undefined ? native.call(this, value) : native.call(this, value, key);
+      }; Object.assign(window, { restoreExternalMail: () => { IDBObjectStore.prototype.put = native; } });
+    });
+    await input.press('Enter'); await expect(page.locator('.output')).toContainText('メールを保存できませんでした。入力は残っています');
+    expect((await snapshot(page)).mail).toEqual([]);
+    await page.evaluate(() => (window as unknown as { restoreExternalMail(): void }).restoreExternalMail());
+    const savedOutput = await command(page, 'Y', 'メール #1 をこのブラウザー内に保存しました');
+    expect(savedOutput).toContain('メールサーバーへ送信していません'); expect(savedOutput).not.toContain('を送信しました');
+    await command(page, 'Y', 'この画面では使えない');
+    const verify = async () => {
+      const list = await command(page, 'SENT', '[ブラウザー内保存・外部送信なし]');
+      expect(list).toContain(`INET#${address}`); expect(list).not.toMatch(/既読確認|未読|\(SYN-/);
+      const detail = await command(page, 'READ 1', 'メールサーバーへ送信していません');
+      expect(detail).toContain(`宛先：INET#${address}`); expect(detail).toContain('件名：  編集した便り  ');
+      expect(detail).toContain('  日本語の一行目　ｶﾅ <b>文字</b>  \n\n  二行目を編集  ');
+      expect(detail).not.toMatch(/既読確認|返信先|宛先：\(SYN-/);
+      await command(page, 'REPLY 1', '受信したメールに返信');
+      await command(page, 'INBOX', 'メール一覧：0件');
+      await command(page, 'READ 1', 'その番号のメールはこの箱にありません');
+      await command(page, 'BACK', route.title); await command(page, 'BACK', route.parent);
+    };
+    await verify();
+    const saved = await backup(page);
+    expect(saved.mail).toHaveLength(1);
+    expect(saved.mail![0]).toMatchObject({ internetAddress: address, origin: 'local-human', subject: '  編集した便り  ' });
+    expect(saved.mail![0]).not.toHaveProperty('recipientId');
+    expect(saved.members).toEqual(initial.members); expect(saved.posts).toEqual(initial.posts); expect(saved.readStates).toEqual(initial.readStates);
+    await page.reload(); await expect(page.locator('.output')).toContainText('MAIN'); await enter(); await verify();
+    await restore(page, saved); await enter(); await verify(); expect((await snapshot(page)).mail).toEqual(saved.mail);
+    await command(page, 'HANDLE', 'ハンドル設定'); await command(page, 'NEW', 'ハンドル名='); await command(page, '別の手紙の主', '登録しました');
+    await enter(); await command(page, 'SENT', 'メール一覧：0件'); await command(page, 'INBOX', 'メール一覧：0件');
+    await command(page, 'READ 1', 'その番号のメールはこの箱にありません');
+    await expect(page.locator('.output b')).toHaveCount(0); await noOtherUi(page);
+    expect(requests.filter((url) => !url.startsWith('http://127.0.0.1:14373/'))).toEqual([]);
+    expect(requests.filter((url) => /webllm|model|mailto:|letters\.example/i.test(url))).toEqual([]);
+  });
+}
+
+for (const operation of ['reset', 'restore'] as const) {
+  test(`Internet draft cancellation and ${operation} invalidate a reviewed external draft in another tab`, async ({ page, context }) => {
+    await start(page, '外への下書き'); await command(page, '1', '電子メール');
+    for (const stage of ['address', 'title', 'body', 'review', 'edit']) {
+      await command(page, stage === 'address' ? 'WRITE' : 'WRITE INET#observer@letters.example.invalid', stage === 'address' ? '宛先=' : '件名=');
+      if (['body', 'review', 'edit'].includes(stage)) await command(page, '中止する件名', '本文');
+      if (['review', 'edit'].includes(stage)) { await command(page, '日本語の本文', '本文='); await command(page, '.END', 'このブラウザー内に保存しますか'); }
+      if (stage === 'edit') await command(page, 'EDIT', 'LINE 番号');
+      await command(page, stage === 'review' ? 'N' : '.CANCEL', 'メールを中止');
+    }
+    expect((await snapshot(page)).mail).toEqual([]);
+    const saved = await backup(page), other = await context.newPage();
+    await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
+    await command(other, 'X', '旧電子メール'); await command(other, 'WRITE INET#observer@letters.example.invalid', '件名=');
+    await command(other, '古い下書き', '本文'); await command(other, '保存しない本文', '本文=');
+    await command(other, '.END', 'このブラウザー内に保存しますか');
+    if (operation === 'reset') {
+      await command(page, 'RESET', '初期状態に戻しますか');
+      await Promise.all([page.waitForEvent('load'), other.waitForEvent('load'), command(page, 'Y')]);
+    } else await Promise.all([other.waitForEvent('load'), restore(page, saved)]);
+    await expect(other.locator('.output')).toContainText('MAIN');
+    await command(other, 'SKIP'); await command(other, 'Y', 'この画面では使えない');
+    expect((await snapshot(page)).mail).toEqual([]);
+  });
+}

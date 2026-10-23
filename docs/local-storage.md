@@ -316,7 +316,7 @@ mail-bearing exports without writing; retain a backup before upgrading.
 | Sig | `id`, `keyword`, `title` | — |
 | Forum | `id`, `sigId`, `boardNo`, `name`, `nextPostNumber` | — |
 | Post | `id`, `forumId`, `number`, `authorId`, `title`, `body`, `createdAt`, `origin` | `displaySecondNumber`, `replyToPostId`, `simulation` |
-| Mail | `id`, `number`, `senderId`, `recipientId`, `subject`, `body`, `createdAt`, `origin` | `replyToMailId`, `readAt`, `simulation`, `recipientConfirmation` |
+| Mail | `id`, `number`, `senderId`, exactly one of `recipientId` / `internetAddress`, `subject`, `body`, `createdAt`, `origin` | Resident mail only: `replyToMailId`, `readAt`, `simulation`, `recipientConfirmation` |
 | ReadState | `memberId`, `forumId`, `lastReadNumber` | — |
 | Session | `lastLoginAt`, `lastLogoutAt`, `commandHistory` | — |
 | Setting | `id`, `value` | — |
@@ -373,9 +373,10 @@ fields and database version as needed; never drop unknown content.
 
 `mail` is a dedicated IndexedDB store with unique global `number` plus sender,
 recipient and reply-parent indexes. It never inserts into `posts` or allocates
-forum numbers. Each letter has exactly one human and one of the stable ten
-`fictional-ai:*` residents. INBOX/SENT are projections by recipient/sender, not
-mutable duplicate copies. `readAt` belongs only to the human recipient; reading
+forum numbers. Each resident letter has exactly one human and one of the stable ten
+`fictional-ai:*` residents. An outbound Internet letter instead has one existing
+human sender and an explicit `internetAddress`. INBOX/SENT are projections by
+recipient/sender, not mutable duplicate copies. `readAt` belongs only to the human recipient; reading
 one letter does not mark earlier numbers read. Subjects are nonblank single-line
 text up to 200 UTF-16 units, bodies nonblank up to 20000; terminal/invisible
 controls are invalid. Canonical timestamps, IDs, numbers, origins, simulations
@@ -385,9 +386,9 @@ parents. Human origins are `local-human`; generated resident mail uses
 `local-ai:webllm:<modelId>` with a matching stable simulation run ID.
 
 `createHumanMail({id, senderId, recipient, subject, body, replyToMailId?})`
-resolves the exact existing resident ID/short address/handle, checks sender and
-parent, allocates the number and inserts in one transaction. Stable draft IDs
-return the existing identical send on retry and reject changed-content collisions.
+resolves the exact existing resident ID/short address/handle or explicit `INET#`
+Internet address, checks sender and parent, allocates the number and inserts in
+one transaction. Stable draft IDs return the existing identical send on retry and reject changed-content collisions.
 A private `session/mail-next-number` counter prevents reuse after deletion;
 restore initializes it from the imported maximum on the next send. It is excluded
 from exports. `markMailRead(memberId, mailId)` accepts only the human recipient
@@ -405,6 +406,27 @@ any stores, then replaces everything atomically. Existing v1 JSON without `mail`
 imports an empty mailbox; upgrading the v1 database only creates the new empty
 store. Neither migration seeds private mail or alters prior forums/posts.
 See [mail commands and privacy](mail.md).
+
+Issue #93 extends the same store/JSON v1 shape with exactly one of `recipientId`
+or `internetAddress`. The latter stores the raw ASCII address without `INET#`,
+preserving spelling/case; there is no external member record, index or secondary
+mailbox. The [bounded address subset](mail.md#browser-local-internet-destinations-issue-93)
+is shared by commands, writes and imports. An external letter must have an
+existing human sender and `local-human` origin, and cannot carry `recipientId`,
+`readAt`, `replyToMailId`, `simulation` or `recipientConfirmation`. Contradictory,
+malformed and forged variants fail before any import replacement or write. Local
+resident correspondence, parent reversal and confirmation validation are retained.
+External letters cannot be reply targets or acquire recipient read markers.
+
+The existing atomic insert/counter transaction, ID collision checks and world
+fences cover both kinds. Same-ID retries compare destination kind and exact address
+as well as sender/content/parent. Failure leaves no letter or consumed number.
+External letters enter only their sender's SENT projection; resident pair memory
+explicitly excludes them. They do not consume resident generation budgets. JSON
+and logs include external addresses and letter content, with the same unencrypted
+local privacy limits. Old backups remain valid; older app versions reject the new
+field without replacing data. No database/backup version bump or mailbox migration
+is needed for this additive destination shape.
 
 Issue #89 adds optional `recipientConfirmation: { at, replyMailId,
 provenance: 'local-resident-reply-v1' }` on human-sent mail only. This explicitly

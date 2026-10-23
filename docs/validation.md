@@ -1994,3 +1994,62 @@ Earlier failed research paths and unresolved dates/encoding/protocols/charges
 remain explicit. Optional native IME, other browser engines, dated-session and
 historical-user observations were not performed. No post-merge verification is
 required. No push, PR, merge, external comment or deployment was performed.
+
+## Browser-local outbound Internet mail (#93)
+
+Validated on 2026-10-24 with Node.js 24.12.0 in the assigned implementation
+worktree, against the Issue read live from GitHub.
+
+- `npm ci`: passed; zero reported vulnerabilities and no dependency/lockfile changes.
+- `npm run build`: passed TypeScript checking and production bundling.
+- `npm test -- tests/mail-repository.spec.ts tests/mail-presentation.spec.ts tests/mail.spec.ts --workers=2`:
+  **38 passed** in **1.4 minutes**, with no failures, retries or skips.
+- Final `npm test`: **331 passed** in **3.7 minutes**, with no failures, retries or
+  skips. Both configured servers ran, including TypeScript checking and the
+  production build. Existing functional, storage, consent, private-context,
+  simulated-IME, terminal, calendar, OSL download and other-service checks passed.
+- Reviewed the complete implementation, test and documentation diff against #93;
+  local Markdown links/heading anchors, code fences, `git diff --check` and the
+  staged whitespace check passed. No new framework, real model, inference API
+  or hardware/human gate was used.
+- The existing optional WebLLM large-chunk advisory and Node color-environment
+  warnings remain informational; no check failed.
+
+New repository/controller cases exercise the same accepted/rejected ASCII address
+table through WRITE, COMPOSE, the omitted-address prompt and record validation,
+including exact length boundaries, case preservation, malformed/multiple/control/
+Unicode/unsupported destinations and an invalid explicit prefix matching a
+resident handle. Bare Internet addresses remain meaningfully rejected. Stable
+local-address precedence and ambiguous-handle coverage is retained unchanged.
+Mixed resident/Internet concurrent allocation, identical concurrent submission,
+changed-content/kind/address collisions, quota rollback after record insertion,
+delete/restore numbering, strict forged imports, member/provenance checks,
+recipient-read rejection and exact JSON/reopen round-trips passed. Failed imports
+preserve the complete world; external saves create no member or public record.
+
+Production keyboard journeys cover MAIN `1`, MAIN `X` and SIG `MAIL`, with their
+own contextual returns, discoverable fictional example, direct WRITE/COMPOSE or
+prompted addressing, literal Japanese multiline/blank/indented text, simulated
+IME at title and approval, review/EDIT, explicit local approval, rollback/retry,
+SENT/READ local-save status, no reply/read evidence, another human's empty mailbox,
+reload and real JSON download/restore. Cancellation at every draft stage and
+cross-tab reset/restore invalidate reviewed external drafts. Request observation
+found no external requests, model loading, address lookup or mailto handoff.
+A controller fixture verifies that a committed save consumes the pinned draft
+even when subsequent refresh fails.
+
+Deterministic privacy fixtures show that external letters leave scheduling and
+resident correspondence allowances unchanged, establish no acquaintance or mail
+target, and contribute no address/subject/body to resident pair memory, mail,
+forum or OLT prompts. Explicitly forged external reply targets fail. Existing
+resident reply confirmation and human-recipient read semantics remain covered.
+
+README, Settings/About, the [mail contract](mail.md#browser-local-internet-destinations-issue-93),
+[storage contract](local-storage.md#mail-records-and-migration) and
+[historical research](research/pcvan-1996-1997.md#outbound-internet-mail-issue-93)
+distinguish dated `INET#` evidence from reconstructed controls/ASCII limits,
+local-save status, fictional examples and unresolved mailbox relationships.
+The November 1996 and October 1994 publisher PDF texts were rechecked; the earlier
+January 1994 paper's damaged extraction remains contextual only. External letters
+and addresses are documented as included in JSON backups and terminal logs.
+No post-merge verification is required by #93.

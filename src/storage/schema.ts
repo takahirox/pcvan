@@ -39,8 +39,9 @@ export interface LocalNetNewsArticle {
 export interface NetNewsState {
   version: 1; nextNumbers: Record<string, number>; contributions: LocalNetNewsArticle[];
 }
-export interface Mail {
-  id: string; number: number; senderId: string; recipientId: string;
+export type MailDestination = { recipientId: string; internetAddress?: never } | { recipientId?: never; internetAddress: string };
+export type Mail = MailDestination & {
+  id: string; number: number; senderId: string;
   subject: string; body: string; createdAt: string; origin: string;
   replyToMailId?: string; readAt?: string;
   recipientConfirmation?: { at: string; replyMailId: string; provenance: 'local-resident-reply-v1' };
@@ -284,11 +285,18 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       }
       break;
     case 'mail':
-      fields(value, ['id', 'number', 'senderId', 'recipientId', 'subject', 'body', 'createdAt', 'origin'],
-        ['replyToMailId', 'readAt', 'simulation', 'recipientConfirmation']);
-      string(value.id); integer(value.number, 1); string(value.senderId); string(value.recipientId);
+      fields(value, ['id', 'number', 'senderId', 'subject', 'body', 'createdAt', 'origin'],
+        ['recipientId', 'internetAddress', 'replyToMailId', 'readAt', 'simulation', 'recipientConfirmation']);
+      string(value.id); integer(value.number, 1); string(value.senderId);
+      if (Object.hasOwn(value, 'recipientId') === Object.hasOwn(value, 'internetAddress')) invalid('Expected exactly one mail destination.');
+      if (Object.hasOwn(value, 'internetAddress')) {
+        validateInternetAddress(value.internetAddress);
+        if (value.origin !== 'local-human' || ['replyToMailId', 'readAt', 'simulation', 'recipientConfirmation'].some((key) => Object.hasOwn(value, key))) {
+          invalid('Internet letters are outbound local saves only.');
+        }
+      } else string(value.recipientId);
       string(value.origin); timestamp(value.createdAt);
-      if (value.id.length > 256 || value.senderId.length > 128 || value.recipientId.length > 128) invalid('Mail identity is too long.');
+      if (value.id.length > 256 || value.senderId.length > 128 || (typeof value.recipientId === 'string' && value.recipientId.length > 128)) invalid('Mail identity is too long.');
       for (const [key, max] of [['subject', 200], ['body', 20000]] as const) {
         string(value[key]);
         if (value[key].length > max || /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/.test(value[key]) ||
@@ -397,6 +405,13 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
   const numbers = new Set<number>();
   for (const row of mail) {
     const sender = members.find((m) => m.id === row.senderId);
+    if (numbers.has(row.number)) invalid('Duplicate mail number.');
+    numbers.add(row.number);
+    if (row.internetAddress !== undefined) {
+      validateRecord('mail', row);
+      if (sender?.actor !== 'human') invalid('Internet letters require an existing human sender.');
+      continue;
+    }
     const recipient = members.find((m) => m.id === row.recipientId);
     const resident = sender?.actor === 'ai' ? sender : recipient;
     if (!sender || !recipient || sender.actor === recipient.actor ||
@@ -404,8 +419,6 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
         (row.readAt !== undefined && recipient.actor !== 'human') ||
         (sender.actor === 'human' ? row.origin !== 'local-human' || row.simulation !== undefined
           : !row.origin.startsWith('local-ai:webllm:') || !row.simulation)) invalid('Invalid mail correspondents or provenance.');
-    if (numbers.has(row.number)) invalid('Duplicate mail number.');
-    numbers.add(row.number);
     if (row.recipientConfirmation !== undefined) {
       const confirmation = row.recipientConfirmation;
       const reply = mail.find((m) => m.id === confirmation.replyMailId);
@@ -421,6 +434,29 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
           parent.recipientId !== row.senderId) invalid('Mail replies require an earlier letter from the correspondent.');
     }
   }
+}
+
+/** Reconstructed ASCII subset, shared by composition, storage and backup validation. */
+export function validateInternetAddress(value: unknown): asserts value is string {
+  if (typeof value !== 'string' || value.length > 254) invalid('Invalid Internet address. Use INET#observer@letters.example.invalid.');
+  const parts = value.split('@');
+  const local = parts[0]!, domain = parts[1] ?? '';
+  const labels = domain.split('.');
+  if (parts.length !== 2 || local.length > 64 || !/^[A-Za-z0-9_+-]+(?:\.[A-Za-z0-9_+-]+)*$/.test(local) ||
+      domain.length > 253 || labels.length < 2 || !/^[A-Za-z]{2,63}$/.test(labels.at(-1)!) ||
+      labels.some((label) => label.length > 63 || !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label))) {
+    invalid('Invalid Internet address. Use INET#observer@letters.example.invalid.');
+  }
+}
+
+/** An explicit Internet prefix is never resolved through the member directory. */
+export function resolveMailDestination(members: readonly Member[], address: string): MailDestination {
+  if (/^INET#/i.test(address.trimStart())) {
+    const internetAddress = address.slice(5);
+    validateInternetAddress(internetAddress);
+    return { internetAddress };
+  }
+  return { recipientId: resolveMailResident(members, address.trim()).id };
 }
 
 /** Stable local addresses take precedence over potentially ambiguous handles. */
