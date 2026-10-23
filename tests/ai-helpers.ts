@@ -20,7 +20,10 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           if (mode === 'failure') { queueMicrotask(() => this.onerror?.()); return; }
           const data = JSON.parse(message.content.request.messages[1]!.content);
           stats.prompts.push(data);
-          const raw = mode === 'invalid' ? '{}' : data.kind === 'mail' ? JSON.stringify({
+          const raw = mode === 'invalid' ? '{}' : data.kind === 'olt' ? JSON.stringify({
+            kind: 'olt', personaId: data.personaId, roomId: data.roomId,
+            text: `星の観察、いいですね。${data.personaId}/${visit}/${stats.generations}`,
+          }) : data.kind === 'mail' ? JSON.stringify({
             personaId: data.personaId, recipientId: data.recipientId,
             ...(data.replyToMailId ? { replyToMailId: data.replyToMailId } : {}),
             subject: '星見のお便り', body: `お便りありがとう。夜空を見上げました。${data.personaId}/${visit}/${stats.generations}`,

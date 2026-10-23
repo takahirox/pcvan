@@ -1,3 +1,7 @@
+import { OLT_SETTING, oltState, observeOlt, appendOlt, attendance, VISITOR_LEASE, iso, validOltText,
+  validateOlt, validateOltMembers, oltAuthorization, oltEnabled } from '../olt-state';
+import type { OltRoom, OltState, OltTurn, RoomId } from '../olt-state';
+import { planOltTurn, commitOltText } from '../ai/olt';
 import {
   invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailResident,
 } from './schema';
@@ -185,6 +189,7 @@ export class LocalRepository {
         const member = row as Member;
         const content = await this.snapshot(tx);
         validateMailRelations(content.mail ?? [], [...content.members.filter((m) => m.id !== member.id), member]);
+        validateOltMembers(oltState(content), [...content.members.filter((m) => m.id !== member.id), member]);
       }
       if (store === 'forums') {
         const forum = row as Forum;
@@ -196,6 +201,10 @@ export class LocalRepository {
         const read = row as Records['readStates'];
         if (!await request(tx.objectStore('members').get(read.memberId)) ||
             !await request(tx.objectStore('forums').get(read.forumId))) invalid('Missing member or forum.');
+      }
+      if (store === 'settings' && (row as Records['settings']).id === OLT_SETTING) {
+        const state = (row as Records['settings']).value; validateOlt(state);
+        validateOltMembers(state, (await this.snapshot(tx)).members);
       }
       await request(tx.objectStore(store).put(row));
       return row;
@@ -369,6 +378,11 @@ export class LocalRepository {
       }
       if (store === 'mail') hasChildren = await referenced('mail', 'replyToMailId', key);
       if (store === 'posts') hasChildren = await referenced('posts', 'replyToPostId', key);
+      if (store === 'members') {
+        const state = oltState(await this.snapshot(tx));
+        hasChildren ||= state.rooms.some((r) => r.lines.some((l) => l.authorId === key) ||
+          r.residents.some((p) => p.memberId === key) || r.visitors.some((p) => p.memberId === key));
+      }
       if (hasChildren) invalid('Record is still referenced. Delete children first.');
       await request(tx.objectStore(store).delete(key));
     });
@@ -631,6 +645,75 @@ export class LocalRepository {
       await this.writeActivity(tx, state);
       return post;
     }, signal).then((result) => { if (result && 'senderId' in result) this.notifySetupChanged(); return result; });
+  }
+
+  /** A bounded reserved setting avoids a store-version collision with SIG/mail migrations. */
+  private changeOlt<T>(change: (state: OltState, content: Backup) => T, now: string, signal?: AbortSignal): Promise<T> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const content = await this.snapshot(tx), state = oltState(content, now);
+      const result = change(state, content);
+      validateOlt(state); validateOltMembers(state, content.members);
+      await request(tx.objectStore('settings').put({ id: OLT_SETTING, value: state }));
+      return result;
+    }, signal);
+  }
+
+  observeRoom(clientId: string, roomId?: RoomId, memberId?: string, now = new Date().toISOString()): Promise<OltState> {
+    return this.changeOlt((state, content) => {
+      const at = Date.parse(now);
+      if (memberId && !content.members.some((m) => m.id === memberId && m.actor === 'human')) invalid('Missing human OLT member.');
+      if (!clientId || clientId.length > 128) invalid('Invalid OLT client.');
+      observeOlt(state, content, at);
+      for (const room of state.rooms) {
+        const old = room.visitors.find((v) => v.clientId === clientId);
+        if (old && (room.id !== roomId || old.memberId !== memberId)) {
+          room.visitors = room.visitors.filter((v) => v.clientId !== clientId);
+          if (!room.visitors.some((v) => v.memberId === old.memberId)) appendOlt(room, old.memberId, 'leave', '', 'local-presence', at);
+        }
+        if (room.id !== roomId || !memberId) continue;
+        const present = attendance(room, at).includes(memberId);
+        const visitor = room.visitors.find((v) => v.clientId === clientId);
+        if (visitor) visitor.until = iso(at + VISITOR_LEASE);
+        else {
+          if (room.visitors.length >= 16) invalid('OLT visitor limit reached.');
+          room.visitors.push({ clientId, memberId, until: iso(at + VISITOR_LEASE) });
+        }
+        if (!present) appendOlt(room, memberId, 'enter', '', 'local-presence', at);
+      }
+      return state;
+    }, now);
+  }
+
+  speakRoom(roomId: RoomId, clientId: string, text: string, now = new Date().toISOString()): Promise<OltRoom> {
+    return this.changeOlt((state, content) => {
+      if (!validOltText(text)) invalid('発言は制御文字を含まない1〜400文字で入力してください。');
+      observeOlt(state, content, Date.parse(now));
+      const room = state.rooms.find((r) => r.id === roomId)!;
+      const visitor = room.visitors.find((v) => v.clientId === clientId);
+      if (!visitor) invalid('JOIN で入室し直してください。');
+      appendOlt(room, visitor.memberId, 'say', text, 'local-human', Date.parse(now));
+      return room;
+    }, now);
+  }
+
+  claimRoomTurn(roomId: RoomId, now = new Date().toISOString()): Promise<OltTurn | undefined> {
+    return this.changeOlt((state, content) => {
+      observeOlt(state, content, Date.parse(now));
+      return planOltTurn(state, state.rooms.find((r) => r.id === roomId)!, content, Date.parse(now), createRecordId());
+    }, now);
+  }
+
+  finishRoomTurn(roomId: RoomId, token: string, raw?: string, signal?: AbortSignal, now = new Date().toISOString()): Promise<void> {
+    return this.changeOlt((state, content) => {
+      const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
+      if (!turn || turn.id !== token) return;
+      room.pending = null;
+      const at = Date.parse(now);
+      if (raw === undefined || !oltEnabled(content) || turn.context !== oltAuthorization(content) || Date.parse(turn.until) <= at ||
+        !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at) ||
+        !room.visitors.some((v) => Date.parse(v.until) > at)) return;
+      commitOltText(room, turn, raw, at);
+    }, now, signal);
   }
 
   private async snapshot(tx: IDBTransaction): Promise<Backup> {

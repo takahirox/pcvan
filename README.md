@@ -21,8 +21,8 @@ No environment variables, API keys, AI models, WebGPU, hosted database, login se
 or telemetry are needed for ordinary use. Optional local AI uses a lazily loaded
 WebLLM runtime; model downloads start only after an explicit user action. There
 are no external font requests. Local content, settings, session timestamps, and
-command history use IndexedDB in this browser profile. The transcript and input
-draft remain in memory.
+command history use IndexedDB in this browser profile. The terminal display and input
+draft remain in memory; OLT room history is persisted.
 
 On the first visit, a new local world already has 30 original Japanese posts by
 ten fictional regulars: eight conversations in MITI 資料室 and DAISIZEN
@@ -36,7 +36,8 @@ PC-VAN service participation uses only the transcript and persistent command inp
 The compact **設定 / Options** button in the header opens the modern application
 Settings dialog for display, AI, local data, offline storage and technical help.
 It is outside the simulated service; handle registration, navigation, reading and
-posting and mail remain terminal-only. Type a line and press Enter. `HELP` describes the current screen. Japanese IME
+posting, mail and OLT remain terminal-only. Type a line and press Enter. Use
+`HELP` (or `/HELP` in an OLT room) for the current screen. Japanese IME
 confirmation never submits. Escape reveals queued output and skips the 1.2-second
 connection presentation; it does not cancel drafts or approve confirmations.
 
@@ -129,7 +130,8 @@ commands. Submitted draft text does appear in the session transcript and `LOG`.
 PageUp/PageDown scroll output; Shift+Tab focuses it, Left/Right scroll long lines,
 and Tab returns to input. Literal HTML is never interpreted. `LOG` includes
 accepted text still awaiting display, but excludes the unsent input. Export before
-reloading; JSON backups contain world data/history, not the transcript or live drafts.
+reloading; JSON backups contain world data/history, not the terminal display or
+live drafts. OLT room history is included as world data.
 
 ## Menu destinations and collections
 
@@ -160,10 +162,27 @@ reloading; JSON backups contain world data/history, not the transcript or live d
 | `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
 
 At DAISIZEN (`13` → `2`), `MAIL` opens its own mailbox directory,
-`LIBRARY` and `OSL` each open a named file list (0 files), and `OLT` and
-`CONFERENCE` each open a named room (0 other participants). `FORUMS` retains
+`LIBRARY` and `OSL` each open a named file list (0 files). `OLT` opens a local
+chat room directory; `CONFERENCE` retains its empty room view. `FORUMS` retains
 boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
 posting, reply and unread behavior. A saved empty board stays empty.
+
+OLT accepts `JOIN 1` / `JOIN 2` (or a room number), `WHO number` and `LIST`.
+Inside a room, ordinary lines are speech, including literal `MAIN`, `BACK`,
+`WRITE` and `HELP`. Use `/HELP`, `/WHO`, `/LIST` (last 40 lines), `/JOIN number`,
+`/LEAVE` / `/BACK`, or `/MAIN`. `//text` sends a leading slash literally.
+`/HANDLE` leaves the room for terminal handle registration/selection. The same
+human/resident IDs and current handles are used by forums, mail and OLT.
+
+The ten fictional residents may visit, listen, greet, converse and depart according
+to their configured hours and interests. After existing model consent, replies
+can arrive after a short delay, without generation/approval commands. Quiet and
+empty rooms are normal. No consent or usable WebGPU means no generated speech;
+human chat, navigation and persisted readback still work. No remote users connect.
+Presence and bounded transcripts survive reload and JSON backup, while closed
+or hidden tabs never generate a backlog of chat. Setup, provenance and maintenance
+remain in Options. See [OLT behavior](docs/local-ai.md#olt-rooms) and
+[storage contract](docs/local-storage.md#olt-persistence).
 
 Mail directories accept `INBOX`, `SENT`, `MEMBERS`, `WRITE address` (or `WRITE`
 then an address), `READ number`, and `REPLY number`. `LIST` refreshes the current
@@ -465,7 +484,8 @@ Composition checks cover edit/review/cancel/send, blank drafts, Japanese multili
 text, reply navigation and missing parents, transactional initialization/numbering,
 failed writes, and read markers across members, forums, connections and reloads.
 Section/service checks cover every MAIN and index destination, all five service views,
-mailbox browsing, empty collections/rooms, preserved fixture evidence, scoped helpers,
+mailbox browsing, empty collections, OLT conversation/presence, preserved fixture
+evidence, scoped helpers,
 unsupported input, return paths, offline keyboard use without network requests,
 and unchanged local content after visiting services and returning to forums.
 Command-only browser journeys cover handle handoff, composition/editing, IME,
