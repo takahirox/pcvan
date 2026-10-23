@@ -58,6 +58,18 @@ Application model/storage status stays in Settings; requested typed application
 menus also show their results. Background model messages never interrupt a human
 prompt. Ordinary terminal output contains service content and prompt feedback.
 
+## Service dates
+
+Entry, forum headers, mail lists/details, conference contributions and live or
+replayed OLT lines use one world calendar in fixed JST. Forum headers retain
+`YY/MM/DD  HH:mm`; other services show `YY年MM月DD日 HH:mm:ss` and identify JST
+where a timezone label is present. Missing logout says `記録なし`, including after
+reload without Q. The fictional week starts November 18–24, 1996; elapsed time
+can carry it into later months/years. Titles, bodies and OSL catalogue dates are
+literal. Settings session times remain actual UTC. The [storage policy](local-storage.md#historical-display-calendar-issue-67)
+explains durable anchoring and legacy imports; [research](research/pcvan-1996-1997.md#shared-historical-calendar-issue-67)
+separates evidence from reconstructed formatting.
+
 ## Output pacing and export
 
 `OutputRenderer` retains the complete accepted logical text separately from the

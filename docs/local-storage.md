@@ -134,8 +134,9 @@ real user IDs were imported. Other local SIGs and forums remain stored/exportabl
 but are outside this evidence-backed directory.
 
 The post renderer preserves the exact title/body strings, including full-width
-spaces, blank lines, trailing spaces, and literal HTML. UTC dates are a stable
-presentation choice. `displaySecondNumber` is displayed only when present;
+spaces, blank lines, trailing spaces, and literal HTML. Dates use the shared
+historical JST presentation calendar described below. `displaySecondNumber` is
+displayed only when present;
 its meaning is unknown, and it is not a total, reply parent, or pagination limit.
 The renderer accepts an optional explicit line-count display value, but the app
 omits it because the v1 post schema has no such field. It never derives a count
@@ -494,3 +495,52 @@ ordered safe numbers, timestamps, provenance, authors and earlier local parents
 before replacement. Quota failures roll back replacement, and old tabs/drafts
 remain fenced after replacement/reset. Stored timestamps survive round-trips;
 conference operations do not reschedule residents or change forum/mail counters.
+
+## Historical display calendar (Issue #67)
+
+`historical-calendar` is a reserved, strictly validated setting with exactly
+`{ version: 1, sourceAnchor: "<canonical UTC ISO timestamp>" }`. It is part of the
+existing version-1 JSON backup, without a database upgrade or dependency.
+`sourceAnchor` must be outside the JST years 1996–1997. Its historical anchor is
+derived, never separately editable: the same weekday and JST time of day in
+1996-11-18 through 1996-11-24. Presentation projects each operational instant as
+`H + (instant - A)`, then formats in fixed JST, independent of browser timezone.
+Gregorian day, month, leap and year boundaries advance normally; there is no
+annual wrap or per-render year substitution. Seed history can precede that week.
+
+Direct writes cannot change an existing anchor or delete its setting.
+Initialization reads and adds the setting inside the existing all-store write
+transaction, so competing tabs agree. Fresh activation/reset uses the creation
+instant. Existing operational `community-world.createdAt` takes priority and is
+never overwritten by calendar initialization. For a legacy document without a
+usable operational world marker, the deterministic fallback is the earliest
+operational timestamp among post/mail creation and simulation times, mail read
+times, conference contributions, session login/logout, AI activity watermark,
+batch endpoints and runs (including pending runs), next-due values, and OLT
+window/observation/due/lease/line times. Arbitrary settings, text, titles and
+fixture date strings are not scanned. The same dated backup therefore derives
+the same mapping at different restoration times. Import initializes atomically
+before new session/activity writes can contaminate that evidence; failures roll
+back the entire import, including the mapping.
+
+A canonical instant whose **JST** year is 1996 or 1997 is conservatively treated
+as already historical and formatted directly. This is an import assumption,
+not authentication. Such a `community-world` marker is provenance, never the
+source anchor for contemporary activity. If *all* dated evidence is historical,
+use its earliest instant plus 28 UTC years as a deterministic operational
+surrogate (1996/1997 → 2024/2025, including leap day). The new contemporary events
+then follow the same elapsed-time formula; their dates may already be beyond
+1997. Historical records stay unchanged. Only an entirely undated document uses
+its first activation/import instant. Once saved, the mapping takes priority over
+all fallback evidence, including newly arriving catch-up records.
+
+Forum/mail choose `simulation.simulatedAt ?? createdAt` before projecting once;
+`simulatedAt` is an operational catch-up event time, not an already shifted date.
+Rendering never writes records. Creation/commit time, simulation provenance,
+mail `readAt`, IDs, counters, replies, ordering, read watermarks, session history,
+AI consent/due times and OLT expiry/retention retain their operational semantics.
+Reset discards the old calendar and creates a new mapping atomically. Backup
+restoration retains an existing mapping exactly. Authored dates, user text and
+OSL date-only metadata are never translated. Modern Settings retains actual UTC
+session times and raw provenance. The epoch, JST policy and non-forum layouts
+are disclosed reconstructions; see the [research record](research/pcvan-1996-1997.md#shared-historical-calendar-issue-67).

@@ -57,7 +57,8 @@ in-memory transcript and a downloaded terminal log. Reload discards unsent draft
 
 Numbers are stable, ascending local mail numbers shared across boxes, with gaps
 when letters belong to other handles or have been deleted. They are not forum
-numbers. Reading displays subject, both handles, UTC time and the reply reference;
+numbers. Reading displays subject, both handles, the shared historical JST date
+and the reply reference;
 listings show the correspondent, subject, date and individual unread/read marker.
 No starter letters or archived/private source material are seeded.
 

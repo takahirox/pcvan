@@ -1,3 +1,4 @@
+import { CALENDAR_SETTING, isHistorical } from '../calendar';
 import { OLT_SETTING, validateOlt, validateOltMembers } from '../olt-state';
 import { personas, personaMemberId, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentSettings } from '../ai/personas';
@@ -297,6 +298,11 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
+      if (value.id === CALENDAR_SETTING) {
+        fields(value.value, ['version', 'sourceAnchor']);
+        timestamp(value.value.sourceAnchor);
+        if (value.value.version !== 1 || isHistorical(value.value.sourceAnchor as string)) invalid('Invalid historical calendar.');
+      }
       if (value.id === OLT_SETTING) validateOlt(value.value);
       if (value.id === CONFERENCE_SETTING) validateConference(value.value);
       if (value.id === 'ai-activity') validateActivity(value.value);

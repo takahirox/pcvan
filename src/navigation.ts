@@ -1,3 +1,4 @@
+import { calendarSetting } from './calendar';
 import { conferenceState, conferenceHelp, renderConference, renderContribution } from './conference';
 import { additionalSigs, boardCulture } from './communities';
 import { renderOltDirectory } from './olt';
@@ -145,7 +146,7 @@ export class PcvanController implements TerminalController {
           const read = /^READ ([1-9]\d*)$/.exec(command);
           if (read) {
             const state = conferenceState(this.content), row = state.contributions.find((r) => r.number === Number(read[1]));
-            return row ? renderContribution(row, state, this.content.members ?? [])
+            return row ? renderContribution(row, state, this.content.members ?? [], calendarSetting(this.content))
               : ['その番号の発言はありません。LIST で一覧を確認してください。', conferenceHelp, demoPrompt];
           }
           return this.invalidCommand('LIST / READ 番号 / WRITE / REPLY 番号 / BACK / MAIN / HELP');
@@ -243,7 +244,7 @@ export class PcvanController implements TerminalController {
       const post = data.posts.find((item) => item.number === Number(read[1]));
       const parent = post && replyReference(post, data.posts);
       return post ? [
-        ...renderPost(post, forumName(keyword, boardNo), undefined, this.content.members),
+        ...renderPost(post, forumName(keyword, boardNo), undefined, this.content.members, calendarSetting(this.content)),
         ...(parent ? [`返信先：#${parent.number}`] : []),
         this.forumHelp, returnHelp,
         demoPrompt,
@@ -341,7 +342,7 @@ export class PcvanController implements TerminalController {
       ];
       case 'mailbox': return [
         `${this.collectionTitle} / ${mailboxes[this.mailbox]}`,
-        ...renderMailList(this.content.mail ?? [], this.content.members ?? [], this.memberId, this.mailbox),
+        ...renderMailList(this.content.mail ?? [], this.content.members ?? [], this.memberId, this.mailbox, calendarSetting(this.content)),
         'LIST: 一覧を再表示', returnHelp, demoPrompt,
       ];
       case 'communication': return [

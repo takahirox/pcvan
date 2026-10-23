@@ -1,3 +1,4 @@
+import { serviceDate, calendarSetting } from '../src/calendar';
 import { expect, test } from '@playwright/test';
 import { PcvanController } from '../src/navigation';
 import { conferenceState, starterConference } from '../src/conference';
@@ -76,7 +77,7 @@ test('production anonymous read → registration → reply/edit → save → lis
   await page.reload(); await expect(page.locator('.output')).toContainText('番号またはコマンド=');
   await enter(page); await command(page, 'READ 4', row.body);
   expect(conferenceState(await snapshot(page))).toEqual(conferenceState(saved));
-  await restore(page, saved); await command(page, 'READ 4', row.createdAt);
+  await restore(page, saved); await command(page, 'READ 4', serviceDate(row.createdAt, calendarSetting(saved)));
   expect(conferenceState(await snapshot(page))).toEqual(conferenceState(saved));
   await command(page, 'MAIN', 'MAIN'); await noOtherUi(page);
 });

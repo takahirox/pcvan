@@ -1,3 +1,4 @@
+import { calendarSetting, serviceDate } from './calendar';
 import type { Backup, JsonValue } from './storage/schema';
 import type { LocalRepository } from './storage/repository';
 import { activeHuman } from './forums';
@@ -39,7 +40,7 @@ export class TerminalOlt {
   }
   private line(line: OltLine, data: Backup) {
     const name = data.members.find((m) => m.id === line.authorId)?.handle ?? line.authorId;
-    return `${line.createdAt.slice(0, 10)} ${line.createdAt.slice(11, 19)} ${line.kind === 'say' ? `<${name}> ${line.text}`
+    return `${serviceDate(line.createdAt, calendarSetting(data))} ${line.kind === 'say' ? `<${name}> ${line.text}`
       : `* ${name} ${line.kind === 'enter' ? '入室' : '退室'}`}`;
   }
   private show(room: OltRoom, data: Backup, full: boolean) {
@@ -47,7 +48,7 @@ export class TerminalOlt {
     this.seen = room.nextNumber - 1;
     if (full) this.actions.print(`OLT / ${roomDefinitions.find((d) => d.id === room.id)!.name}`, this.who(room, data));
     if (lines.length) this.actions.print(...lines.map((l) => this.line(l, data)));
-    if (full) this.actions.print(roomHelp, 'そのまま入力: 発言（400文字まで）/ //文字: 先頭の / を発言 / /HANDLE: ハンドル設定', '日時 UTC / 発言=');
+    if (full) this.actions.print(roomHelp, 'そのまま入力: 発言（400文字まで）/ //文字: 先頭の / を発言 / /HANDLE: ハンドル設定', '日時 JST / 発言=');
   }
   async leave() {
     this.invalidate();

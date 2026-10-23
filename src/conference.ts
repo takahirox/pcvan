@@ -1,3 +1,5 @@
+import { serviceDate } from './calendar';
+import type { HistoricalCalendar } from './calendar';
 import type { Backup, ConferenceState, Contribution, Member } from './storage/schema';
 import { CONFERENCE_ID, CONFERENCE_SETTING } from './storage/schema';
 
@@ -16,10 +18,10 @@ export function renderConference(content: { settings?: Backup['settings'] }): st
       return `#${row.number} ${row.title}${parent ? ` RE#${parent.number}` : ''}`;
     }) : ['まだ発言はありません。WRITE で最初の発言をどうぞ。']), conferenceHelp, 'コマンド='];
 }
-export function renderContribution(row: Contribution, state: ConferenceState, members: readonly Member[]): string[] {
+export function renderContribution(row: Contribution, state: ConferenceState, members: readonly Member[], calendar?: HistoricalCalendar): string[] {
   const parent = state.contributions.find((p) => p.id === row.replyToPostId);
   return [conferenceTitle, `#${row.number} ${row.title}`,
-    `発言者：${members.find((m) => m.id === row.authorId)?.handle ?? '名無し'} / ${row.createdAt}`,
+    `発言者：${members.find((m) => m.id === row.authorId)?.handle ?? '名無し'} / ${serviceDate(row.createdAt, calendar)} (JST)`,
     ...(parent ? [`返信先：#${parent.number}`] : []), '★内容', row.body, conferenceHelp, 'コマンド='];
 }
 

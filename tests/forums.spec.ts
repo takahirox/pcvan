@@ -57,7 +57,7 @@ test('MITI route reaches numbered original demos; gaps and invalid reads preserv
   expect(listing).not.toMatch(/創作|再構成|https?:/);
   const read = controller.submit(' read   1 ').join('\n');
   expect(read).toContain('#1/9001　資料室');
-  expect(read).toContain('★タイトル (DEMO0001)  96/07/06  12:34');
+  expect(read).toContain('★タイトル (DEMO0001)  96/07/06  21:34');
   expect(read).toContain('★内容\n  架空の星');
   expect(read).toContain('架空の星を見つけたら、どんな名前を付けますか。');
   for (const invalid of ['READ 2', 'READ 999', 'READ 0', 'READ -1', 'READ 1.5', 'READ 9007199254740992', 'READ 1 extra', 'Q', 'J MITI']) {
@@ -76,7 +76,7 @@ test('MITI route reaches numbered original demos; gaps and invalid reads preserv
 test('headers preserve title/body spacing and optional fields without interpreting secondary numbers', () => {
   const post = { ...demos.posts[0]!, displaySecondNumber: 0, title: '  創作　ｶﾅ  ', body: '\n  <b>文字</b>　。\n\n末尾  \n' };
   expect(renderPost(post, '表示試験', 7)).toEqual([
-    '#1/0　表示試験', '★タイトル (DEMO0001)  96/07/06  12:34  ( 7)',
+    '#1/0　表示試験', '★タイトル (DEMO0001)  96/07/06  21:34  ( 7)',
     post.title, '★内容', post.body,
   ]);
   const { displaySecondNumber: _second, ...withoutSecond } = post;
@@ -106,7 +106,7 @@ test('author headers use current handles for human, seed, generated and legacy p
   expect(renderPost(human, '広場', undefined, members)[1]).toContain('(人間)');
   expect(renderPost(seeded, '広場', undefined, members)[1]).toContain('(常連)');
   const rendered = renderPost(generated, '広場', undefined, members).join('\n');
-  expect(rendered).toContain('(常連)  96/07/06  12:34');
+  expect(rendered).toContain('(常連)  96/07/06  21:34');
   expect(rendered).not.toMatch(/fictional-ai:|架空の投稿時刻|local-ai:|runId|AI住人|シミュレーション/);
   members[2]!.handle = '星の番人';
   expect(renderPost(generated, '広場', undefined, members)[1]).toContain('(星の番人)');

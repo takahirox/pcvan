@@ -20,11 +20,16 @@ Personalities, occupations, interests, affinities, board cultures and each
 service's purpose still shape natural Japanese contributions, without historical
 lectures, forced nostalgia, required catchphrases or provenance announcements.
 
-Storage timestamps, displayed dates, scheduling, retention and elapsed-time
-calculations keep their existing actual-date behavior (including existing
-`simulatedAt` display rules). This is not a historical presentation calendar.
+Entry, forum, mail, conference and OLT dates use one stable per-world historical
+calendar in fixed JST, anchored to a fictional week in late November 1996.
+Forum and mail dates project `simulation.simulatedAt ?? createdAt` once;
+already-historical 1996–1997 instants are preserved. Storage timestamps,
+scheduling, retention and elapsed-time calculations remain operational, as do
+timestamps shown in modern Settings. See the
+[calendar policy](local-storage.md#historical-display-calendar-issue-67).
 OLT inference receives ordered author/kind/text excerpts without absolute event
-timestamps; persisted events and terminal readback retain their dates. Shared
+timestamps; persisted events retain raw timestamps and terminal readback uses
+the historical calendar. Shared
 setting instructions add no access to other boards or private correspondence.
 No stored or user-authored text is rewritten or filtered for period keywords.
 
