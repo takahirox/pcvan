@@ -1,23 +1,24 @@
 import {
-  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents,
+  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailResident,
 } from './schema';
-import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Member, NewPost, Post, Records, Session, Store } from './schema';
+import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
 import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
-import { models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
+import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { WORLD_SETTING } from './schema';
 import { canPopulateCommunity, communityBoards, communityPosts, SEED_FIXTURE } from './community';
+import { validateMailGeneration } from '../ai/mail';
 import { postInput, validateGeneration } from '../ai/generation';
 
 export * from './schema';
 export const DATABASE_NAME = 'pcvan-local';
-export const DATABASE_VERSION = 1;
+export const DATABASE_VERSION = 2;
 export const ACTIVE_MEMBER_SETTING = 'active-human-member';
 export interface ForumDestination { keyword: 'MITI' | 'DAISIZEN'; boardNo: number; name: string }
 // Command activity watermarks and session history advance without editing the world.
-export const worldContext = (data: Backup): string => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.readStates,
+export const worldContext = (data: Backup): string => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.mail ?? [], data.readStates,
   data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } } : row)]);
 /** Fence open profile editors across world replacement and concurrent edits. */
 export function residentContext(content: Pick<Backup, 'settings'>): string {
@@ -61,20 +62,29 @@ export function openRepository(name = DATABASE_NAME): Promise<LocalRepository> {
       if (!globalThis.indexedDB) throw new RepositoryError('unavailable', 'IndexedDB is unavailable in this browser.');
       opening = indexedDB.open(name, DATABASE_VERSION);
     } catch (error) { reject(storageError(error)); return; }
-    opening.onupgradeneeded = () => {
+    opening.onupgradeneeded = (event) => {
       const db = opening.result;
-      db.createObjectStore('members', { keyPath: 'id' });
-      db.createObjectStore('sigs', { keyPath: 'id' });
-      db.createObjectStore('forums', { keyPath: 'id' }).createIndex('sigId', 'sigId');
-      const posts = db.createObjectStore('posts', { keyPath: 'id' });
-      posts.createIndex('forumNumber', ['forumId', 'number'], { unique: true });
-      posts.createIndex('authorId', 'authorId');
-      posts.createIndex('replyToPostId', 'replyToPostId');
-      const reads = db.createObjectStore('readStates', { keyPath: ['memberId', 'forumId'] });
-      reads.createIndex('memberId', 'memberId');
-      reads.createIndex('forumId', 'forumId');
-      db.createObjectStore('settings', { keyPath: 'id' });
-      db.createObjectStore('session');
+      if (event.oldVersion < 1) {
+        db.createObjectStore('members', { keyPath: 'id' });
+        db.createObjectStore('sigs', { keyPath: 'id' });
+        db.createObjectStore('forums', { keyPath: 'id' }).createIndex('sigId', 'sigId');
+        const posts = db.createObjectStore('posts', { keyPath: 'id' });
+        posts.createIndex('forumNumber', ['forumId', 'number'], { unique: true });
+        posts.createIndex('authorId', 'authorId');
+        posts.createIndex('replyToPostId', 'replyToPostId');
+        const reads = db.createObjectStore('readStates', { keyPath: ['memberId', 'forumId'] });
+        reads.createIndex('memberId', 'memberId');
+        reads.createIndex('forumId', 'forumId');
+        db.createObjectStore('settings', { keyPath: 'id' });
+        db.createObjectStore('session');
+      }
+      if (event.oldVersion < 2) {
+        const mail = db.createObjectStore('mail', { keyPath: 'id' });
+        mail.createIndex('number', 'number', { unique: true });
+        mail.createIndex('senderId', 'senderId');
+        mail.createIndex('recipientId', 'recipientId');
+        mail.createIndex('replyToMailId', 'replyToMailId');
+      }
     };
     opening.onblocked = () => {
       blocked = true;
@@ -166,11 +176,16 @@ export class LocalRepository {
 
   // Relationship-sensitive mutations share a scope so deletes/imports cannot race
   // with child creation in another tab. No external asynchronous work occurs in tx.
-  put<S extends Exclude<Store, 'posts'>>(store: S, value: Records[S]): Promise<Records[S]> {
+  put<S extends Exclude<Store, 'posts' | 'mail'>>(store: S, value: Records[S]): Promise<Records[S]> {
     const row = structuredClone(value);
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!['members', 'sigs', 'forums', 'readStates', 'settings'].includes(store)) invalid('This store does not support put.');
       validateRecord(store, row);
+      if (store === 'members') {
+        const member = row as Member;
+        const content = await this.snapshot(tx);
+        validateMailRelations(content.mail ?? [], [...content.members.filter((m) => m.id !== member.id), member]);
+      }
       if (store === 'forums') {
         const forum = row as Forum;
         if (!await request(tx.objectStore('sigs').get(forum.sigId))) invalid('Missing SIG.');
@@ -267,6 +282,53 @@ export class LocalRepository {
     });
   }
 
+  /** Resolve an exact local resident address and allocate the number atomically. */
+  createHumanMail(draft: { id: string; senderId: string; recipient: string; subject: string; body: string; replyToMailId?: string }): Promise<Mail> {
+    const input = structuredClone(draft);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (!input || typeof input !== 'object' || Array.isArray(input) ||
+          ['id', 'senderId', 'recipient', 'subject', 'body'].some((key) => typeof input[key as keyof typeof input] !== 'string') ||
+          Object.keys(input).some((key) => !['id', 'senderId', 'recipient', 'subject', 'body', 'replyToMailId'].includes(key))) invalid('Invalid mail draft.');
+      const content = await this.snapshot(tx);
+      const sender = content.members.find((m) => m.id === input.senderId);
+      if (sender?.actor !== 'human') invalid('Select a local human member.');
+      if (input.replyToMailId !== undefined && (typeof input.replyToMailId !== 'string' || !input.replyToMailId.trim())) invalid('Invalid mail reply parent.');
+      const address = input.recipient.trim();
+      const recipient = resolveMailResident(content.members, address);
+      const previous = (content.mail ?? []).find((m) => m.id === input.id);
+      if (previous) {
+        if (previous.senderId !== sender.id || previous.recipientId !== recipient.id || previous.subject !== input.subject ||
+            previous.body !== input.body || previous.replyToMailId !== input.replyToMailId) invalid('Mail ID collision.');
+        return previous;
+      }
+      return this.insertMail(tx, { id: input.id, senderId: sender.id, recipientId: recipient.id,
+        subject: input.subject, body: input.body, origin: 'local-human',
+        ...(input.replyToMailId !== undefined ? { replyToMailId: input.replyToMailId } : {}) });
+    }).then((mail) => { this.notifySetupChanged(); return mail; });
+  }
+
+  private async insertMail(tx: IDBTransaction, input: Omit<Mail, 'number' | 'createdAt'>): Promise<Mail> {
+    const content = await this.snapshot(tx);
+    const maximum = (content.mail ?? []).reduce((n, m) => Math.max(n, m.number), 0);
+    const number = Math.max(maximum + 1, (await request(tx.objectStore('session').get('mail-next-number'))) ?? 1);
+    const row: Mail = { ...input, number, createdAt: new Date().toISOString() };
+    validateRecord('mail', row);
+    validateMailRelations([...(content.mail ?? []), row], content.members);
+    await request(tx.objectStore('mail').add(row));
+    await request(tx.objectStore('session').put(number + 1, 'mail-next-number'));
+    return row;
+  }
+
+  /** Only the human recipient can mark this individual letter read. */
+  markMailRead(memberId: string, mailId: string): Promise<void> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const member: Member | undefined = await request(tx.objectStore('members').get(memberId));
+      const row: Mail | undefined = await request(tx.objectStore('mail').get(mailId));
+      if (member?.actor !== 'human' || !row || row.recipientId !== memberId) invalid('Missing received letter.');
+      if (!row.readAt) await request(tx.objectStore('mail').put({ ...row, readAt: new Date(Math.max(Date.now(), Date.parse(row.createdAt))).toISOString() }));
+    }).then(() => this.notifySetupChanged());
+  }
+
   /** A monotonic per-member/forum high-water mark, including across tabs. */
   markRead(memberId: string, postId: string): Promise<void> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
@@ -298,12 +360,14 @@ export class LocalRepository {
       const referenced = async (table: Store, index: string, match: IDBValidKey) =>
         (await request(tx.objectStore(table).index(index).count(match))) > 0;
       let hasChildren = false;
-      if (store === 'members') hasChildren = await referenced('posts', 'authorId', key) || await referenced('readStates', 'memberId', key);
+      if (store === 'members') hasChildren = await referenced('posts', 'authorId', key) || await referenced('readStates', 'memberId', key) ||
+        await referenced('mail', 'senderId', key) || await referenced('mail', 'recipientId', key);
       if (store === 'sigs') hasChildren = await referenced('forums', 'sigId', key);
       if (store === 'forums') {
         hasChildren = (await request(tx.objectStore('posts').index('forumNumber')
           .count(IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER])))) > 0 || await referenced('readStates', 'forumId', key);
       }
+      if (store === 'mail') hasChildren = await referenced('mail', 'replyToMailId', key);
       if (store === 'posts') hasChildren = await referenced('posts', 'replyToPostId', key);
       if (hasChildren) invalid('Record is still referenced. Delete children first.');
       await request(tx.objectStore(store).delete(key));
@@ -361,7 +425,7 @@ export class LocalRepository {
     const content = await this.snapshot(tx);
     if (!content.settings.some((r) => r.id === WORLD_SETTING)) {
       const imported = await request(tx.objectStore('session').get('imported'));
-      const pristine = !imported && content.session === null && stores.every((store) => !content[store].length);
+      const pristine = !imported && content.session === null && stores.every((store) => !(content[store] ?? []).length);
       await request(settings.add({ id: WORLD_SETTING, value: {
         version: 1, createdAt: now, status: imported ? 'imported' : 'legacy',
       } }));
@@ -526,11 +590,11 @@ export class LocalRepository {
   }
 
   /** Run status, identity, number and result share a commit. No model work runs inside IDB. */
-  commitAiRun(id: string, raw: string, signal?: AbortSignal): Promise<Post | undefined> {
+  commitAiRun(id: string, raw: string, signal?: AbortSignal): Promise<Post | Mail | undefined> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       const state = await this.readActivity(tx, new Date().toISOString());
       const run = state.batch?.runs.find((row) => row.id === id);
-      const existing: Post | undefined = await request(tx.objectStore('posts').get(id));
+      const existing: Post | Mail | undefined = await request(tx.objectStore('posts').get(id)) ?? await request(tx.objectStore('mail').get(id));
       // Stable post keys also cover an uncertain commit acknowledgement / old batch retry.
       if (existing) {
         if (existing.simulation?.runId !== id) invalid('AI run ID collision.');
@@ -542,7 +606,21 @@ export class LocalRepository {
       if (!state.maxPosts) invalid('AI activity is disabled or the run is missing.');
       if (run.status === 'committed') return undefined; // A later explicit deletion stays deleted.
       if (run.status !== 'running') invalid('AI run is not running.');
-      const target = { personaId: run.personaId, forumId: run.forumId,
+      if (!state.consent || state.batch!.modelId !== state.modelId || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && p.frequency > 0)) invalid('Mail/model activity is no longer authorized.');
+      if (run.mail) {
+        const content = await this.snapshot(tx);
+        const generated = validateMailGeneration(raw, content, run.personaId, run.mail);
+        const senderId = personaMemberId(run.personaId);
+        const previous = (content.mail ?? []).find((m) => m.senderId === senderId && m.recipientId === run.mail!.humanId &&
+          (run.mail!.replyToMailId ? m.replyToMailId === run.mail!.replyToMailId : true));
+        if (previous) { run.status = 'committed'; await this.writeActivity(tx, state); return undefined; }
+        const mail = await this.insertMail(tx, { id, senderId, recipientId: run.mail.humanId,
+          ...generated, origin: aiOrigin(state.modelId),
+          ...(run.mail.replyToMailId ? { replyToMailId: run.mail.replyToMailId } : {}),
+          simulation: { runId: id, simulatedAt: run.simulatedAt, fictional: true } });
+        run.status = 'committed'; await this.writeActivity(tx, state); return mail;
+      }
+      const target = { personaId: run.personaId, forumId: run.forumId!,
         ...(run.replyToPostId === undefined ? {} : { replyToPostId: run.replyToPostId }) };
       const generated = validateGeneration(raw, await this.snapshot(tx), target);
       const input = postInput(generated, state.batch!.modelId, await this.snapshot(tx));
@@ -552,11 +630,11 @@ export class LocalRepository {
       run.status = 'committed';
       await this.writeActivity(tx, state);
       return post;
-    }, signal);
+    }, signal).then((result) => { if (result && 'senderId' in result) this.notifySetupChanged(); return result; });
   }
 
   private async snapshot(tx: IDBTransaction): Promise<Backup> {
-    const backup: Backup = { format: 'pcvan-local', version: 1, members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [], session: null };
+    const backup: Backup = { format: 'pcvan-local', version: 1, members: [], sigs: [], forums: [], posts: [], mail: [], readStates: [], settings: [], session: null };
     await Promise.all(stores.map(async (store) => {
       Object.assign(backup, { [store]: await request(tx.objectStore(store).getAll()) });
     }));
@@ -602,7 +680,7 @@ export class LocalRepository {
         invalid('世界や設定が変わりました。現在の設定から確認し直してください。');
       for (const store of allStores) await request(tx.objectStore(store).clear());
       for (const store of stores) {
-        for (const row of backup[store]) {
+        for (const row of backup[store] ?? []) {
           // A restored legacy marker must not advertise the pre-feature opt-in.
           const restored = store === 'settings' && 'id' in row && row.id === WORLD_SETTING &&
             'value' in row && (row.value as { status?: string })?.status === 'legacy'

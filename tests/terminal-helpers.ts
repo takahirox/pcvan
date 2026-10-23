@@ -65,7 +65,7 @@ export async function snapshot(page: Page): Promise<Backup> {
       const request = indexedDB.open('pcvan-local'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
     });
     try {
-      const stores = ['members', 'sigs', 'forums', 'posts', 'readStates', 'settings', 'session'];
+      const stores = ['members', 'sigs', 'forums', 'posts', 'mail', 'readStates', 'settings', 'session'];
       const tx = db.transaction(stores, 'readonly');
       const result: Record<string, unknown> = { format: 'pcvan-local', version: 1 };
       await Promise.all(stores.map((store) => new Promise<void>((resolve) => {

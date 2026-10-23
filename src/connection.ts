@@ -16,6 +16,7 @@ export class ConnectionController implements TerminalController {
 
   setContent(content: ForumContent): void { this.navigation.setContent(content); }
   setMemberId(id: string | undefined): void { this.navigation.setMemberId(id); }
+  get mailContext() { return this.navigation.mailContext; }
   get forum() { return this.navigation.forum; }
 
   completeConnection(): readonly string[] {

@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 
 test('a clean world is empty; all entities round-trip exactly and posts survive reload', async ({ page }) => {
   expect(await page.evaluate(() => window.repo.exportBackup())).toEqual({
-    format: 'pcvan-local', version: 1, members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [], session: null,
+    format: 'pcvan-local', version: 1, mail: [], members: [], sigs: [], forums: [], posts: [], readStates: [], settings: [], session: null,
   });
   const fixture = backupFixture();
   const exported = await page.evaluate(async (data) => {
@@ -239,7 +239,7 @@ test('a failed counter write rolls back an already inserted post', async ({ page
 test('version changes close old connections so an upgrade can finish', async ({ page }) => {
   const result = await page.evaluate(async () => {
     await new Promise<void>((resolve, reject) => {
-      const opening = indexedDB.open('test-world', 2);
+      const opening = indexedDB.open('test-world', window.repositoryModule.DATABASE_VERSION + 1);
       opening.onerror = () => reject(opening.error);
       opening.onsuccess = () => { opening.result.close(); resolve(); };
     });

@@ -14,6 +14,7 @@ export const keyboardHelp = ['PC-VAN 内の閲覧・利用者登録・投稿は�
   'SETTINGS / CONFIG: 設定 / HANDLE: 利用者 / ABOUT: 詳細・出自 / LOG: ログ保存',
   'BACK: 一つ戻る / MAIN: MAIN / HELP: 現在の画面の案内',
   '編集中は BACK / MAIN で移動しません。.CANCEL で明示的に破棄します。',
+  'メール: MAIN 1 / X または SIG MAIL → MEMBERS / WRITE 宛先 / INBOX / SENT / READ 番号 / REPLY 番号',
   'WRITE → タイトル → 本文を1行ずつ → .END → EDIT / Y / N',
   '確認中の空入力は承認になりません。Y はその確認だけを承認します。'];
 export function about(content: Backup): string[] {
@@ -25,6 +26,9 @@ export function about(content: Backup): string[] {
     '10人の住人は架空の人物です。local-seed:fictional は事前に書いた30件・8話題の創作で、史料の転載でもモデル生成でもありません。',
     'local-ai:webllm: は端末内で生成した人工の投稿、local-human は利用者の投稿です。DEMO は架空の見本です。',
     '初期会話の日時は世界作成日前の約2週間に配置した創作です。生成投稿の simulatedAt は創作の活動時刻、createdAt は保存時刻です。',
+    'メールも架空の住人と人間の間だけでブラウザー内に保存・生成します。外部配送はありません。コマンド・宛先・箱の共有は現代の再構成です。',
+    'メールはローカル世界内での私信で、暗号化されません。同じ端末・ブラウザープロファイルにアクセスできる人からの隔離はありません。JSON とログにも私信が含まれます。',
+    'メールの文脈は相手との最大4通と両者の公開投稿最大4件。ほかの相手の私信は含めません。メール既読は受信者ごとの各通に記録します。',
     'モデルの重みは外部から取得しますが、推論・投稿データの処理は端末内です。外部推論・API キーは使いません。',
     '同じ掲示板の直近最大4件のローカル創作を文脈に使用。日本語品質はモデル・機器によります。',
     '新しい世界の自動活動上限は4。モデル同意前は生成しません。約1分ごとに予定確認。閉じている間は動かず、再訪時に最大72時間の一部を再現します。',
@@ -37,6 +41,7 @@ export function about(content: Backup): string[] {
     '初期会話: https://github.com/takahirox/pcvan/blob/main/data/pcvan/fictional-community.json',
     '見本: https://github.com/takahirox/pcvan/blob/main/data/pcvan/demo-posts.json',
     ...residentProfiles(content).map((row) => `${row.handle} / fictional-ai:${row.id} / ${JSON.stringify(row)}`),
+    ...(content.mail ?? []).map((m) => `メール #${m.number} / ${m.senderId} → ${m.recipientId} / origin=${m.origin} / createdAt=${m.createdAt} / ${JSON.stringify(m.simulation ?? null)}`),
     ...content.posts.map((post) => `${post.forumId} #${post.number} / ${post.authorId} / actor=${content.members.find((m) => m.id === post.authorId)?.actor} / origin=${post.origin} / createdAt=${post.createdAt} / ${JSON.stringify(post.simulation ?? null)}`),
   ];
 }

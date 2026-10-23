@@ -2,30 +2,33 @@ import type { Post } from './storage/schema';
 import type { ForumDestination } from './storage/repository';
 
 export interface ComposeDraft { authorId: string; title: string; body: string; replyToPostId?: string }
-export interface ComposerActions {
+export interface ComposerActions<T = ForumDestination> {
   print(...lines: string[]): void;
-  save(destination: ForumDestination, draft: ComposeDraft): Promise<Post>;
+  save(destination: T, draft: ComposeDraft): Promise<Pick<Post, 'number'>>;
 }
 
 /** A draft owns the terminal until an explicit send or cancellation. */
-export class TerminalComposer {
+export class TerminalComposer<T extends { keyword: string; name: string } = ForumDestination> {
   private stage: 'title' | 'body' | 'review' | 'edit' = 'title';
   private title = '';
   private lines: string[] = [];
   private done = false;
-  constructor(private target: ForumDestination, private authorId: string,
-    private parent: Post | undefined, private actions: ComposerActions) {
-    actions.print(parent ? `返信先：#${parent.number}` : '新規発言', `${target.keyword} / ${target.name}`, 'タイトル=');
+  constructor(private target: T, private authorId: string,
+    private parent: Pick<Post, 'id' | 'number'> | undefined, private actions: ComposerActions<T>, private kind: 'post' | 'mail' = 'post', initialTitle = '') {
+    if (initialTitle) { this.title = initialTitle; this.stage = 'body'; }
+    actions.print(parent ? `返信先：#${parent.number}` : (kind === 'mail' ? '新規メール' : '新規発言'), `${target.keyword} / ${target.name}`, initialTitle ? `件名：${initialTitle}` : `${this.titleLabel}=`);
+    if (initialTitle) this.help();
   }
+  private get titleLabel() { return this.kind === 'mail' ? '件名' : 'タイトル'; }
   get active() { return !this.done; }
   private preview() {
     this.stage = 'review';
-    this.actions.print(`タイトル：${this.title}`, `本文：${this.lines.length}行`,
-      ...this.lines.map((line, index) => `${index + 1}: ${line}`), '投稿しますか？ (Y/N/EDIT)=');
+    this.actions.print(...(this.kind === 'mail' ? [`宛先：${this.target.name}`] : []), `${this.titleLabel}：${this.title}`, `本文：${this.lines.length}行`,
+      ...this.lines.map((line, index) => `${index + 1}: ${line}`), this.kind === 'mail' ? '送信しますか？ (Y/N/EDIT)=' : '投稿しますか？ (Y/N/EDIT)=');
   }
   help() {
     this.actions.print('下書きは保持されています。.CANCEL / CANCEL: 明示的に破棄。BACK / MAIN: 移動せず保持。',
-      this.stage === 'title' ? 'タイトルを入力（1〜200文字）。'
+      this.stage === 'title' ? `${this.titleLabel}を入力（1〜200文字）。`
       : this.stage === 'body' ? '本文を1行ずつ入力（全体1〜20000文字）。空行も保存。.END: 確認 / .TEXT 文字: 命令もそのまま本文へ。'
       : this.stage === 'edit' ? 'TITLE 文字 / LINE 番号 文字 / DELETE 番号 / APPEND / REVIEW。空の LINE 番号 は空行に置換。'
       : 'Y: 保存 / N: 破棄 / EDIT: 編集 / HELP: 案内');
@@ -34,11 +37,11 @@ export class TerminalComposer {
     if (this.done) return;
     const command = line.trim().toUpperCase();
     if (['CANCEL', '.CANCEL'].includes(command)) {
-      this.done = true; this.actions.print('投稿を中止しました。コマンド='); return;
+      this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : '投稿を中止しました。コマンド='); return;
     }
     if (['HELP', 'BACK', 'MAIN'].includes(command)) { this.help(); return; }
     if (this.stage === 'title') {
-      if (!line.trim() || line.length > 200) { this.actions.print('タイトルは空白だけにせず、200文字以内で入力してください。タイトル='); return; }
+      if (!line.trim() || line.length > 200) { this.actions.print(`${this.titleLabel}は空白だけにせず、200文字以内で入力してください。${this.titleLabel}=`); return; }
       this.title = line; this.stage = 'body'; this.help(); return;
     }
     if (this.stage === 'body') {
@@ -53,7 +56,7 @@ export class TerminalComposer {
       this.lines.push(bodyLine); this.actions.print('本文='); return;
     }
     if (this.stage === 'review') {
-      if (command === 'N') { this.done = true; this.actions.print('投稿を中止しました。コマンド='); return; }
+      if (command === 'N') { this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : '投稿を中止しました。コマンド='); return; }
       if (command === 'EDIT') { this.stage = 'edit'; this.help(); return; }
       if (command !== 'Y') { this.actions.print('Y / N / EDIT を入力してください。下書きは保持されています。'); return; }
       try {
@@ -61,9 +64,9 @@ export class TerminalComposer {
           body: this.lines.join('\n'), ...(this.parent ? { replyToPostId: this.parent.id } : {}) });
         // Never leave a sendable draft after the transaction commits.
         this.done = true;
-        this.actions.print(`発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
+        this.actions.print(this.kind === 'mail' ? `メール #${post.number} を送信しました。SENT / READ ${post.number} で確認できます。` : `発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
       } catch (error) {
-        this.actions.print(`投稿を保存できませんでした。入力は残っています。${String(error)}`, 'Y: 再試行 / EDIT: 編集 / N: 中止');
+        this.actions.print(`${this.kind === 'mail' ? 'メール' : '投稿'}を保存できませんでした。入力は残っています。${String(error)}`, 'Y: 再試行 / EDIT: 編集 / N: 中止');
       }
       return;
     }
@@ -71,8 +74,8 @@ export class TerminalComposer {
     const replace = /^LINE ([1-9]\d*)(?: (.*))?$/i.exec(line);
     const remove = /^DELETE ([1-9]\d*)$/i.exec(line);
     if (title) {
-      if (!title[1]!.trim() || title[1]!.length > 200) this.actions.print('タイトルは1〜200文字です。変更していません。');
-      else { this.title = title[1]!; this.actions.print('タイトルを変更しました。'); }
+      if (!title[1]!.trim() || title[1]!.length > 200) this.actions.print(`${this.titleLabel}は1〜200文字です。変更していません。`);
+      else { this.title = title[1]!; this.actions.print(`${this.titleLabel}を変更しました。`); }
     } else if (replace || remove) {
       const index = Number((replace ?? remove)![1]) - 1;
       if (index >= this.lines.length) { this.actions.print('その行はありません。変更していません。'); return; }

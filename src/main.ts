@@ -148,7 +148,7 @@ const ai = createAiControls({
 const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
-  destination: () => controller.forum, ai,
+  destination: () => controller.forum, mailbox: () => controller.mailContext, ai,
   preferences: () => terminal.preferences, applyPreferences: terminal.setPreferences,
   sessionTimes: () => terminal.sessionTimes, log: terminal.logText,
   save: async (target, draft) => {

@@ -2,6 +2,7 @@ import type { AiActivity, AiBatch, AiRun, Backup, Post } from '../storage/schema
 import { WORLD_SETTING } from '../storage/schema';
 import { models, personas, personaMemberId, residentProfiles } from './personas';
 import { localConversation } from '../storage/community';
+import { chooseMail } from './mail';
 import type { ResidentProfile } from './personas';
 
 export const ACTIVITY_SETTING = 'ai-activity';
@@ -36,12 +37,16 @@ export function routineFactor(profile: ResidentProfile, at: number): number {
   // Work and sleep strongly reduce visits but permit occasional exceptions.
   return hours.includes(local.getUTCHours()) ? 1 : .04;
 }
-function chooseAction(content: Backup, profile: ResidentProfile, at: number, seed: string): Omit<AiRun, 'id' | 'status' | 'simulatedAt'> | null {
+function chooseAction(content: Backup, profile: ResidentProfile, at: number, seed: string, planned: readonly AiRun[], mailLimit: number): Omit<AiRun, 'id' | 'status' | 'simulatedAt'> | null {
   const draw = (key: string) => random(`${seed}:${profile.id}:${at}:${key}`);
   const localDay = Math.floor((at + profile.utcOffsetMinutes * 60_000) / (24 * HOUR));
   // Occasional three-day absences are independent of the number of page visits.
   if (!profile.frequency || random(`${seed}:${profile.id}:away:${Math.floor(localDay / 3)}`) < .12 ||
       draw('visit') >= profile.participation * routineFactor(profile, at)) return null;
+  if (planned.filter((r) => r.mail).length < mailLimit) {
+    const mail = chooseMail(content, profile, at, seed, planned);
+    if (mail) return { personaId: profile.id, mail };
+  }
   const total = profile.reading + profile.newThread + profile.reply + profile.inactivity;
   const action = draw('action') * total;
   if (!total || action < profile.reading + profile.inactivity) return null;
@@ -98,7 +103,7 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
   const id = `residents:${state.lastActivityAt}:${timestamp}`;
   const runs: AiRun[] = [];
   for (const { profile, at } of opportunities) {
-    const action = chooseAction(content, profile, at, state.seed!);
+    const action = chooseAction(content, profile, at, state.seed!, runs, Math.min(2, Math.max(1, Math.floor(state.maxPosts / 2))));
     if (!action) continue;
     if (runs.length >= Math.min(state.maxPosts, MAX_SESSION_POSTS)) { truncated = true; continue; }
     runs.push({ ...action, id: `${id}:${profile.id}:${Math.floor(at)}`, simulatedAt: new Date(at).toISOString(), status: 'pending' });

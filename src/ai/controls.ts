@@ -141,6 +141,7 @@ export function createAiControls(actions: AiActions,
     status() {
       return [activityStatus(), supported ? message : 'WebGPU が利用できません。端末・閲覧・手動投稿は利用できます。',
         `6時間の自動投稿上限: ${activity?.maxPosts ?? 0} / 同意: ${activity?.consent ? 'あり' : 'なし'} / 試行 ${budget.attempts}/${MAX_SESSION_POSTS} / 保存 ${budget.committed}`,
+        'メールも同じ生成上限を使い、住人の次の予定で届くことがあります。',
         ...(activity?.batch?.runs.map((run) => `${run.id} / ${run.status} / ${run.personaId} / simulatedAt=${run.simulatedAt}`) ?? [])];
     },
     invalidate() { autoBlocked = true; cancel(); message = 'モデル解放済み'; },

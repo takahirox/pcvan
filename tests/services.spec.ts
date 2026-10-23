@@ -36,7 +36,7 @@ for (const [input, label, empty] of entries) {
     const directory = controller.submit('HELP');
     const output = controller.submit(`  ${input.toLowerCase()}  `);
     expect(controller.screen).toBe('daisizen-service');
-    expect(controller.needsContent).toBe(false);
+    expect(controller.needsContent).toBe(input === 'MAIL');
     expect(output.join('\n')).toContain(`大自然＆動植物（DAISIZEN） / ${label}`);
     expect(output.join('\n')).toContain(empty);
     expect(output.join('\n')).not.toMatch(/未実装|利用不可/);

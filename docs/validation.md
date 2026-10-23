@@ -668,7 +668,7 @@ Native IME, real GPU/model downloads, other browser engines, physical devices
 and optional nostalgic-flow feedback were not tested. No post-merge verification
 is required for #33. The new service collections are intentionally read-only and
 empty; real mail, commerce, file transfer, internet gateways and multi-user chat
-remain outside scope. See the [menu map and commands](../README.md#menu-destinations-and-empty-collections).
+remain outside scope. See the [menu map and commands](../README.md#menu-destinations-and-collections).
 
 
 ## Issue #35: independently scheduled local residents
@@ -931,3 +931,51 @@ per window. Reconnecting does not replenish it. Individual schedules and the
 Optional real-GPU/model-download and subjective conversation checks were not
 performed. No push, PR, merge, deployment or comment was performed. No post-merge
 verification is required.
+
+## Issue #52: local electronic mail with familiar residents
+
+Validated on 2026-10-23 with Node.js 24.12.0 and npm 11.6.2 on macOS.
+The assigned worktree descended from `a5e766a`; a read-only remote-head check
+confirmed `main` still pointed to that same source commit.
+
+- `npm ci`: passed; 0 vulnerabilities reported.
+- Final `npm test -- --workers=4`: **188 tests passed** in 55.2 seconds,
+  with no retries or skips. This includes 16 new mail tests and the complete
+  existing terminal, storage, forum, settings, offline and autonomous resident suites.
+- `npm run build`: passed TypeScript checking and production bundling. The
+  existing optional WebLLM chunk-size advisory remains.
+- Human browser journeys cover MAIN `1`, MAIN `X` and SIG `MAIL`, handle reuse/
+  inline registration, address discovery, send/read/reply, subject/body editing,
+  Japanese multiline/IME input, cancellation at every stage, invalid commands,
+  failed-write draft retention/retry and a consumed successful send.
+- Real Chromium IndexedDB tests cover strict mail fields/relationships, stable
+  address precedence and ambiguous handles, atomic numbering, concurrent duplicate
+  delivery, quota rollback, member-edit guards, independent human projections and
+  individual read markers. Mail writes preserve all prior forum records.
+- Mocked WebLLM plus fake clocks exercise the actual consent/startup/timer path:
+  delayed private replies, a SIG acquaintance initiating mail as the same member,
+  preserved active IME input/transcript, public posting capacity, quiet/unopened/
+  unsupported AI, malformed output/inference failure, bounded retry, quota recovery,
+  deduplicated reopening and a second tab reading the same mailbox.
+- Mail prompt checks exclude other humans' and other recipients' letters, bound
+  long pair history and public context, label profile/excerpt data untrusted and
+  reject wrong identities/parents, extra fields, HTML and control characters.
+  Deterministic catch-up retains the shared cap and 72-hour horizon.
+- A real version-1 database upgrades by adding an empty mail store without
+  changing posts/read states. Pre-mail JSON imports an empty mailbox. Mail-bearing
+  backup round-trip, offline reload/read/restore, reset and stale-connection/draft
+  fences are covered. No GPU/model/network is needed for stored reading or sending.
+- An intermediate full run exposed a pre-existing timing assumption in the
+  terminal echo test (immediate assertion before the asynchronous command queue).
+  The assertion now waits for the echo; the final complete rerun passed.
+- Documentation link checks (38 local links/anchors) and `git diff --check`
+  passed. New commands, addresses, shared mailbox behavior and layouts are
+  explicitly reconstructed; the mail-specific research record preserves evidence
+  classifications and unverified host-menu/address details.
+
+No real model weights were downloaded. Real GPU inference and subjective
+character quality checks were not performed; historical terminal UI accuracy is
+not claimed. These are
+optional validation; mocked output verifies routing, scheduling and persistence.
+No push, PR, merge, comment or deployment was performed. No post-merge verification
+is required.

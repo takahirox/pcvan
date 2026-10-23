@@ -3,7 +3,7 @@ import demoPosts from '../data/pcvan/demo-posts.json' with { type: 'json' };
 import type { Backup, Member, Post } from './storage/schema';
 import { ACTIVE_MEMBER_SETTING } from './storage/repository';
 
-export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'members' | 'readStates' | 'settings'>>;
+export type ForumContent = Pick<Backup, 'sigs' | 'forums' | 'posts'> & Partial<Pick<Backup, 'members' | 'readStates' | 'settings' | 'mail'>>;
 // Reader copy omits explanatory paragraphs; the original fiction and all evidence
 // metadata remain intact in the fixture linked from Settings → About.
 const demoReading: Record<string, { title: string; body: string }> = {

@@ -5,6 +5,7 @@ import { emptyContent, forumName, forumPosts, renderPost, replyReference } from 
 import type { ForumContent } from './forums';
 import type { ForumDestination } from './storage/repository';
 import { mainCollections, serviceCollections, mailboxes, renderCollection } from './sections';
+import { mailboxRows, renderMailList, mailHelp } from './mail';
 import type { CollectionKind, Mailbox } from './sections';
 
 const { miti, daisizen } = sigEvidence;
@@ -71,8 +72,13 @@ export class PcvanController implements TerminalController {
     return { keyword, boardNo, name: forumName(keyword, boardNo) };
   }
 
+  get mailContext(): { box: Mailbox; title: string } | null {
+    return (['section', 'daisizen-service', 'mailbox'].includes(this.currentScreen) && this.collectionKind === 'mail')
+      ? { box: this.currentScreen === 'mailbox' ? this.mailbox : 'INBOX', title: this.collectionTitle } : null;
+  }
+
   get needsContent(): boolean {
-    return ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
+    return !!this.mailContext || ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
   }
 
   get screen(): Screen {
@@ -124,6 +130,7 @@ export class PcvanController implements TerminalController {
           ? 'INBOX / SENT / LIST / BACK / MAIN / HELP' : 'LIST / BACK / MAIN / HELP');
       }
       case 'mailbox':
+        if (Object.hasOwn(mailboxes, command)) { this.mailbox = command as Mailbox; return this.render(); }
         if (command === 'LIST') return this.render();
         return this.invalidCommand('LIST / BACK / MAIN / HELP');
       case 'communication':
@@ -237,12 +244,15 @@ export class PcvanController implements TerminalController {
       ];
       case 'section':
       case 'daisizen-service': return [
-        ...renderCollection(this.collectionTitle, this.collectionKind),
+        ...(this.collectionKind === 'mail' ? [this.collectionTitle,
+          `受信箱：${mailboxRows(this.content.mail ?? [], this.memberId, 'INBOX').length}件 / 送信済み：${mailboxRows(this.content.mail ?? [], this.memberId, 'SENT').length}件`,
+          ...((this.content.mail ?? []).length ? [] : ['現在、メールはありません。']), mailHelp]
+          : renderCollection(this.collectionTitle, this.collectionKind)),
         'LIST: 一覧を再表示', returnHelp, demoPrompt,
       ];
       case 'mailbox': return [
         `${this.collectionTitle} / ${mailboxes[this.mailbox]}`,
-        'メール一覧：0件', '現在、メールはありません。',
+        ...renderMailList(this.content.mail ?? [], this.content.members ?? [], this.memberId, this.mailbox),
         'LIST: 一覧を再表示', returnHelp, demoPrompt,
       ];
       case 'communication': return [

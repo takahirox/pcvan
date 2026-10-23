@@ -1,7 +1,9 @@
 # Local repository and JSON backups
 
 The application stores its local world in IndexedDB, database `pcvan-local`,
-database version **1**. The repository has no runtime dependencies, network writes,
+database version **2**. Version 2 adds only the `mail` store/indexes;
+upgrading version 1 preserves every existing store and record. The repository has
+no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. Before starting the first
 session, `openActivity()` initializes a pristine world with ten fictional residents,
 two writable boards and 30 original static Japanese posts. Model consent remains
@@ -37,7 +39,7 @@ these application data controls are outside the historical service.
 ## Factory reset
 
 Settings → ローカルデータ・保守 → **初期状態に戻す** explains irreversible
-deletion of members, posts, read markers, resident edits, preferences, AI consent/
+deletion of members, posts, mail, read markers, resident edits, preferences, AI consent/
 deferral, history and live drafts. **先に JSON を保存** exports before approval.
 Only the explicit reset confirmation executes deletion; 中止 or closing preserves
 the world. Errors remain in Settings. `RESET` / typed `Y` remains an optional
@@ -221,9 +223,9 @@ repo.close();
 | `resetWorld({confirmReset}, now?)` | Requires literal `true`; atomically clears all world stores, runs the first-visit bootstrap and rotates the private generation token. Invalidates older repository connections. |
 | `close()` | Releases the connection. Old connections also close on `versionchange`; reload before further use. |
 
-Stores are `members`, `sigs`, `forums`, `posts`, `readStates`, `settings`, and a
+Stores are `members`, `sigs`, `forums`, `posts`, `mail`, `readStates`, `settings`, and a
 `session` store (out-of-line key `current` plus private import/generation markers). The generic methods exclude
-session; generic `put` also excludes posts so it cannot bypass allocation.
+session; generic `put` also excludes posts and mail so it cannot bypass allocation.
 Indexes cover forums by SIG, posts by `[forumId, number]` (unique), author and
 reply parent, and read states by member and forum. Relationship-sensitive writes
 share a transaction scope across stores, preventing concurrent deletion/import
@@ -252,7 +254,10 @@ in this tab. Repository methods perform no external awaits inside transactions; 
 
 ## Version 1 JSON document
 
-The root object has exactly these required fields (empty arrays are valid):
+The root object retains these required fields (empty arrays are valid). Current
+exports also include optional `mail: []`; pre-mail v1 documents import with an
+empty mailbox. Unknown root fields are still rejected. Older app versions reject
+mail-bearing exports without writing; retain a backup before upgrading.
 
 ```json
 {
@@ -274,6 +279,7 @@ The root object has exactly these required fields (empty arrays are valid):
 | Sig | `id`, `keyword`, `title` | — |
 | Forum | `id`, `sigId`, `boardNo`, `name`, `nextPostNumber` | — |
 | Post | `id`, `forumId`, `number`, `authorId`, `title`, `body`, `createdAt`, `origin` | `displaySecondNumber`, `replyToPostId`, `simulation` |
+| Mail | `id`, `number`, `senderId`, `recipientId`, `subject`, `body`, `createdAt`, `origin` | `replyToMailId`, `readAt`, `simulation` |
 | ReadState | `memberId`, `forumId`, `lastReadNumber` | — |
 | Session | `lastLoginAt`, `lastLogoutAt`, `commandHistory` | — |
 | Setting | `id`, `value` | — |
@@ -294,8 +300,9 @@ It is strictly validated. Existing worlds without it are marked on first use;
 only a completely empty, never-imported database with no session/settings is
 seeded automatically. Restoring a legacy marker changes its status to `imported`
 to prevent advertising the legacy opt-in; seeded backup provenance stays intact.
-These additive settings remain inside the version-1 backup envelope; no IndexedDB
-version/store upgrade is needed. See [the resident activity contract](local-ai.md#scheduling-discussion-and-bounds).
+These additive settings remain inside the version-1 backup envelope. Mail uses
+the same envelope with an explicitly optional `mail` array and IndexedDB version 2.
+See [the resident activity contract](local-ai.md#scheduling-discussion-and-bounds).
 
 A simulated AI post optionally includes `simulation: { runId, simulatedAt,
 fictional: true }`. `runId` equals its stable post ID and `simulatedAt` is a
@@ -322,8 +329,45 @@ must reference an earlier-numbered post in the same forum (also excluding reply
 cycles). These are local schema invariants, not claims about historical PC-VAN.
 Full validation precedes any writes, and native transaction failures (including
 quota or constraint errors) roll back clears and inserts together. Future changes
-must explicitly version the backup format and IndexedDB schema rather than
-silently dropping unknown content.
+must document migrations and update the format or explicitly validated additive
+fields and database version as needed; never drop unknown content.
+
+## Mail records and migration
+
+`mail` is a dedicated IndexedDB store with unique global `number` plus sender,
+recipient and reply-parent indexes. It never inserts into `posts` or allocates
+forum numbers. Each letter has exactly one human and one of the stable ten
+`fictional-ai:*` residents. INBOX/SENT are projections by recipient/sender, not
+mutable duplicate copies. `readAt` belongs only to the human recipient; reading
+one letter does not mark earlier numbers read. Subjects are nonblank single-line
+text up to 200 UTF-16 units, bodies nonblank up to 20000; terminal/invisible
+controls are invalid. Canonical timestamps, IDs, numbers, origins, simulations
+and relationships are strictly checked. A reply references an earlier-numbered
+letter with exactly reversed correspondents, excluding cycles/cross-recipient
+parents. Human origins are `local-human`; generated resident mail uses
+`local-ai:webllm:<modelId>` with a matching stable simulation run ID.
+
+`createHumanMail({id, senderId, recipient, subject, body, replyToMailId?})`
+resolves the exact existing resident ID/short address/handle, checks sender and
+parent, allocates the number and inserts in one transaction. Stable draft IDs
+return the existing identical send on retry and reject changed-content collisions.
+A private `session/mail-next-number` counter prevents reuse after deletion;
+restore initializes it from the imported maximum on the next send. It is excluded
+from exports. `markMailRead(memberId, mailId)` accepts only the human recipient
+and keeps the first read time. Generic `put` cannot bypass mail allocation.
+Member/parent deletion guards include mail references. Normal sends/read updates
+notify tabs, whose commands refresh snapshots even when notifications are missed.
+
+Generated mail uses `commitAiRun` and the same consent/model/pause/world checks as
+public generation; run state, letter, number and provenance commit together.
+Quota/constraint errors roll everything back. Duplicate run delivery returns the
+existing letter. Reset/import rotate the existing generation fence, discard
+live drafts and cancel in-flight output; old repository connections cannot write
+into the replacement world. Backup validation includes all mail before clearing
+any stores, then replaces everything atomically. Existing v1 JSON without `mail`
+imports an empty mailbox; upgrading the v1 database only creates the new empty
+store. Neither migration seeds private mail or alters prior forums/posts.
+See [mail commands and privacy](mail.md).
 
 ## Repeatable checks
 
