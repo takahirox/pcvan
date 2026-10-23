@@ -148,7 +148,7 @@ const ai = createAiControls({
 const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
-  destination: () => controller.forum, mailbox: () => controller.mailContext, ai,
+  isOlt: () => controller.isOlt, destination: () => controller.forum, mailbox: () => controller.mailContext, ai,
   preferences: () => terminal.preferences, applyPreferences: terminal.setPreferences,
   sessionTimes: () => terminal.sessionTimes, log: terminal.logText,
   save: async (target, draft) => {
@@ -203,8 +203,16 @@ function tickResidents() {
   if (!resetting && controller.screen !== 'disconnected' && document.visibilityState === 'visible') void ai.tick().catch(reportError);
 }
 setInterval(tickResidents, 60_000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') touchActivity(); else tickResidents(); });
-window.addEventListener('pagehide', () => { ai.invalidate(); touchActivity(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { commands.olt.suspend(); ai.cancelBackground(); touchActivity(); }
+  else { tickResidents(); tickRoom(); }
+});
+function tickRoom() {
+  if (!resetting && document.visibilityState === 'visible' && !settingsDialog?.open)
+    void commands.olt.tick(() => terminal.composing || terminal.hasInput || !!settingsDialog?.open).catch(reportError);
+}
+setInterval(tickRoom, 3_000);
+window.addEventListener('pagehide', () => { commands.olt.suspend(); ai.invalidate(); touchActivity(); });
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) { ai.resume(); tickResidents(); }
 });

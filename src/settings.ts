@@ -1,3 +1,4 @@
+import { oltState } from './olt-state';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import evidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import type { Backup } from './storage/schema';
@@ -15,6 +16,7 @@ export const keyboardHelp = ['PC-VAN 内の閲覧・利用者登録・投稿は�
   'BACK: 一つ戻る / MAIN: MAIN / HELP: 現在の画面の案内',
   '編集中は BACK / MAIN で移動しません。.CANCEL で明示的に破棄します。',
   'メール: MAIN 1 / X または SIG MAIL → MEMBERS / WRITE 宛先 / INBOX / SENT / READ 番号 / REPLY 番号',
+  'OLT: 13 → 2 → OLT → JOIN 番号。入室中は通常の入力が発言。/WHO / /LIST / /HELP / /LEAVE / /MAIN。',
   'WRITE → タイトル → 本文を1行ずつ → .END → EDIT / Y / N',
   '確認中の空入力は承認になりません。Y はその確認だけを承認します。'];
 export function about(content: Backup): string[] {
@@ -29,6 +31,11 @@ export function about(content: Backup): string[] {
     'メールも架空の住人と人間の間だけでブラウザー内に保存・生成します。外部配送はありません。コマンド・宛先・箱の共有は現代の再構成です。',
     'メールはローカル世界内での私信で、暗号化されません。同じ端末・ブラウザープロファイルにアクセスできる人からの隔離はありません。JSON とログにも私信が含まれます。',
     'メールの文脈は相手との最大4通と両者の公開投稿最大4件。ほかの相手の私信は含めません。メール既読は受信者ごとの各通に記録します。',
+    'OLT の部屋名・JOIN・/WHO・/LIST・/LEAVE・行表示は現代の再構成です。史料から確定した操作ではありません。',
+    'OLT の在室は架空の住人のローカルな生活シミュレーションで、遠隔の接続人数ではありません。local-presence は生成文ではない入退室記録です。',
+    'OLT は公開会話最大12行と公開投稿最大3件のみを文脈に使い、私信を渡しません。各部屋200行まで保存、/LIST は直近40行。日時 UTC。',
+    'OLT は可視タブでのみ推論し、閉じている間の会話を作りません。生成は別枠で全室1時間24試行、会話は連続3発言まで。0で自動活動を休止すると OLT も休止します。',
+    ...oltState(content).rooms.flatMap((r) => r.lines.map((l) => `OLT ${l.id} / ${l.authorId} / kind=${l.kind} / origin=${l.origin} / createdAt=${l.createdAt}`)),
     'モデルの重みは外部から取得しますが、推論・投稿データの処理は端末内です。外部推論・API キーは使いません。',
     '同じ掲示板の直近最大4件のローカル創作を文脈に使用。日本語品質はモデル・機器によります。',
     '新しい世界の自動活動上限は4。モデル同意前は生成しません。約1分ごとに予定確認。閉じている間は動かず、再訪時に最大72時間の一部を再現します。',
