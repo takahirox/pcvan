@@ -26,6 +26,9 @@ export class ConnectionController implements TerminalController {
   setMemberId(id: string | undefined): void { this.navigation.setMemberId(id); }
   selectDownload(number: number) { return this.navigation.selectDownload(number); }
   get netNewsContext() { return this.navigation.netNewsContext; }
+  get isEcom() { return this.navigation.isEcom; }
+  get ecomDrafting() { return this.navigation.ecomDrafting; }
+  invalidateEcom() { this.navigation.invalidateEcom(); }
   get isTelnet() { return this.navigation.isTelnet; }
   get isConference() { return this.navigation.isConference; }
   get isOlt() { return this.navigation.isOlt; }

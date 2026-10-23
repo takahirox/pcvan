@@ -102,6 +102,9 @@ const terminal = mountTerminal(root, {
     void enqueue(async () => {
       if (acceptedRevision !== revision) return;
       await finishConnection();
+      // Check replacement generation before interpreting any visit-local postal input.
+      if (controller.isEcom) await refreshContent();
+      if (acceptedRevision !== revision) return;
       const recordable = commands.recordsHistory;
       if (recordable) { session.history.add(line); commandsDuringHistoryLoad?.push(line); }
       print(`> ${line}`); terminal.reveal();
@@ -121,9 +124,11 @@ const terminal = mountTerminal(root, {
             }
           }
         }
-        if (line.trim()) navigate(line);
+        if (line.trim() || controller.isEcom) navigate(line);
       }
       if (resetting) return;
+      // Commands queued in a departed visit cannot operate a subsequent visit.
+      if (before === 'ecom' && !controller.isEcom) revision++;
       const repo = await repository, after = controller.screen;
       if (before === 'disconnected' && after !== 'disconnected') {
         showSessionTimes(await repo.startSession());
@@ -138,8 +143,8 @@ const terminal = mountTerminal(root, {
       updateConnection();
     }).catch(reportError);
   },
-  previous: (current) => session.history.previous(current),
-  next: (current) => session.history.next(current),
+  previous: (current) => controller.isEcom ? current : session.history.previous(current),
+  next: (current) => controller.isEcom ? current : session.history.next(current),
   completeConnection,
 });
 function applicationReport(kind: 'ai' | 'offline', ...lines: string[]) {
@@ -173,6 +178,8 @@ const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   isTelnet: () => controller.isTelnet,
+  isEcom: () => controller.isEcom, ecomDrafting: () => controller.ecomDrafting,
+  invalidateEcom: () => controller.invalidateEcom(),
   isNetNewsDirectory: () => ['internet-directory', 'netnews-directory'].includes(controller.screen),
   selectDownload: (number: number) => controller.selectDownload(number),
   netNews: () => controller.netNewsContext, netNewsSaved: () => navigate('LIST'),

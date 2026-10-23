@@ -156,7 +156,9 @@ test('JSON backup, import and reset preserve transcript and shared authors, then
   await command(page, 'JOIN 1', '発言='); await command(page, '変更後', '<保存する客>'); await command(page, '/LEAVE', '退出');
   await restore(page, saved); expect((await snapshot(page)).settings.find((s) => s.id === 'olt-rooms')).toEqual(olt);
   await command(page, 'JOIN 2', '保存する発言'); await command(page, '/LEAVE', '退出');
-  await command(page, 'RESET', '初期状態に戻しますか'); await command(page, 'Y');
+  await command(page, 'RESET', '初期状態に戻しますか');
+  // Approval reloads the page; its old transcript echo can disappear before polling.
+  await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter');
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
   expect(await state(page)).toBeUndefined(); expect((await snapshot(page)).posts).toHaveLength(66);
 });

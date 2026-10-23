@@ -38,6 +38,9 @@ export interface CommandActions {
   selectDownload?(number: number): ServiceDownload | null;
   downloadFile?(body: string, filename: string): void;
   isTelnet?(): boolean;
+  isEcom?(): boolean;
+  ecomDrafting?(): boolean;
+  invalidateEcom?(): void;
   isOlt?(): boolean;
   isConference?(): boolean;
   netNews?(): { group: string; articles: readonly NetNewsArticle[] } | null;
@@ -88,9 +91,10 @@ export class TerminalCommands {
   applicationOutput(kind: 'ai' | 'offline') {
     return !this.composer?.active && !this.mailAddress && !this.registration && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
   }
-  get recordsHistory() { return !this.composer?.active && !this.mailAddress && !this.registration && !this.confirmation && !this.fileRequest && !this.profile; }
+  get recordsHistory() { return !this.actions.isEcom?.() && !this.composer?.active && !this.mailAddress && !this.registration && !this.confirmation && !this.fileRequest && !this.profile; }
   invalidate() {
     this.revision++;
+    this.actions.invalidateEcom?.();
     this.olt.invalidate();
     const active = this.composer?.active || this.mailAddress || this.registration || this.confirmation || this.fileRequest || this.profile;
     this.composer = undefined; this.mailAddress = false; this.registration = null; this.intent = undefined;
@@ -131,7 +135,7 @@ export class TerminalCommands {
         'AUTO 0〜12: 6時間の自動投稿上限（0で休止）/ RETRY: 未完了を再試行 / RESIDENTS: 住人編集');
     }
     if (menu === 'storage') print('JSON バックアップ・復元・初期化', 'BACKUP: JSON 保存 / IMPORT: ファイル選択・置換確認 / RESET: 初期状態に戻す',
-      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・メール・ローカルNetNews記事・既読・設定・履歴を含みます。モデルと端末キャッシュは含みません。外部に保存してください。');
+      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・メール・ローカルNetNews記事・既読・設定・履歴を含みます。モデル・端末キャッシュ・ECOMの郵便内容と模擬受付票は含みません。外部に保存してください。');
     if (menu === 'offline') { print('オフライン・容量', 'CACHE: 端末を保存 / STATUS: 保存状態・容量 / PERSIST: 永続保存を要求'); await this.offline.storage(); }
     if (menu === 'profiles') print('住人編集', ...residentProfiles(data).map((row, i) => `${i + 1} ${row.handle}`), '番号: 編集する住人');
     if (menu !== 'settings') print('HELP: この案内 / BACK: 一つ戻る / MAIN: MAIN');
@@ -213,6 +217,7 @@ export class TerminalCommands {
   async submit(line: string): Promise<boolean> {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     const print = this.actions.print;
+    if (this.actions.ecomDrafting?.()) return false;
     if (this.composer?.active) { await this.composer.submit(line); return true; }
     if (this.mailAddress) {
       if (['CANCEL', '.CANCEL'].includes(command)) { this.mailAddress = false; print('メールを中止しました。コマンド='); }
@@ -353,7 +358,7 @@ export class TerminalCommands {
     }
     // Global application controls above retain ownership. Every service command
     // in TELNET belongs to its local navigation, including unsupported input.
-    if (!this.menu && this.actions.isTelnet?.()) return false;
+    if (!this.menu && (this.actions.isTelnet?.() || this.actions.isEcom?.())) return false;
     if (!this.menu && this.actions.mailbox?.()) {
       const data = await this.actions.read(), human = activeHuman(data);
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }
