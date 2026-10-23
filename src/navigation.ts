@@ -1,3 +1,4 @@
+import { conferenceState, conferenceHelp, renderConference, renderContribution } from './conference';
 import { additionalSigs, boardCulture } from './communities';
 import { renderOltDirectory } from './olt';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
@@ -91,10 +92,12 @@ export class PcvanController implements TerminalController {
       ? { box: this.currentScreen === 'mailbox' ? this.mailbox : 'INBOX', title: this.collectionTitle } : null;
   }
 
+  get isConference(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'CONFERENCE'; }
+
   get isOlt(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'OLT'; }
 
   get needsContent(): boolean {
-    return this.isOlt || !!this.mailContext || ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
+    return this.isConference || this.isOlt || !!this.mailContext || ['miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
   }
 
   get screen(): Screen {
@@ -137,6 +140,16 @@ export class PcvanController implements TerminalController {
       }
       case 'section':
       case 'daisizen-service': {
+        if (this.isConference) {
+          if (command === 'LIST') return this.render();
+          const read = /^READ ([1-9]\d*)$/.exec(command);
+          if (read) {
+            const state = conferenceState(this.content), row = state.contributions.find((r) => r.number === Number(read[1]));
+            return row ? renderContribution(row, state, this.content.members ?? [])
+              : ['その番号の発言はありません。LIST で一覧を確認してください。', conferenceHelp, demoPrompt];
+          }
+          return this.invalidCommand('LIST / READ 番号 / WRITE / REPLY 番号 / BACK / MAIN / HELP');
+        }
         if (this.readingService) {
           if (command === 'LIST') return this.render();
           const category = Number(command);
@@ -307,7 +320,8 @@ export class PcvanController implements TerminalController {
         returnHelp, demoPrompt,
       ];
       case 'section':
-      case 'daisizen-service': if (this.isOlt) return renderOltDirectory({ settings: this.content.settings ?? [] });
+      case 'daisizen-service': if (this.isConference) return renderConference(this.content);
+        if (this.isOlt) return renderOltDirectory({ settings: this.content.settings ?? [] });
         if (this.readingService) return [this.collectionTitle, ...renderServiceDirectory(this.readingService), returnHelp, demoPrompt];
         return [
         ...(this.collectionKind === 'mail' ? [this.collectionTitle,

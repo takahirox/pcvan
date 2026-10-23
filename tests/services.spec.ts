@@ -7,7 +7,7 @@ import { PcvanController } from '../src/navigation';
 const entries = [
   ['MAIL', '電子メール', '受信箱：0件'],
   ['LIBRARY', 'ライブラリィ', '2 自然の森（歳時記）'],
-  ['CONFERENCE', '電子会議室', '参加者：0人'],
+  ['CONFERENCE', '電子会議室', '発言一覧：0件'],
   ['OLT', 'ＯＬＴ（＊）', '参加者：0人'],
   ['OSL', 'ＯＳＬ', '1 ＳＩＧの道具箱'],
 ] as const;
@@ -38,13 +38,13 @@ for (const [input, label, empty] of entries) {
     const directory = controller.submit('HELP');
     const output = controller.submit(`  ${input.toLowerCase()}  `);
     expect(controller.screen).toBe('daisizen-service');
-    expect(controller.needsContent).toBe(['MAIL', 'OLT'].includes(input));
+    expect(controller.needsContent).toBe(['MAIL', 'OLT', 'CONFERENCE'].includes(input));
     expect(output.join('\n')).toContain(`大自然＆動植物（DAISIZEN） / ${label}`);
     expect(output.join('\n')).toContain(empty);
     expect(output.join('\n')).not.toMatch(/未実装|利用不可/);
     expect(controller.submit('LIST')).toEqual(output);
     for (const command of [...(['LIBRARY', 'OSL'].includes(input) ? ['0', '99', '-1', '1.5', '9007199254740993'] : ['1', '2']), 'Q', 'E', 'H', 'RB1', 'TL1', 'DL1', 'KW', 'READ 1', 'SEND hello', 'UPLOAD file', 'hello', '<b>発言</b>', 'FORUMS', ...entries.map(([helper]) => helper)]) {
-      expect(controller.submit(command).join('\n')).toContain('この画面では使えない');
+      expect(controller.submit(command).join('\n')).toContain(input === 'CONFERENCE' && command === 'READ 1' ? 'その番号の発言はありません' : 'この画面では使えない');
       expect(controller.screen).toBe('daisizen-service');
       expect(controller.submit('HELP')).toEqual(output);
     }

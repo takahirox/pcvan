@@ -1,3 +1,49 @@
+# Issue #65: retained DAISIZEN conference contributions
+
+Validated on 2026-10-23 with Node.js 24.12.0 on macOS.
+
+- `npm ci`: passed, zero reported vulnerabilities; no dependency/lockfile changes.
+- `npm run build`: passed TypeScript checking and the production build.
+- `npm test -- tests/conference.spec.ts tests/conference-repository.spec.ts tests/services.spec.ts`:
+  **20 passed** in 21.2 seconds, with no failures or skips.
+- `npm test`: **242 passed** in 1.1 minutes, with no failures or skips. This
+  includes TypeScript checking, the production build and all existing regression
+  checks against production assets and the repository-module Vite server.
+- After updating the reset explanation to include the three conference examples,
+  `npm test -- tests/factory-reset.spec.ts tests/settings-dialog.spec.ts tests/storage-controls.spec.ts`:
+  **29 passed** in 41.8 seconds, including another type-check and production build.
+- Added local Markdown links and the conference heading anchor resolve. Reviewed
+  the final implementation/content/documentation diff against Issue #65;
+  `git diff --check` and `git diff --cached --check` pass, including new files.
+- Vite's existing large-chunk warning and Node's existing `NO_COLOR`/`FORCE_COLOR`
+  warning remain informational. No model download or real inference was used.
+
+New controller/repository/production-browser coverage exercises anonymous reading,
+three original Japanese starter contributions with two existing resident authors
+and reply relationships, writing with optional registration, reply/edit/review,
+cancellation at every composer stage, retained drafts on BACK/MAIN, IME guards,
+exact Japanese whitespace/literal markup, invalid commands/numbers, list/read,
+Settings return context at 320px, leave/reentry/reload and JSON round-trip.
+Older missing and intentionally empty conferences stay empty, can accept their
+first human contribution, and remain empty again after restoring the earlier
+backup. Browsing and cancellation preserve community collections.
+
+Repository checks cover concurrent numbering, idempotent sends, invalid authors,
+missing/forum/forward reply references, identity changes/deletes, quota rollback
+and retry, strict import validation and atomic restore failure, stable stored
+timestamps, reset/reseed and stale import/reset fences. Existing seeded, legacy,
+imported and explicitly forum-populated worlds receive no conference examples.
+AI planning is identical with and without conference storage; forum/mail records
+and resident scheduling settings remain independent.
+
+Documentation, About and evidence metadata distinguish high-confidence general
+retained-message semantics from unresolved DAISIZEN-specific configuration. The
+three starter contributions and all conference controls/topic organization are
+original reconstruction, with source inspection dates and limitations recorded.
+No historical prose, poem, real identity or image was copied. No human/hardware
+or real-model check is required; none was performed. No post-merge verification
+is required.
+
 # Issue #59: distinct DAISIZEN library and OSL journeys
 
 Validated on 2026-10-23 with Node.js 24.12.0 on macOS.

@@ -26,7 +26,8 @@ draft remain in memory; OLT room history is persisted.
 
 On the first visit, a new local world already has 66 original Japanese posts by
 ten fictional regulars: eighteen conversations across nature, mysteries, PCs,
-games and everyday life. Read them immediately, before creating a human member or
+games and everyday life, plus three retained electronic-conference contributions.
+Read them immediately, before creating a human member or
 allowing a model download. They are bundled fiction, never historical archives
 or claims of live network activity.
 
@@ -197,7 +198,20 @@ the preview body's UTF-8 bytes (LF, no BOM), not historical transmission bytes.
 No files execute or transfer, and browsing does not change community records or
 require a handle. See [collection provenance](docs/research/pcvan-1996-1997.md#library-and-osl-browsing-issue-59).
 
-`OLT` opens a local chat room directory; `CONFERENCE` retains its empty room view. `FORUMS` retains
+`CONFERENCE` opens a retained electronic conference, separate from forums and OLT.
+Use `LIST` / `HELP` for contributions, `READ number` for a body, `WRITE` for a new
+contribution or `REPLY number` for a reply. Writing uses the selected local human
+handle (registration is optional until writing). Enter a title and multiline body,
+then `.END` → `EDIT` / `Y` / `N`; `.CANCEL` discards explicitly. `BACK` returns
+to DAISIZEN and `MAIN` clears navigation. Drafts retain ownership until submitted
+or cancelled. Reads need no handle, AI consent or model. Submissions remain in
+this browser after return/reload and in JSON backups. New starter worlds include
+three original Japanese contributions by 草笛 and こまどり; existing/imported or
+intentionally empty conferences stay empty and accept their first human contribution.
+No attendance or AI generation is attached to the conference. Topic organization,
+commands and content are reconstruction; see [conference evidence](docs/research/pcvan-1996-1997.md#retained-electronic-conference-issue-65).
+
+`OLT` opens a local chat room directory. `FORUMS` retains
 boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
 posting, reply and unread behavior. A saved empty board stays empty.
 
@@ -249,7 +263,7 @@ and human sending need no model, GPU or network. Letters stay in IndexedDB and
 JSON backups. Private within this fictional world does not mean encryption or
 isolation from anyone using the same browser profile/device.
 
-Other information collections and `CONFERENCE` remain empty. `HELP`, `BACK` and `MAIN`
+Other information collections remain empty. `HELP`, `BACK` and `MAIN`
 work throughout; `BACK` from a mailbox returns to its own entry directory. The
 index uses MAIN selectors except `2` and `Q`. `Q` remains scoped to MAIN, without
 single-letter `B`/`M` aliases. Commands, mailbox sharing and layouts are reconstructed
@@ -338,7 +352,8 @@ dialog. Other tabs reload after replacement; stale connections cannot write into
 the replacement world. `BACKUP` / `IMPORT` remain optional typed shortcuts.
 
 A truly pristine profile receives ten resident identities, ten populated boards
-and 66 prewritten posts in eighteen threads in one transaction. The original
+and 66 prewritten forum posts in eighteen threads, plus three electronic-conference
+contributions, in one transaction. The original
 [30 posts/eight threads](data/pcvan/fictional-community.json) remain intact;
 [36 additional authored posts](data/pcvan/expanded-community.json) add PC help,
 games, books, bird observations, a small observation event and everyday
@@ -379,7 +394,8 @@ it irreversibly deletes local posts, mail, members, read
 markers, resident edits, AI activity/consent, display preferences and history.
 中止 or closing preserves them. `RESET` remains a typed shortcut with its own
 explicit `Y` confirmation.
-The app recreates the expanded baseline: ten residents and 66 posts in eighteen threads,
+The app recreates the expanded baseline: ten residents, 66 forum posts in eighteen threads
+and three electronic-conference contributions,
 then reloads this and other open tabs into a fresh MAIN session. Check the restored
 posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.
 Reset needs no model, WebGPU or download. It preserves downloaded model weights,

@@ -1,3 +1,5 @@
+import { conferenceState } from './conference';
+import type { Contribution } from './storage/schema';
 import { TerminalOlt } from './olt';
 import type { Backup, Mail, Post, TerminalPreferences } from './storage/schema';
 import { resolveMailResident, validateBackup } from './storage/schema';
@@ -21,7 +23,7 @@ import { modelDisclosure } from './ai/setup';
 import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
-type Intent = { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
+type Intent = { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
@@ -31,6 +33,7 @@ export interface CommandActions {
   navigate(line: string): void;
   destination(): ForumDestination | null;
   isOlt?(): boolean;
+  isConference?(): boolean;
   mailbox?(): { box: Mailbox; title: string } | null;
   save(target: ForumDestination, draft: ComposeDraft): Promise<Post>;
   restore(text: string, expectedContext: string): Promise<void>;
@@ -124,7 +127,17 @@ export class TerminalCommands {
   private startCompose(intent: Intent, data: Backup) {
     const authorId = activeHuman(data);
     if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'mail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
-    if ('mail' in intent) {
+    if ('conference' in intent) {
+      const id = createRecordId();
+      this.composer = new TerminalComposer({ keyword: 'DAISIZEN', name: '電子会議室' }, authorId, intent.parent, {
+        print: this.actions.print,
+        save: async (_target, draft) => {
+          const row = await (await this.actions.repository()).createConferenceContribution({ id, ...draft });
+          try { await this.actions.read(); } catch { /* Committed: a later LIST refreshes. */ }
+          return row;
+        },
+      });
+    } else if ('mail' in intent) {
       if (!intent.recipient) {
         this.mailAddress = true; this.printAddresses(data); this.actions.print('宛先='); return;
       }
@@ -274,7 +287,7 @@ export class TerminalCommands {
     if (command === 'RESET') {
       this.confirm({ kind: 'reset', expected: context(await this.actions.read()) },
         '投稿・メール・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
-        '最初の10人・66件の投稿を準備し、他のタブも再読み込みします。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
+        '最初の10人・66件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
     }
     if (!this.menu && this.actions.mailbox?.()) {
       const data = await this.actions.read(), human = activeHuman(data);
@@ -298,6 +311,14 @@ export class TerminalCommands {
     }
     if (!this.menu) {
       if (command === 'WRITE' || /^REPLY \d+$/.test(command)) {
+        if (this.actions.isConference?.()) {
+          const data = await this.actions.read(), state = conferenceState(data);
+          const number = command === 'WRITE' ? undefined : Number(command.split(' ')[1]);
+          const parent = state.contributions.find((row) => row.number === number);
+          if (number !== undefined && !parent) print('返信先の発言がありません。LIST で一覧を確認してください。');
+          else this.startCompose({ conference: true, ...(parent ? { parent } : {}) }, data);
+          return true;
+        }
         const target = this.actions.destination();
         if (!target) { print('投稿先の掲示板で WRITE / REPLY 番号 を入力してください。'); return true; }
         const data = await this.actions.read(), posts = forumPosts(data, target.keyword, target.boardNo);

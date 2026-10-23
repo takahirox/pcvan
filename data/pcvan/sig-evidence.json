@@ -47,7 +47,17 @@
         "status": "provisional",
         "source_url": "https://www.chayagate.com/daisizen/index.htm",
         "demo_entry": { "input": "CONFERENCE", "evidence_category": "D", "status": "reconstructed" },
-        "unavailable_reason": "会議室の選択・発言・閲覧・退出のコマンドと手順は未確認です。"
+        "unavailable_reason": "保存型の読み書きは一般サービス史料で裏付けられますが、DAISIZEN固有の構成・操作・参加規則・管理方法は未確認です。",
+        "retained_messages": {
+          "inspected_at": "2026-10-23",
+          "confidence": "high for general retained reading/contribution; DAISIZEN controls unresolved",
+          "sources": [
+            { "url": "https://iwparchives.jp/wp-content/themes/twentytwelve/bn/pdf/im199410-104-bbs.pdf", "evidence_category": "A", "era": "1994-10, printed page 104; general service model" },
+            { "url": "https://someya.sakura.ne.jp/poem/tansi/tansimain.html", "evidence_category": "A", "era": "1996-08-07 notice in an author-preserved archive; another SIG" },
+            { "url": "https://www.vector.co.jp/soft/win95/net/se024554.html", "evidence_category": "B", "era": "Client-author description; release date unresolved" }
+          ],
+          "reconstruction": "One local conference, topic organization, commands, prompts and three original Japanese contributions are category D. No archived prose, poems or real identities are copied."
+        }
       },
       {
         "label": "ＯＬＴ（＊）",
