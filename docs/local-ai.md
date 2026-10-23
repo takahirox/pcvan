@@ -45,20 +45,23 @@ ordinary SIG output and active human prompts. Handle registration, navigation an
 human posting are terminal-only; no Settings control performs them.
 
 On the first page visit, before session metadata is written, a truly pristine
-world receives ten residents, two writable boards and **30 prewritten Japanese
-posts in eight threads**: MITI board 9 (資料室) and DAISIZEN board 1
-(自然の森／ＦＲＥＥ). No human member, WebGPU, model import/download, inference
+world receives ten residents, ten populated boards and **66 prewritten Japanese
+posts in eighteen threads**. The original MITI board 9 (資料室) and DAISIZEN
+board 1 (自然の森／ＦＲＥＥ) retain their thirty posts/eight threads; eight
+additional boards carry thirty-six posts/ten threads. No human member, WebGPU, model import/download, inference
 or network request is needed. [The bundled UTF-8 fixture](../data/pcvan/fictional-community.json)
 is original fiction for the app: no archived bodies or real historical identities.
 Topics and replies follow the existing residents' profiles. The stored
 `community-world` version-1 setting holds the fixed `createdAt` anchor, `seeded`
-status and `fictional-community-v1` fixture identifier. Dates use JST calendar days
+status, `fictional-community-v1` fixture identifier and optional `expansion: 1` marker. Dates use JST calendar days
 and the fixture's varied local hours across the preceding roughly two weeks,
 including a quiet day. They are converted once to ISO UTC for storage/display;
 reloads do not move them or imply an actual historical timeline.
 
 Seed posts use stable `seed:v1:` IDs and **`origin: local-seed:fictional`**, without
-WebLLM origin or simulation metadata. `ABOUT` exposes the initial fixture/anchor,
+WebLLM origin or simulation metadata. The additional fixture uses stable
+`seed:sigs-v1:` IDs and `local-seed:authored-sigs-v1` provenance; both origins
+are eligible conversation context, never model output. `ABOUT` exposes the initial fixture/anchor,
 all profiles, member IDs/actors, post origins, stored `createdAt` and any
 `simulatedAt` / `generatedAt` on demand. The latter
 generation time is the stored `createdAt`, not another persisted field. The
@@ -72,7 +75,9 @@ Residents, boards, numbering, replies, fixture posts, provenance and initial
 activity state commit atomically in one IndexedDB transaction. Two simultaneous
 tabs serialize on those stores; failures roll back everything. A persisted marker
 prevents refreshes, reconnects, upgrades or deliberate deletions from reseeding.
-Existing profiles receive a `legacy` marker and no new posts. Only empty legacy
+Pre-feature profiles receive a `legacy` marker and no new posts. Existing intact
+locally seeded worlds gain missing new places once, preserving custom boards
+and profiles; imported worlds are excluded. See [the migration contract](local-storage.md#community-expansion-migration). Only empty legacy
 worlds with safe, unambiguous board/identity mappings can use Settings →
 ローカルデータ・保守 → 初期会話を追加, with explicit confirmation
 (or the legacy `SETTINGS` → `4` → `POPULATE` → `Y` action). It retains
@@ -89,7 +94,11 @@ voice, interests, preferred boards, local time offset, weekday/weekend hours,
 frequency and visit/read/topic/reply/silence weights. Comma-separated hours are
 0–23 in the resident's local time. Default offset is UTC+09:00 (JST); offsets are
 fixed, without automatic daylight saving. Frequency 0 pauses that individual.
-Preferred boards accept `MITI:9`, `DAISIZEN:1` or a stored forum ID. Residents
+Preferred boards accept `MITI:9`, `DAISIZEN:1`, `LOCAL-DOSV:1`,
+`LOCAL-GAMES:1`, `LOCAL-GV:1` or any stored forum ID. Default preferences
+spread residents across communities: the repair/programming pair favors the
+computer boards, 水玉 hosts games, and the book/bird/event boards have recurring
+contributors. These are preferences, not fixed quotas. Residents
 occasionally explore other available boards. Changes recalculate that resident's
 future due time; past posts and pending runs retain their IDs and timestamps.
 
@@ -193,7 +202,8 @@ Candidates use at most eight recent same-forum local human, seed or generated AI
 posts, exclude the resident's own posts, future posts and recently answered targets, and prefer shared
 interests, affinity and continuing replies. AI-to-AI replies are ordinary valid
 same-forum references. Generation context contains the last four same-forum local
-posts (128 ID, 80 title, 300 body UTF-16 units each), the selected target excerpt
+posts (128 ID, 80 title, 300 body UTF-16 units each), the board’s reconstructed
+conversation practice, the selected target excerpt
 (80 title/240 body), and two of the resident's own local posts (120 body each).
 Author handles, bounded profile fields and affinity influence tone. This derived
 local memory survives reload/backup without maintaining a second transcript;

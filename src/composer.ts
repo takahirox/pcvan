@@ -1,3 +1,4 @@
+import { additionalSigs } from './communities';
 import type { Post } from './storage/schema';
 import type { ForumDestination } from './storage/repository';
 
@@ -16,7 +17,7 @@ export class TerminalComposer<T extends { keyword: string; name: string } = Foru
   constructor(private target: T, private authorId: string,
     private parent: Pick<Post, 'id' | 'number'> | undefined, private actions: ComposerActions<T>, private kind: 'post' | 'mail' = 'post', initialTitle = '') {
     if (initialTitle) { this.title = initialTitle; this.stage = 'body'; }
-    actions.print(parent ? `返信先：#${parent.number}` : (kind === 'mail' ? '新規メール' : '新規発言'), `${target.keyword} / ${target.name}`, initialTitle ? `件名：${initialTitle}` : `${this.titleLabel}=`);
+    actions.print(parent ? `返信先：#${parent.number}` : (kind === 'mail' ? '新規メール' : '新規発言'), `${additionalSigs.find((sig) => sig.keyword === target.keyword)?.name ?? target.keyword} / ${target.name}`, initialTitle ? `件名：${initialTitle}` : `${this.titleLabel}=`);
     if (initialTitle) this.help();
   }
   private get titleLabel() { return this.kind === 'mail' ? '件名' : 'タイトル'; }

@@ -1,3 +1,4 @@
+import { additionalSigs, boardCulture } from './communities';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import type { TerminalController } from './controller';
@@ -13,7 +14,7 @@ const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
-  'index' | 'section' | 'mailbox';
+  'index' | 'section' | 'mailbox' | 'community';
 
 // Layout is reconstructed. The fixture's CJK labels occupy two terminal cells
 // per character; ASCII occupies one. Padding never changes the label itself.
@@ -55,6 +56,8 @@ export class PcvanController implements TerminalController {
   private currentScreen: Screen = 'main';
   private content = emptyContent();
   private boardNo = 9;
+  private community = additionalSigs[0]!;
+  private forumKeyword = 'DAISIZEN';
   private memberId: string | undefined;
   private service = services[0]!;
   private section = mainMenu.entries[0]!;
@@ -66,7 +69,7 @@ export class PcvanController implements TerminalController {
   setMemberId(id: string | undefined): void { this.memberId = id; }
 
   get forum(): ForumDestination | null {
-    const keyword = this.currentScreen === 'miti-materials' ? 'MITI' : this.currentScreen === 'forum' ? 'DAISIZEN' : null;
+    const keyword = this.currentScreen === 'miti-materials' ? 'MITI' : this.currentScreen === 'forum' ? this.forumKeyword : null;
     if (!keyword) return null;
     const boardNo = keyword === 'MITI' ? 9 : this.boardNo;
     return { keyword, boardNo, name: forumName(keyword, boardNo) };
@@ -121,13 +124,15 @@ export class PcvanController implements TerminalController {
       }
       case 'section':
       case 'daisizen-service': {
+        if (command === 'SIGS' && this.currentScreen === 'section' && ['8', '11'].includes(this.section.selector)) return this.enter('communication');
         if (this.collectionKind === 'mail' && Object.hasOwn(mailboxes, command)) {
           this.mailbox = command as Mailbox;
           return this.enter('mailbox');
         }
         if (command === 'LIST') return this.render();
         return this.invalidCommand(this.collectionKind === 'mail'
-          ? 'INBOX / SENT / LIST / BACK / MAIN / HELP' : 'LIST / BACK / MAIN / HELP');
+          ? 'INBOX / SENT / LIST / BACK / MAIN / HELP' : this.currentScreen === 'section' && ['8', '11'].includes(this.section.selector)
+            ? 'SIGS / LIST / BACK / MAIN / HELP' : 'LIST / BACK / MAIN / HELP');
       }
       case 'mailbox':
         if (Object.hasOwn(mailboxes, command)) { this.mailbox = command as Mailbox; return this.render(); }
@@ -137,7 +142,11 @@ export class PcvanController implements TerminalController {
         // Bridge selectors are documented in Settings, not historical data.
         if (command === '1') return this.enter('miti');
         if (command === '2') return this.enter('daisizen');
-        return this.invalidCommand('1 / 2 / BACK / MAIN / HELP');
+        {
+          const sig = additionalSigs.find((s) => s.selector === command);
+          if (sig) { this.community = sig; return this.enter('community'); }
+        }
+        return this.invalidCommand('1–5 / BACK / MAIN / HELP');
       case 'miti':
         if (command === miti.steps[1]!.input) return this.enter('miti-forums');
         return this.invalidCommand(`${miti.steps[1]!.input} / BACK / MAIN / HELP`);
@@ -154,18 +163,23 @@ export class PcvanController implements TerminalController {
       }
       case 'daisizen-forums': {
         const forum = daisizen.forums.find((item) => String(item.number) === command);
-        if (forum) { this.boardNo = forum.number; return this.enter('forum'); }
+        if (forum) { this.boardNo = forum.number; this.forumKeyword = 'DAISIZEN'; return this.enter('forum'); }
         return this.invalidCommand('1–7 / BACK / MAIN / HELP');
       }
+      case 'community': {
+        const board = this.community.boards.find((b) => String(b.number) === command);
+        if (board) { this.boardNo = board.number; this.forumKeyword = this.community.keyword; return this.enter('forum'); }
+        return this.invalidCommand('表示された番号 / BACK / MAIN / HELP');
+      }
       case 'forum':
-        return this.handleForum(command, 'DAISIZEN', this.boardNo);
+        return this.handleForum(command, this.forumKeyword, this.boardNo);
       case 'disconnected':
         if (command === 'RECONNECT') return this.enter('main');
         return ['接続は終了しています。RECONNECT で再接続してください。'];
     }
   }
 
-  private handleForum(command: string, keyword: 'MITI' | 'DAISIZEN', boardNo: number): readonly string[] {
+  private handleForum(command: string, keyword: string, boardNo: number): readonly string[] {
     if (command === 'LIST') return this.render();
     const read = /^READ ([1-9]\d*)$/.exec(command);
     if (read && Number.isSafeInteger(Number(read[1]))) {
@@ -184,10 +198,11 @@ export class PcvanController implements TerminalController {
 
   private readonly forumHelp = 'LIST: 投稿一覧 / READ 番号: 本文 / WRITE: 新規投稿 / REPLY 番号: 返信 / BACK: フォーラム一覧';
 
-  private renderForum(keyword: 'MITI' | 'DAISIZEN', boardNo: number): string[] {
+  private renderForum(keyword: string, boardNo: number): string[] {
     const data = forumPosts(this.content, keyword, boardNo);
     return [
-      `${keyword} / ${forumName(keyword, boardNo)} / 投稿一覧（番号順）`,
+      `${additionalSigs.find((s) => s.keyword === keyword)?.name ?? keyword} / ${forumName(keyword, boardNo)} / 投稿一覧（番号順）`,
+      ...(boardCulture(keyword, boardNo) ? [boardCulture(keyword, boardNo)!] : []),
       ...(!data.available ? ['対応するローカルフォーラムが見つからないか、重複しています。']
         : data.posts.length ? data.posts.map((post) => {
           const parent = replyReference(post, data.posts);
@@ -248,6 +263,7 @@ export class PcvanController implements TerminalController {
           `受信箱：${mailboxRows(this.content.mail ?? [], this.memberId, 'INBOX').length}件 / 送信済み：${mailboxRows(this.content.mail ?? [], this.memberId, 'SENT').length}件`,
           ...((this.content.mail ?? []).length ? [] : ['現在、メールはありません。']), mailHelp]
           : renderCollection(this.collectionTitle, this.collectionKind)),
+        ...(this.currentScreen === 'section' && ['8', '11'].includes(this.section.selector) ? ['SIGS: SIG 一覧'] : []),
         'LIST: 一覧を再表示', returnHelp, demoPrompt,
       ];
       case 'mailbox': return [
@@ -259,6 +275,7 @@ export class PcvanController implements TerminalController {
         'コミュニケーション',
         `1 ${miti.name}（MITI）へ`,
         `2 ${daisizen.name}へ`,
+        ...additionalSigs.map((s) => `${s.selector} ${s.name}へ`),
         returnHelp,
         demoPrompt,
       ];
@@ -275,7 +292,9 @@ export class PcvanController implements TerminalController {
         'BACK: SIG に戻る',
         returnHelp, demoPrompt,
       ];
-      case 'forum': return [...this.renderForum('DAISIZEN', this.boardNo), returnHelp, demoPrompt];
+      case 'community': return [this.community.name,
+        ...this.community.boards.map((b) => `${b.number} ${b.label}`), returnHelp, demoPrompt];
+      case 'forum': return [...this.renderForum(this.forumKeyword, this.boardNo), returnHelp, demoPrompt];
       default: {
         const step = this.currentScreen === 'miti' ? 0 : this.currentScreen === 'miti-forums' ? 1 : 2;
         const evidence = miti.steps[step]!;

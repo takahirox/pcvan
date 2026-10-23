@@ -979,3 +979,45 @@ not claimed. These are
 optional validation; mocked output verifies routing, scheduling and persistence.
 No push, PR, merge, comment or deployment was performed. No post-merge verification
 is required.
+
+## Issue #51 — expanded SIG communities
+
+Implemented against the selected worktree at `cba62b449ab130f030e74061e01d7d5ba55e083a`
+(application upstream includes local mail, PR #54). Read the open GitHub Issue
+and rechecked primary/operator sources; the research notes distinguish historical
+names from reconstructed target-era layouts and the original game community.
+
+The new baseline has five communities, ten populated boards, eighteen threads
+and 66 authored posts. The original thirty posts/eight threads remain unchanged.
+New tests cover shared identities, differentiated content, every additional SIG
+board’s navigation/read/empty states, terminal human writes/replies and read
+markers, reload, actual scheduled mocked-worker replies across two SIGs, bounded
+board-specific context, and suppression of internal storage keys in composition.
+Repository checks cover expansion rollback under injected quota failure,
+concurrent connections, custom-board/counter/profile/read preservation, repeated
+opens, pre-expansion JSON restore exclusion, deleted-original opt-out, and strict
+expansion provenance validation. Existing reset, backup/restore, IME, focus,
+consent, budgets, cross-tab locking, mail and MAIN mapping checks also pass.
+
+Validation on 2026-10-23:
+
+- `npm ci`: succeeded, 24 packages audited, zero reported vulnerabilities.
+- `npm run build`: passed TypeScript and production bundling. The existing large
+  WebLLM chunk warning remains; weights are not bundled or downloaded.
+- Final `npm test -- --config .tmp-playwright.config.ts --workers=4`:
+  **192 passed in 55.5 seconds**, no retries. Another independent worktree was
+  using ports 14373/14374, so temporary copies of the unchanged tests/config
+  substituted only ports 15373/15374. Both development-module tests and production
+  browser tests ran against this worktree’s servers/assets. Temporary files were
+  removed afterward; the normal repository configuration is unchanged.
+- The first full regression run had 187 passes/two failures due to older test
+  assumptions: an injected write fault could hit startup in another database,
+  and the recovery fixture assumed a resident’s default preferred board stayed
+  singular. Scoped the fault to its database and explicitly pinned that recovery
+  fixture’s preferences. A focused new-content test also corrected an assertion
+  that searched a body for a term present only in its title. Final runs passed.
+- Local Markdown link/heading checks and `git diff --check`: passed.
+
+No real model/GPU, deployment, push, PR, merge or external comment was used.
+Subjective human walkthrough and further target-era archival research remain
+optional; no post-merge verification is required by this Issue.

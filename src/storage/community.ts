@@ -1,3 +1,4 @@
+import expansion from '../../data/pcvan/expanded-community.json' with { type: 'json' };
 import fixture from '../../data/pcvan/fictional-community.json' with { type: 'json' };
 import { personaMemberId, residentProfiles } from '../ai/personas';
 import type { Backup, Post } from './schema';
@@ -11,7 +12,7 @@ export const communityBoards = [
 
 /** Seeds are eligible conversation, but never claims of model inference. */
 export function localConversation(post: Post): boolean {
-  return post.origin === 'local-human' || post.origin === SEED_ORIGIN || post.origin.startsWith('local-ai:webllm:');
+  return post.origin === 'local-human' || post.origin === SEED_ORIGIN || post.origin === expansion.origin || post.origin.startsWith('local-ai:webllm:');
 }
 
 /** Conservatively accept only unambiguous empty legacy worlds; never rewrite directories. */
@@ -46,4 +47,26 @@ export function communityPosts(anchor: string, forums: Record<string, { id: stri
     authorId: personaMemberId(p.author), title: p.title, body: p.body, createdAt: p.createdAt,
     origin: SEED_ORIGIN, ...(p.replyTo ? { replyToPostId: `seed:v1:${p.replyTo}` } : {}),
   }));
+}
+
+/** Only our intact, locally seeded v1 baseline authorizes an automatic extension.
+ * Existing member edits are fine; conflicting actor IDs and missing originals are not. */
+export function canExpandCommunity(content: Backup): boolean {
+  const world = content.settings.find((s) => s.id === WORLD_SETTING)?.value;
+  if (!world || typeof world !== 'object' || Array.isArray(world) || world.status !== 'seeded' ||
+      world.fixture !== SEED_FIXTURE || world.expansion !== undefined) return false;
+  return fixture.posts.every((p) => content.posts.some((old) => old.id === `seed:v1:${p.id}` && old.origin === SEED_ORIGIN)) &&
+    fixture.posts.every((p) => content.members.some((m) => m.id === personaMemberId(p.author) && m.actor === 'ai'));
+}
+
+export function expandedPosts(anchor: string, board: string, forumId: string): Post[] {
+  const day = 86_400_000;
+  const midnight = Math.floor((Date.parse(anchor) + 9 * 3_600_000) / day) * day - 9 * 3_600_000;
+  return expansion.posts.filter((p) => p.board === board).sort((a, b) =>
+    b.daysAgo - a.daysAgo || a.hour - b.hour || a.minute - b.minute).map((p, i) => ({
+      id: `seed:sigs-v1:${p.id}`, forumId, number: i + 1, authorId: personaMemberId(p.author),
+      title: p.title, body: p.body,
+      createdAt: new Date(midnight - p.daysAgo * day + (p.hour * 60 + p.minute) * 60_000).toISOString(),
+      origin: expansion.origin, ...(p.replyTo ? { replyToPostId: `seed:sigs-v1:${p.replyTo}` } : {}),
+    }));
 }

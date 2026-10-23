@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "provenance": "Original authored fiction, not archival transcripts or model output. New SIG selectors and boards are reconstructed; source metadata is displayed only in Settings → Details/About.",
+  "sigs": [
+    {
+      "keyword": "LOCAL-DOSV",
+      "name": "DOS/Vワールド",
+      "selector": "3",
+      "evidence": "Historical name attested by the former operator’s memorial publication (2000); 1996–1997 menu, board names and all local selectors reconstructed. LOCAL-DOSV is an application key, not an attested jump code.",
+      "source_url": "https://elm-chan.org/bbt/dosvdanyo/",
+      "boards": [
+        {
+          "number": 1,
+          "label": "パソコン相談室",
+          "culture": "機種・OS・試した条件を添えて相談。解決したら結果を報告。半田ごてが世話役。",
+          "status": "reconstructed"
+        },
+        {
+          "number": 2,
+          "label": "工作机",
+          "culture": "小さな工作とプログラムの試行記録。失敗も残す。タブストップが週末の進捗をまとめる。",
+          "status": "reconstructed"
+        }
+      ],
+      "status": "reconstructed",
+      "name_status": "provisional"
+    },
+    {
+      "keyword": "LOCAL-GAMES",
+      "name": "ゲーム談話室",
+      "selector": "4",
+      "evidence": "Entirely reconstructed local community, not a historical PC-VAN SIG identity or code. The 1986 primary article lists WIZARDRY CLUB, supporting an earlier gaming SIG tradition but not any 1996–1997 identity or menu. That older SIG is not recreated here.",
+      "source_url": "https://www.jstage.jst.go.jp/article/officeautomation/7/4/7_KJ00001992495/_pdf/-char/ja",
+      "boards": [
+        {
+          "number": 1,
+          "label": "攻略と感想",
+          "culture": "作品名・機種を添える。先の展開はタイトルに予告。答えより小さなヒントを。水玉が案内係。",
+          "status": "reconstructed"
+        },
+        {
+          "number": 2,
+          "label": "週末スコア帳",
+          "culture": "上手下手を競わず自分の記録と工夫を書く。週末ごとに一つの遊びを持ち寄る。",
+          "status": "reconstructed"
+        }
+      ],
+      "status": "reconstructed",
+      "name_status": "reconstructed"
+    },
+    {
+      "keyword": "LOCAL-GV",
+      "name": "グローバル・ビレッジ",
+      "selector": "5",
+      "evidence": "Historical SIG and ビレッジ・ボード label appear in the period Japan Society for Information and Management article; that older menu does not establish 1996–1997 placement. Local selection and all etiquette/inhabitants reconstructed. LOCAL-GV is not an attested jump code.",
+      "source_url": "https://www.jstage.jst.go.jp/article/officeautomation/7/4/7_KJ00001992495/_pdf/-char/ja",
+      "boards": [
+        {
+          "number": 1,
+          "label": "ビレッジ・ボード",
+          "culture": "初めての人も短い近況から。読むだけの日も歓迎。そろばんが月ごとの寄り合いを呼びかける。",
+          "status": "reconstructed"
+        }
+      ],
+      "status": "reconstructed",
+      "name_status": "provisional"
+    }
+  ],
+  "daisizenBoards": [
+    {
+      "keyword": "DAISIZEN",
+      "number": 3,
+      "label": "ダーウィン図書館",
+      "culture": "しおりが整理係。書名と自分の観察を分けて書く。断定を急がない。",
+      "status": "provisional",
+      "culture_status": "reconstructed"
+    },
+    {
+      "keyword": "DAISIZEN",
+      "number": 5,
+      "label": "バードウォッチング",
+      "culture": "こまどりが案内係。日時・天気・姿や声を記す。営巣場所の細部は伏せる。",
+      "status": "provisional",
+      "culture_status": "reconstructed"
+    },
+    {
+      "keyword": "DAISIZEN",
+      "number": 7,
+      "label": "伝言板／企画室",
+      "culture": "観察会の相談と終了報告。草笛が取りまとめる。欠席や返信を急かさない。",
+      "status": "provisional",
+      "culture_status": "reconstructed"
+    }
+  ]
+}

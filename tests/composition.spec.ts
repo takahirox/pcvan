@@ -5,7 +5,7 @@ test('first run → handle → seeded read → reply/edit/save → list/read →
   await start(page, 'たか'); await noOtherUi(page);
   await enterForum(page); await command(page, 'READ 1', '★内容');
   const before = await snapshot(page);
-  expect(before.posts).toHaveLength(30);
+  expect(before.posts).toHaveLength(66);
   expect(before.readStates[0]!.lastReadNumber).toBe(1);
   await command(page, 'REPLY 1', '返信先：#1');
   await command(page, '昔のパソコン通信', '本文');
@@ -23,7 +23,7 @@ test('first run → handle → seeded read → reply/edit/save → list/read →
   await command(page, 'LIST', '#17 返信を編集');
   await command(page, 'READ 17', '返信先：#1');
   const saved = await snapshot(page), reply = saved.posts.find((p) => p.number === 17)!;
-  expect(saved.posts).toHaveLength(31);
+  expect(saved.posts).toHaveLength(67);
   expect(reply).toMatchObject({ title: '返信を編集', body: '  日本語　ｶﾅ <b>文字</b>  \n\n 変更した本文  ', origin: 'local-human', replyToPostId: before.posts.find((p) => p.number === 1 && p.forumId === reply.forumId)!.id });
   await expect(page.locator('.output b')).toHaveCount(0);
   await page.reload(); await expect(page.locator('.output')).toContainText('番号またはコマンド=');
@@ -65,7 +65,7 @@ test('skipped handle resumes pending WRITE; blank, long, command-shaped body and
     if (stage === 'edit') await command(page, 'EDIT', 'LINE 番号');
     await command(page, '.CANCEL', '投稿を中止');
   }
-  expect((await snapshot(page)).posts).toHaveLength(31);
+  expect((await snapshot(page)).posts).toHaveLength(67);
 });
 
 test('human handle selection retains independent read states and never selects residents', async ({ page }) => {
@@ -90,7 +90,7 @@ test('IME confirmation cannot submit title/body/review; storage failure retains 
   const input = page.locator('#command');
   await input.fill('変換中'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
   await expect(input).toHaveValue('変換中');
-  expect((await snapshot(page)).posts).toHaveLength(30);
+  expect((await snapshot(page)).posts).toHaveLength(66);
   await input.dispatchEvent('compositionend'); await input.press('Enter');
   await expect(page.locator('.output')).toContainText('本文を1行ずつ');
   await command(page, '日本語', '本文='); await command(page, '.END', '投稿しますか');
@@ -105,10 +105,10 @@ test('IME confirmation cannot submit title/body/review; storage failure retains 
     Object.assign(window, { restorePut: () => { IDBObjectStore.prototype.put = native; } });
   });
   await command(page, 'Y', '入力は残っています');
-  expect((await snapshot(page)).posts).toHaveLength(30);
+  expect((await snapshot(page)).posts).toHaveLength(66);
   await page.evaluate(() => (window as unknown as { restorePut(): void }).restorePut());
   await command(page, 'Y', '発言 #17'); await command(page, 'LIST', '#17 変換中');
-  expect((await snapshot(page)).posts).toHaveLength(31);
+  expect((await snapshot(page)).posts).toHaveLength(67);
 });
 
 test('deleted reply parent fails safely and a failed read marker never reveals stale post content', async ({ page }) => {
@@ -158,7 +158,7 @@ test('rapid queued lines preserve prompt order, exact text and a single transact
   });
   await expect(page.locator('.output')).toContainText('#17 連続入力の題');
   const data = await backup(page);
-  expect(data.posts).toHaveLength(31);
+  expect(data.posts).toHaveLength(67);
   expect(data.posts.find((p) => p.number === 17)!.body).toBe('  最初  \n\n最後');
   expect(data.session!.commandHistory).toContain('WRITE');
   expect(data.session!.commandHistory).not.toContain('  最初  ');
