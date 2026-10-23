@@ -86,7 +86,9 @@ for (const width of [320, 1280]) {
       expect(await command(page, line, mainMenu.prompt.text)).toBe(`\n> ${line}\n${initial}`);
     }
     await command(page, 'Q', 'RECONNECT');
-    expect(await command(page, 'RECONNECT', mainMenu.prompt.text)).toBe(`\n> RECONNECT\nPC-VAN 接続中…\n${initial}`);
+    const reconnected = await command(page, 'RECONNECT', mainMenu.prompt.text);
+    expect(reconnected).toMatch(/^\n> RECONNECT\nPC-VAN 接続中…\nPC-VAN \/ パーソナル通信サービス\n/);
+    expect(reconnected.endsWith(`\n${initial}`)).toBe(true);
     await expect(input).toBeFocused();
     await expect(input).toHaveValue('');
   });

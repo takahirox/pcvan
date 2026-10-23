@@ -38,8 +38,29 @@ Settings dialog for display, AI, local data, offline storage and technical help.
 It is outside the simulated service; handle registration, navigation, reading and
 posting, mail and OLT remain terminal-only. Type a line and press Enter. Use
 `HELP` (or `/HELP` in an OLT room) for the current screen. Japanese IME
-confirmation never submits. Escape reveals queued output and skips the 1.2-second
+confirmation never submits. Escape reveals queued output and skips the remaining
 connection presentation; it does not cancel drafts or approve confirmations.
+
+Initial entry and `Q` → `RECONNECT` automatically show connection status, service
+identification, a fixed fictional `LOCAL-DEMO` ID/password presentation, previous
+logout/current login, a scripted profile decline, an original welcome notice,
+then the unchanged MAIN. These are output stages: no credentials, authentication,
+account creation or profile-editor interaction. The reconstructed pacing is six
+400ms intervals (about 2.4 seconds after local startup data is ready), separate
+from character reveal speed, including Instant/reduced-motion display. Escape or
+a submitted command skips the rest. The optional local handle invitation runs
+only at this handoff under its existing first-use rules.
+
+Session dates remain actual browser-session timestamps in UTC, never silently
+changed to 1996. Only `Q` records a logout; a fresh world or reload without `Q`
+does not invent one. A historical display calendar is separate work. The
+[entry research](docs/research/pcvan-1996-1997.md#staged-session-entry-issue-61)
+records the 1995-04-02 excerpt published 2010-09-22 (contents: high confidence;
+independent authenticity/adjacent-year applicability: moderate), the undated
+client-author announcement description, and the separate 1992 reproduction and
+1996-11-25 NORMA gateway context. Exact 1996 applicability, stage arrangement,
+notice wording and timing remain reconstruction. Sources and limitations are
+also available in Settings → Details/About, outside routine terminal output.
 
 On first use, answer the optional handle invitation with `Y`, enter a Japanese
 handle, or use `N` / `SKIP` to read without registering. `HANDLE` lists only human

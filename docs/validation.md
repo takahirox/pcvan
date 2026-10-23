@@ -1174,3 +1174,53 @@ Optional automated screenshot comparison, native hardware/IME testing and furthe
 dated capture research were not performed. Exact historical cell offsets, terminal
 width and unchanged 1997 availability remain unverified. No push, PR, merge,
 external comment or deployment was performed; no post-merge verification is required.
+
+## Staged session entry without credentials (#61)
+
+Validation on 2026-10-23 in the assigned worktree, after reading the live open
+Issue and repository development/review guidance:
+
+- Added a reconstructed six-interval entry (400ms each) for initial visits and
+  Q/reconnect, with service identification, fixed fictional ID/password output,
+  actual UTC session dates, scripted profile decline and original welcome notice.
+  The existing MAIN fixture is unchanged. No credentials, authentication,
+  profile-editor branches, member records or schema migration were added.
+- Completion, timers and commands share the application queue. Timer cancellation
+  invalidates queued callbacks; optional first-use registration completes at the
+  handoff before another command owns input. Startup supplies actual session
+  records before automatic stages begin. Character reveal, IME guards and
+  Settings focus continue through the existing terminal implementation.
+- `npm ci`: passed, zero reported vulnerabilities. Existing installed Chromium
+  was reused; no browser installation, model download or hardware check was needed.
+- Initial focused `npx playwright test tests/connection.spec.ts --workers=2`:
+  **21 passed (51.0s)**. Added one more delayed-startup natural-entry case before
+  the full run; no failing checks or retries were encountered.
+- Final documented `npm test`: **232 passed (1.1m)** using the normal production
+  and source-module servers, no retries or skips. This includes TypeScript
+  checking and the production build. The existing optional WebLLM chunk-size
+  advisory and environment color warnings remain non-failing.
+- Focused controller and production-browser checks cover natural unskipped entry,
+  fresh/returning worlds, no fabricated logout on reload, exact saved dates,
+  repeated Q/reconnect and history, completion/command cancellation at every
+  stage, intermediate browser skips, repeated Escape, IME and pending input,
+  early service commands, pending WRITE registration and composer ownership,
+  rapid submissions before RECONNECT executes, Settings focus during entry and
+  delayed IndexedDB startup with natural completion or queued skips/commands.
+  No later entry text reaches a service or human prompt. Existing terminal,
+  composition, mail, OLT, consent, activity, storage and backup suites also pass.
+- MAIN browser comparisons at 320px/1280px still require the same complete menu
+  after natural reconnect; only the expected preceding presentation changed.
+  Existing startup skip helpers were retained, alongside explicit unskipped tests.
+- Rechecked the preserved 1995 excerpt, Vector client-author description,
+  retrospective's distinct 1992/1996 examples and NORMA PDF text (printed page 12).
+  All four external research URLs resolve. README and on-demand About/Details
+  disclose source dates/confidence, stage/timing assumptions, actual-date policy
+  and NORMA's separate scope. Routine entry contains no source URLs or provenance
+  paragraphs. Local Markdown links/anchors, final diff and whitespace were checked.
+
+Optional screenshot capture, physical terminal/native IME testing, historical-user
+feedback and further dated root-login research were not performed. Historical
+sequence applicability remains reconstructed as documented in the
+[entry research](research/pcvan-1996-1997.md#staged-session-entry-issue-61).
+No push, PR, merge, external comment or deployment was performed. No post-merge
+verification is required.
