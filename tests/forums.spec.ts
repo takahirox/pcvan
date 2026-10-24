@@ -4,7 +4,12 @@ import demos from '../data/pcvan/demo-posts.json' with { type: 'json' };
 import { PcvanController } from '../src/navigation';
 import { renderPost } from '../src/forums';
 import { validateRecord } from '../src/storage/schema';
-import { backupFixture } from './backup-fixture';
+import { backupFixture, unreadFixture } from './backup-fixture';
+import { additionalSigs } from '../src/communities';
+import { command, start, enterForum, snapshot, restore, backup, noOtherUi } from './terminal-helpers';
+import type { Backup } from '../src/storage/schema';
+import type { Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 function miti() {
   const controller = new PcvanController();
@@ -224,4 +229,287 @@ test('empty DAISIZEN board and invalid forum selectors preserve navigation', () 
   controller.submit('BACK');
   controller.submit('1');
   expect(controller.submit('READ 1').join('\n')).toContain('小さな庭の便り');
+});
+
+test('unread controls cover MITI, every DAISIZEN board and additional SIG boards with actual parent paths', () => {
+  const routes = [
+    { keyword: 'MITI', boardNo: 9, steps: ['J MITI', '3', '9'], parent: 'miti-forums' },
+    ...evidence.daisizen.forums.map((f) => ({ keyword: 'DAISIZEN', boardNo: f.number, steps: ['13', '2', 'FORUMS', String(f.number)], parent: 'daisizen-forums' })),
+    ...additionalSigs.flatMap((s) => s.boards.map((b) => ({ keyword: s.keyword, boardNo: b.number, steps: ['13', s.selector, String(b.number)], parent: 'community' }))),
+  ];
+  for (const route of routes) {
+    const controller = new PcvanController(), content = unreadFixture();
+    content.sigs[0]!.keyword = route.keyword;
+    content.forums[0]!.boardNo = route.boardNo; content.forums[1]!.boardNo = 99;
+    controller.setContent(content); controller.setMemberId('human');
+    for (const step of route.steps) controller.submit(step);
+    const before = structuredClone(content), screen = controller.screen;
+    const listing = controller.submit('  unRead  ').join('\n');
+    expect(listing).toContain('未読一覧（番号順）');
+    expect(listing).toContain('#4 返事 RE#1 [未読]');
+    expect(listing).toContain('#9 最後の便り [未読]');
+    expect(listing).not.toContain('#1 こんにちは');
+    expect(listing.indexOf('#4 ')).toBeLessThan(listing.indexOf('#9 '));
+    const next = controller.submit(' next ').join('\n');
+    expect(next).toContain('#4/12'); expect(next).toContain('返事　今の筆名');
+    expect(next).toContain('96/11/20  10:03'); expect(next).toContain('返信先：#1');
+    for (const invalid of ['NEXT 1', 'NEXT NEXT', 'UNREAD 1', 'UN READ', 'NEXT extra', 'READ 4 extra', '']) {
+      expect(controller.submit(invalid).join('\n')).toContain('この画面では使えない');
+      expect(controller.screen).toBe(screen);
+    }
+    expect(controller.submit('LIST').join('\n')).toContain('#1 こんにちは [既読]');
+    expect(controller.submit('HELP').join('\n')).toContain('投稿一覧（番号順）');
+    expect(controller.submit('HELP').join('\n')).toContain('UNREAD: 未読一覧 / NEXT: 次の未読');
+    expect(content).toEqual(before);
+    controller.submit('BACK'); expect(controller.screen).toBe(route.parent);
+    controller.submit('MAIN'); expect(controller.screen).toBe('main');
+  }
+});
+
+test('unread absent/exhausted markers, anonymous and demo readers, empty and ambiguous mappings remain read-only', () => {
+  const controller = miti(), content = unreadFixture();
+  controller.setContent(content); controller.setMemberId('human');
+  content.readStates = [];
+  expect(controller.submit('UNREAD').join('\n')).toContain('#1 こんにちは [未読]');
+  expect(controller.submit('NEXT').join('\n')).toContain('#1　資料室');
+  content.readStates = [{ memberId: 'human', forumId: 'forum', lastReadNumber: 100 }];
+  expect(controller.submit('NEXT').join('\n')).toContain('未読の投稿はありません');
+  expect(controller.submit('UNREAD').join('\n')).toContain('未読の投稿はありません');
+  content.posts = [];
+  expect(controller.submit('NEXT').join('\n')).toContain('未読の投稿はありません');
+  expect(controller.submit('LIST').join('\n')).toContain('投稿はありません');
+  content.forums[0]!.boardNo = 8;
+  for (const cmd of ['NEXT', 'UNREAD']) expect(controller.submit(cmd).join('\n')).toContain('見つからないか、重複');
+  content.forums[0]!.boardNo = 9; content.forums.push({ ...content.forums[0]!, id: 'duplicate' });
+  for (const cmd of ['NEXT', 'UNREAD']) expect(controller.submit(cmd).join('\n')).toContain('見つからないか、重複');
+  content.forums.pop(); content.sigs.push({ ...content.sigs[0]!, id: 'duplicate-sig' });
+  for (const cmd of ['NEXT', 'UNREAD']) expect(controller.submit(cmd).join('\n')).toContain('見つからないか、重複');
+  for (const member of [undefined, 'ai', 'missing']) {
+    controller.setContent(unreadFixture()); controller.setMemberId(member);
+    for (const cmd of ['NEXT', 'UNREAD']) expect(controller.submit(cmd).join('\n')).toContain('HANDLE');
+    expect(controller.submit('READ 4').join('\n')).toContain('★内容');
+  }
+  const demo = miti(); demo.setMemberId('human');
+  for (const cmd of ['NEXT', 'UNREAD']) expect(demo.submit(cmd).join('\n')).toContain('HANDLE');
+  expect(demo.submit('READ 1').join('\n')).toContain('★内容');
+});
+
+async function unreadWorld(page: Page, content = unreadFixture()) {
+  await start(page); await restore(page, content); await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+}
+
+// These restored fixtures have no active generation; only session/history changes.
+function protectedRecords(data: Backup) {
+  return { members: data.members, sigs: data.sigs, forums: data.forums, posts: data.posts, mail: data.mail,
+    settings: data.settings };
+}
+
+test('production unread → rapid NEXT → exhaustion persists the exact candidates and only intended markers', async ({ page }) => {
+  const external: string[] = [];
+  page.on('request', (r) => { if (!r.url().startsWith('http://127.0.0.1:14373/')) external.push(r.url()); });
+  await unreadWorld(page);
+  const before = await snapshot(page);
+  await command(page, 'ABOUT', 'フォーラム未読の調査URL');
+  await command(page, 'BACK', '投稿一覧');
+  await page.getByRole('button', { name: '設定 / Options', exact: true }).click();
+  const modal = page.getByRole('dialog'); await modal.locator('.about-panel > summary').click();
+  await expect(modal.locator('.settings-about')).toContainText('カテゴリーDの再構成');
+  await expect(modal.locator('.settings-about')).toContainText('forum-unread-reading-issue-107');
+  await page.keyboard.press('Escape');
+  const unread = await command(page, '  unRead  ', '未読一覧');
+  expect(unread).toContain('#4 返事 RE#1 [未読]'); expect(unread).toContain('#9 最後の便り [未読]');
+  expect(unread).not.toContain('#1 こんにちは');
+  expect((await snapshot(page)).readStates).toEqual(before.readStates);
+  await page.evaluate(() => {
+    const native = IDBObjectStore.prototype.put;
+    Object.assign(window, { readWrites: 0 });
+    IDBObjectStore.prototype.put = function (value, key) {
+      if (this.name === 'readStates') (window as unknown as { readWrites: number }).readWrites++;
+      return key === undefined ? native.call(this, value) : native.call(this, value, key);
+    };
+    const input = document.querySelector<HTMLInputElement>('#command')!;
+    for (const line of [' next ', 'NEXT', 'NEXT', 'UNREAD', 'LIST', 'HELP', 'NEXT 1', 'UNREAD all', '']) {
+      input.value = line; input.form!.requestSubmit();
+    }
+  });
+  await expect(page.locator('.output')).toContainText('> UNREAD all');
+  await command(page, 'UNREAD', '未読の投稿はありません');
+  const output = (await page.locator('.output').textContent())!;
+  expect(output.indexOf('#4/12　資料室')).toBeLessThan(output.indexOf('#9　資料室'));
+  expect(output.match(/#4\/12　資料室/g)).toHaveLength(1);
+  expect(output.match(/#9　資料室/g)).toHaveLength(1);
+  expect(output).toContain('返事　今の筆名\n★内容\n応答\n返信先：#1');
+  expect(output).toContain('  <i>最後</i>　ｶﾅ  \n\n末尾  ');
+  expect(await page.evaluate(() => (window as unknown as { readWrites: number }).readWrites)).toBe(2);
+  const after = await snapshot(page);
+  expect(after.readStates).toEqual(before.readStates.map((s) => s.memberId === 'human' && s.forumId === 'forum' ? { ...s, lastReadNumber: 9 } : s));
+  expect(protectedRecords(after)).toEqual(protectedRecords(before));
+  await expect(page.locator('.output i, .output b')).toHaveCount(0);
+  await command(page, 'BACK', 'MITI / フォーラム');
+  const downloading = page.waitForEvent('download'); await command(page, 'LOG');
+  const log = await readFile((await (await downloading).path())!, 'utf8');
+  expect(log).toContain('>   unRead  '); expect(log).toContain('#4/12　資料室');
+  expect(log).toContain('  <i>最後</i>　ｶﾅ  \n\n末尾  ');
+  await noOtherUi(page); expect(external).toEqual([]);
+});
+
+test('production absent marker, numbered READ high-water, human/forum isolation and JSON/reload recovery', async ({ page }) => {
+  const fixture = unreadFixture(); fixture.readStates = [];
+  fixture.sigs.push({ id: 'daisizen', keyword: 'DAISIZEN', title: '別のSIG' });
+  fixture.forums[1]!.sigId = 'daisizen'; fixture.forums[1]!.boardNo = 1;
+  await unreadWorld(page, fixture);
+  await command(page, 'UNREAD', '#1 こんにちは [未読]');
+  await command(page, 'NEXT', '#1　資料室');
+  await command(page, 'READ   9', '#9　資料室');
+  await command(page, 'READ 4', '#4/12　資料室');
+  await command(page, 'NEXT', '未読の投稿はありません');
+  expect((await snapshot(page)).readStates).toEqual([{ memberId: 'human', forumId: 'forum', lastReadNumber: 9 }]);
+  for (const line of ['MAIN', '13', '2', 'FORUMS', '1']) await command(page, line, 'コマンド=');
+  await command(page, 'NEXT', '#1　自然の森／ＦＲＥＥ');
+  await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+  await command(page, 'NEXT', '未読の投稿はありません');
+  await command(page, 'HANDLE', '人間'); await command(page, '2', '別の人 を選択');
+  await command(page, 'BACK', '設定 / SETTINGS'); await command(page, 'BACK', '投稿一覧');
+  await command(page, 'NEXT', '#1　資料室');
+  const saved = await backup(page);
+  expect(saved.readStates).toEqual([
+    { memberId: 'human', forumId: 'forum', lastReadNumber: 9 },
+    { memberId: 'human', forumId: 'other', lastReadNumber: 1 },
+    { memberId: 'human2', forumId: 'forum', lastReadNumber: 1 },
+  ]);
+  await page.reload(); await expect(page.locator('.output')).toContainText('MAIN'); await enterForum(page);
+  await command(page, 'NEXT', '#4/12　資料室');
+  await restore(page, saved); await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+  await command(page, 'NEXT', '#4/12　資料室');
+  expect((await snapshot(page)).readStates.find((s) => s.memberId === 'human2')!.lastReadNumber).toBe(4);
+});
+
+test('production other-tab content, current selection/name and high-water changes refresh on each command', async ({ page, context }) => {
+  await unreadWorld(page);
+  const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
+  // Raw IndexedDB changes deliberately send no notification: next command must refresh.
+  await other.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => resolve(r.result); });
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(['settings', 'members', 'readStates', 'posts'], 'readwrite');
+      tx.objectStore('settings').put({ id: 'active-human-member', value: 'human2' });
+      tx.objectStore('members').put({ id: 'ai', handle: '別タブの筆名', actor: 'ai' });
+      tx.objectStore('readStates').put({ memberId: 'human2', forumId: 'forum', lastReadNumber: 3 });
+      const posts = tx.objectStore('posts'), r = posts.get('reply'); r.onsuccess = () => posts.put({ ...r.result, body: '別タブの最新本文' });
+      tx.oncomplete = () => resolve();
+    }); db.close();
+  });
+  const read = await command(page, 'NEXT', '別タブの最新本文');
+  expect(read).toContain('返事　別タブの筆名');
+  let states = (await snapshot(page)).readStates;
+  expect(states.find((s) => s.memberId === 'human' && s.forumId === 'forum')!.lastReadNumber).toBe(3);
+  expect(states.find((s) => s.memberId === 'human2')!.lastReadNumber).toBe(4);
+  await other.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => resolve(r.result); });
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction('posts', 'readwrite'), store = tx.objectStore('posts'), r = store.get('ninth');
+      r.onsuccess = () => store.put({ ...r.result, id: 'new-fifth', number: 5, title: '追加された便り' });
+      tx.oncomplete = () => resolve();
+    }); db.close();
+  });
+  await command(page, 'UNREAD', '#5 追加された便り [未読]');
+  await command(page, 'NEXT', '#5　資料室');
+  await enterForum(other); await command(other, 'READ 9', '#9　資料室');
+  expect(await command(page, 'NEXT', '未読の投稿はありません')).not.toContain('★内容');
+  await command(page, 'READ 1', '#1　資料室');
+  states = (await snapshot(page)).readStates;
+  expect(states.find((s) => s.memberId === 'human2')!.lastReadNumber).toBe(9);
+});
+
+test('production NEXT write/refresh failures reveal no body and allow retry', async ({ page }) => {
+  await unreadWorld(page); const before = await snapshot(page);
+  await page.evaluate(() => {
+    const native = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, key) {
+      if (this.name === 'readStates') throw new DOMException('test quota', 'QuotaExceededError');
+      return key === undefined ? native.call(this, value) : native.call(this, value, key);
+    };
+    Object.assign(window, { restoreReadPut: () => { IDBObjectStore.prototype.put = native; } });
+  });
+  expect(await command(page, 'NEXT', '既読の保存に失敗しました。再試行')).not.toContain('★内容');
+  expect((await snapshot(page)).readStates).toEqual(before.readStates);
+  await page.evaluate(() => (window as unknown as { restoreReadPut(): void }).restoreReadPut());
+  await command(page, 'NEXT', '#4/12　資料室');
+  await page.evaluate(() => {
+    const native = IDBObjectStore.prototype.getAll;
+    IDBObjectStore.prototype.getAll = function (...args: Parameters<typeof native>) {
+      if (this.name === 'posts') throw new DOMException('test read', 'UnknownError');
+      return native.apply(this, args);
+    };
+    Object.assign(window, { restoreGetAll: () => { IDBObjectStore.prototype.getAll = native; } });
+  });
+  expect(await command(page, 'NEXT', 'ローカル保存エラー')).not.toContain('★内容');
+  await command(page, 'BACK', 'MITI / フォーラム');
+  await page.evaluate(() => (window as unknown as { restoreGetAll(): void }).restoreGetAll());
+  await command(page, '9', '投稿一覧'); await command(page, 'NEXT', '#9　資料室');
+  expect(protectedRecords(await snapshot(page))).toEqual(protectedRecords(before));
+});
+
+test('production anonymous and restored-empty worlds never seed content or create read state', async ({ page }) => {
+  const fixture = unreadFixture(); fixture.members = fixture.members.filter((m) => m.actor !== 'human');
+  fixture.posts = fixture.posts.map((p) => ({ ...p, authorId: 'ai' })); fixture.readStates = []; fixture.mail = [];
+  await unreadWorld(page, fixture); const before = await snapshot(page);
+  for (const line of ['UNREAD', 'NEXT']) {
+    const result = await command(page, line, 'HANDLE');
+    expect(result).not.toContain('登録しますか'); expect(result).not.toContain('★内容');
+  }
+  await command(page, 'LIST', '#4 返事'); await command(page, 'READ 4', '★内容');
+  expect(protectedRecords(await snapshot(page))).toEqual(protectedRecords(before));
+  expect((await snapshot(page)).readStates).toEqual([]);
+  const empty = unreadFixture(); empty.sigs = []; empty.forums = []; empty.posts = []; empty.readStates = [];
+  await restore(page, empty); await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+  const emptyBefore = await snapshot(page);
+  await command(page, 'UNREAD', '未読の投稿はありません'); await command(page, 'NEXT', '未読の投稿はありません');
+  await command(page, 'READ 1', '投稿はありません');
+  expect(protectedRecords(await snapshot(page))).toEqual(protectedRecords(emptyBefore));
+  expect((await snapshot(page)).readStates).toEqual([]);
+});
+
+test('production composition, IME and other services own UNREAD/NEXT without forum marker writes', async ({ page }) => {
+  await unreadWorld(page); const before = await snapshot(page);
+  const input = page.locator('#command');
+  await input.fill('NEXT'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+  await expect(input).toHaveValue('NEXT'); expect((await snapshot(page)).readStates).toEqual(before.readStates);
+  await input.dispatchEvent('compositionend'); await input.fill('');
+  await command(page, 'WRITE', 'タイトル='); await command(page, 'NEXT', '本文を1行ずつ');
+  await command(page, 'UNREAD', '本文='); await command(page, 'NEXT', '本文=');
+  const preview = await command(page, '.END', '投稿しますか'); expect(preview).toContain('1: UNREAD\n2: NEXT');
+  await command(page, '.CANCEL', '投稿を中止');
+  for (const route of [['MAIN', '1'], ['MAIN', '13', '2', 'CONFERENCE'], ['MAIN', '7', '1', '1']]) {
+    for (const line of route) await command(page, line, 'コマンド=');
+    for (const line of ['NEXT', 'UNREAD']) expect(await command(page, line, 'この画面では使えない')).not.toContain('★内容');
+  }
+  expect((await snapshot(page)).readStates).toEqual(before.readStates);
+  expect(protectedRecords(await snapshot(page))).toEqual(protectedRecords(before)); await noOtherUi(page);
+});
+
+test('production stale replacement without notifications stops queued NEXT; restore/reset discard old markers', async ({ page, context }) => {
+  await page.addInitScript(() => { Object.defineProperty(window, 'BroadcastChannel', { value: undefined }); });
+  await unreadWorld(page); await command(page, 'NEXT', '#4/12　資料室');
+  const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
+  const empty = unreadFixture(); empty.posts = []; empty.readStates = [];
+  await restore(other, empty);
+  const reloaded = page.waitForEvent('load');
+  await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>('#command')!;
+    for (let i = 0; i < 2; i++) { input.value = 'NEXT'; input.form!.requestSubmit(); }
+  });
+  await reloaded; await expect(page.locator('.output')).toContainText('MAIN');
+  expect(await page.locator('.output').textContent()).not.toContain('★内容');
+  expect((await snapshot(page)).readStates).toEqual([]);
+  await enterForum(page); await command(page, 'NEXT', '未読の投稿はありません');
+  await restore(page, unreadFixture()); await command(page, 'MAIN', 'MAIN'); await enterForum(page);
+  await command(page, 'NEXT', '#4/12　資料室');
+  await command(page, 'RESET', '初期状態に戻しますか');
+  await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter');
+  await expect(page.locator('.output')).toContainText('初期状態に戻しました');
+  await expect.poll(async () => { await page.locator('#command').press('Escape'); return page.locator('.output').textContent(); }).toContain('登録しますか');
+  await command(page, 'SKIP', '登録を中止'); await enterForum(page); await command(page, 'NEXT', 'HANDLE');
+  const reset = await snapshot(page);
+  expect(reset.readStates).toEqual([]); expect(reset.posts.some((p) => p.id === 'ninth')).toBe(false);
 });

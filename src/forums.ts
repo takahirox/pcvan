@@ -28,6 +28,12 @@ export function replyReference(post: Post, posts: readonly Post[]): Post | undef
   return posts.find((parent) => parent.id === post.replyToPostId && parent.forumId === post.forumId);
 }
 
+/** Reuse the per-human/forum high-water mark; callers supply number-sorted posts. */
+export function unreadPosts(content: ForumContent, posts: readonly Post[], memberId: string): Post[] {
+  return posts.filter((post) => post.number > (content.readStates?.find((state) =>
+    state.memberId === memberId && state.forumId === post.forumId)?.lastReadNumber ?? 0));
+}
+
 // IDs, dates, titles and bodies are original fiction. Historical evidence is
 // confined to the SIG/board directory, never the demonstration's contents.
 export function forumPosts(content: ForumContent, keyword: string, boardNo: number) {

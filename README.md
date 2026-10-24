@@ -587,10 +587,27 @@ are recorded in [the research notes](docs/research/pcvan-1996-1997.md#expanded-c
 | `5` グローバル・ビレッジ | `1` ビレッジ・ボード | Monthly gatherings and brief introductions, reading-only visits welcome |
 | `2` → `FORUMS` | DAISIZEN `3`, `5`, `7` gain histories | Book notes, observations without precise nest locations, optional neighborhood events |
 
-Every board accepts `LIST`, `READ number`, `WRITE`, `REPLY number`, `HELP`,
+Every board accepts `LIST`, `UNREAD`, `NEXT`, `READ number`, `WRITE`, `REPLY number`, `HELP`,
 `BACK` and `MAIN`. The same human handle/member ID and ten residents travel
 between boards. AI remains optional and uses the existing consent and budgets.
 See [SIG navigation](docs/sig-navigation.md).
+
+For a reading round, enter a forum → `UNREAD` → `NEXT` → repeated `NEXT` →
+the no-unread response → `BACK`. `UNREAD` lists existing numbers above the
+selected human's marker; `NEXT` opens the lowest such number, skipping gaps.
+`LIST` and `HELP` still show the complete list. These commands refresh content
+and the selected human each time; `HANDLE` selects/registers a local reader,
+while anonymous `LIST` / numbered `READ` remain available. NEXT saves the marker
+before displaying the body and can be retried if saving fails.
+
+The marker is a **high-water mark**: reading number N, including numbered READ,
+marks everything through N read, even bodies never opened individually. It is
+separate for each human/forum and survives reload and JSON restore. UNREAD/NEXT,
+their spelling and one-post-at-a-time journey are **category D reconstruction**,
+not authenticated PC-VAN host syntax or client autopilot emulation. Client
+descriptions support unread retrieval, with unresolved release dating; the
+1995 publisher comparison describes other services' unread controls. See the
+[dated sources and access limits](docs/research/pcvan-1996-1997.md#forum-unread-reading-issue-107).
 
 OLT accepts `JOIN 1` / `JOIN 2` (or a room number), `WHO number` and `LIST`.
 Inside a room, ordinary lines are speech, including literal `MAIN`, `BACK`,

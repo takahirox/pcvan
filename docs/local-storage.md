@@ -119,6 +119,26 @@ an error without showing cached posts;
 advances the selected human's read marker before displaying it; failed marker
 writes report an error without displaying the post. Reading never mutates posts.
 
+`UNREAD` lists only existing posts above the selected human/forum's
+`lastReadNumber` (absent means zero), preserving ascending numbers and references
+to parents outside that list. `NEXT` resolves the lowest existing unread number
+from the refreshed snapshot, awaits the existing `markRead(memberId, postId)`
+transaction, then forwards that exact number through the normal READ renderer.
+It does not resolve a second candidate after changing the marker. Queued NEXT
+commands each refresh after the preceding command completes. Cross-tab changes
+to content, selection and markers become visible on the next command; stale-world
+generation checks stop commands on replaced snapshots.
+
+`LIST` and `HELP` retain the full forum view: UNREAD introduces no filtering mode
+or reader cursor. Neither lists, guidance, invalid commands, blank input nor
+exhausted NEXT write read state. Without a selectable human, UNREAD/NEXT give
+concise HANDLE guidance; anonymous LIST/READ still work. Display-only demos
+cannot acquire personal markers. Empty/restored-empty content stays empty, and
+ambiguous mappings retain the existing unavailable message. No schema, backup
+format, seed or subscription change is involved. Controls and high-water semantics
+are [category D assumptions](research/pcvan-1996-1997.md#forum-unread-reading-issue-107),
+not authenticated historical commands or tracking rules.
+
 `src/forums.ts` maps stored SIGs by case-insensitive `keyword` (`MITI` or
 `DAISIZEN`, `LOCAL-DOSV`, `LOCAL-GAMES`, `LOCAL-GV`) and stored forums by
 `sigId` plus `boardNo`. See [SIG navigation](sig-navigation.md). Stored record IDs do not need to match fixture IDs. One matching SIG

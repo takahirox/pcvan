@@ -20,7 +20,14 @@ Every MAIN selector `1`–`21`, `X`, `Q` retains its existing destination.
 
 DAISIZEN boards `2`, `4`, `6` retain accessible empty states until someone posts.
 `LIST` lists numbered messages; `READ number` reads and advances the selected
-human’s read marker. `WRITE` and `REPLY number` use the existing title/body,
+human’s read marker. `UNREAD` lists existing numbers above that human/forum's
+marker and `NEXT` reads the lowest one, skipping gaps. Each command refreshes the
+selected human/content; absent markers mean zero. Reading N marks everything
+through N read, even unopened bodies. `LIST`/`HELP` retain the full list; UNREAD
+sets no persistent filter. Personal unread commands need a human selected through
+HANDLE; anonymous LIST/READ remain available. These are
+[category D controls](research/pcvan-1996-1997.md#forum-unread-reading-issue-107).
+`WRITE` and `REPLY number` use the existing title/body,
 `.END`, review/edit and `Y` confirmation sequence. `HELP` repeats the current
 screen, `BACK` returns to its parent, and `MAIN` returns to MAIN. Inside an
 active composition, `.CANCEL` explicitly discards the draft before navigation.
