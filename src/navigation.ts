@@ -1,5 +1,6 @@
 import { EcomVisit } from './ecom';
 import { GopherVisit } from './gopher';
+import { ArchieVisit } from './archie';
 import { ftpFiles, renderFtp } from './ftp';
 import { remoteLetters, renderTelnet, telnetControls, telnetHost, telnetPrompt } from './telnet';
 import type { TelnetScreen } from './telnet';
@@ -28,7 +29,7 @@ import type { NetNewsSearch } from './netnews';
 const { miti, daisizen } = sigEvidence;
 const services = daisizen.sections.filter((section) => section.demo_entry);
 
-export type Screen = TelnetScreen | 'gopher' | 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
+export type Screen = TelnetScreen | 'archie' | 'gopher' | 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
   'ecom' | 'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
@@ -83,6 +84,8 @@ export class PcvanController implements TerminalController {
   private currentScreen: Screen = 'main';
   private readonly ecom = new EcomVisit();
   private readonly gopher = new GopherVisit();
+  private readonly archie = new ArchieVisit();
+  get isArchie() { return this.currentScreen === 'archie'; }
   get isGopher() { return this.currentScreen === 'gopher'; }
   get isEcom() { return this.currentScreen === 'ecom'; }
   get ecomDrafting() { return this.isEcom && this.ecom.drafting; }
@@ -180,13 +183,14 @@ export class PcvanController implements TerminalController {
         this.clearBiz();
         this.clearNetNews();
         this.gopher.reset();
+        this.archie.reset();
         this.parents.length = 0;
         this.currentScreen = 'main';
         return this.render();
       }
       if (command === 'BACK') {
-        if (this.isGopher) {
-          const result = this.gopher.submit(line);
+        if (this.isGopher || this.isArchie) {
+          const result = (this.isArchie ? this.archie : this.gopher).submit(line);
           if (result) return result;
           this.currentScreen = this.parents.pop() ?? 'main';
           return this.render();
@@ -270,7 +274,9 @@ export class PcvanController implements TerminalController {
         if (command === '2') { this.telnetItem = 0; return this.enter('telnet-directory'); }
         if (command === '3') { this.ftpItem = 0; return this.enter('ftp-list'); }
         if (command === '4') { this.gopher.reset(); return this.enter('gopher'); }
-        return this.invalidCommand('1: NetNews / 2: TELNET / 3: FTP / 4: Gopher / LIST / BACK / MAIN / HELP');
+        if (command === '5') { this.archie.reset(); return this.enter('archie'); }
+        return this.invalidCommand('1: NetNews / 2: TELNET / 3: FTP / 4: Gopher / 5: Archie / LIST / BACK / MAIN / HELP');
+      case 'archie': return this.archie.submit(line)!;
       case 'gopher': return this.gopher.submit(line)!;
       case 'ftp-list':
       case 'ftp-preview': {
@@ -617,6 +623,7 @@ export class PcvanController implements TerminalController {
       case 'ftp-preview': return [...renderFtp(this.ftpItem), returnHelp, demoPrompt];
       case 'internet-directory': return [...renderInternetDirectory(), returnHelp, demoPrompt];
       case 'gopher': return this.gopher.render();
+      case 'archie': return this.archie.render();
       case 'netnews-directory': return [...renderNetNewsDirectory(), returnHelp, demoPrompt];
       case 'netnews-list': return [...renderNetNewsList(netNewsGroup(this.content, this.netNewsGroup), this.netNewsSearch), returnHelp, demoPrompt];
       case 'netnews-article': {

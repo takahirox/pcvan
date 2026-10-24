@@ -97,7 +97,7 @@ export function netNewsResults(group: NetNewsGroup, search?: NetNewsSearch): rea
 }
 
 export function renderInternetDirectory(): string[] {
-  return ['インターネット / サービス一覧', '1 NetNews', '2 TELNET', '3 FTP', '4 Gopher', '1: グループ一覧 / 2: TELNET接続先一覧 / 3: FTPファイル一覧 / 4: Gopherルート / LIST: サービス一覧'];
+  return ['インターネット / サービス一覧', '1 NetNews', '2 TELNET', '3 FTP', '4 Gopher', '5 Archie', '1: グループ一覧 / 2: TELNET接続先一覧 / 3: FTPファイル一覧 / 4: Gopherルート / 5: Archieファイル名検索 / LIST: サービス一覧'];
 }
 
 export function renderNetNewsDirectory(): string[] {

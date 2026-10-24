@@ -124,7 +124,7 @@ const terminal = mountTerminal(root, {
             }
           }
         }
-        if (line.trim() || controller.isEcom) navigate(line);
+        if (line.trim() || controller.isEcom || controller.isArchie) navigate(line);
       }
       if (resetting) return;
       // Commands queued in a departed visit cannot operate a subsequent visit.
@@ -179,6 +179,7 @@ const commandActions = {
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   isTelnet: () => controller.isTelnet,
   isGopher: () => controller.isGopher,
+  isArchie: () => controller.isArchie,
   isEcom: () => controller.isEcom, ecomDrafting: () => controller.ecomDrafting,
   invalidateEcom: () => controller.invalidateEcom(),
   isNetNewsDirectory: () => ['internet-directory', 'netnews-directory'].includes(controller.screen),
@@ -197,7 +198,7 @@ const commandActions = {
       const repo = await repository;
       await repo.replaceFromJson(text, { confirmReplace: true, expectedContext });
       commands.invalidate(); terminal.clearInput(); revision++;
-      if (controller.isTelnet || controller.isGopher) navigate('MAIN');
+      if (controller.isTelnet || controller.isGopher || controller.isArchie) navigate('MAIN');
       if (!settingsDialog?.open) print('バックアップを復元しました。コマンド=');
       try { await refreshContent(); } catch (error) { reportError(error); }
       return repo.getSession();
