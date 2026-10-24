@@ -3281,3 +3281,44 @@ and staged whitespace checks pass, including the new test file. The dependency
 lockfile is unchanged. Optional native IME observation, other browser engines and
 new historical manual recovery were not performed. No required post-merge
 verification applies.
+
+## PR #124 review correction: shared-clock OLT arbitration (Issue #123)
+
+Validated on 2026-10-24 with Node.js 24.12.0 on macOS. `npm ci` passed
+without lockfile changes or reported vulnerabilities.
+
+The review's two-tab failure reproduced with **19 passed, 1 failed (43.2s)**
+over twenty repetitions. A temporary diagnostic run produced **27 passed,
+3 failed (57.7s)** over thirty repetitions. These used **three workers**.
+Diagnostics showed distinct consecutive turns, with the second prompt containing
+the first saved speech: the test compared an older one-line snapshot with a later
+two-generation count. Playwright's clock is shared by the browser context;
+advancing it from both tabs doubled the elapsed time and allowed another turn.
+
+The test now installs and pauses that clock once, advances it once for both tabs,
+and verifies both clocks reached exactly 21 seconds. It requires exactly one
+saved speech line, no pending turn, unique line IDs and an equal total inference
+count across both tabs, retaining attendance and departure assertions. The paused
+prototype initially waited on the second tab's connection presentation timer:
+**9 failed, 3 interrupted, 18 not run** before stopping it. Entering through the
+existing MAIN command completes that connection explicitly. No runtime arbitration
+or scheduling code was changed; the temporary diagnostics were removed.
+
+- `npm test -- tests/olt.spec.ts --grep 'two tabs share' --repeat-each=30 --workers=3`:
+  **30 passed (34.4s), actual three workers**.
+- First `npm test -- --workers=3`: **499 passed, 1 failed (8.5m)**. The OLT
+  check and all twenty scheduling checks passed. The existing factory-reset
+  pending-generation test read the old document during reload and reported
+  `Execution context was destroyed`; its captured new document showed a completed
+  reset. No unrelated test or runtime change was made.
+- `npm test -- tests/factory-reset.spec.ts --grep 'reset invalidates pending production generate' --repeat-each=5 --workers=3`:
+  **5 passed (5.6s), actual three workers**.
+- Final `npm test -- --workers=3`: **500 passed (7.9m), actual three workers**,
+  with no failures, retries or skips. Both complete runs included configured
+  TypeScript checking and production bundling, with test/runtime files unchanged
+  between them. Existing Vite chunk-size and Node color warnings remain.
+
+Reviewed the revision diff and checked whitespace with `git diff --check` and
+`git diff --cached --check`. No documentation links were added. No real model
+execution, native IME observation, other browser-engine checks, push or merge was
+performed. No required post-merge verification applies.
