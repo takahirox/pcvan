@@ -44,7 +44,7 @@ test('atomic seed failure rolls back every record; concurrent connections seed o
   }, anchor);
   expect(result.failed).toBe(true); expect(result.rolledBack).toBe(true); expect(result.writes).toBe(8);
   expect(result.invalidMarkers).toEqual([true, true, true, true, true]);
-  expect(result.first.posts).toHaveLength(66); expect(new Set(result.first.posts.map((p) => p.id)).size).toBe(66);
+  expect(result.first.posts).toHaveLength(69); expect(new Set(result.first.posts.map((p) => p.id)).size).toBe(69);
   expect(result.roundtrip.posts).toEqual(result.first.posts);
   expect(result.roundtrip.settings.find((s) => s.id === 'community-world')).toEqual(result.first.settings.find((s) => s.id === 'community-world'));
   expect(result.cleared.posts).toEqual([]); expect(result.cleared.forums).toEqual(result.first.forums); expect(result.repeat).toBe(false);

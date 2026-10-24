@@ -1,3 +1,4 @@
+import { wakaba } from './wakaba';
 import { serviceDate } from './calendar';
 import type { HistoricalCalendar } from './calendar';
 import { expandedBoards } from './communities';
@@ -56,7 +57,8 @@ export function forumPosts(content: ForumContent, keyword: string, boardNo: numb
 }
 
 export function forumName(keyword: string, boardNo: number): string {
-  return keyword === 'MITI' ? evidence.miti.steps[2]!.destination
+  return keyword === wakaba.keyword && boardNo === wakaba.boardNo ? wakaba.name
+    : keyword === 'MITI' ? evidence.miti.steps[2]!.destination
     : keyword === 'DAISIZEN' ? evidence.daisizen.forums.find((forum) => forum.number === boardNo)!.label
     : expandedBoards.find((board) => board.keyword === keyword && board.boardNo === boardNo)!.name;
 }

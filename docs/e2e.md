@@ -26,6 +26,7 @@ native file pickers/downloads, confirmations, keyboard focus and mocked models.
 | Real JSON export/import, cancellation, invalid file/quota rollback, stale confirmations | `storage-controls.spec.ts` |
 | Typed reset, transactional rollback, stale connections, tabs, preserved caches/recovery | `factory-reset.spec.ts` |
 | MAIN 1–21/X/Q, index/services, verified MITI route, empty views | `navigation.spec.ts`, `sections.spec.ts`, `services.spec.ts`, `forums.spec.ts`, `journey.spec.ts` |
+| Wakaba MAIN/index welcome/return, beginner read/write/reply, unread gaps, cross-tab freshness, protected records, pristine-only seed/lazy send rollback and restore/reset | `wakaba.spec.ts`, `wakaba-repository.spec.ts` |
 | Progressive UTF-8 output, graphemes, bounded queues, themes, speed, motion, logs | `progressive-output.spec.ts`, `connection.spec.ts` |
 | Keyboard history/focus/scroll, literal text and narrow layout | `terminal.spec.ts`, `immersive.spec.ts` |
 | Modern Settings: display, models, consent/cancel/progress/failure, all ten profiles, JSON import/export/reset, stale callbacks, focus/IME/mobile and offline storage | `settings-dialog.spec.ts` |

@@ -100,7 +100,10 @@ for (const entry of mainMenu.entries) {
     const controller = new PcvanController();
     const result = controller.submit(entry.selector).join('\n');
     expect(result).toContain(`${entry.selector} ${entry.label}`);
-    if (entry.selector === '13') {
+    if (entry.selector === '16') {
+      expect(controller.screen).toBe('wakaba');
+      expect(result).toContain('1 はじめての広場');
+    } else if (entry.selector === '13') {
       expect(controller.screen).toBe('communication');
     } else if (entry.selector === '7') {
       expect(controller.screen).toBe('internet-directory');

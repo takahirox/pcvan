@@ -2582,3 +2582,75 @@ No historical PC-VAN unread command sequence is claimed. Native Japanese IME,
 additional browser engines and former-user feedback remain optional.
 Default/eight-worker reliability remains unresolved; three-worker success does
 not resolve it. No post-merge or deployment verification is required.
+
+## Wakaba beginner board (Issue #109)
+
+Validated in the assigned worktree on 2026-10-24 with Node.js 24.12.0 on macOS.
+The implementation uses the Issue's research assessment; it does not claim a new
+period directory/session recovery or newly successful catalog metadata retrieval.
+
+- `npm ci`: passed, 23 packages added, zero reported vulnerabilities; no dependency
+  or lockfile changes.
+- `npm run build`: passed TypeScript checking and production build.
+- `npx playwright install chromium`: passed with the existing browser available.
+- First focused run with `--workers=3`: **102 passed, 5 failed (45.0s)**.
+  Corrected existing MAIN 16 and aggregate recovery-count expectations; new tests
+  incorrectly compared an entry echo to a returned screen, reused a stale
+  connection after restore, and dispatched keydown instead of form submission.
+- Second focused run with `--workers=3`: **106 passed, 1 failed (37.4s)**.
+  Corrected an overbroad test cleanup edit that referenced the reopened connection
+  variable in a different repository test.
+- Third focused run with `--workers=3`: **106 passed, 1 failed (42.6s)**.
+  Added protected welcome-input coverage expected a prompt after global WRITE's
+  existing no-destination guidance; corrected that expectation to the actual
+  guidance. No runtime behavior or existing safeguard was weakened for these fixes.
+
+- Fourth focused run,
+  `npm test -- tests/wakaba.spec.ts tests/wakaba-repository.spec.ts tests/navigation.spec.ts tests/sections.spec.ts tests/forums.spec.ts tests/composition.spec.ts tests/community.spec.ts tests/expanded-community.spec.ts tests/repository.spec.ts tests/journey.spec.ts --workers=3`:
+  **107 passed (39.7s)**, with configured TypeScript checking/production build and
+  no failures, retries or skips. Subsequent review strengthened the new protected
+  fixtures with saved conference and OLT content; these test-only additions receive
+  a separate targeted check after the complete suite. No runtime code changed.
+
+- Complete `npm test -- --workers=3`: **401 passed (7.5m)**, including configured
+  TypeScript checking and production build, with no failures, retries or skips.
+  The previous 392 checks become 391 applicable checks (MAIN 16 leaves the generic
+  empty-article parameterization) plus ten dedicated Wakaba checks. Existing
+  functional, storage, consent, IME, terminal pacing/skip and offline coverage pass.
+
+- Final strengthened-fixture check,
+  `npm test -- tests/wakaba.spec.ts tests/wakaba-repository.spec.ts --workers=3`:
+  **10 passed (16.5s)** with configured TypeScript checking/production build and
+  no failures, retries or skips. This explicitly retains saved conference/OLT
+  content during browsing, reading and lazy submission, and excludes it from
+  beginner prompt data.
+- Reviewed the complete diff against #109, including new files, unchanged original
+  fixture content, scope and aggregate assertions. All **160 local Markdown
+  targets/heading anchors** and **five Settings research anchors** passed; code
+  fences are balanced. Working-tree and staged whitespace checks passed. Existing
+  Vite large-bundle and NO_COLOR/FORCE_COLOR warnings remain informational.
+
+Ten new controller, production-terminal and IndexedDB checks cover MAIN/index
+welcome/return through the connection wrapper, no welcome composition destination,
+invalid selectors, pristine original question/reply/greeting, identity/date/parent
+rendering, numbered and gapped unread reads, exact queued NEXT candidates,
+per-human marker isolation, anonymous HANDLE guidance, current cross-tab
+content/name/selection and new posts, failed marker/refresh saves, WRITE/REPLY
+review/edit/save/cancel and lazy first submission rollback. They cover concurrent
+initialization/allocation, seed-write rollback, absent/empty/ambiguous mappings,
+legacy population and eligible old-world expansion, deletion/consent/reopen,
+reload/JSON round-trip/restored-empty/reset, Japanese/markup, simulated IME,
+composer ownership of NEXT/UNREAD, focus, log export, typed and modern About.
+Inactive-fixture comparisons protect members, posts, mail, directories, read
+states, unrelated settings (including conference/OLT settings when present),
+preferences and consent, with only intended post/counter/missing directory or
+read-marker changes and normal session/activity watermark bookkeeping permitted.
+Existing fixture preservation assertions remain, including all original thirty
+and expansion thirty-six records. Aggregate assertions now include three Wakaba
+posts, while legacy opt-in remains at 66. Public beginner prompt culture uses
+only the existing board context, without private-mail or OLT context.
+
+The journey requires no real inference, model download or external service.
+Native Japanese IME, former-user feedback and dated manual/session comparison
+remain optional. Default/eight-worker reliability remains unresolved;
+three-worker success does not resolve it. No required post-merge verification.

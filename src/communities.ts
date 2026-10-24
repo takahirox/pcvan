@@ -1,3 +1,4 @@
+import { wakaba } from './wakaba';
 import expanded from '../data/pcvan/expanded-sigs.json' with { type: 'json' };
 
 /** Application keys and bridge selectors; never historical jump commands. */
@@ -7,5 +8,6 @@ export const expandedBoards = [
   ...additionalSigs.flatMap((s) => s.boards.map((b) => ({ keyword: s.keyword, boardNo: b.number, name: b.label, culture: b.culture }))),
 ];
 export function boardCulture(keyword: string, boardNo: number): string | undefined {
+  if (keyword.toUpperCase() === wakaba.keyword && boardNo === wakaba.boardNo) return wakaba.culture;
   return expandedBoards.find((b) => b.keyword === keyword.toUpperCase() && b.boardNo === boardNo)?.culture;
 }

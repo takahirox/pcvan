@@ -24,9 +24,9 @@ are no external font requests. Local content, settings, session timestamps, and
 command history use IndexedDB in this browser profile. The terminal display and input
 draft remain in memory; OLT room history is persisted.
 
-On the first visit, a new local world already has 66 original Japanese posts by
-ten fictional regulars: eighteen conversations across nature, mysteries, PCs,
-games and everyday life, plus three retained electronic-conference contributions.
+On the first visit, a new local world already has 69 original Japanese posts by
+ten fictional regulars: twenty conversations across nature, mysteries, PCs,
+games, everyday life and beginner questions, plus three retained electronic-conference contributions.
 Read them immediately, before creating a human member or
 allowing a model download. They are bundled fiction, never historical archives
 or claims of live network activity.
@@ -195,7 +195,7 @@ live drafts. OLT room history is included as world data.
 | `13` | コミュニケーション | Five-community directory |
 | `14` | ＰＣ－ＶＡＮ利用情報（無料） | Article list, 0 articles |
 | `15` | ☆★☆ おすすめ ☆★☆ | Article list, 0 articles |
-| `16` | ☆★☆ わかばマーク ☆★☆ | Article list, 0 articles |
+| `16` | ☆★☆ わかばマーク ☆★☆ | Beginner welcome → `1` はじめての広場; read, unread, write and reply |
 | `17` | ＢＩＧＬＯＢＥガイド | Article list, 0 articles |
 | `18` | インターサイト | Information article list, 0 articles |
 | `19` | ＢＩＧＬＯＢＥイベント（無料） | Article list, 0 articles |
@@ -576,6 +576,29 @@ reconstruction; see [conference identity evidence and source limits](docs/resear
 boards `1`–`7`; `J MITI` → `3` → `9` retains 資料室 and its existing reading,
 posting, reply and unread behavior. A saved empty board stays empty.
 
+MAIN or index `16` opens a short Wakaba welcome; `1` enters the single
+original beginner board **はじめての広場**. Read with `LIST` / `READ number`,
+select a human through `HANDLE` for `UNREAD` / `NEXT`, or try `WRITE` / `REPLY number`
+→ title → body → `.END` → review/edit → `Y` to save or `N` / `.CANCEL` to cancel.
+`BACK` follows board → welcome → actual MAIN/index caller; `MAIN` clears the path.
+The welcome itself is not a composition destination. Missing/empty boards explain
+how to begin; only a successful human save creates an absent board.
+
+Only pristine initialization/reset adds [three original contributions](data/pcvan/wakaba.json)
+by existing fictional residents 水玉 and タブストップ, including a question and linked
+reply. Existing, legacy-populated, expanded, imported or deliberately emptied worlds
+receive no Wakaba examples automatically. The existing scheduler may visit stored
+boards under consent, resident preferences and normal budgets; no answer is promised.
+
+The reproduction supports MAIN 16 provisionally, and retrospective participant/client
+documentation supports beginner communication with moderate historical confidence.
+Exact 1996 secondary screens/controls have low confidence. Board name, selector `1`,
+`LOCAL-WAKABA:1`, wording, navigation, controls and conversation are **category D
+reconstruction**, not an authenticated SIG directory or `J WAKABA` shortcut.
+Wakaba OLT and a full historical directory remain outside this subset. Settings →
+Details/About and the [research record](docs/research/pcvan-1996-1997.md#wakaba-beginner-board-issue-109)
+provide source scope, access dates and limitations.
+
 The community directory (`13`, or `8` / `11` → `SIGS`) adds these routes.
 Selectors below are reconstructed bridges; historical names and date limitations
 are recorded in [the research notes](docs/research/pcvan-1996-1997.md#expanded-communities-issue-51).
@@ -749,7 +772,7 @@ New worlds default to an automatic cap of four saved posts and twelve generation
 attempts per six-hour window while the page stays open. Reconnecting does not
 renew that allowance. This does not authorize a model download. After consent, later visits may load the authorized model when
 work is due, including fetching evicted assets. Readiness does not promise
-immediate posts. The 66 prewritten posts exist before model setup.
+immediate posts. The 69 prewritten posts exist before model setup.
 
 The resident editor selects each of the ten profiles and edits handle, job,
 routine, voice, interests, hours, UTC offset, frequency, weights and affinities.
@@ -789,15 +812,16 @@ invalid data and transaction failures preserve the old world. Errors stay in the
 dialog. Other tabs reload after replacement; stale connections cannot write into
 the replacement world. `BACKUP` / `IMPORT` remain optional typed shortcuts.
 
-A truly pristine profile receives ten resident identities, ten populated boards
-and 66 prewritten forum posts in eighteen threads, plus three electronic-conference
+A truly pristine profile receives ten resident identities, eleven populated boards
+and 69 prewritten forum posts in twenty threads, plus three electronic-conference
 contributions, in one transaction. The original
 [30 posts/eight threads](data/pcvan/fictional-community.json) remain intact;
 [36 additional authored posts](data/pcvan/expanded-community.json) add PC help,
 games, books, bird observations, a small observation event and everyday
-conversation. Dates are fixed once relative to creation (or the one-time expansion), over the preceding roughly two weeks, with a quiet day and recent
-activity; they are not dated as genuine 1996 material. `origin: local-seed:fictional`
-and `local-seed:authored-sigs-v1` plus the `community-world` setting preserve provenance in `ABOUT` and JSON backups.
+conversation; Wakaba adds three posts in two beginner threads. Dates are fixed once relative to creation (or the one-time expansion), over the preceding roughly two weeks, with a quiet day and recent
+activity; they are not dated as genuine 1996 material. Origins
+`local-seed:fictional`, `local-seed:authored-sigs-v1` and `local-seed:wakaba-v1`,
+plus the `community-world` setting, preserve provenance in `ABOUT` and JSON backups.
 Subsequent model output uses `local-ai:webllm:<modelId>` instead.
 
 Reloads and other tabs never refill deleted posts. Intact, locally seeded v1
@@ -812,8 +836,8 @@ fallback. Clearing all browser site data removes the initialization marker, so t
 next visit creates a new world. Export first to retain your current world.
 
 Stored SIGs map by case-insensitive `keyword` and forums by `boardNo`. The
-MITI/DAISIZEN routes remain stable; application keys `LOCAL-DOSV`, `LOCAL-GAMES`
-and `LOCAL-GV` identify reconstructed additions, never historical jump commands.
+MITI/DAISIZEN routes remain stable; application keys `LOCAL-DOSV`, `LOCAL-GAMES`,
+`LOCAL-GV` and `LOCAL-WAKABA` identify reconstructed additions, never historical jump commands.
 Repository snapshots always take precedence over the legacy display-only demos,
 including empty restores or missing boards. Ambiguous mappings are reported
 without choosing arbitrary content.
@@ -832,7 +856,7 @@ it irreversibly deletes local posts, mail, members, read
 markers, resident edits, AI activity/consent, display preferences and history.
 中止 or closing preserves them. `RESET` remains a typed shortcut with its own
 explicit `Y` confirmation.
-The app recreates the expanded baseline: ten residents, 66 forum posts in eighteen threads
+The app recreates the expanded baseline: ten residents, 69 forum posts in twenty threads
 and three electronic-conference contributions,
 then reloads this and other open tabs into a fresh MAIN session. Check the restored
 posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.
