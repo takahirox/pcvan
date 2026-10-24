@@ -2,9 +2,12 @@
 
 A browser-only Japanese text terminal prototype, built with Vite, TypeScript, and
 plain DOM. MAIN uses the provenance-tagged circa-1996 retrospective transcription
-in `data/pcvan/main-1996.json`, including its original Japanese labels. It is
-provisional and **not confirmed for all of 1997**. The two-column layout, colors,
-font, and fluid terminal width are reconstructed presentation choices. See the
+in `data/pcvan/main-1996.json` for its Japanese labels and full-width typography.
+A preserved walkthrough dated July 26, 1996 corroborates the paired-row structure;
+its damaged Japanese text does not verify those labels. The selected menu remains
+provisional: July evidence establishes neither November continuity nor availability
+**throughout 1997**. Exact column spacing, colors, font, and fluid terminal width
+are reconstructed presentation choices. See the
 [historical evidence and limitations](docs/research/pcvan-1996-1997.md).
 
 ## Run locally
