@@ -84,16 +84,22 @@ test('silent residents, expiry and reload produce bounded chronology without clo
 });
 
 test('two tabs share attendance and arbitrate each AI turn once', async ({ page, context }) => {
-  await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '同じ客');
+  // Playwright's clock belongs to the context: install and advance it once for
+  // both tabs, with no wall-clock drift into the next conversational turn.
+  await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+  await mockWorker(page, 'ok'); await start(page, '同じ客');
   await residents(page); await consent(page); await room(page);
-  const other = await context.newPage(); await other.clock.install({ time: epoch }); await mockWorker(other, 'ok'); await other.goto('/');
-  await expect(other.locator('.output')).toContainText('MAIN'); await room(other);
+  const other = await context.newPage(); await mockWorker(other, 'ok'); await other.goto('/');
+  // Complete the connection through MAIN rather than its paused presentation timer.
+  await room(other);
   const joined = await state(page), night = joined!.rooms.find((r) => r.id === 'night')!;
   expect(night.visitors).toHaveLength(2); expect(night.lines.filter((l) => l.kind === 'enter' && l.authorId === night.visitors[0]!.memberId)).toHaveLength(1);
   await command(page, 'ふたりで星を見ています', '<同じ客>');
-  await Promise.all([advance(page, 7), advance(other, 7)]);
-  await expect.poll(async () => (await speech(page)).length).toBeGreaterThan(0);
+  await advance(page, 7);
+  expect(await Promise.all([page, other].map((p) => p.evaluate(() => Date.now())))).toEqual([epoch.getTime() + 21_000, epoch.getTime() + 21_000]);
+  await expect.poll(async () => (await speech(page)).length).toBe(1);
   const lines = await speech(page); expect(new Set(lines.map((l) => l.id)).size).toBe(lines.length);
+  expect((await state(page))!.rooms.find((r) => r.id === 'night')!.pending).toBeNull();
   const allPrompts = await Promise.all([page, other].map((p) => p.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)));
   expect(allPrompts.reduce((n, v) => n + v, 0)).toBe(lines.length);
   await command(other, '/LEAVE', '退出'); await command(page, '/WHO', '同じ客');

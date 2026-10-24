@@ -50,8 +50,18 @@ async function loadHistory(load: () => Promise<Session | null>) {
     const saved = await load(); session.history.replace([...(saved?.commandHistory ?? []), ...lines]); showSessionTimes(saved);
   } finally { commandsDuringHistoryLoad = null; }
 }
-async function refreshContent(): Promise<Backup> {
-  const content = await (await repository).exportBackup();
+async function readContent(background = false): Promise<Backup> {
+  const repo = await repository;
+  try { await repo.reconcileScheduledMail(); }
+  catch (error) {
+    // Keep a recoverable queue without taking a draft/IME's output ownership.
+    // An explicit mailbox operation reports the failure and can retry.
+    if (!background || (error instanceof RepositoryError && error.code === 'stale')) throw error;
+  }
+  return repo.exportBackup();
+}
+async function refreshContent(background = false): Promise<Backup> {
+  const content = await readContent(background);
   terminal.restorePreferences(content.settings);
   controller.setContent(content); controller.setMemberId(activeHuman(content)); ai.refresh(content);
   try { settingsDialog?.refresh(content); }
@@ -105,7 +115,7 @@ const terminal = mountTerminal(root, {
       // Check replacement generation before interpreting any visit-local postal input.
       if (controller.isEcom) await refreshContent();
       if (acceptedRevision !== revision) return;
-      const recordable = commands.recordsHistory;
+      const recordable = commands.recordsHistory && !/^\s*WRITE-AT(?:\s|$)/i.test(line);
       if (recordable) { session.history.add(line); commandsDuringHistoryLoad?.push(line); }
       print(`> ${line}`); terminal.reveal();
       const before = controller.screen;
@@ -161,7 +171,7 @@ function applicationReport(kind: 'ai' | 'offline', ...lines: string[]) {
 }
 const ai = createAiControls({
   print: (...lines) => applicationReport('ai', ...lines),
-  read: () => enqueue(async () => (await repository).exportBackup()),
+  read: () => enqueue(readContent),
   activity: {
     openActivity: (now) => enqueue(async () => (await repository).openActivity(now)),
     configureActivity: (maxPosts, modelId, now) => enqueue(async () => {
@@ -244,8 +254,24 @@ void startup.then((activity) => {
 const touchActivity = () => {
   if (!resetting && controller.screen !== 'disconnected') void enqueue(async () => (await repository).touchActivity()).catch(reportError);
 };
+let residentTickRunning = false;
+let residentTickRequested = false;
 function tickResidents() {
-  if (!resetting && controller.screen !== 'disconnected' && document.visibilityState === 'visible') void ai.tick().catch(reportError);
+  if (resetting || document.visibilityState !== 'visible') return;
+  // Delivery must continue even while the previous tick awaits model work.
+  void enqueue(() => refreshContent(true)).catch(reportError);
+  residentTickRequested = true;
+  if (residentTickRunning) return;
+  residentTickRunning = true;
+  void (async () => {
+    try {
+      // Retain a boundary received while asynchronous delivery/context reads run.
+      while (residentTickRequested && !resetting && document.visibilityState === 'visible') {
+        residentTickRequested = false;
+        if (controller.screen !== 'disconnected') await ai.tick();
+      }
+    } finally { residentTickRunning = false; }
+  })().catch(reportError);
 }
 setInterval(tickResidents, 60_000);
 document.addEventListener('visibilitychange', () => {
@@ -269,9 +295,9 @@ if (typeof BroadcastChannel !== 'undefined') {
         if (event.data?.source === repo.notificationSource) return;
         const kind = typeof event.data === 'string' ? event.data : event.data?.kind;
         if (kind === 'reset' || kind === 'replace') { reloadWorld(); return; }
-        void enqueue(refreshContent).catch(reportError);
+        void enqueue(() => refreshContent(true)).catch(reportError);
       }).catch(reportError);
     });
   } catch { /* Focus refresh covers missed notifications. */ }
 }
-window.addEventListener('focus', () => { void enqueue(refreshContent).catch(reportError); });
+window.addEventListener('focus', () => { void enqueue(() => refreshContent(true)).catch(reportError); });

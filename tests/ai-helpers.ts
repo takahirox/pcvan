@@ -62,12 +62,13 @@ export async function mockPendingWorker(page: Page, work: 'load' | 'generate') {
   }, work);
 }
 
-export async function mockModel(page: Page) {
-  await page.addInitScript(() => {
+export async function mockModel(page: Page, mode: 'ok' | 'load-fail' = 'ok') {
+  await page.addInitScript((mode) => {
     Object.defineProperty(navigator, 'gpu', { value: {}, configurable: true });
-    Object.assign(window, { aiMock: { mode: 'ok', loads: [] as string[], prompts: [] as unknown[], disposed: 0 } });
-  });
-  await page.route('**/src/ai/webllm-adapter.ts', (route) => route.fulfill({ contentType: 'text/javascript', body: `
+    Object.assign(window, { aiMock: { mode, loads: [] as string[], prompts: [] as unknown[], disposed: 0 } });
+  }, mode);
+  // Vite can append a timestamp after dependency optimization or invalidation.
+  await page.route((url) => url.pathname === '/src/ai/webllm-adapter.ts', (route) => route.fulfill({ contentType: 'text/javascript', body: `
     export async function modelWeightsCached() { return true; }
     export function createWebLlmAdapter() {
       const mock = window.aiMock;

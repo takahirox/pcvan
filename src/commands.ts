@@ -3,13 +3,13 @@ import { serviceCategories } from './service-collections';
 import { profileArgument, renderResidentProfile } from './resident-profile';
 import type { ServiceDownload } from './service-collections';
 import type { NetNewsArticle } from './netnews';
-import { calendarSetting } from './calendar';
+import { calendarSetting, scheduleInstant, scheduleTime, SCHEDULE_HORIZON } from './calendar';
 import { conferenceState } from './conference';
 import type { Contribution } from './storage/schema';
 import type { OltContext } from './olt-state';
 import { TerminalOlt } from './olt';
 import type { Backup, Mail, Post, TerminalPreferences } from './storage/schema';
-import { resolveMailDestination, resolveMailResident, validateBackup } from './storage/schema';
+import { resolveMailDestination, resolveMailResident, validateBackup, scheduledMail } from './storage/schema';
 import type { ForumDestination, LocalRepository } from './storage/repository';
 import { ACTIVE_MEMBER_SETTING, createRecordId, residentContext, worldContext as context } from './storage/repository';
 import { activeHuman, forumPosts } from './forums';
@@ -30,7 +30,7 @@ import { modelDisclosure } from './ai/setup';
 import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
-type Intent = { osl: true; category: 1 | 2 } | { multiMail: true } | { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
+type Intent = { osl: true; category: 1 | 2 } | { multiMail: true } | { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail; scheduled?: boolean };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
@@ -79,6 +79,8 @@ export class TerminalCommands {
   private intent: Intent | undefined;
   private composer: TerminalComposer | TerminalComposer<{ keyword: string; name: string }> | undefined;
   private mailAddress = false;
+  private scheduledAddress = false;
+  private pendingCancellation: { senderId: string; reference: string } | undefined;
   private mailSelection: { authorId: string; recipients: { id: string; label: string }[] } | undefined;
   private confirmation: Confirmation | undefined;
   private fileRequest: ServiceDownload | undefined;
@@ -98,15 +100,16 @@ export class TerminalCommands {
     this.settings = createSettingsActions(actions);
   }
   applicationOutput(kind: 'ai' | 'offline') {
-    return !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
+    return !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.pendingCancellation && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
   }
-  get recordsHistory() { return !this.actions.isEcom?.() && !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.confirmation && !this.fileRequest && !this.profile; }
+  get recordsHistory() { return !this.actions.isEcom?.() && !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.confirmation && !this.pendingCancellation && !this.fileRequest && !this.profile; }
   invalidate() {
     this.revision++;
     this.actions.invalidateEcom?.();
     this.olt.invalidate();
-    const active = this.composer?.active || this.mailAddress || this.mailSelection || this.registration || this.confirmation || this.fileRequest || this.profile;
+    const active = this.composer?.active || this.mailAddress || this.mailSelection || this.registration || this.pendingCancellation || this.confirmation || this.fileRequest || this.profile;
     this.composer?.invalidate();
+    this.pendingCancellation = undefined; this.scheduledAddress = false;
     this.composer = undefined; this.mailAddress = false; this.mailSelection = undefined; this.registration = null; this.intent = undefined;
     this.fileRequest = undefined;
     this.confirmation = undefined; this.profile = undefined; this.field = undefined; this.menu = null;
@@ -199,24 +202,41 @@ export class TerminalCommands {
       });
     } else if ('mail' in intent) {
       if (!intent.recipient) {
-        this.mailAddress = true; this.printAddresses(data); this.actions.print('宛先='); return;
+        this.scheduledAddress = !!intent.scheduled; this.mailAddress = true; this.printAddresses(data); this.actions.print('宛先='); return;
       }
       let recipient;
-      try { recipient = resolveMailDestination(data.members, intent.recipient); }
-      catch { this.mailAddress = true; this.actions.print('宛先が見つからないか重複しています。MEMBERS の宛先または有効な INET#address を入力してください。宛先='); return; }
+      try { recipient = intent.scheduled ? { recipientId: resolveMailResident(data.members, intent.recipient).id } : resolveMailDestination(data.members, intent.recipient); }
+      catch { this.scheduledAddress = !!intent.scheduled; this.mailAddress = true; this.actions.print(intent.scheduled ? '宛先が見つからないか重複しています。日時指定は既存のローカル住人1人だけです。宛先=' : '宛先が見つからないか重複しています。MEMBERS の宛先または有効な INET#address を入力してください。宛先='); return; }
       this.mailAddress = false;
-      const id = createRecordId();
+      const id = createRecordId(), revision = this.revision;
+      const label = mailCorrespondent(data.members.find((m) => m.id === recipient.recipientId));
+      const calendar = calendarSetting(data)!;
       this.composer = new TerminalComposer({ keyword: 'MAIL', name: recipient.internetAddress !== undefined ? `INET#${recipient.internetAddress}` : mailCorrespondent(data.members.find((m) => m.id === recipient.recipientId)), localMail: recipient.internetAddress !== undefined }, authorId, intent.parent, {
         print: this.actions.print,
         save: async (_target, draft) => {
-          const row = await (await this.actions.repository()).createHumanMail({ id, senderId: draft.authorId,
+          const repo = await this.actions.repository();
+          if (revision !== this.revision) throw new Error('世界が変更されました。');
+          if (intent.scheduled) {
+            const row = await repo.scheduleHumanMail({ id: `P-${id}`, senderId: draft.authorId, recipientId: recipient.recipientId!,
+              recipientLabel: label, subject: draft.title, body: draft.body, dueAt: draft.dueAt! });
+            return { pendingReference: row.id, status: row.status };
+          }
+          const row = await repo.createHumanMail({ id, senderId: draft.authorId,
             recipient: recipient.internetAddress !== undefined ? `INET#${recipient.internetAddress}` : recipient.recipientId, subject: draft.title, body: draft.body,
             ...(intent.parent ? { replyToMailId: intent.parent.id } : {}) });
           // Saving is committed. A failed refresh must never leave a sendable draft.
           try { await this.actions.read(); } catch { /* A later LIST refreshes. */ }
           return row;
         },
-      }, 'mail', intent.parent ? `Re: ${intent.parent.subject.replace(/^(Re: )+/i, '')}`.slice(0, 200) : '');
+      }, 'mail', intent.parent ? `Re: ${intent.parent.subject.replace(/^(Re: )+/i, '')}`.slice(0, 200) : '', undefined, intent.scheduled ? {
+        prompt: () => { const now = new Date().toISOString(); return [
+          `日時指定（再構成） 宛先：${label}`,
+          `現在：${scheduleTime(now, calendar)} (JST)。現在より後〜${scheduleTime(new Date(Date.parse(now) + SCHEDULE_HORIZON).toISOString(), calendar)} (JST)、最大30日。`,
+          'YYYY-MM-DD HH:mm (JST) / .CANCEL: 中止。配達日時=']; },
+        parse: (line) => scheduleInstant(line, calendar, new Date().toISOString()),
+        valid: (due) => Date.parse(due) > Date.now() && Date.parse(due) <= Date.now() + SCHEDULE_HORIZON,
+        label: (due) => scheduleTime(due, calendar),
+      } : undefined);
     } else this.composer = new TerminalComposer(intent.target, authorId, intent.parent, this.actions);
   }
   private selectionHelp() {
@@ -244,7 +264,7 @@ export class TerminalCommands {
   }
   private printAddresses(data: Backup) {
     this.actions.print('宛先一覧（宛先ID / 会員表示）', ...residentProfiles(data).filter((p) => data.members.some((m) => m.id === personaMemberId(p.id) && m.actor === 'ai'))
-      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'PROFILE 宛先ID・SYN-表示ID・ハンドル: 公開プロフィール', 'WRITE 宛先（一覧の宛先IDまたはハンドル） / WRITE-MULTI: 複数のローカル住人（再構成） / .CANCEL: 中止', internetMailHelp);
+      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'PROFILE 宛先ID・SYN-表示ID・ハンドル: 公開プロフィール', 'WRITE 宛先（一覧の宛先IDまたはハンドル） / WRITE-AT 宛先・PENDING: 日時指定（再構成） / WRITE-MULTI: 複数のローカル住人（再構成） / .CANCEL: 中止', internetMailHelp);
   }
   private confirm(value: Confirmation, ...warning: string[]) {
     this.fileRequest = undefined;
@@ -301,8 +321,21 @@ export class TerminalCommands {
     if (this.mailAddress) {
       if (['CANCEL', '.CANCEL'].includes(command)) { this.mailAddress = false; print('メールを中止しました。コマンド='); }
       else if (['HELP', 'MEMBERS', 'BACK', 'MAIN'].includes(command)) { this.printAddresses(await this.actions.read()); print('宛先='); }
-      else this.startCompose({ mail: true, recipient: line }, await this.actions.read());
+      else { const data = await this.actions.read(); if (revision === this.revision) this.startCompose({ mail: true, recipient: line, scheduled: this.scheduledAddress }, data); }
       return true;
+    }
+    if (this.pendingCancellation) {
+      const pending = this.pendingCancellation;
+      if (['N', 'CANCEL', '.CANCEL', 'BACK', 'MAIN'].includes(command)) {
+        this.pendingCancellation = undefined; print('取消しを中止しました。コマンド='); return true;
+      }
+      if (command !== 'Y') { print('この予約を取り消しますか？ (Y/N)='); return true; }
+      const data = await this.actions.read();
+      if (revision !== this.revision || this.pendingCancellation !== pending) return true;
+      this.pendingCancellation = undefined;
+      if (activeHuman(data) !== pending.senderId) { print('利用者が変更されました。取消しを確認し直してください。'); return true; }
+      const cancelled = await (await this.actions.repository()).cancelScheduledMail(pending.senderId, pending.reference);
+      print(cancelled ? `予約 ${pending.reference} を取り消しました。` : '取消しできません。配達時刻以降または処理済みです。', 'コマンド='); return true;
     }
     if (this.registration) {
       if (['N', 'SKIP', 'CANCEL', '.CANCEL', 'BACK', 'MAIN'].includes(command)) {
@@ -456,6 +489,23 @@ export class TerminalCommands {
       if (revision !== this.revision) return true;
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }
       if (command === 'WRITE-MULTI') { this.startCompose({ multiMail: true }, data); return true; }
+      if (command === 'PENDING' || /^(READ-PENDING|CANCEL-PENDING)(?: |$)/.test(command)) {
+        const letters = scheduledMail(data).letters.filter((l) => l.senderId === human && l.status === 'pending');
+        if (command === 'PENDING') {
+          print(`配達待ち：${letters.length}件`, ...letters.map((l) => `${l.id} / ${l.recipientLabel} / ${scheduleTime(l.dueAt, calendarSetting(data)!)} (JST) / ${l.subject}`),
+            'READ-PENDING 参照 / CANCEL-PENDING 参照（配達前にYで取消し） / BACK: 戻る / MAIN: MAIN'); return true;
+        }
+        const reference = line.trim().split(/\s+/)[1];
+        const letter = letters.find((l) => l.id.toUpperCase() === reference?.toUpperCase());
+        if (!letter) { print('その参照の配達待ちはありません。PENDING で確認してください。'); return true; }
+        print(`予約 ${letter.id}`, `宛先：${letter.recipientLabel}`, `配達予定：${scheduleTime(letter.dueAt, calendarSetting(data)!)} (JST)`, `件名：${letter.subject}`, '★内容', letter.body);
+        if (command.startsWith('CANCEL-PENDING')) {
+          this.pendingCancellation = { senderId: human!, reference: letter.id }; print('この予約を取り消しますか？ (Y/N)=');
+        } else print('PENDING / CANCEL-PENDING 参照 / コマンド=');
+        return true;
+      }
+      const scheduled = /^ *WRITE-AT(?: ([\s\S]*))?$/i.exec(line);
+      if (scheduled) { this.startCompose({ mail: true, scheduled: true, recipient: scheduled[1] ?? '' }, data); return true; }
       const write = /^ *(?:WRITE|COMPOSE)(?: ([\s\S]*))?$/i.exec(line);
       if (write) { this.startCompose({ mail: true, recipient: write[1] ?? '' }, data); return true; }
       const selected = /^(READ|REPLY) ([1-9]\d*)$/.exec(command);

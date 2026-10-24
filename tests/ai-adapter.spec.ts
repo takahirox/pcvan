@@ -1,4 +1,25 @@
 import { expect, test } from '@playwright/test';
+import { mockModel } from './ai-helpers';
+
+test('mock adapter handles bare and timestamped module URLs with deterministic startup mode', async ({ page }) => {
+  await mockModel(page, 'load-fail');
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async () => {
+    const errors: string[] = [];
+    for (const path of ['/src/ai/webllm-adapter.ts', '/src/ai/webllm-adapter.ts?t=123456789']) {
+      const { createWebLlmAdapter, modelWeightsCached } = await import(path);
+      if (!await modelWeightsCached('test-model')) throw new Error('Mock cache unavailable');
+      const adapter = createWebLlmAdapter();
+      try { await adapter.load('test-model', () => {}, new AbortController().signal); }
+      catch (error) { errors.push((error as Error).message); }
+      finally { adapter.dispose(); }
+    }
+    return { errors, mock: (window as unknown as { aiMock: { loads: string[]; disposed: number } }).aiMock };
+  });
+  expect(result.errors).toEqual(['offline weights unavailable', 'offline weights unavailable']);
+  expect(result.mock.loads).toEqual(['test-model', 'test-model']);
+  expect(result.mock.disposed).toBe(2);
+});
 
 test('real WebLLM adapter uses structured worker requests, forwards progress, rejects truncation and terminates cancelled/failed workers', async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');

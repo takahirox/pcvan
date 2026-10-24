@@ -69,3 +69,19 @@ export function serviceDate(instant: string, calendar?: HistoricalCalendar, styl
   if (style === 'forum') return `${date.slice(2, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}  ${date.slice(11, 16)}`;
   return `${date.slice(2, 4)}年${date.slice(5, 7)}月${date.slice(8, 10)}日 ${date.slice(11, 19)}`;
 }
+
+export const SCHEDULE_HORIZON = 30 * day;
+/** Input and inverse projection use UTC arithmetic only; the UI calendar is JST. */
+export function scheduleTime(instant: string, calendar: HistoricalCalendar): string {
+  const projected = historicalAnchor(calendar.sourceAnchor) + Date.parse(instant) - Date.parse(calendar.sourceAnchor);
+  return new Date(projected + jst).toISOString().slice(0, 16).replace('T', ' ');
+}
+export function scheduleInstant(input: string, calendar: HistoricalCalendar, now: string): string {
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(input)) throw new Error('YYYY-MM-DD HH:mm (JST)');
+  const local = Date.parse(`${input.replace(' ', 'T')}:00.000Z`);
+  if (!Number.isFinite(local) || new Date(local).toISOString().slice(0, 16).replace('T', ' ') !== input)
+    throw new Error('実在する日時を入力してください。');
+  const due = local - jst - historicalAnchor(calendar.sourceAnchor) + Date.parse(calendar.sourceAnchor);
+  if (due <= Date.parse(now) || due > Date.parse(now) + SCHEDULE_HORIZON) throw new Error('現在より後、30日以内の日時を入力してください。');
+  return new Date(due).toISOString();
+}

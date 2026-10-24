@@ -3178,3 +3178,225 @@ evidence and confidence limits without claiming a recovered host workflow.
 Optional native IME observation, other browser engines and historical-user feedback
 were not performed. No required post-merge verification remains. No push, pull
 request, merge or external comment was performed.
+
+# Scheduled local resident delivery (Issue #123)
+
+Validated on 2026-10-24 with Node.js 24.12.0 on macOS. The implementation uses
+Issue #123's dated evidence record; historical retrieval was not repeated here.
+No real model download or inference, external mail request, push, PR, merge or
+external comment was performed.
+
+The first build could not start because dependencies were absent (`tsc: command
+not found`). `npm ci` installed the lockfile unchanged, reporting zero
+vulnerabilities. Subsequent configured builds/type checking passed. Existing Vite
+large-chunk and Node `NO_COLOR`/`FORCE_COLOR` warnings remain.
+
+Validation and corrections during implementation:
+
+- The initial scheduling-only selection requested three workers but used **one**
+  (one test file): **5 passed, 7 failed (30.0s)**. Corrected browser-evaluation
+  arguments, advancing versus fixed clock assumptions and contextual BACK
+  expectations. These failures did not establish product regressions.
+- The focused mail/composition/calendar/activity/terminal/progressive-output
+  selection used **three workers**: **103 passed, 7 failed (2.9m)**. Six failures
+  exposed an overly broad commit-time mail filter affecting legacy immediate
+  letters/backwards-clock confirmation. Restricted the new commit filter to
+  scheduled availability. The remaining failure used an invalid test AI run ID;
+  corrected it to the existing batch prefix contract.
+- Expanded scheduling plus existing mail repository selection requested three
+  workers and used **two** (two files): **50 passed, 1 failed (36.2s)**. Corrected
+  the test's handle registration syntax; a single-test rerun (**one worker**)
+  then exposed the test's missing intermediate Settings return. Corrected that
+  expectation. The next two-file run passed **51/51 (32.5s), actual two workers**.
+- Review found that cancellation could capture its clock before waiting for a
+  storage lock. Moved default submission/cancellation/reconciliation clocks inside
+  their transactions and added a real IndexedDB lock held across the due boundary.
+  Also rejected case-only pending-reference aliases to keep inspection unambiguous.
+- Stopped an initial complete three-worker run to include that correction:
+  **277 passed, 2 failed, 3 interrupted, 216 not run (3.3m)**. The two failures
+  were existing autonomous timer checks (paused-resident and expanded-SIG reply);
+  an isolated diagnostic selection passed **2/2 (17.4s), actual one worker**.
+  No cause or default-worker reliability conclusion is inferred from that rerun;
+  the temporary diagnostic wrapper was removed.
+- The updated two-file selection passed **51, failed 1 (34.8s), actual two
+  workers**: the new reset test waited for an echo in a document intentionally
+  replaced by reload. Changed it to await both page loads and the approval key
+  event directly, preserving the stale-approval assertions.
+
+- A second complete three-worker run was stopped for the timing corrections:
+  **322 passed, 2 failed, 3 interrupted, 172 not run (5.3m)**. The expanded-SIG
+  timer opportunity was again missing; the long anonymous BiZ journey reached
+  its 30-second test timeout while still processing commands. The active-minute
+  handler now retains a boundary arriving during an earlier asynchronous refresh,
+  then checks again after that pass. The two long BiZ production cases receive
+  60 seconds each; assertions and worker configuration are unchanged.
+- Final scheduling/autonomy/expanded-community selection:
+  `npm test -- --workers=3 tests/scheduled-mail.spec.ts tests/autonomy.spec.ts tests/expanded-community.spec.ts`
+  passed **34/34 (31.8s), actual three workers**. This includes the storage-lock
+  deadline, reset reload synchronization and legacy arbitrary-mail-ID preservation.
+
+- The next complete run used **three workers**: **496 passed, 3 failed (7.8m)**.
+  Two mailbox-directory assertions rejected reconstruction commentary in routine
+  help; removed that parenthetical while keeping the qualification in the time
+  prompt, About and documentation. One Wakaba repository evaluation lost its
+  browser context after I edited runtime source during the still-active dev-server
+  suite. An overlapping focused launch also failed to start because those servers
+  were still running; no checks ran in that launch.
+- Review of the retained tick found that awaiting model work could postpone a
+  later delivery pass. Each active boundary now queues delivery reconciliation
+  independently of the coalesced AI check. Added a production test with inference
+  intentionally held indefinitely; delivery still releases at the next boundary.
+  Scheduling, affected autonomy, section navigation and Wakaba repository selection
+  passed **57/57 (33.8s), actual three workers**, including that new test. Runtime
+  and test files are held unchanged for the final complete run.
+
+The scheduling coverage includes all three entry routes in Tokyo, Los Angeles
+and Kiritimati timezones; inverse JST dates/ranges and rollover; registration,
+literal text/editing/queued input/private recall; pinned recipient renaming;
+pending inspection by selected human; confirmed cancellation; exact due boundaries
+and lock waits; concurrent retry/release/numbering; quota rollback/recovery;
+reload/JSON/empty legacy restore and identical-world stale handles; cross-tab
+reset/restore of drafts/cancellation approvals; late focus resume; active IME and
+output ownership during successful/failed release; AI-disabled deterministic
+delivery; pre-due public/private prompt isolation; mocked catch-up contexts on
+both sides of availability; scheduled-parent response-delay commitment checks;
+and consumed-save behavior after output failure.
+
+Final complete run, with no subsequent runtime/test edits:
+
+```sh
+npm test -- --workers=3
+```
+
+**500 passed (8.1m), actual three workers**, including TypeScript checking and
+production bundling. No failures, retries or skipped tests. This retains the
+existing functional, storage, consent, privacy, IME and terminal regressions.
+The new scheduling file contributes twenty checks.
+
+Reviewed the complete diff against Issue #123, including the independent delivery
+boundary, legacy IDs, composer consumption, scheduled-parent chronology and test
+time allowance. All **182 local documentation links/anchors** in the five affected
+Markdown documents resolve; their code fences balance. Final `git diff --check`
+and staged whitespace checks pass, including the new test file. The dependency
+lockfile is unchanged. Optional native IME observation, other browser engines and
+new historical manual recovery were not performed. No required post-merge
+verification applies.
+
+## PR #124 review correction: shared-clock OLT arbitration (Issue #123)
+
+Validated on 2026-10-24 with Node.js 24.12.0 on macOS. `npm ci` passed
+without lockfile changes or reported vulnerabilities.
+
+The review's two-tab failure reproduced with **19 passed, 1 failed (43.2s)**
+over twenty repetitions. A temporary diagnostic run produced **27 passed,
+3 failed (57.7s)** over thirty repetitions. These used **three workers**.
+Diagnostics showed distinct consecutive turns, with the second prompt containing
+the first saved speech: the test compared an older one-line snapshot with a later
+two-generation count. Playwright's clock is shared by the browser context;
+advancing it from both tabs doubled the elapsed time and allowed another turn.
+
+The test now installs and pauses that clock once, advances it once for both tabs,
+and verifies both clocks reached exactly 21 seconds. It requires exactly one
+saved speech line, no pending turn, unique line IDs and an equal total inference
+count across both tabs, retaining attendance and departure assertions. The paused
+prototype initially waited on the second tab's connection presentation timer:
+**9 failed, 3 interrupted, 18 not run** before stopping it. Entering through the
+existing MAIN command completes that connection explicitly. No runtime arbitration
+or scheduling code was changed; the temporary diagnostics were removed.
+
+- `npm test -- tests/olt.spec.ts --grep 'two tabs share' --repeat-each=30 --workers=3`:
+  **30 passed (34.4s), actual three workers**.
+- First `npm test -- --workers=3`: **499 passed, 1 failed (8.5m)**. The OLT
+  check and all twenty scheduling checks passed. The existing factory-reset
+  pending-generation test read the old document during reload and reported
+  `Execution context was destroyed`; its captured new document showed a completed
+  reset. No unrelated test or runtime change was made.
+- `npm test -- tests/factory-reset.spec.ts --grep 'reset invalidates pending production generate' --repeat-each=5 --workers=3`:
+  **5 passed (5.6s), actual three workers**.
+- Final `npm test -- --workers=3`: **500 passed (7.9m), actual three workers**,
+  with no failures, retries or skips. Both complete runs included configured
+  TypeScript checking and production bundling, with test/runtime files unchanged
+  between them. Existing Vite chunk-size and Node color warnings remain.
+
+Reviewed the revision diff and checked whitespace with `git diff --check` and
+`git diff --cached --check`. No documentation links were added. No real model
+execution, native IME observation, other browser-engine checks, push or merge was
+performed. No required post-merge verification applies.
+
+## PR #124 review correction: reload-safe mail reset approval (Issue #123)
+
+The review reported **499 passed, 1 failed (8.2m), actual three workers**.
+All twenty scheduling checks passed. The existing multi-mail reset test used
+`command(page, 'Y')`, which waited for an approval echo in the document that reset
+replaces. The replacement document showed successful reset, but that wait prevented
+the test from reaching its stale-approval assertions. Five isolated repetitions
+passed during review, demonstrating the intermittent synchronization failure.
+
+Reset approval now fills `Y` and presses Enter directly while awaiting both tabs'
+load events, matching the scheduling tests. The subsequent queued-command and
+empty-mail assertions remain unchanged. No runtime code was changed.
+
+Validation on 2026-10-24 with Node.js 24.12.0 on macOS:
+
+- The first focused launch could not start because Playwright dependencies were
+  absent (`playwright: command not found`); no checks ran. `npm ci` then passed
+  with no reported vulnerabilities or lockfile changes.
+- `npm test -- tests/mail.spec.ts tests/scheduled-mail.spec.ts --workers=3`:
+  **41 passed (2.7m), actual two workers** for the two selected files. Both
+  corrected reset cases and all twenty scheduling checks passed.
+- `npm test -- --workers=3`: **500 passed (7.9m), actual three workers**,
+  with no failures, retries or skips. Both runs included configured TypeScript
+  checking and production bundling. Existing Vite chunk-size and Node color
+  warnings remain. Test/runtime files were unchanged throughout the full run.
+
+Reviewed the complete revision diff; `git diff --check` and
+`git diff --cached --check` passed. No documentation links were added, and Markdown
+code fences remain balanced. No real model execution, native IME observation,
+other browser-engine checks, push or merge was performed. No required post-merge
+verification applies.
+
+## PR #124 review correction: cold startup and reset registration (Issue #123)
+
+The review reported **496 passed, 4 failed (7.9m), actual three workers**:
+timestamped Vite module requests bypassed the adapter mock, one startup lost its
+registration prompt, and a reset test navigated while welcome registration still
+owned input. Warm repetitions did not resolve those findings.
+
+The adapter mock now matches the module pathname regardless of query parameters.
+A regression check imports both bare and timestamped URLs and verifies mocked
+cache/load/disposal behavior. Reopened mock state and its initial failure mode
+are initialized together, removing dependence on two init scripts' execution
+order. The reset test completes connection/welcome handling and dismisses any
+invitation in both tabs before navigation; its reset and stale-restore assertions
+are preserved.
+
+Startup inspection found that welcome persists its invitation flag before
+printing the prompt, so a dev-server reload can lose that visit's invitation.
+Vite now explicitly optimizes the sole bare runtime dependency with
+`noDiscovery: true`. Its installed optimizer implementation completes that work
+during initialization and does not perform later discovery-triggered reloads.
+A cold four-case diagnostic before the changes passed; the exact cause of the
+review's missing prompt was not reproduced. No application startup code changed.
+
+Validation on 2026-10-24 with Node.js 24.12.0 on macOS:
+
+- Before changes, `DEBUG=vite:deps` with the four affected autonomy/Settings/reset
+  cases: **4 passed (12.7s), actual three workers**, after `npm ci` using an empty
+  temporary npm cache. This diagnostic is not the acceptance result.
+- `npm test -- --workers=3 tests/ai-adapter.spec.ts tests/autonomy.spec.ts tests/factory-reset.spec.ts tests/settings-dialog.spec.ts`:
+  **41 passed (1.1m), actual three workers**.
+- Reinstalled with `npm ci` using a second empty temporary npm cache. Both
+  installs reported zero vulnerabilities and left the lockfile unchanged;
+  reinstalling also removed Vite's generated dependency cache.
+- `DEBUG=vite:deps npm test -- --workers=3`: **501 passed (8.0m), actual three
+  workers**, with no failures, retries or skips. The cold-start log shows explicit
+  dependency optimization finishing before tests begin, with no discovery reload.
+  All twenty scheduling checks and all four previously failing cases passed.
+  Test/configuration files remained unchanged throughout this complete run.
+
+Both post-change runs included configured TypeScript checking and production
+bundling. Existing Vite chunk-size and Node color warnings remain. Reviewed the
+complete revision diff; unstaged and staged whitespace checks pass. No
+documentation links were added, and Markdown code fences remain balanced. No
+real model execution, native IME observation, other browser-engine checks, push
+or merge was performed. No required post-merge verification applies.

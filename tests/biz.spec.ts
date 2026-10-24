@@ -151,6 +151,9 @@ test('About qualifies BiZ command evidence, continuity, reconstruction and ficti
 
 for (const handle of [undefined, '資料検索の人']) {
   test(`production BiZ journey preserves records and literal text at 320px (${handle ?? 'anonymous empty world'})`, async ({ page }) => {
+    // Two full search journeys include hundreds of commands and repeated About
+    // scrollback. Allow the production journey to finish under three-worker load.
+    test.setTimeout(60_000);
     await page.clock.setFixedTime(new Date('2026-10-23T14:00:00.000Z'));
     await page.setViewportSize({ width: 320, height: 640 });
     const remote: string[] = [];

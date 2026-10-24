@@ -1,5 +1,5 @@
 import type { AiRun, Backup, Mail, MailTarget } from '../storage/schema';
-import { invalid } from '../storage/schema';
+import { invalid, mailAvailableAt } from '../storage/schema';
 import { localConversation } from '../storage/community';
 import { personaMemberId, residentProfiles } from './personas';
 import type { ResidentProfile } from './personas';
@@ -7,7 +7,7 @@ import type { GenerationPrompt } from './generation';
 import { random } from './activity';
 import { historicalSetting } from './setting';
 
-const time = (m: Mail) => Date.parse(m.simulation?.simulatedAt ?? m.createdAt);
+const time = (m: Mail) => Date.parse(mailAvailableAt(m));
 // There is one reply target per generation. Keep storage IDs (which may encode
 // batch retry bookkeeping) private; commitAiRun binds this reference to its
 // validated, stored MailTarget when saving the reply and confirmation.

@@ -196,12 +196,15 @@ test('a suspended tab missing notifications cannot approve old consent after res
   const reloading = page.waitForEvent('load');
   await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter'); await reloading;
   await expect(page.locator('.output')).toContainText('MAIN');
+  // MAIN precedes asynchronous welcome processing. Either tab can claim the
+  // shared invitation; finish connection and dismiss it in both before navigating.
+  await command(page, 'SKIP'); await command(other, 'SKIP');
   expect((await snapshot(other)).posts).toHaveLength(72);
   expect((await snapshot(other)).settings.find((s) => s.id === 'ai-activity')!.value).toMatchObject({ consent: false });
   await enterForum(page); await command(page, 'WRITE', '登録しますか');
   await command(page, 'Y', 'ハンドル名='); await command(page, '新しい人', 'タイトル=');
   await command(page, '古い下書き', '本文'); await command(page, '保存しない', '本文='); await command(page, '.END', '投稿しますか');
-  await command(other, 'SKIP', '登録を中止'); await restore(other, saved);
+  await restore(other, saved);
   const reloadAfterRestore = page.waitForEvent('load'); await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter'); await reloadAfterRestore;
   expect((await snapshot(other)).posts).toHaveLength(72);
 });

@@ -492,7 +492,8 @@ for (const operation of ['reset', 'restore'] as const) {
       }
       if (operation === 'reset') {
         await command(page, 'RESET', '初期状態に戻しますか');
-        await Promise.all([page.waitForEvent('load'), other.waitForEvent('load'), command(page, 'Y')]);
+        await page.locator('#command').fill('Y');
+        await Promise.all([page.waitForEvent('load'), other.waitForEvent('load'), page.locator('#command').press('Enter')]);
       } else await Promise.all([other.waitForEvent('load'), restore(page, saved)]);
       await expect(other.locator('.output')).toContainText('MAIN');
       await command(other, 'SKIP');
