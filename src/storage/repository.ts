@@ -1,3 +1,5 @@
+import { activeHuman } from '../forums';
+import type { MailFile } from './mail-file';
 import { OSL_SETTING, oslState, validateOsl, validateOslMembers } from './schema';
 import type { OslEntry } from './schema';
 import { bulletin } from '../bulletin';
@@ -198,6 +200,11 @@ export class LocalRepository {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!['members', 'sigs', 'forums', 'readStates', 'settings'].includes(store)) invalid('This store does not support put.');
       validateRecord(store, row);
+      if (store === 'settings' && (row as Records['settings']).id === 'ai-activity') {
+        const activity = (row as Records['settings']).value as unknown as AiActivity;
+        const content = await this.snapshot(tx);
+        if (activity.batch?.runs.some((r) => r.mail?.replyToMailId && content.mail?.some((m) => m.id === r.mail!.replyToMailId && m.file))) invalid('File mail cannot be a planned reply parent.');
+      }
       if (store === 'settings' && (row as Records['settings']).id === SCHEDULED_MAIL_SETTING) invalid('Use scheduled mail operations to change the queue.');
       if (store === 'settings' && (row as Records['settings']).id === CALENDAR_SETTING) {
         const existing = await request(tx.objectStore('settings').get(CALENDAR_SETTING));
@@ -469,13 +476,36 @@ export class LocalRepository {
       const previous = (content.mail ?? []).find((m) => m.id === input.id);
       if (previous) {
         if (previous.senderId !== sender.id || previous.recipientId !== destination.recipientId || previous.internetAddress !== destination.internetAddress || previous.subject !== input.subject ||
-            previous.body !== input.body || previous.replyToMailId !== input.replyToMailId) invalid('Mail ID collision.');
+            previous.file !== undefined || previous.body !== input.body || previous.replyToMailId !== input.replyToMailId) invalid('Mail ID collision.');
         return previous;
       }
       return this.insertMail(tx, { id: input.id, senderId: sender.id, ...destination,
         subject: input.subject, body: input.body, origin: 'local-human',
         ...(input.replyToMailId !== undefined ? { replyToMailId: input.replyToMailId } : {}) });
     }).then((mail) => { this.notifySetupChanged(); return mail; });
+  }
+
+  /** One file and its bytes share the ordinary mail transaction and allocator. */
+  createHumanFileMail(draft: { id: string; senderId: string; recipientId: string; subject: string; file: MailFile }, requireSelected = false): Promise<Mail> {
+    const input = structuredClone(draft);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 5 ||
+          ['id', 'senderId', 'recipientId', 'subject'].some((k) => typeof input[k as 'id'] !== 'string') || !Object.hasOwn(input, 'file')) invalid('Invalid file-mail draft.');
+      const content = await this.snapshot(tx);
+      if (requireSelected && activeHuman(content) !== input.senderId) throw new RepositoryError('stale', '利用者が変更されました。');
+      if (!content.members.some((m) => m.id === input.senderId && m.actor === 'human') ||
+          resolveMailResident(content.members, input.recipientId).id !== input.recipientId) invalid('Invalid pinned file-mail correspondents.');
+      const row = { ...input, body: '', origin: 'local-human' };
+      validateRecord('mail', { ...row, number: 1, createdAt: new Date().toISOString() });
+      const previous = content.mail?.find((m) => m.id === input.id);
+      if (previous) {
+        if (previous.senderId !== input.senderId || previous.recipientId !== input.recipientId || previous.subject !== input.subject ||
+            !previous.file || previous.file.filename !== input.file.filename || previous.file.size !== input.file.size ||
+            previous.file.encoding !== input.file.encoding || previous.file.data !== input.file.data) invalid('File-mail ID collision.');
+        return previous;
+      }
+      return this.insertMail(tx, row);
+    });
   }
 
   /** One atomic set of ordinary local letters; IDs encode only the retry identity and ordinal. */
@@ -504,7 +534,7 @@ export class LocalRepository {
           const saved = previous.find((m) => m.id === row.id);
           if (!saved || saved.senderId !== row.senderId || saved.recipientId !== row.recipientId ||
               saved.subject !== row.subject || saved.body !== row.body || saved.origin !== row.origin ||
-              saved.replyToMailId !== undefined || saved.internetAddress !== undefined || saved.senderInternetAddress !== undefined) invalid('Multi-mail ID collision.');
+              saved.file !== undefined || saved.replyToMailId !== undefined || saved.internetAddress !== undefined || saved.senderInternetAddress !== undefined) invalid('Multi-mail ID collision.');
           return saved;
         });
       }

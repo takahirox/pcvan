@@ -62,6 +62,7 @@ async function readContent(background = false): Promise<Backup> {
 }
 async function refreshContent(background = false): Promise<Backup> {
   const content = await readContent(background);
+  commands.observeFileMail(content);
   terminal.restorePreferences(content.settings);
   controller.setContent(content); controller.setMemberId(activeHuman(content)); ai.refresh(content);
   try { settingsDialog?.refresh(content); }
@@ -106,11 +107,11 @@ const terminal = mountTerminal(root, {
   submit: (line) => {
     if (resetting) return;
     cancelConnectionTimer();
-    const acceptedRevision = revision;
+    const acceptedRevision = revision, fileInputContext = commands.fileInputContext;
     // Echo inside the same queue as the response so rapid lines never split a
     // title/body prompt. Empty lines reach the composer unchanged.
     void enqueue(async () => {
-      if (acceptedRevision !== revision) return;
+      if (acceptedRevision !== revision || fileInputContext !== commands.fileInputContext) return;
       await finishConnection();
       // Check replacement generation before interpreting any visit-local postal input.
       if (controller.isEcom) await refreshContent();

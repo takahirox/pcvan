@@ -1,3 +1,5 @@
+import { decodeMailFile } from './mail-file';
+import type { MailFile } from './mail-file';
 import oslExamples from '../../data/pcvan/daisizen-collections.json' with { type: 'json' };
 import { netNewsGroups, localNetNewsMessageId } from '../netnews';
 import { CALENDAR_SETTING, isHistorical, calendarSetting, scheduleInstant, scheduleTime, SCHEDULE_HORIZON } from '../calendar';
@@ -73,6 +75,7 @@ export const INTERNET_SAMPLE_ORIGIN = 'local-sample:internet-letter-v1';
 export type Mail = MailIdentity & {
   id: string; number: number;
   subject: string; body: string; createdAt: string; origin: string;
+  file?: MailFile;
   replyToMailId?: string; readAt?: string;
   delivery?: { scheduleId: string; submittedAt: string; availableAt: string };
   recipientConfirmation?: { at: string; replyMailId: string; provenance: 'local-resident-reply-v1' };
@@ -330,7 +333,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'mail':
       fields(value, ['id', 'number', 'subject', 'body', 'createdAt', 'origin'],
-        ['senderId', 'senderInternetAddress', 'recipientId', 'internetAddress', 'replyToMailId', 'readAt', 'simulation', 'recipientConfirmation', 'delivery']);
+        ['senderId', 'senderInternetAddress', 'recipientId', 'internetAddress', 'replyToMailId', 'readAt', 'simulation', 'recipientConfirmation', 'delivery', 'file']);
       string(value.id); integer(value.number, 1);
       if (Object.hasOwn(value, 'senderInternetAddress')) {
         validateInternetAddress(value.senderInternetAddress); string(value.recipientId);
@@ -351,8 +354,13 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       string(value.origin); timestamp(value.createdAt);
       if (value.id.length > 256 || (typeof value.senderId === 'string' && value.senderId.length > 128) ||
           (typeof value.recipientId === 'string' && value.recipientId.length > 128)) invalid('Mail identity is too long.');
+      if (Object.hasOwn(value, 'file')) {
+        try { decodeMailFile(value.file); } catch { invalid('Invalid file-mail bytes or filename.'); }
+        if (typeof value.subject !== 'string' || !validOslText(value.subject) || value.body !== '' || value.origin !== 'local-human' ||
+            ['replyToMailId', 'readAt', 'simulation', 'delivery', 'recipientConfirmation', 'internetAddress', 'senderInternetAddress'].some((k) => Object.hasOwn(value, k))) invalid('Unsupported file-mail combination.');
+      }
       for (const [key, max] of [['subject', 200], ['body', 20000]] as const) {
-        string(value[key]);
+        string(value[key], key !== 'body' || value.file === undefined);
         if (value[key].length > max || /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/.test(value[key]) ||
             (key === 'subject' && value[key].includes('\n'))) invalid('Invalid mail text.');
       }
@@ -462,6 +470,8 @@ export function validateBackup(value: unknown): asserts value is Backup {
   if (netnews !== undefined) { validateNetNews(netnews); validateNetNewsMembers(netnews, backup.members); }
   validateMailRelations(backup.mail ?? [], backup.members);
   validateScheduledRelations(backup);
+  const activity = backup.settings.find((s) => s.id === 'ai-activity')?.value as unknown as AiActivity | undefined;
+  if (activity?.batch?.runs.some((r) => r.mail?.replyToMailId && backup.mail?.some((m) => m.id === r.mail!.replyToMailId && m.file))) invalid('File mail cannot be a planned reply parent.');
   for (const read of backup.readStates) {
     if (!members.has(read.memberId) || !forums.has(read.forumId)) invalid('Read state references a missing member or forum.');
   }
@@ -501,6 +511,7 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
         (row.readAt !== undefined && recipient.actor !== 'human') ||
         (sender.actor === 'human' ? row.origin !== 'local-human' || row.simulation !== undefined
           : !row.origin.startsWith('local-ai:webllm:') || !row.simulation)) invalid('Invalid mail correspondents or provenance.');
+    if (row.file && sender.actor !== 'human') invalid('File mail requires a human sender.');
     if (row.recipientConfirmation !== undefined) {
       const confirmation = row.recipientConfirmation;
       const reply = mail.find((m) => m.id === confirmation.replyMailId);
@@ -512,7 +523,7 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
     }
     if (row.replyToMailId !== undefined) {
       const parent = mail.find((m) => m.id === row.replyToMailId);
-      if (!parent || parent.senderInternetAddress !== undefined || parent.internetAddress !== undefined ||
+      if (!parent || parent.file !== undefined || parent.senderInternetAddress !== undefined || parent.internetAddress !== undefined ||
           parent.number >= row.number || parent.senderId !== row.recipientId ||
           parent.recipientId !== row.senderId || (parent.delivery !== undefined &&
             Date.parse(mailAvailableAt(row)) < Date.parse(mailAvailableAt(parent)) + 20 * 60_000)) invalid('Mail replies require an earlier letter from the correspondent.');

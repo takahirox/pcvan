@@ -176,6 +176,13 @@ accepted text still awaiting display, but excludes the unsent input. Export befo
 reloading; JSON backups contain world data/history, not the terminal display or
 live drafts. OLT room history is included as world data.
 
+Native browser-local file mail is available in all three mail routes:
+`WRITE-FILE hoshimori` → subject → `PICK` → review → `Y`, then `SENT`,
+`READ number`, and separately `ACQUIRE number` → `Y`. Files from 0 through
+262,144 bytes retain exact bytes across reload and JSON restore. See the
+[filename rules, privacy and complete journey](docs/mail.md#native-browser-local-file-mail-issue-125)
+and [qualified historical evidence](docs/research/pcvan-1996-1997.md#native-file-mail-issue-125).
+
 ## Menu destinations and collections
 
 | MAIN selector | Destination | Initial view |

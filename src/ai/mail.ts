@@ -13,7 +13,7 @@ const time = (m: Mail) => Date.parse(mailAvailableAt(m));
 // validated, stored MailTarget when saving the reply and confirmation.
 const replyTargetReference = 'reply-target';
 export function pairMail(content: Backup, residentId: string, humanId: string): Mail[] {
-  return (content.mail ?? []).filter((m) => m.internetAddress === undefined && m.senderInternetAddress === undefined && ((m.senderId === residentId && m.recipientId === humanId) ||
+  return (content.mail ?? []).filter((m) => m.file === undefined && m.internetAddress === undefined && m.senderInternetAddress === undefined && ((m.senderId === residentId && m.recipientId === humanId) ||
     (m.senderId === humanId && m.recipientId === residentId))).sort((a, b) => a.number - b.number);
 }
 
