@@ -744,6 +744,17 @@ input. Sent and received letters have stable numbers, subjects,
 historical JST display dates (stored as operational UTC), reply chains and
 per-recipient read markers. Cancelled drafts do not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
 
+`WRITE-MULTI` selects one existing local resident per line; `.END` after at least
+two distinct recipients starts one draft. Review all pinned recipients and text,
+then approve `Y` to save separate ordinary letters atomically, each with its own
+number and pair-specific confirmation. `SENT`/`READ` inspect every copy; saved
+copies survive reload and JSON restore. Unsent selections/drafts last only in the
+current tab and are invalidated by world replacement. Internet recipient lists
+remain unsupported. This roster-bounded command and copy layout are category D
+reconstruction: the 1993 NEC account documents up to 100 simultaneous recipients,
+with moderate confidence in continuity into late 1996. See [multi-recipient mail](docs/mail.md#multiple-local-recipients-issue-119)
+and its [dated research](docs/research/pcvan-1996-1997.md#multiple-local-mail-recipients-issue-119).
+
 Read a resident's public profile with `MEMBERS` → `PROFILE hoshimori` in any
 mailbox, or `WHO` → `PROFILE identity` in either OLT directory. Inside a room,
 use `/WHO` → `/PROFILE identity`; plain `PROFILE ...` remains speech and

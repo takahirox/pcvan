@@ -474,6 +474,26 @@ and keeps the first read time. Generic `put` cannot bypass mail allocation.
 Member/parent deletion guards include mail references. Normal sends/read updates
 notify tabs, whose commands refresh snapshots even when notifications are missed.
 
+Issue #119 adds `createHumanMultiMail({id, senderId, recipientIds, subject, body})`.
+It requires at least two distinct **pinned full IDs** of currently eligible local
+residents, an existing human, and the existing mail text validation. It validates
+the complete request, then inserts and allocates every copy inside one existing
+transaction. A failure after an earlier insert rolls back all copies and counter
+updates. Concurrent ordinary, Internet and multi-recipient writes share the
+allocator. The draft's stable retry ID derives each ordinary row ID as
+`local-multi:<percent-encoded-draft-id>:<zero-based-ordinal>`. On retry, the entire
+matching set must exist and match sender, ordered recipients and content; an
+incomplete set or collision fails rather than partially redelivering. A partially
+deleted set cannot be completed by the old retry identity.
+
+There are no stored recipient lists, batch fields, group records, schema/index
+changes or new backup requirements. Each row passes ordinary mail validation
+and has its own pair, parent and confirmation. JSON validates each ordinary row;
+legacy backups and explicitly empty mailboxes retain their existing meaning.
+Selection and reviewed drafts are in-memory only, excluded from history and
+backups. Existing generation fences protect saves and world replacement discards
+selection across tabs. See [the terminal contract](mail.md#multiple-local-recipients-issue-119).
+
 Generated mail uses `commitAiRun` and the same consent/model/pause/world checks as
 public generation; run state, letter, number and provenance commit together.
 Quota/constraint errors roll everything back. Duplicate run delivery returns the

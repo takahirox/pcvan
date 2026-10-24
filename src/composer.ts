@@ -5,28 +5,30 @@ import type { ForumDestination } from './storage/repository';
 export interface ComposeDraft { authorId: string; title: string; body: string; replyToPostId?: string }
 export interface ComposerActions<T = ForumDestination> {
   print(...lines: string[]): void;
-  save(destination: T, draft: ComposeDraft): Promise<Pick<Post, 'number'>>;
+  save(destination: T, draft: ComposeDraft): Promise<Pick<Post, 'number'> | { copies: { number: number; recipient: string }[] }>;
 }
 
 /** A draft owns the terminal until an explicit send or cancellation. */
-export class TerminalComposer<T extends { keyword: string; name: string; localMail?: boolean } = ForumDestination> {
+export class TerminalComposer<T extends { keyword: string; name: string; localMail?: boolean; recipients?: string[] } = ForumDestination> {
   private stage: 'title' | 'body' | 'review' | 'edit' = 'title';
   private title = '';
   private lines: string[] = [];
   private done = false;
+  private saving = false;
   constructor(private target: T, private authorId: string,
     private parent: Pick<Post, 'id' | 'number'> | undefined, private actions: ComposerActions<T>, private kind: 'post' | 'mail' | 'article' = 'post', initialTitle = '') {
     if (initialTitle) { this.title = initialTitle; this.stage = 'body'; }
     if (kind === 'mail' && target.localMail) actions.print('このブラウザー内だけに保存します。メールサーバーへ送信しません。');
     if (kind === 'article') actions.print('公開記事（私信ではありません）。このブラウザー内だけに保存し、Usenetへ配信しません。');
     actions.print(parent ? `${kind === 'article' ? '公開フォローアップ先' : '返信先'}：#${parent.number}` : (kind === 'mail' ? '新規メール' : kind === 'article' ? '新規記事' : '新規発言'), `${additionalSigs.find((sig) => sig.keyword === target.keyword)?.name ?? target.keyword} / ${target.name}`, initialTitle ? `件名：${initialTitle}` : `${this.titleLabel}=`);
+    if (target.recipients) actions.print(...target.recipients.map((name) => `宛先：${name}`));
     if (initialTitle) this.help();
   }
   private get titleLabel() { return this.kind !== 'post' ? '件名' : 'タイトル'; }
   get active() { return !this.done; }
   private preview() {
     this.stage = 'review';
-    this.actions.print(...(this.kind === 'article' ? [`Newsgroups: ${this.target.name}`, ...(this.parent ? [`公開フォローアップ先：#${this.parent.number}`, `親 Message-ID: ${this.parent.id}`] : [])] : []), ...(this.kind === 'mail' ? [`宛先：${this.target.name}`] : []), `${this.titleLabel}：${this.title}`, `本文：${this.lines.length}行`,
+    this.actions.print(...(this.kind === 'article' ? [`Newsgroups: ${this.target.name}`, ...(this.parent ? [`公開フォローアップ先：#${this.parent.number}`, `親 Message-ID: ${this.parent.id}`] : [])] : []), ...(this.kind === 'mail' ? (this.target.recipients ?? [this.target.name]).map((name) => `宛先：${name}`) : []), `${this.titleLabel}：${this.title}`, `本文：${this.lines.length}行`,
       ...this.lines.map((line, index) => `${index + 1}: ${line}`), this.kind === 'mail' ? (this.target.localMail ? 'このブラウザー内に保存しますか？ メールサーバーへ送信しません。 (Y/N/EDIT)=' : '送信しますか？ (Y/N/EDIT)=') : '投稿しますか？ (Y/N/EDIT)=');
   }
   help() {
@@ -37,7 +39,7 @@ export class TerminalComposer<T extends { keyword: string; name: string; localMa
       : 'Y: 保存 / N: 破棄 / EDIT: 編集 / HELP: 案内');
   }
   async submit(line: string) {
-    if (this.done) return;
+    if (this.done || this.saving) return;
     const command = line.trim().toUpperCase();
     if (['CANCEL', '.CANCEL'].includes(command)) {
       this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : this.kind === 'article' ? '記事を中止しました。コマンド=' : '投稿を中止しました。コマンド='); return;
@@ -62,15 +64,21 @@ export class TerminalComposer<T extends { keyword: string; name: string; localMa
       if (command === 'N') { this.done = true; this.actions.print(this.kind === 'mail' ? 'メールを中止しました。コマンド=' : this.kind === 'article' ? '記事を中止しました。コマンド=' : '投稿を中止しました。コマンド='); return; }
       if (command === 'EDIT') { this.stage = 'edit'; this.help(); return; }
       if (command !== 'Y') { this.actions.print('Y / N / EDIT を入力してください。下書きは保持されています。'); return; }
+      this.saving = true;
       try {
         const post = await this.actions.save(this.target, { authorId: this.authorId, title: this.title,
           body: this.lines.join('\n'), ...(this.parent ? { replyToPostId: this.parent.id } : {}) });
         // Never leave a sendable draft after the transaction commits.
         this.done = true;
+        if ('copies' in post) {
+          this.actions.print(...post.copies.map((copy) => `メール #${copy.number} → ${copy.recipient} を保存しました。SENT / READ ${copy.number} で確認できます。`), 'コマンド=');
+          return;
+        }
         this.actions.print(this.kind === 'mail' ? (this.target.localMail ? `メール #${post.number} をこのブラウザー内に保存しました。メールサーバーへ送信していません。SENT / READ ${post.number} で確認できます。` : `メール #${post.number} を送信しました。SENT / READ ${post.number} で確認できます。`) : this.kind === 'article' ? `記事 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。` : `発言 #${post.number} を登録しました。LIST / READ ${post.number} で確認できます。`, 'コマンド=');
       } catch (error) {
+        if (this.done) throw error;
         this.actions.print(`${this.kind === 'mail' ? 'メール' : this.kind === 'article' ? '記事' : '投稿'}を保存できませんでした。入力は残っています。${String(error)}`, 'Y: 再試行 / EDIT: 編集 / N: 中止');
-      }
+      } finally { this.saving = false; }
       return;
     }
     const title = /^TITLE (.*)$/i.exec(line);

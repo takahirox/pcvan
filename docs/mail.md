@@ -15,6 +15,7 @@ addresses and display layout is a **category D reconstruction**, not a verified
 | `MEMBERS` | Associate each available resident's stable short address with their forum/OLT synthetic token and safe current handle. |
 | `READ number` | Read a letter in the current box; mark only that received letter read for its human recipient. |
 | `WRITE address` / `COMPOSE address` | Start a letter to an existing resident or explicit `INET#address`. An omitted address prompts in the same input. |
+| `WRITE-MULTI` | Select distinct existing local residents, one per line; `.END` after at least two, then compose once and explicitly approve separate copies. |
 | `REPLY number` | Reply to received mail in INBOX, preserving its parent ID and prefilling `Re: subject`. |
 | `HANDLE` | Choose/register the existing local human identity. An unregistered composition resumes after inline registration. |
 | `HELP` / `BACK` / `MAIN` | Redisplay, return to the entry directory/parent, or return to MAIN. During a draft these commands keep it and explain cancellation. |
@@ -90,6 +91,57 @@ Absence means **unknown/unconfirmed**, never proven unread.
 No private mail is added automatically. Settings can explicitly add the fictional
 Internet sample described below; no archived/private source material is seeded.
 
+## Multiple local recipients (Issue #119)
+
+From MAIN `1`, MAIN `X` or DAISIZEN `MAIL`, enter `WRITE-MULTI`. The existing
+human registration/selection flow applies. Enter one existing resident's short
+address, full local ID or exact handle per line, for example `hoshimori` then
+`kusabue`. `.END` requires at least two distinct residents and starts the ordinary
+subject/body composer. Selection is bounded by the available local roster, not
+by a claimed historical capacity. Unknown/ambiguous handles, humans, Internet
+addresses and duplicate aliases are rejected without dropping accepted selections.
+`SYN-…` display labels are not addresses. `HELP`/`MEMBERS` retain selections;
+attempted navigation explains `CANCEL`/`.CANCEL`, which discards the entire selection.
+
+Opening and every review list each pinned safe label distinctly. Renaming or
+reordering members cannot retarget the draft. `.TEXT`, literal Japanese/blank
+lines, limits, `.END`, `EDIT` and explicit review `Y` behave as in single-recipient
+composition. Text editing retains recipients; to change recipients, cancel and
+restart. No empty line, unrelated command or IME confirmation approves delivery.
+
+Approval saves **one ordinary local letter per recipient in one transaction**.
+Each has its own stable ID, monotonic global number, correspondent, reply chain
+and confirmation. Success identifies every number and recipient; `SENT` then
+`READ number` inspects each copy. Every copy contains the same exact approved text
+and only its own correspondent context. Failure rolls back the complete set and
+number allocation, retaining the draft for retry. Identical concurrent retries
+return the complete saved set; conflicting reuse fails. A committed draft is
+consumed even if refresh or rendering fails. Saved copies survive reload and
+JSON export/import without a new group-message format or backup version.
+
+Resident prompts remain pair-specific: another recipient's private letters or
+copy never become context. A resident reply confirms only its explicit parent
+copy. Common text intentionally sent to both pairs may appear independently.
+Sending does not load a model or guarantee replies, change consent/budgets, send
+external mail or open a mail client. This is separate-copy correspondence, without
+authenticated BCC, CC, reply-all or group conversations. `WRITE`/`COMPOSE` retain
+single-address parsing, including handles with spaces or punctuation; Internet
+recipient lists remain unsupported.
+
+Selection and unsent text live only in the current tab's memory, are excluded
+from command history and JSON backups, and disappear on cancellation, reload,
+reset or restore. World replacement invalidates drafts across tabs, even for an
+identical JSON restore. Entered/reviewed text can remain in scrollback and exported
+terminal logs; saved letters are included in JSON. Local handles do not provide
+device-level isolation or encryption.
+
+The NEC office account documents up to 100 simultaneous recipients in March 1993
+(high confidence); continuity into late 1996 is a moderate-confidence inference.
+This bounded local journey, command, controls, recipient visibility and copy
+layout are **category D reconstruction**. The Issue's 2026-10-24 investigation did
+not recover a qualifying target-year session. See [sources, access limits and
+unresolved questions](research/pcvan-1996-1997.md#multiple-local-mail-recipients-issue-119).
+
 ## Browser-local Internet destinations (Issue #93)
 
 From any of the three mail entries, `HELP`/mailbox guidance introduces `INET#`;
@@ -135,7 +187,7 @@ External addresses and letters survive reload and JSON export/import with the
 rest of mail. Read/drafted text also appears in terminal logs. Unsent drafts are
 not backed up; reset/restore invalidate them across tabs. No mailbox migration,
 remote transport, arbitrary incoming-message editor, attachments, delivery simulation or
-multiple recipients are implemented. Historical `INET#` addressing has high
+Internet recipient lists are implemented. Historical `INET#` addressing has high
 confidence for November 1996; these controls, limits, local-save status and layout
 are category D product choices. See the [dated evidence and unresolved mailbox
 relationships](research/pcvan-1996-1997.md#outbound-internet-mail-issue-93).
@@ -244,7 +296,10 @@ those two on boards both have used. Catch-up filters future material before
 prompting. No other human's mail, other resident's mailbox, complete backup,
 settings, history or global transcript enters the mail request. Profiles, names
 and excerpts are explicitly untrusted discussion data. The model returns only
-strict JSON with pinned sender/recipient/parent IDs and bounded plain text.
+strict JSON with pinned sender/recipient IDs, a fixed prompt-local reply-target
+reference when replying, and bounded plain text. Stored parent IDs, including
+multi-recipient retry identities and selection ordinals, stay out of both prompt
+text and output schemas. Saving binds the reply to the validated stored target.
 Invalid output, extra fields, wrong routing, HTML/control characters and exact
 copies of existing pair letters fail without delivery. These checks constrain
 routing and context; they cannot guarantee model truthfulness or perfect tone.

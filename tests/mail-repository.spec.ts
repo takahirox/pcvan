@@ -19,7 +19,7 @@ async function prepareConfirmation(page: Page) {
     await repo.put('settings', { id: 'ai-activity', value: { ...activity, consent: true, batch: {
       id: 'confirm-batch', from: epoch, to: '2026-10-21T01:00:00.000Z', modelId: activity.modelId, runs: [run],
     } } as never });
-    const raw = JSON.stringify({ personaId: run.personaId, recipientId: humanId, replyToMailId: parent.id,
+    const raw = JSON.stringify({ personaId: run.personaId, recipientId: humanId, replyToMailId: 'reply-target',
       subject: 'Re: 星の手紙', body: '星のお便りをありがとう。' });
     return { parent, context, run, raw };
   }, epoch);
@@ -85,7 +85,7 @@ test('mail backup strictness, individual recipient read markers, replies, import
     const activity = await repo.openActivity();
     const run = { id: 'mail-batch:one', personaId: 'hoshimori', simulatedAt: '2026-10-21T01:00:00.000Z', status: 'running', mail: { humanId, replyToMailId: sent.id } };
     await repo.put('settings', { id: 'ai-activity', value: { ...activity, consent: true, batch: { id: 'mail-batch', from: '2026-10-21T00:00:00.000Z', to: '2026-10-21T02:00:00.000Z', modelId: activity.modelId, runs: [run] } } as never });
-    const raw = JSON.stringify({ personaId: 'hoshimori', recipientId: humanId, replyToMailId: sent.id, subject: 'Re: 便り', body: 'お便りありがとう。' });
+    const raw = JSON.stringify({ personaId: 'hoshimori', recipientId: humanId, replyToMailId: 'reply-target', subject: 'Re: 便り', body: 'お便りありがとう。' });
     const path = '/src/storage/repository.ts';
     const other = await (await import(path)).openRepository('mail-world') as LocalRepository;
     const deliveries = await Promise.all([repo.commitAiRun(run.id, raw), other.commitAiRun(run.id, raw)]);
@@ -624,3 +624,161 @@ test('sample IDs reject collisions, mixed sample/resident allocation stays monot
   expect(result.mixed.map((m) => m.number).sort()).toEqual([2, 3]);
   expect(result.stale).toBe('stale'); expect(result.afterStale).toEqual(result.beforeStale);
 });
+
+test('multi-mail complete-set retries, collisions, mixed concurrent numbering and rollback use one transaction', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, before = await repo.exportBackup();
+    const senderId = before.members.find((m) => m.actor === 'human')!.id;
+    const recipientIds = ['fictional-ai:hoshimori', 'fictional-ai:kusabue'];
+    const draft = { id: 'multi', senderId, recipientIds, subject: '  招待  ', body: '  日本語\n\n　ｶﾅ  ' };
+    const path = '/src/storage/repository.ts';
+    const other = await (await import(path)).openRepository('mail-world') as LocalRepository;
+    const first = await Promise.all([repo.createHumanMultiMail(draft), other.createHumanMultiMail(draft)]);
+    const failures: string[] = [];
+    for (const change of [{ body: 'collision' }, { subject: 'changed' }, { recipientIds: [...recipientIds].reverse() },
+      { recipientIds: [recipientIds[0]!, 'fictional-ai:hankote'] }, { recipientIds: [recipientIds[0]!] },
+      { recipientIds: [recipientIds[0]!, recipientIds[0]!] }, { recipientIds: ['hoshimori', recipientIds[1]!] },
+      { recipientIds: [senderId, recipientIds[1]!] }, { recipientIds: ['INET#one@letters.example.invalid', recipientIds[1]!] },
+      { recipientIds: ['missing', recipientIds[1]!] }, { senderId: recipientIds[0]! }, { subject: ' ' }, { body: '\u001b[2J' }, { extra: true }]) {
+      try { await repo.createHumanMultiMail({ ...draft, ...change } as never); failures.push('saved'); }
+      catch (e) { failures.push((e as { code: string }).code); }
+    }
+    const [multi, local, internet] = await Promise.all([
+      other.createHumanMultiMail({ ...draft, id: 'second' }),
+      repo.createHumanMail({ id: 'ordinary', senderId, recipient: 'hoshimori', subject: '普通', body: '一通' }),
+      repo.createHumanMail({ id: 'internet', senderId, recipient: 'INET#one@letters.example.invalid', subject: '外', body: '保存のみ' }),
+    ]);
+    // Throw after the first mail.add has succeeded, during the second copy's allocation.
+    const native = IDBObjectStore.prototype.put;
+    let allocations = 0;
+    IDBObjectStore.prototype.put = function (value, key) {
+      if (this.name === 'session' && key === 'mail-next-number' && ++allocations === 2) throw new DOMException('quota', 'QuotaExceededError');
+      return key === undefined ? native.call(this, value) : native.call(this, value, key);
+    };
+    let quota = '';
+    try { await repo.createHumanMultiMail({ ...draft, id: 'retry' }); }
+    catch (e) { quota = (e as { code: string }).code; }
+    finally { IDBObjectStore.prototype.put = native; }
+    const afterFailure = await repo.list('mail');
+    const retry = await repo.createHumanMultiMail({ ...draft, id: 'retry' });
+    // An imported/partially deleted set must fail closed, never fill in only missing copies.
+    await repo.delete('mail', retry[1]!.id);
+    let incomplete = '';
+    try { await repo.createHumanMultiMail({ ...draft, id: 'retry' }); } catch (e) { incomplete = (e as { code: string }).code; }
+    other.close();
+    return { first, failures, numbers: [...multi, local, internet].map((m) => m.number).sort((a, b) => a - b),
+      quota, allocations, afterFailure, retry, incomplete, before, after: await repo.exportBackup() };
+  });
+  expect(result.first[0]).toEqual(result.first[1]);
+  expect(result.first[0]!.map((m) => m.number)).toEqual([1, 2]);
+  expect(result.failures).toEqual(Array(14).fill('validation'));
+  expect(result.numbers).toEqual([3, 4, 5, 6]);
+  expect(result.quota).toBe('quota'); expect(result.allocations).toBe(2);
+  expect(result.afterFailure).toHaveLength(6);
+  expect(result.retry.map((m) => m.number)).toEqual([7, 8]); expect(result.incomplete).toBe('validation');
+  for (const key of ['members', 'sigs', 'forums', 'posts', 'readStates', 'settings'] as const) expect(result.after[key]).toEqual(result.before[key]);
+});
+
+test('multi-mail JSON, legacy and empty restore, pinned eligibility and identical-world generation fences', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, before = await repo.exportBackup();
+    const senderId = before.members.find((m) => m.actor === 'human')!.id;
+    const draft = { id: 'multi', senderId, recipientIds: ['fictional-ai:hoshimori', 'fictional-ai:kusabue'], subject: '便り', body: '一緒に星を見ませんか。' };
+    await repo.createHumanMultiMail(draft);
+    const saved = await repo.exportBackup(), path = '/src/storage/repository.ts';
+    const other = await (await import(path)).openRepository('mail-world') as LocalRepository;
+    await repo.replaceFromJson(JSON.stringify(saved), { confirmReplace: true });
+    const restored = await repo.exportBackup(); let stale = '';
+    try { await other.createHumanMultiMail({ ...draft, id: 'stale' }); } catch (e) { stale = (e as { code: string }).code; }
+    other.close();
+    const retry = await repo.createHumanMultiMail(draft);
+    const { mail: _mail, ...legacy } = before;
+    await repo.replaceFromJson(JSON.stringify(legacy), { confirmReplace: true });
+    const legacyMail = await repo.list('mail');
+    await repo.replaceFromJson(JSON.stringify({ ...before, mail: [] }), { confirmReplace: true });
+    const emptyMail = await repo.list('mail');
+    // Simulate a removed roster entry outside guarded repository APIs.
+    const db = await new Promise<IDBDatabase>((resolve) => { const req = indexedDB.open('mail-world'); req.onsuccess = () => resolve(req.result); });
+    await new Promise<void>((resolve) => { const tx = db.transaction('members', 'readwrite'); tx.objectStore('members').delete(draft.recipientIds[1]!); tx.oncomplete = () => resolve(); });
+    db.close();
+    let removed = '';
+    try { await repo.createHumanMultiMail(draft); } catch (e) { removed = (e as { code: string }).code; }
+    return { saved, restored, retry, stale, legacyMail, emptyMail, removed, final: await repo.list('mail') };
+  });
+  expect(result.restored).toEqual(result.saved); expect(result.retry).toEqual(result.saved.mail);
+  expect(result.stale).toBe('stale'); expect(result.legacyMail).toEqual([]); expect(result.emptyMail).toEqual([]);
+  expect(result.removed).toBe('validation'); expect(result.final).toEqual([]);
+});
+
+test('multi-mail copies keep pair prompts and explicit-parent confirmations independent', async ({ page }) => {
+  const result = await page.evaluate(async (epoch) => {
+    const repo = window.mailRepo, content = await repo.exportBackup();
+    const humanId = content.members.find((m) => m.actor === 'human')!.id;
+    const parents = await repo.createHumanMultiMail({ id: 'invitation', senderId: humanId,
+      recipientIds: ['fictional-ai:hoshimori', 'fictional-ai:kusabue'], subject: '観望会', body: '週末、一緒に星を見ませんか。' });
+    await repo.createHumanMail({ id: 'private-other', senderId: humanId, recipient: 'kusabue', subject: '秘密の草笛', body: '草笛だけへの私信' });
+    const mp = '/src/ai/mail.ts', { buildMailPrompt, pairMail } = await import(mp);
+    const prompts = [], stages = [];
+    for (const [index, personaId] of ['hoshimori', 'kusabue'].entries()) {
+      const parent = parents[index]!, target = { humanId, replyToMailId: parent.id };
+      const before = await repo.exportBackup();
+      prompts.push(buildMailPrompt(before, personaId, target));
+      const activity = await repo.openActivity();
+      const batchId = `batch:${personaId}`;
+      const run = { id: `${batchId}:one`, personaId, simulatedAt: epoch, status: 'running' as const, mail: target };
+      await repo.put('settings', { id: 'ai-activity', value: { ...activity, consent: true, batch: {
+        id: batchId, from: epoch, to: '2026-10-21T01:00:00.000Z', modelId: activity.modelId, runs: [run],
+      } } as never });
+      const raw = JSON.stringify({ personaId, recipientId: humanId, replyToMailId: JSON.parse(prompts[index]!.user).replyToMailId,
+        subject: 'Re: 観望会', body: `${personaId}からの返事です。楽しみです。` });
+      const saved = await repo.commitAiRun(run.id, raw);
+      const after = await repo.exportBackup();
+      stages.push({ saved, confirmations: parents.map((p) => after.mail!.find((m) => m.id === p.id)!.recipientConfirmation),
+        pairIds: pairMail(after, parent.recipientId!, humanId).map((m) => m.id) });
+    }
+    return { prompts, parents, stages, after: await repo.exportBackup() };
+  }, epoch);
+  expect(result.prompts[0]!.user).toContain('週末、一緒に星を見ませんか。');
+  expect(JSON.stringify(result.prompts[0])).not.toMatch(/草笛だけへの私信|秘密の草笛|kusabue|recipientIds|copies/);
+  for (const prompt of result.prompts) {
+    // Inspect the full model input, including schema enums, for either copy's
+    // batch prefix, shared retry identity and ordinal-bearing storage ID.
+    expect(JSON.stringify(prompt)).not.toMatch(/local-multi|invitation|recipientIds|copies/);
+    for (const parent of result.parents) expect(JSON.stringify(prompt)).not.toContain(parent.id);
+    expect(JSON.parse(prompt.user).replyToMailId).toBe('reply-target');
+    expect(JSON.parse(prompt.schema).properties.replyToMailId.enum).toEqual(['reply-target']);
+  }
+  expect(result.stages[0]!.confirmations[0]).toBeTruthy(); expect(result.stages[0]!.confirmations[1]).toBeUndefined();
+  expect(result.stages[1]!.confirmations.every(Boolean)).toBe(true);
+  for (let i = 0; i < 2; i++) {
+    expect(result.stages[i]!.pairIds).toContain(result.parents[i]!.id);
+    expect(result.stages[i]!.pairIds).not.toContain(result.parents[1 - i]!.id);
+    expect(result.stages[i]!.saved).toMatchObject({ replyToMailId: result.parents[i]!.id, recipientId: result.parents[i]!.senderId });
+  }
+});
+
+for (const failure of ['validation', 'abort'] as const) {
+  test(`multi-mail ${failure} after an earlier copy write rolls back the set and allocator`, async ({ page }) => {
+    const result = await page.evaluate(async (failure) => {
+      const repo = window.mailRepo, before = await repo.exportBackup();
+      const draft = { id: 'rollback', senderId: before.members.find((m) => m.actor === 'human')!.id,
+        recipientIds: ['fictional-ai:hoshimori', 'fictional-ai:kusabue'], subject: '一括', body: '本文' };
+      const path = '/src/storage/repository.ts', { RepositoryError } = await import(path);
+      const native = IDBObjectStore.prototype.add; let copies = 0, code = '';
+      IDBObjectStore.prototype.add = function (value, key) {
+        if (this.name === 'mail' && ++copies === 2) {
+          if (failure === 'validation') throw new RepositoryError('validation', 'Injected validation failure after first insert.');
+          this.transaction.abort();
+        }
+        return key === undefined ? native.call(this, value) : native.call(this, value, key);
+      };
+      try { await repo.createHumanMultiMail(draft); } catch (e) { code = (e as { code: string }).code; }
+      finally { IDBObjectStore.prototype.add = native; }
+      const after = await repo.exportBackup(), retry = await repo.createHumanMultiMail(draft);
+      return { before, after, retry, copies, code };
+    }, failure);
+    expect(result.after).toEqual(result.before); expect(result.copies).toBe(2);
+    expect(result.code).toBe(failure === 'validation' ? 'validation' : 'storage');
+    expect(result.retry.map((m) => m.number)).toEqual([1, 2]);
+  });
+}

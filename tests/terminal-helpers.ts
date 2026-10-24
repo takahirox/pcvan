@@ -5,13 +5,15 @@ import type { Backup } from '../src/storage/schema';
 
 export async function command(page: Page, line: string, response?: string) {
   const output = page.locator('.output');
-  const start = (await output.textContent())?.length ?? 0;
+  // Slice in the browser so repeated About/review output does not transfer the entire transcript.
+  const start = await output.evaluate((element) => element.textContent?.length ?? 0);
+  const addedOutput = () => output.evaluate((element, offset) => (element.textContent ?? '').slice(offset), start);
   const input = page.locator('#command');
   await input.fill(line); await input.press('Enter');
-  await expect.poll(async () => (await output.textContent())!.slice(start)).toContain(`> ${line}`);
-  if (response) await expect.poll(async () => (await output.textContent())!.slice(start)).toContain(response);
+  await expect.poll(addedOutput).toContain(`> ${line}`);
+  if (response) await expect.poll(addedOutput).toContain(response);
   // Echo precedes async writes. A following queued command is still ordered.
-  return (await output.textContent())!.slice(start);
+  return addedOutput();
 }
 export async function start(page: Page, handle?: string, url = '/') {
   await page.goto(url);
@@ -75,4 +77,11 @@ export async function snapshot(page: Page): Promise<Backup> {
       return result as unknown as Backup;
     } finally { db.close(); }
   });
+}
+
+/** Keep recipient selection separate from the literal subject/body composer. */
+export async function selectMailRecipients(page: Page, addresses = ['hoshimori', 'kusabue']) {
+  await command(page, 'WRITE-MULTI', 'ローカル住人を1行に1人');
+  for (const address of addresses) await command(page, address, '選択済み：');
+  return command(page, '.END', '件名=');
 }

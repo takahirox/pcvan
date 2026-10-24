@@ -7,7 +7,7 @@ import type { Contribution } from './storage/schema';
 import type { OltContext } from './olt-state';
 import { TerminalOlt } from './olt';
 import type { Backup, Mail, Post, TerminalPreferences } from './storage/schema';
-import { resolveMailDestination, validateBackup } from './storage/schema';
+import { resolveMailDestination, resolveMailResident, validateBackup } from './storage/schema';
 import type { ForumDestination, LocalRepository } from './storage/repository';
 import { ACTIVE_MEMBER_SETTING, createRecordId, residentContext, worldContext as context } from './storage/repository';
 import { activeHuman, forumPosts } from './forums';
@@ -28,7 +28,7 @@ import { modelDisclosure } from './ai/setup';
 import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
-type Intent = { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
+type Intent = { multiMail: true } | { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
@@ -76,6 +76,7 @@ export class TerminalCommands {
   private intent: Intent | undefined;
   private composer: TerminalComposer | TerminalComposer<{ keyword: string; name: string }> | undefined;
   private mailAddress = false;
+  private mailSelection: { authorId: string; recipients: { id: string; label: string }[] } | undefined;
   private confirmation: Confirmation | undefined;
   private fileRequest: ServiceDownload | undefined;
   private revision = 0;
@@ -94,15 +95,15 @@ export class TerminalCommands {
     this.settings = createSettingsActions(actions);
   }
   applicationOutput(kind: 'ai' | 'offline') {
-    return !this.composer?.active && !this.mailAddress && !this.registration && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
+    return !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
   }
-  get recordsHistory() { return !this.actions.isEcom?.() && !this.composer?.active && !this.mailAddress && !this.registration && !this.confirmation && !this.fileRequest && !this.profile; }
+  get recordsHistory() { return !this.actions.isEcom?.() && !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.confirmation && !this.fileRequest && !this.profile; }
   invalidate() {
     this.revision++;
     this.actions.invalidateEcom?.();
     this.olt.invalidate();
-    const active = this.composer?.active || this.mailAddress || this.registration || this.confirmation || this.fileRequest || this.profile;
-    this.composer = undefined; this.mailAddress = false; this.registration = null; this.intent = undefined;
+    const active = this.composer?.active || this.mailAddress || this.mailSelection || this.registration || this.confirmation || this.fileRequest || this.profile;
+    this.composer = undefined; this.mailAddress = false; this.mailSelection = undefined; this.registration = null; this.intent = undefined;
     this.fileRequest = undefined;
     this.confirmation = undefined; this.profile = undefined; this.field = undefined; this.menu = null;
     this.detailReturns = [];
@@ -148,8 +149,11 @@ export class TerminalCommands {
   }
   private startCompose(intent: Intent, data: Backup) {
     const authorId = activeHuman(data);
-    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'mail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
-    if ('netnews' in intent) {
+    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'mail' in intent || 'multiMail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
+    if ('multiMail' in intent) {
+      this.mailSelection = { authorId, recipients: [] };
+      this.printAddresses(data); this.selectionHelp();
+    } else if ('netnews' in intent) {
       const id = createRecordId();
       this.composer = new TerminalComposer({ keyword: 'NetNews', name: intent.group }, authorId,
         intent.parent ? { id: intent.parent.messageId, number: intent.parent.number } : undefined, {
@@ -196,9 +200,32 @@ export class TerminalCommands {
       }, 'mail', intent.parent ? `Re: ${intent.parent.subject.replace(/^(Re: )+/i, '')}`.slice(0, 200) : '');
     } else this.composer = new TerminalComposer(intent.target, authorId, intent.parent, this.actions);
   }
+  private selectionHelp() {
+    this.actions.print('WRITE-MULTI：ローカル住人を1行に1人選択（再構成）。',
+      ...this.mailSelection!.recipients.map((m) => `選択済み：${m.label}`),
+      '.END: 2人以上で本文作成へ / HELP・MEMBERS: 一覧 / CANCEL・.CANCEL: 破棄。移動するには中止してください。宛先=');
+  }
+  private startMultiComposer() {
+    const selection = this.mailSelection!;
+    const revision = this.revision;
+    this.mailSelection = undefined;
+    const id = createRecordId();
+    this.composer = new TerminalComposer({ keyword: 'MAIL', name: '複数の住人（個別コピー）', localMail: true,
+      recipients: selection.recipients.map((m) => m.label) }, selection.authorId, undefined, {
+      print: this.actions.print,
+      save: async (_target, draft) => {
+        const repository = await this.actions.repository();
+        if (revision !== this.revision) throw new Error('世界が変更されました。下書きを作り直してください。');
+        const rows = await repository.createHumanMultiMail({ id, senderId: draft.authorId,
+          recipientIds: selection.recipients.map((m) => m.id), subject: draft.title, body: draft.body });
+        try { await this.actions.read(); } catch { /* Committed: a later LIST refreshes. */ }
+        return { copies: rows.map((row, i) => ({ number: row.number, recipient: selection.recipients[i]!.label })) };
+      },
+    }, 'mail');
+  }
   private printAddresses(data: Backup) {
     this.actions.print('宛先一覧（宛先ID / 会員表示）', ...residentProfiles(data).filter((p) => data.members.some((m) => m.id === personaMemberId(p.id) && m.actor === 'ai'))
-      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'PROFILE 宛先ID・SYN-表示ID・ハンドル: 公開プロフィール', 'WRITE 宛先（一覧の宛先IDまたはハンドル） / .CANCEL: 中止', internetMailHelp);
+      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'PROFILE 宛先ID・SYN-表示ID・ハンドル: 公開プロフィール', 'WRITE 宛先（一覧の宛先IDまたはハンドル） / WRITE-MULTI: 複数のローカル住人（再構成） / .CANCEL: 中止', internetMailHelp);
   }
   private confirm(value: Confirmation, ...warning: string[]) {
     this.fileRequest = undefined;
@@ -225,6 +252,28 @@ export class TerminalCommands {
     const print = this.actions.print;
     if (this.actions.ecomDrafting?.()) return false;
     if (this.composer?.active) { await this.composer.submit(line); return true; }
+    if (this.mailSelection) {
+      const selection = this.mailSelection;
+      if (['CANCEL', '.CANCEL'].includes(command)) {
+        this.mailSelection = undefined; print('メールを中止しました。コマンド='); return true;
+      }
+      if (command === '.END') {
+        if (selection.recipients.length < 2) { print('異なる住人を2人以上選択してください。宛先='); return true; }
+        this.startMultiComposer(); return true;
+      }
+      const data = await this.actions.read();
+      if (revision !== this.revision || this.mailSelection !== selection) return true;
+      if (['HELP', 'MEMBERS', 'BACK', 'MAIN'].includes(command)) {
+        this.printAddresses(data); this.selectionHelp(); return true;
+      }
+      try {
+        if (/^INET#/i.test(line.trim())) throw new Error('Local residents only.');
+        const resident = resolveMailResident(data.members, line.trim());
+        if (selection.recipients.some((m) => m.id === resident.id)) print('その住人は選択済みです。宛先=');
+        else { selection.recipients.push({ id: resident.id, label: mailCorrespondent(resident) }); this.selectionHelp(); }
+      } catch { print('宛先を選択できません。既存のローカル住人を1行に1人入力してください。選択は保持されています。移動するには CANCEL。宛先='); }
+      return true;
+    }
     if (this.mailAddress) {
       if (['CANCEL', '.CANCEL'].includes(command)) { this.mailAddress = false; print('メールを中止しました。コマンド='); }
       else if (['HELP', 'MEMBERS', 'BACK', 'MAIN'].includes(command)) { this.printAddresses(await this.actions.read()); print('宛先='); }
@@ -246,6 +295,7 @@ export class TerminalCommands {
       if (!line.trim() || line.length > 80) { print('ハンドル名は空白だけにせず80文字以内で入力してください。'); return true; }
       try { await (await this.actions.repository()).createHumanMember(line); }
       catch (error) { print(`登録できませんでした。ハンドル名は再入力できます。${String(error)}`); return true; }
+      if (revision !== this.revision) return true;
       // Registration is committed. A refresh failure must not invite creation
       // of a duplicate identity, just as a committed post cannot be resent.
       this.registration = null;
@@ -253,6 +303,7 @@ export class TerminalCommands {
       print('ハンドルを登録しました。');
       try {
         const data = await this.actions.read();
+        if (revision !== this.revision) return true;
         if (intent) this.startCompose(intent, data); else if (this.menu) await this.show(this.menu); else print('コマンド=');
       } catch (error) { print(`登録済みですが画面を更新できません。HANDLE / WRITE から再開してください。${String(error)}`); }
       return true;
@@ -378,7 +429,9 @@ export class TerminalCommands {
         return true;
       }
       const data = await this.actions.read(), human = activeHuman(data);
+      if (revision !== this.revision) return true;
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }
+      if (command === 'WRITE-MULTI') { this.startCompose({ multiMail: true }, data); return true; }
       const write = /^ *(?:WRITE|COMPOSE)(?: ([\s\S]*))?$/i.exec(line);
       if (write) { this.startCompose({ mail: true, recipient: write[1] ?? '' }, data); return true; }
       const selected = /^(READ|REPLY) ([1-9]\d*)$/.exec(command);

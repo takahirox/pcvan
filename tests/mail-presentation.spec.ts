@@ -186,3 +186,101 @@ test('incoming external sender has its own address, sample label, recipient and 
   expect(detail.join('\n')).not.toMatch(/不明|既読確認/); expect(letter).toEqual(before);
   expect(renderMailList([letter], members, 'other', 'INBOX', calendar)[0]).toBe('メール一覧：0件');
 });
+
+test('multi selection pins safe identities, rejects duplicate aliases/ambiguity and retains all labels through edit and retry', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async (data) => {
+    const path = '/src/commands.ts', { TerminalCommands } = await import(path);
+    const residents: Member[] = [
+      { id: 'fictional-ai:hoshimori', handle: '同名', actor: 'ai' },
+      { id: 'fictional-ai:kusabue', handle: '同名', actor: 'ai' },
+    ];
+    data.members.push(...residents);
+    let printed: string[] = []; const saved: Record<string, unknown>[] = [], navigation: string[] = [];
+    const commands = new TerminalCommands({ read: async () => data, print: (...lines: string[]) => printed.push(...lines),
+      repository: async () => ({ createHumanMultiMail: async (draft: Record<string, unknown>) => {
+        saved.push(structuredClone(draft)); if (saved.length === 1) throw new Error('quota'); return [{ number: 4 }, { number: 5 }];
+      } }), navigate: (line: string) => navigation.push(line), mailbox: () => ({ box: 'INBOX', title: 'メール' }), ai: {},
+    });
+    await commands.submit('WRITE-MULTI'); const ownsSelection = !commands.recordsHistory && !commands.applicationOutput('ai');
+    await commands.submit('同名'); const ambiguity = [...printed]; printed = [];
+    await commands.submit('hoshimori');
+    residents[0]!.handle = '改名'; residents[1]!.handle = 'hoshimori'; data.members.reverse();
+    await commands.submit('fictional-ai:hoshimori'); const duplicate = [...printed]; printed = [];
+    await commands.submit('kusabue'); await commands.submit('MAIN');
+    await commands.submit('.END'); const opening = [...printed]; printed = [];
+    residents[1]!.handle = '二人目の改名';
+    await commands.submit('件名'); await commands.submit('本文'); await commands.submit('.END'); const review = [...printed]; printed = [];
+    await commands.submit('Y'); await commands.submit('EDIT'); await commands.submit('LINE 1 修正');
+    printed = []; await commands.submit('REVIEW'); const edited = [...printed]; printed = [];
+    await Promise.all([commands.submit('Y'), commands.submit('Y')]); const success = [...printed];
+    return { ownsSelection, ambiguity, duplicate, opening, review, edited, success, saved, navigation, historyAfter: commands.recordsHistory };
+  }, backupFixture());
+  const label1 = `(${identityToken({ id: 'fictional-ai:hoshimori' } as Member)}) 同名`;
+  const label2 = `(${identityToken({ id: 'fictional-ai:kusabue' } as Member)}) hoshimori`;
+  expect(result.ownsSelection).toBe(true); expect(result.historyAfter).toBe(true);
+  expect(result.ambiguity.join('\n')).toContain('選択は保持'); expect(result.duplicate.join('\n')).toContain('その住人は選択済み');
+  for (const output of [result.opening, result.review, result.edited]) {
+    expect(output).toContain(`宛先：${label1}`); expect(output).toContain(`宛先：${label2}`);
+    expect(output.join('\n')).not.toContain('二人目の改名');
+  }
+  expect(result.navigation).toEqual([]); expect(result.saved).toHaveLength(2);
+  expect(result.saved[1]).toEqual({ ...result.saved[0], body: '修正' });
+  expect(result.saved[1]).toMatchObject({ senderId: 'human', recipientIds: ['fictional-ai:hoshimori', 'fictional-ai:kusabue'] });
+  expect(result.success.join('\n')).toContain(`メール #4 → ${label1}`); expect(result.success.join('\n')).toContain(`メール #5 → ${label2}`);
+});
+
+test('multi committed save consumes every copy after refresh or output failure; invalidate discards pending selection reads', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async (data) => {
+    const path = '/src/commands.ts', { TerminalCommands } = await import(path);
+    data.members.push({ id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' }, { id: 'fictional-ai:kusabue', handle: '草笛', actor: 'ai' });
+    const results = [];
+    for (const failOutput of [false, true]) {
+      const saved: unknown[] = [], outputs: string[] = [];
+      const commands = new TerminalCommands({
+        read: async () => { if (saved.length) throw new Error('refresh'); return data; },
+        print: (...lines: string[]) => { if (failOutput && lines.some((l) => l.includes('READ 2 で確認'))) throw new Error('render'); outputs.push(...lines); },
+        repository: async () => ({ createHumanMultiMail: async (draft: unknown) => { saved.push(draft); return [{ number: 1 }, { number: 2 }]; } }),
+        mailbox: () => ({ box: 'SENT', title: 'メール' }), ai: {},
+      });
+      for (const line of ['WRITE-MULTI', 'hoshimori', 'kusabue', '.END', '件名', '本文', '.END']) await commands.submit(line);
+      try { await commands.submit('Y'); } catch { /* post-commit output failure */ }
+      try { await commands.submit('Y'); } catch { /* refresh still unavailable */ }
+      results.push({ saved, outputs, recordable: commands.recordsHistory });
+    }
+    let release!: () => void, hold = false;
+    const outputs: string[] = [], saved: unknown[] = [];
+    const commands = new TerminalCommands({ read: async () => { if (hold) await new Promise<void>((resolve) => { release = resolve; }); return data; },
+      print: (...lines: string[]) => outputs.push(...lines), mailbox: () => ({ box: 'SENT', title: 'メール' }), ai: {},
+      repository: async () => ({ createHumanMultiMail: async (draft: unknown) => { saved.push(draft); return []; } }),
+    });
+    await commands.submit('WRITE-MULTI'); hold = true;
+    const pending = commands.submit('hoshimori'); commands.invalidate(); release(); await pending;
+    hold = false; await commands.submit('.END'); await commands.submit('Y');
+    return { results, saved, outputs, recordable: commands.recordsHistory };
+  }, backupFixture());
+  for (const r of result.results) {
+    expect(r.saved).toHaveLength(1); expect(r.recordable).toBe(true); expect(r.outputs.join('\n')).not.toContain('保存できませんでした');
+  }
+  expect(result.saved).toEqual([]); expect(result.recordable).toBe(true);
+  expect(result.outputs.join('\n')).toContain('世界が変更されました');
+  expect(result.outputs.join('\n')).not.toContain('選択済み：');
+});
+
+test('multi save waiting for a repository cannot write after controller invalidation', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async (data) => {
+    const path = '/src/commands.ts', { TerminalCommands } = await import(path);
+    data.members.push({ id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' }, { id: 'fictional-ai:kusabue', handle: '草笛', actor: 'ai' });
+    let release!: (value: unknown) => void; const saved: unknown[] = [];
+    const commands = new TerminalCommands({ read: async () => data, print: () => {}, mailbox: () => ({ box: 'SENT', title: 'メール' }), ai: {},
+      repository: () => new Promise((resolve) => { release = resolve; }),
+    });
+    for (const line of ['WRITE-MULTI', 'hoshimori', 'kusabue', '.END', '件名', '本文', '.END']) await commands.submit(line);
+    const pending = commands.submit('Y'); commands.invalidate();
+    release({ createHumanMultiMail: async (draft: unknown) => { saved.push(draft); return []; } }); await pending;
+    return { saved, recordable: commands.recordsHistory };
+  }, backupFixture());
+  expect(result.saved).toEqual([]); expect(result.recordable).toBe(true);
+});

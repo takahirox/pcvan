@@ -127,9 +127,9 @@ test('mail prompts exclude other humans and other recipients, bound history and 
     for (let i = 0; i < 6; i++) await repo.createHumanMail({ id: `history-${i}`, senderId: human.id, recipient: 'hoshimori', subject: '過去の便り'.repeat(30), body: '本文'.repeat(10000) });
     const content = await repo.exportBackup(), target = { humanId: human.id, replyToMailId: first.id };
     const prompt = buildMailPrompt(content, 'hoshimori', target);
-    const good = { personaId: 'hoshimori', recipientId: human.id, replyToMailId: first.id, subject: '星の便り', body: '観察のお話をありがとう。' };
+    const good = { personaId: 'hoshimori', recipientId: human.id, replyToMailId: 'reply-target', subject: '星の便り', body: '観察のお話をありがとう。' };
     const invalid = ['{}', JSON.stringify({ ...good, recipientId: other.id }), JSON.stringify({ ...good, replyToMailId: 'other-human' }),
-      JSON.stringify({ ...good, extra: true }), JSON.stringify({ ...good, body: '\u001b[2J' }), JSON.stringify({ ...good, body: '<b>text</b>' }),
+      JSON.stringify({ ...good, replyToMailId: first.id }), JSON.stringify({ ...good, extra: true }), JSON.stringify({ ...good, body: '\u001b[2J' }), JSON.stringify({ ...good, body: '<b>text</b>' }),
       JSON.stringify({ ...good, subject: 'line\nbreak' }), JSON.stringify({ ...good, body: 'あ'.repeat(1201) })];
     const failures = invalid.map((raw) => { try { validateMailGeneration(raw, content, 'hoshimori', target); return false; } catch { return true; } });
     const valid = validateMailGeneration(JSON.stringify(good), content, 'hoshimori', target);
@@ -141,7 +141,7 @@ test('mail prompts exclude other humans and other recipients, bound history and 
   expect(context.mail.every((m: { body: string }) => m.body.length <= 120)).toBe(true);
   expect(context.replyTarget.body.length).toBeLessThanOrEqual(240);
   expect(result.prompt.user.length).toBeLessThan(4000); expect(result.prompt.system).toContain('untrusted data');
-  expect(result.failures).toEqual(Array(8).fill(true)); expect(result.valid.subject).toBe('星の便り');
+  expect(result.failures).toEqual(Array(9).fill(true)); expect(result.valid.subject).toBe('星の便り');
 });
 
 for (const mode of ['invalid', 'failure'] as const) {
@@ -354,4 +354,28 @@ test('Internet letters create no resident acquaintance, targets, pair memory or 
   expect(result.prompts).toEqual(result.privateFree); expect(JSON.stringify(result.prompts)).not.toMatch(/EXTERNAL_ADDRESS|EXTERNAL_SUBJECT|EXTERNAL_BODY/);
   expect(result.forgedTargets).toEqual([true, true, true]); expect(result.pairs).toEqual([result.parent]);
   expect({ ...result.externalOnly, mail: [] }).toEqual(result.before);
+});
+
+test('mocked scheduled reply to one multi-mail copy leaves its co-recipient unconfirmed and out of the prompt', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '観望会の主');
+  await command(page, '1', '電子メール'); await command(page, 'WRITE-MULTI', '宛先=');
+  await command(page, 'hoshimori', '選択済み：'); await command(page, 'kusabue', '選択済み：');
+  await command(page, '.END', '件名='); await command(page, '観望会', '本文');
+  await command(page, '週末、一緒に星を見ませんか。', '本文='); await command(page, '.END', 'このブラウザー内に保存しますか');
+  await command(page, 'Y', 'READ 2 で確認');
+  const parents = (await snapshot(page)).mail!;
+  await mailVisits(page); await consent(page); await page.clock.fastForward(61 * 60_000);
+  await expect.poll(async () => (await incoming(page)).length).toBe(1);
+  const data = await snapshot(page), reply = (await incoming(page))[0]!;
+  expect(reply).toMatchObject({ senderId: parents[0]!.recipientId, recipientId: parents[0]!.senderId, replyToMailId: parents[0]!.id });
+  expect(data.mail!.find((m) => m.id === parents[0]!.id)!.recipientConfirmation?.replyMailId).toBe(reply.id);
+  expect(data.mail!.find((m) => m.id === parents[1]!.id)!.recipientConfirmation).toBeUndefined();
+  const prompts = await page.evaluate(() => (window as unknown as { journeyWorker: { prompts: Record<string, unknown>[] } }).journeyWorker.prompts);
+  const mail = prompts.find((p) => p.kind === 'mail')!;
+  expect(mail).toMatchObject({ personaId: 'hoshimori', replyToMailId: 'reply-target' });
+  expect(JSON.stringify(mail)).toContain('週末、一緒に星を見ませんか。');
+  for (const parent of parents) expect(JSON.stringify(mail)).not.toContain(parent.id);
+  expect(JSON.stringify(mail)).not.toMatch(/kusabue|local-multi|recipientIds|copies/);
+  await command(page, 'SENT', '[既読確認あり]');
+  await command(page, 'READ 2', '既読確認：確認なし');
 });
