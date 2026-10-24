@@ -1,3 +1,4 @@
+import { profileArgument, renderResidentProfile } from './resident-profile';
 import { calendarSetting, serviceDate } from './calendar';
 import type { Backup, JsonValue } from './storage/schema';
 import type { LocalRepository } from './storage/repository';
@@ -8,13 +9,14 @@ import type { OltContext, OltLine, OltRoom, RoomId } from './olt-state';
 import { buildOltPrompt } from './ai/olt';
 import type { createAiControls } from './ai/controls';
 
-export const roomHelp = '/WHO: 参加者 / /LIST: 最近の会話 / /JOIN 番号: 移動 / /LEAVE・/BACK: 退出 / /MAIN: MAIN / /HELP: 案内';
+export const roomHelp = '/PROFILE 宛先ID・表示ID・ハンドル: 公開プロフィール / /WHO: 参加者 / /LIST: 最近の会話 / /JOIN 番号: 移動 / /LEAVE・/BACK: 退出 / /MAIN: MAIN / /HELP: 案内';
 export function renderOltDirectory(content: Pick<Backup, 'settings'>, context: OltContext): string[] {
   const state = oltState(content);
   return [context === 'wakaba' ? 'わかばマーク / OLT' : '大自然＆動植物（DAISIZEN） / ＯＬＴ（＊）',
     'OLT / 部屋一覧', ...contextRooms(context).map((d, i) =>
     `${i + 1} ${d.name} / 参加者：${attendance(state.rooms.find((r) => r.id === d.id)!).length}人`),
   'JOIN 番号 または番号: 入室 / WHO 番号: 参加者 / LIST: 部屋一覧',
+  'PROFILE 宛先ID・表示ID・ハンドル: 公開プロフィール',
   ...(context === 'wakaba' ? ['初めての質問も、読むだけの参加もどうぞ。返事がない時もあります。'] : []),
   `BACK: ${context === 'wakaba' ? 'わかば' : 'SIG'} / MAIN: MAIN / HELP: 案内`, 'コマンド='];
 }
@@ -31,6 +33,7 @@ export class TerminalOlt {
   private roomId: RoomId | undefined;
   private seen = 0;
   private visit = 0;
+  private submission = 0;
   private working = false;
   private task: AbortController | undefined;
   private readonly clientId = crypto.randomUUID();
@@ -63,6 +66,7 @@ export class TerminalOlt {
     await (await this.actions.repository()).observeRoom(this.clientId);
   }
   async submit(line: string): Promise<boolean> {
+    const submission = ++this.submission;
     const context = this.actions.oltContext();
     if (this.roomId && (!context || !contextRooms(context).some((r) => r.id === this.roomId))) await this.leave();
     if (!context) return false;
@@ -71,14 +75,24 @@ export class TerminalOlt {
     const prefix = this.roomId ? '/' : '';
     const guidance = [...rooms.map((_, i) => `JOIN ${i + 1}`), 'WHO', 'LIST', 'BACK', 'MAIN', 'HELP']
       .map((operation) => prefix + operation).join(' / ');
-    const command = line.trim().toUpperCase();
+    const input = line.trim(), command = input.toUpperCase();
     const inRoom = !!this.roomId;
-    const syntax = inRoom ? command.startsWith('/') && !command.startsWith('//') ? command.slice(1) : '' : command;
+    const operation = inRoom ? input.startsWith('/') && !input.startsWith('//') ? input.slice(1) : '' : input;
+    const syntax = operation.toUpperCase();
     if (inRoom && ['LEAVE', 'BACK', 'MAIN'].includes(syntax)) {
       await this.leave();
       this.actions.print('部屋を退出しました。');
       if (syntax === 'MAIN') this.actions.navigate('MAIN');
       else this.actions.print(...renderOltDirectory(await this.actions.read(), context));
+      return true;
+    }
+    const argument = profileArgument(operation);
+    if (argument !== null) {
+      const visit = this.visit, roomId = this.roomId;
+      const data = await this.actions.read();
+      if (visit === this.visit && submission === this.submission && roomId === this.roomId && context === this.actions.oltContext()) {
+        this.actions.print(...renderResidentProfile(data, argument, inRoom), inRoom ? '発言=' : 'コマンド=');
+      }
       return true;
     }
     const selected = /^(?:JOIN )?([0-9]+)$/.exec(syntax);

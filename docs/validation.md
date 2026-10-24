@@ -2803,3 +2803,80 @@ dated manual/session comparison and real generated-language assessment remain
 optional. No model download, GPU inference or external inference service was used.
 Default/eight-worker reliability remains unresolved; three-worker success does
 not resolve it. No required post-merge verification.
+
+## Resident profile lookup (Issue #115)
+
+Validated in the assigned worktree on 2026-10-24 with Node.js 24.12.0,
+Playwright 1.64.1 and Chromium on macOS.
+
+- `npm ci`: passed, 23 packages added, zero reported vulnerabilities; no
+  dependency or lockfile changes. `npx playwright install chromium` passed with
+  the existing browser available.
+- `npm run build`: passed TypeScript checking and the production build.
+- First new-spec run: **14 passed, 6 failed (42.4s)**. Corrected a nonexistent
+  assertion matcher, an overly strict repository-access mock during existing
+  Settings navigation, and four new expectations that skipped the mailbox's
+  intermediate BACK parent. These were test-harness corrections.
+- New-spec rerun: **20 passed (23.6s)**. Then strengthened protected fixtures
+  with private mail/read markers and checked literal profile text in log export.
+- First expanded focused run: **72 passed, 1 failed (1.9m)**. The new OLT help's
+  literal `SYN-` placeholder conflicted with an existing assertion that an empty
+  room renders no invented participant identity. Changed that help label to
+  “display ID”; the existing regression assertion remains unchanged.
+- Second expanded run: **72 passed, 1 failed (1.8m)**. An existing composition
+  source-module evaluation lost its browser execution context during navigation.
+  No application or test change was made for that failure; the unchanged rerun
+  passed the entire focused set.
+- Final focused command below: **73 passed (1.9m)** using three workers, including
+  configured TypeScript checking/production build, with no failures, retries or
+  skips.
+- Complete `npm test -- --workers=3`: **444 passed (8.6m)**, including all 424
+  existing checks and 20 added checks, configured TypeScript checking and the
+  production build. No failures, retries or skips. Existing functional,
+  storage/backup, consent, mail-addressing, OLT, composition/IME, terminal
+  rendering/logging and offline regressions passed.
+
+```sh
+npm test -- tests/resident-profile.spec.ts tests/mail.spec.ts tests/mail-presentation.spec.ts tests/olt.spec.ts tests/wakaba-olt.spec.ts tests/composition.spec.ts --workers=3
+npm test -- --workers=3
+```
+
+New checks cover current/old MAIN and SIG mail, anonymous and registered reading
+without model consent, both OLT directories/rooms, retained mailbox selection
+and actual BACK parents, continued quiet reading/speech and composition, plain
+and escaped PROFILE speech, and input ownership in recipient entry, registration,
+confirmation and the resident editor. They check deterministic key/token/handle
+precedence, duplicate safe names independent of member order, human/unsupported/
+unknown/external identities, missing operands and restored absences, current
+renamed/customized fields, safe-name fallback and unusually long imported
+handles. Exact four-field assertions exclude internal instructions and settings;
+markup remains literal in terminal text and exported logs.
+
+Paused browser clocks control background timing. Protected-record comparisons
+retain every member, SIG, forum, post, private letter, read marker and setting,
+including consent, scheduling, conference and OLT state; only ordinary session/
+command-history bookkeeping is excluded. Mocked worker load counts stay zero.
+Source-module checks reject repository calls during lookup and verify that it
+never observes attendance; delayed output is suppressed on reset/restore,
+context replacement, re-entry and intervening commands, including invalidation
+before the first asynchronous ownership check completes. Background OLT behavior
+and its cancellation/allowance coverage remain unchanged.
+
+Reviewed the final diff against #115. All **136 local Markdown links** and
+**eight Settings research anchors** resolve; code fences are balanced. Working-
+tree and staged whitespace checks pass, including the new source/test files.
+No existing test expectation was weakened. No dependency, schema, identity-token,
+mail-addressing, model or persistence subsystem changes. Existing Vite large-
+chunk and Node NO_COLOR/FORCE_COLOR warnings remain informational.
+
+The client-author capability description and participant archive introduction
+were re-opened as text. LOGBOY and catalog retrieval failed again; the
+[research record](research/pcvan-1996-1997.md#resident-profile-lookup-issue-115)
+and About retain snippet-only status, dating/access limits and category D
+qualifications for controls, public-field selection and anonymous access. No
+archived identities, profiles or messages were copied. No real model download,
+GPU inference or external inference service was used. Native Japanese IME,
+additional browser engines, dated-manual comparison and former-user feedback
+remain optional and were not performed. Default/eight-worker reliability remains
+unresolved; three-worker success does not resolve it. No required post-merge
+verification.

@@ -9,7 +9,7 @@ export function mailCorrespondent(member?: Member): string {
 }
 
 export const internetMailHelp = 'WRITE INET#address / COMPOSE INET#address（例: INET#observer@letters.example.invalid）。このブラウザー内だけに保存し、メールサーバーへ送信しません。';
-export const mailHelp = 'INBOX: 受信箱 / SENT: 送信済み / LIST: 一覧 / READ 番号: 本文 / WRITE 宛先: 新規 / REPLY 番号: 返信 / MEMBERS: 宛先一覧 / INET#address: Internet宛先（ブラウザー内保存のみ）';
+export const mailHelp = 'INBOX: 受信箱 / SENT: 送信済み / LIST: 一覧 / READ 番号: 本文 / WRITE 宛先: 新規 / REPLY 番号: 返信 / MEMBERS: 宛先一覧 / PROFILE 宛先: 公開プロフィール / INET#address: Internet宛先（ブラウザー内保存のみ）';
 export function mailboxRows(mail: readonly Mail[], humanId: string | undefined, box: Mailbox): Mail[] {
   if (!humanId) return [];
   return mail.filter((m) => box === 'INBOX' ? m.recipientId === humanId : m.senderId === humanId).sort((a, b) => a.number - b.number);

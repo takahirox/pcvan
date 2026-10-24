@@ -1,3 +1,4 @@
+import { profileArgument, renderResidentProfile } from './resident-profile';
 import type { ServiceDownload } from './service-collections';
 import type { NetNewsArticle } from './netnews';
 import { calendarSetting } from './calendar';
@@ -78,6 +79,7 @@ export class TerminalCommands {
   private confirmation: Confirmation | undefined;
   private fileRequest: ServiceDownload | undefined;
   private revision = 0;
+  private submission = 0;
   private detailReturns: (Menu | null)[] = [];
   private selectedModel: string = models[0].id;
   private profile: ResidentProfile | undefined;
@@ -196,7 +198,7 @@ export class TerminalCommands {
   }
   private printAddresses(data: Backup) {
     this.actions.print('宛先一覧（宛先ID / 会員表示）', ...residentProfiles(data).filter((p) => data.members.some((m) => m.id === personaMemberId(p.id) && m.actor === 'ai'))
-      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'WRITE 宛先（一覧の宛先IDまたはハンドル） / .CANCEL: 中止', internetMailHelp);
+      .map((p) => `${p.id} / ${mailCorrespondent(data.members.find((m) => m.id === personaMemberId(p.id)))}`), 'PROFILE 宛先ID・SYN-表示ID・ハンドル: 公開プロフィール', 'WRITE 宛先（一覧の宛先IDまたはハンドル） / .CANCEL: 中止', internetMailHelp);
   }
   private confirm(value: Confirmation, ...warning: string[]) {
     this.fileRequest = undefined;
@@ -218,6 +220,7 @@ export class TerminalCommands {
       ...profileFields.map((key, i) => `${i + 1} ${profileLabels[i]}: ${JSON.stringify(this.profile?.[key])}`), '番号: 値を入力 / SAVE: 検証して保存 / CANCEL・BACK: 変更を破棄');
   }
   async submit(line: string): Promise<boolean> {
+    const revision = this.revision, submission = ++this.submission;
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     const print = this.actions.print;
     if (this.actions.ecomDrafting?.()) return false;
@@ -363,6 +366,17 @@ export class TerminalCommands {
     // in these bounded services belongs to navigation, including unsupported input.
     if (!this.menu && (this.actions.isTelnet?.() || this.actions.isEcom?.() || this.actions.isGopher?.() || this.actions.isArchie?.())) return false;
     if (!this.menu && this.actions.mailbox?.()) {
+      const argument = profileArgument(line);
+      if (argument !== null) {
+        const mailbox = this.actions.mailbox()!;
+        const data = await this.actions.read(); // Existing reset/restore generation check.
+        const current = this.actions.mailbox();
+        if (revision === this.revision && submission === this.submission && !this.menu &&
+            current?.box === mailbox.box && current?.title === mailbox.title) {
+          print(...renderResidentProfile(data, argument), 'コマンド=');
+        }
+        return true;
+      }
       const data = await this.actions.read(), human = activeHuman(data);
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }
       const write = /^ *(?:WRITE|COMPOSE)(?: ([\s\S]*))?$/i.exec(line);

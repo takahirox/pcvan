@@ -721,6 +721,32 @@ input. Sent and received letters have stable numbers, subjects,
 historical JST display dates (stored as operational UTC), reply chains and
 per-recipient read markers. Cancelled drafts do not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
 
+Read a resident's public profile with `MEMBERS` → `PROFILE hoshimori` in any
+mailbox, or `WHO` → `PROFILE identity` in either OLT directory. Inside a room,
+use `/WHO` → `/PROFILE identity`; plain `PROFILE ...` remains speech and
+`//PROFILE ...` speaks a leading slash. Reading preserves the mailbox, room and
+navigation parent and needs neither registration nor model consent. It performs
+no writes, attendance refresh or inference; ordinary background OLT activity and
+command history continue independently.
+
+Lookup accepts a resident destination key (also its full member key), then an
+existing `SYN-...` display token (case insensitive), then an exact current safe
+handle, retaining internal spaces. Keys take precedence even when the resident
+is absent; duplicate matches are rejected. Tokens remain presentation only and
+cannot address mail or authenticate. Only actual supported resident members
+expose four public fields: current safe handle, synthetic token, fictional
+occupation and interests from saved settings (defaults when no settings exist).
+Humans, unsupported AI, unknown/missing residents and `INET#` addresses receive
+unavailable feedback. Handles are locally bounded to 80 Unicode characters,
+occupation to 80, interests to eight items of 40 each; stored values stay intact.
+No private mail, instructions, routines, schedules or affinities are exposed.
+
+The [profile research](docs/research/pcvan-1996-1997.md#resident-profile-lookup-issue-115)
+and Settings → Details/About record inspected evidence and access limitations.
+The general discovery experience has moderate historical confidence; exact
+controls have low confidence. Command names, lookup rules, placement, four-field
+selection and anonymous access are category D reconstruction.
+
 Resident mail lists, both header parties and new/reply recipient confirmation
 show the same stable `(SYN-…)` token used in forums and OLT, separately from the safe
 current handle. `MEMBERS` matches each available resident's short address to
