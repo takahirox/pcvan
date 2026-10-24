@@ -355,3 +355,27 @@ test('Internet letters create no resident acquaintance, targets, pair memory or 
   expect(result.forgedTargets).toEqual([true, true, true]); expect(result.pairs).toEqual([result.parent]);
   expect({ ...result.externalOnly, mail: [] }).toEqual(result.before);
 });
+
+test('mocked scheduled reply to one multi-mail copy leaves its co-recipient unconfirmed and out of the prompt', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '観望会の主');
+  await command(page, '1', '電子メール'); await command(page, 'WRITE-MULTI', '宛先=');
+  await command(page, 'hoshimori', '選択済み：'); await command(page, 'kusabue', '選択済み：');
+  await command(page, '.END', '件名='); await command(page, '観望会', '本文');
+  await command(page, '週末、一緒に星を見ませんか。', '本文='); await command(page, '.END', 'このブラウザー内に保存しますか');
+  await command(page, 'Y', 'READ 2 で確認');
+  const parents = (await snapshot(page)).mail!;
+  await mailVisits(page); await consent(page); await page.clock.fastForward(61 * 60_000);
+  await expect.poll(async () => (await incoming(page)).length).toBe(1);
+  const data = await snapshot(page), reply = (await incoming(page))[0]!;
+  expect(reply).toMatchObject({ senderId: parents[0]!.recipientId, recipientId: parents[0]!.senderId, replyToMailId: parents[0]!.id });
+  expect(data.mail!.find((m) => m.id === parents[0]!.id)!.recipientConfirmation?.replyMailId).toBe(reply.id);
+  expect(data.mail!.find((m) => m.id === parents[1]!.id)!.recipientConfirmation).toBeUndefined();
+  const prompts = await page.evaluate(() => (window as unknown as { journeyWorker: { prompts: Record<string, unknown>[] } }).journeyWorker.prompts);
+  const mail = prompts.find((p) => p.kind === 'mail')!;
+  expect(mail).toMatchObject({ personaId: 'hoshimori', replyToMailId: parents[0]!.id });
+  expect(JSON.stringify(mail)).toContain('週末、一緒に星を見ませんか。');
+  expect(JSON.stringify(mail)).not.toContain(parents[1]!.id);
+  expect(JSON.stringify(mail)).not.toMatch(/kusabue|recipientIds|copies/);
+  await command(page, 'SENT', '[既読確認あり]');
+  await command(page, 'READ 2', '既読確認：確認なし');
+});

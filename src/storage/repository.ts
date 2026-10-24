@@ -11,7 +11,7 @@ import { OLT_SETTING, oltState, observeOlt, appendOlt, attendance, VISITOR_LEASE
 import type { OltRoom, OltState, OltTurn, RoomId } from '../olt-state';
 import { planOltTurn, commitOltText } from '../ai/olt';
 import {
-  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailDestination,
+  invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailDestination, resolveMailResident,
 } from './schema';
 import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailIdentity, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
@@ -386,6 +386,42 @@ export class LocalRepository {
       return this.insertMail(tx, { id: input.id, senderId: sender.id, ...destination,
         subject: input.subject, body: input.body, origin: 'local-human',
         ...(input.replyToMailId !== undefined ? { replyToMailId: input.replyToMailId } : {}) });
+    }).then((mail) => { this.notifySetupChanged(); return mail; });
+  }
+
+  /** One atomic set of ordinary local letters; IDs encode only the retry identity and ordinal. */
+  createHumanMultiMail(draft: { id: string; senderId: string; recipientIds: string[]; subject: string; body: string }): Promise<Mail[]> {
+    const input = structuredClone(draft);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (!input || typeof input !== 'object' || Array.isArray(input) ||
+          ['id', 'senderId', 'subject', 'body'].some((key) => typeof input[key as 'id'] !== 'string') ||
+          !input.id.trim() || input.id.length > 128 || !Array.isArray(input.recipientIds) || input.recipientIds.length < 2 ||
+          input.recipientIds.some((id) => typeof id !== 'string') ||
+          Object.keys(input).some((key) => !['id', 'senderId', 'recipientIds', 'subject', 'body'].includes(key))) invalid('Invalid multi-mail draft.');
+      const content = await this.snapshot(tx);
+      if (!content.members.some((m) => m.id === input.senderId && m.actor === 'human')) invalid('Select a local human member.');
+      // Saving accepts pinned IDs only, never a fresh handle lookup.
+      const recipients = input.recipientIds.map((id) => resolveMailResident(content.members, id));
+      if (recipients.some((m, i) => m.id !== input.recipientIds[i]) || new Set(input.recipientIds).size !== recipients.length) invalid('Select distinct local resident IDs.');
+      const prefix = `local-multi:${encodeURIComponent(input.id)}:`;
+      const previous = (content.mail ?? []).filter((m) => m.id.startsWith(prefix));
+      const rows = recipients.map((recipient, index) => ({ id: `${prefix}${index}`, senderId: input.senderId,
+        recipientId: recipient.id, subject: input.subject, body: input.body, origin: 'local-human' }));
+      // Validate the complete request before writing, and each numbered copy in insertMail.
+      for (const row of rows) validateRecord('mail', { ...row, number: 1, createdAt: new Date().toISOString() });
+      if (previous.length) {
+        if (previous.length !== rows.length) invalid('Incomplete multi-mail retry or ID collision.');
+        return rows.map((row) => {
+          const saved = previous.find((m) => m.id === row.id);
+          if (!saved || saved.senderId !== row.senderId || saved.recipientId !== row.recipientId ||
+              saved.subject !== row.subject || saved.body !== row.body || saved.origin !== row.origin ||
+              saved.replyToMailId !== undefined || saved.internetAddress !== undefined || saved.senderInternetAddress !== undefined) invalid('Multi-mail ID collision.');
+          return saved;
+        });
+      }
+      const saved: Mail[] = [];
+      for (const row of rows) saved.push(await this.insertMail(tx, row));
+      return saved;
     }).then((mail) => { this.notifySetupChanged(); return mail; });
   }
 

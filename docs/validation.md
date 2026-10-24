@@ -2972,3 +2972,90 @@ Default/eight-worker reliability remains unresolved: the required three-worker
 run does not establish it. Optional native Japanese IME, other browser engines,
 former-user feedback and dated manual/session comparison were not performed.
 No required post-merge verification remains.
+
+## Multiple local mail recipients (Issue #119)
+
+Coordinator validation on 2026-10-24 used the assigned worktree and Chromium.
+`npm ci` installed the locked dependencies (23 packages, zero audit findings).
+The initial build attempt before installation could not find `tsc`; the build
+passed after installation. All Playwright commands below requested `--workers=3`.
+The configured web servers perform TypeScript checking and production bundling;
+the existing optional-runtime large-chunk warning remained.
+
+The first new-case run selected `mail-repository.spec.ts` and `mail.spec.ts` with
+`--grep 'multi-mail|WRITE-MULTI'`: **8 passed, 2 failed (51.7s), actual 2 workers**.
+Two fixtures violated existing safeguards: deleting a resident still referenced
+by public posts, and an AI run ID outside its batch namespace. The eligibility
+case now simulates an out-of-band missing roster entry; the mocked run uses its
+valid batch-prefixed identity. Product validation was preserved.
+
+```sh
+npm test -- tests/mail.spec.ts tests/mail-repository.spec.ts tests/mail-presentation.spec.ts tests/mail-autonomy.spec.ts tests/composition.spec.ts tests/terminal.spec.ts --workers=3
+```
+
+An intermediate run had **83 passed, 1 failed (2.8m), actual 3 workers**. The
+existing Internet prompt-isolation test lost its browser execution context during
+a navigation while source edits were still in progress. After completing the
+additional fence/rollback/mock-inference coverage, the unchanged-source rerun
+reported **88 passed (2.8m), actual 3 workers**. The navigation's cause was not
+established; it was not treated as a passing check.
+
+The first complete `npm test -- --workers=3` run reported **469 passed, 4 failed
+(9.7m), actual 3 workers**. MAIN `1` and `X` summary checks correctly rejected
+provenance wording in their operational help. The command remains discoverable
+there; its reconstruction qualification stays in selection, MEMBERS guidance,
+About and documentation. Both existing 320px BiZ journeys also reached their
+30-second test limit while polling growing transcripts. The shared command
+helper now measures and slices newly added output inside the browser, avoiding
+repeated transfer of the entire transcript. It retains the same exact echo and
+response assertions, original literal output and existing timeouts.
+
+```sh
+npm test -- tests/mail.spec.ts tests/mail-repository.spec.ts tests/mail-presentation.spec.ts tests/mail-autonomy.spec.ts tests/composition.spec.ts tests/terminal.spec.ts tests/sections.spec.ts tests/biz.spec.ts --workers=3
+```
+
+This expanded run reported **114 passed, 1 failed (2.9m), actual 3 workers**.
+Both BiZ journeys, the mailbox summary checks and every added case passed. The
+existing `resident confirmation stays absent after parent` case was interrupted
+in its `beforeEach` repository setup by another execution-context-destroyed
+navigation. Its unchanged recheck passed:
+
+```sh
+npm test -- tests/mail-repository.spec.ts --grep 'resident confirmation stays absent after parent,' --workers=3
+```
+
+Result: **1 passed (4.3s), actual 1 worker** because only one case was selected.
+The final complete run, with the corrections above and no further runtime/test
+edits, passed:
+
+```sh
+npm test -- --workers=3
+```
+
+**473 passed (7.2m), actual 3 workers**, including TypeScript checking and
+production bundling. No automatic retries, increased timeouts or relaxed existing
+assertions were used. The earlier failures and navigation interruptions remain
+part of this record; this run does not establish default/eight-worker reliability.
+
+The sixteen added checks cover distinct/duplicate aliases, ambiguous and invalid
+recipients, registration/cancellation, all three actual callers and returns,
+pinned IDs/safe labels through renames/reordering/editing, exact Japanese/blank
+lines and literal markup, simulated IME ownership, history exclusion, review and
+queued approvals, SENT/READ, reload and JSON restore. Repository cases cover
+complete-set concurrent retries/collisions, shared ordinary/Internet/multi-mail
+numbering, quota/validation/abort rollback after an earlier copy write, partial
+set rejection, legacy/empty imports, eligibility and identical-world epoch fences.
+Controller checks cover invalidated pending reads/repository acquisition and
+committed drafts consumed despite refresh/output failures. Existing mocked
+inference verifies pair-only context and independent explicit-parent confirmation;
+no real model was downloaded or run. Protected-record comparisons and existing
+regressions cover unrelated forums, read states, conference/OLT, NetNews, resident
+settings, consent, scheduling and public-work capacity. Production requests stay
+within the local app origin.
+
+The complete diff was reviewed. All six added local Markdown links/anchors and
+changed Markdown fences pass; final working-tree/staged whitespace checks pass.
+Historical provenance preserves the accepted Issue investigation's 2026-10-24
+URLs, confidence and access limitations; no new live historical-source inspection
+is claimed here. Optional native IME, other browser engines, hardware testing and
+new dated host transcripts were not performed. No required post-merge check remains.

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { identityToken } from '../src/member-presentation';
 import { renderPost } from '../src/forums';
-import { command, start, snapshot, noOtherUi, backup, restore, settings } from './terminal-helpers';
+import { command, start, snapshot, noOtherUi, backup, restore, settings, selectMailRecipients } from './terminal-helpers';
 
 async function compose(page: import('@playwright/test').Page, subject: string, body: string, to = 'hoshimori') {
   await command(page, `WRITE ${to}`, '件名='); await command(page, subject, '本文を1行ずつ');
@@ -387,4 +387,120 @@ for (const route of [
     expect(requests.filter((url) => !url.startsWith('http://127.0.0.1:14373/'))).toEqual([]);
     expect(requests.filter((url) => /webllm|model|mailto:|letters\.example/i.test(url))).toEqual([]);
   });
+}
+
+for (const route of [
+  { name: 'MAIN 1', steps: ['1'], title: '電子メール', parent: 'ＰＣ－ＶＡＮ' },
+  { name: 'MAIN X', steps: ['X'], title: '旧電子メール', parent: 'ＰＣ－ＶＡＮ' },
+  { name: 'SIG MAIL', steps: ['13', '2', 'MAIL'], title: '電子メール', parent: '大自然' },
+]) {
+  test(`${route.name}: WRITE-MULTI registration, selection, IME, edit, atomic retry, SENT/READ and JSON`, async ({ page }) => {
+    const requests: string[] = []; page.on('request', (r) => requests.push(r.url()));
+    await start(page);
+    const enter = async () => {
+      await command(page, 'MAIN', 'MAIN');
+      for (const step of route.steps) await command(page, step, 'コマンド=');
+    };
+    await enter();
+    await command(page, 'HELP', 'WRITE-MULTI');
+    expect(await command(page, 'MEMBERS', 'WRITE-MULTI')).toContain('再構成');
+    await command(page, 'WRITE-MULTI', '登録しますか'); await command(page, 'N', '登録を中止');
+    await command(page, 'WRITE-MULTI', '登録しますか'); await command(page, 'Y', 'ハンドル名=');
+    await command(page, '招待する人', 'ローカル住人を1行に1人');
+    const initial = await snapshot(page), residents = ['hoshimori', 'kusabue'].map((id) => initial.members.find((m) => m.id === `fictional-ai:${id}`)!);
+    const labels = residents.map((m) => `(${identityToken(m)}) ${m.handle}`);
+    await command(page, '.END', '2人以上');
+    await command(page, 'hoshimori', '選択済み：');
+    await command(page, residents[0]!.handle, 'その住人は選択済み');
+    await command(page, residents[0]!.id, 'その住人は選択済み');
+    for (const invalid of ['unknown', '招待する人', 'INET#one@letters.example.invalid', identityToken(residents[1]!), 'SENT']) {
+      await command(page, invalid, '選択は保持されています');
+    }
+    for (const line of ['HELP', 'MEMBERS', 'BACK', 'MAIN']) expect(await command(page, line, '宛先=')).toContain(`選択済み：${labels[0]}`);
+    await command(page, '.CANCEL', 'メールを中止');
+    await command(page, 'WRITE-MULTI', 'ローカル住人を1行に1人'); await command(page, '.END', '2人以上');
+    const input = page.locator('#command');
+    await input.fill('hoshimori'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+    await expect(input).toHaveValue('hoshimori'); await input.dispatchEvent('compositionend'); await input.press('Enter');
+    await expect(page.locator('.output')).toContainText(`選択済み：${labels[0]}`);
+    await command(page, '.END', '2人以上'); await command(page, 'kusabue', '選択済み：');
+    const opening = await command(page, '.END', '件名=');
+    for (const label of labels) expect(opening).toContain(`宛先：${label}`);
+    await command(page, '', '200文字以内'); await command(page, '  秋の招待　ｶﾅ  ', '本文を1行ずつ');
+    await command(page, '.END', '本文は空白だけ');
+    for (const line of ['  日本語の一行目　ｶﾅ <b>文字</b>  ', '', '.TEXT MAIN']) await command(page, line, '本文=');
+    const review = await command(page, '.END', 'このブラウザー内に保存しますか');
+    for (const label of labels) expect(review).toContain(`宛先：${label}`);
+    for (const line of ['', 'SENT', 'HELP', 'MAIN']) await command(page, line, line === 'HELP' || line === 'MAIN' ? '下書きは保持' : 'Y / N / EDIT');
+    expect((await snapshot(page)).mail).toEqual([]);
+    await command(page, 'EDIT', 'LINE 番号'); await command(page, 'LINE 3   変更した本文  ', '本文を変更');
+    expect(await command(page, 'REVIEW', 'このブラウザー内に保存しますか')).toContain(`宛先：${labels[1]}`);
+    await input.fill('Y'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+    expect((await snapshot(page)).mail).toEqual([]); await input.dispatchEvent('compositionend');
+    await page.evaluate(() => {
+      const native = IDBObjectStore.prototype.put; let allocations = 0;
+      IDBObjectStore.prototype.put = function (value, key) {
+        if (this.name === 'session' && key === 'mail-next-number' && ++allocations === 2) throw new DOMException('quota', 'QuotaExceededError');
+        return key === undefined ? native.call(this, value) : native.call(this, value, key);
+      }; Object.assign(window, { restoreMultiPut: () => { IDBObjectStore.prototype.put = native; } });
+    });
+    await input.press('Enter'); await expect(page.locator('.output')).toContainText('入力は残っています');
+    expect((await snapshot(page)).mail).toEqual([]);
+    await page.evaluate(() => (window as unknown as { restoreMultiPut(): void }).restoreMultiPut());
+    const outputStart = (await page.locator('.output').textContent())!.length;
+    await page.evaluate(() => {
+      const input = document.querySelector<HTMLInputElement>('#command')!;
+      for (const line of ['Y', 'Y']) { input.value = line; input.form!.requestSubmit(); }
+    });
+    await expect.poll(async () => (await page.locator('.output').textContent())!.slice(outputStart)).toContain('READ 2 で確認できます');
+    const success = (await page.locator('.output').textContent())!.slice(outputStart);
+    expect(success).toContain(`メール #1 → ${labels[0]}`); expect(success).toContain(`メール #2 → ${labels[1]}`);
+    await command(page, 'Y', 'この画面では使えない');
+    const verify = async () => {
+      const list = await command(page, 'SENT', 'メール一覧：2件');
+      for (const label of labels) expect(list).toContain(label);
+      for (let i = 0; i < 2; i++) {
+        const read = await command(page, `READ ${i + 1}`, '★内容');
+        expect(read).toContain(`宛先：${labels[i]}`); expect(read).not.toContain(labels[1 - i]!);
+        expect(read).toContain('件名：  秋の招待　ｶﾅ  '); expect(read).toContain('  日本語の一行目　ｶﾅ <b>文字</b>  \n\n  変更した本文  ');
+        expect(read).toContain('既読確認：確認なし'); expect(read).toMatch(/日時：96年/);
+      }
+      await command(page, 'BACK', route.title); await command(page, 'BACK', route.parent);
+    };
+    await verify(); const saved = await backup(page);
+    expect(saved.mail!.map((m) => m.recipientId).sort()).toEqual(residents.map((m) => m.id).sort());
+    expect(new Set(saved.mail!.map((m) => m.id)).size).toBe(2);
+    expect(saved.session!.commandHistory).not.toContain('hoshimori'); expect(saved.session!.commandHistory).not.toContain('  秋の招待　ｶﾅ  ');
+    for (const key of ['members', 'sigs', 'forums', 'posts', 'readStates'] as const) expect(saved[key]).toEqual(initial[key]);
+    await page.reload(); await expect(page.locator('.output')).toContainText('MAIN'); await enter(); await verify();
+    await restore(page, saved); await enter(); await verify(); expect((await snapshot(page)).mail).toEqual(saved.mail);
+    await expect(page.locator('.output b')).toHaveCount(0); await noOtherUi(page);
+    expect(requests.filter((url) => !url.startsWith('http://127.0.0.1:14373/'))).toEqual([]);
+  });
+}
+
+for (const operation of ['reset', 'restore'] as const) {
+  for (const stage of ['selection', 'review'] as const) {
+    test(`multi-mail ${stage} is invalidated across tabs by ${operation}, including queued approval`, async ({ page, context }) => {
+      await start(page, '古い招待'); const saved = await backup(page), other = await context.newPage();
+      await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
+      await command(other, 'X', '旧電子メール');
+      if (stage === 'selection') { await command(other, 'WRITE-MULTI', '宛先='); await command(other, 'hoshimori', '選択済み：'); }
+      else {
+        await selectMailRecipients(other); await command(other, '古い件名', '本文'); await command(other, '保存しない', '本文=');
+        await command(other, '.END', 'このブラウザー内に保存しますか');
+      }
+      if (operation === 'reset') {
+        await command(page, 'RESET', '初期状態に戻しますか');
+        await Promise.all([page.waitForEvent('load'), other.waitForEvent('load'), command(page, 'Y')]);
+      } else await Promise.all([other.waitForEvent('load'), restore(page, saved)]);
+      await expect(other.locator('.output')).toContainText('MAIN');
+      await command(other, 'SKIP');
+      await other.evaluate(() => {
+        const input = document.querySelector<HTMLInputElement>('#command')!;
+        for (const line of ['.END', 'Y', 'Y']) { input.value = line; input.form!.requestSubmit(); }
+      });
+      await command(other, 'MAIN', 'MAIN'); expect((await snapshot(page)).mail).toEqual([]);
+    });
+  }
 }
