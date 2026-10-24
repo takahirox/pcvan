@@ -148,7 +148,7 @@ export class PcvanController implements TerminalController {
     if (!Number.isSafeInteger(number) || number < 1) return null;
     const items = ['ftp-list', 'ftp-preview'].includes(this.currentScreen) ? ftpFiles
       : this.readingService === 'OSL' && ['service-category', 'service-item'].includes(this.currentScreen)
-        ? categoryItems('OSL', this.serviceCategory) : [];
+        ? categoryItems('OSL', this.serviceCategory, this.content) : [];
     const item = items[number - 1];
     if (!item?.filename) return null;
     const screen = this.currentScreen, service = this.service, category = this.serviceCategory,
@@ -158,6 +158,11 @@ export class PcvanController implements TerminalController {
       this.parents.splice(0, this.parents.length, ...parents);
       return this.render();
     } };
+  }
+
+  get oslCategory(): 1 | 2 | null {
+    return this.readingService === 'OSL' && this.currentScreen === 'service-category' &&
+      (this.serviceCategory === 1 || this.serviceCategory === 2) ? this.serviceCategory : null;
   }
 
   get isConference(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'CONFERENCE'; }
@@ -170,6 +175,7 @@ export class PcvanController implements TerminalController {
 
   get needsContent(): boolean {
     return this.isConference || this.isOlt || !!this.mailContext ||
+      (this.readingService === 'OSL' && ['daisizen-service', 'service-category', 'service-item'].includes(this.currentScreen)) ||
       ['communication', 'wakaba', 'netnews-directory', 'netnews-list', 'netnews-article', 'miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
   }
 
@@ -391,7 +397,7 @@ export class PcvanController implements TerminalController {
         const read = /^READ ([1-9]\d*)$/.exec(command);
         if (read) {
           const index = Number(read[1]) - 1;
-          if (categoryItems(this.readingService!, this.serviceCategory)[index]) {
+          if (categoryItems(this.readingService!, this.serviceCategory, this.content)[index]) {
             this.serviceItem = index;
             return this.currentScreen === 'service-item' ? this.render() : this.enter('service-item');
           }
@@ -722,8 +728,8 @@ export class PcvanController implements TerminalController {
       case 'service-item': return [
         `${daisizen.name} / ${this.service.label}`,
         ...(this.currentScreen === 'service-category'
-          ? renderServiceCategory(this.readingService!, this.serviceCategory)
-          : renderServiceItem(this.readingService!, this.serviceCategory, this.serviceItem)),
+          ? renderServiceCategory(this.readingService!, this.serviceCategory, this.content)
+          : renderServiceItem(this.readingService!, this.serviceCategory, this.serviceItem, this.content)),
         returnHelp, demoPrompt,
       ];
       case 'mailbox': return [

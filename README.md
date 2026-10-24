@@ -551,12 +551,13 @@ Other categories are honestly empty. `HELP` repeats the current view; `LIST`
 returns from content to its listing. `BACK` follows content → category listing →
 service directory → SIG; `MAIN` clears that path. These controls and all examples
 are reconstructed. Category labels/order follow an undated memorial and remain
-provisional for 1996. OSL dates are fictional 1996 simulation dates; sizes count
+provisional for 1996. Bundled OSL dates are fictional 1996 simulation dates; sizes count
 the preview body's UTF-8 bytes (LF, no BOM), not historical transmission bytes.
 From an OSL category listing or preview, `DOWNLOAD number` selects a file in
-that category. Confirm with `Y` to request a browser download of `NOTEINFO.TXT`
-or `HARU96.CSV` under its catalog filename; the payload is the exact bundled
-body, including its final LF. `HELP` repeats the filename, byte count and controls.
+that category. Confirm with `Y` to request a browser download under its catalog
+filename. Bundled `NOTEINFO.TXT` / `HARU96.CSV` and saved original text use
+the exact body, including any entered final LF. `HELP` repeats the filename, byte
+count and controls.
 Empty/invalid input cannot approve; `N`, `BACK` or `CANCEL` cancels into the same
 view, and `MAIN` cancels into MAIN. Success or initiation failure consumes approval
 and returns to the requesting view; another attempt needs a fresh request.
@@ -569,6 +570,43 @@ handoff are modern reconstruction, with historical encodings, protocols, rates,
 charges and exact host prompts unresolved. See
 [acquisition provenance](docs/research/pcvan-1996-1997.md#browser-local-osl-acquisition-issue-91)
 and [collection provenance](docs/research/pcvan-1996-1997.md#library-and-osl-browsing-issue-59).
+
+In OSL category **1** (original documents) or **2** (observation/tabular text),
+`REGISTER` starts terminal composition with the selected category and human
+handle pinned. If needed, the existing optional handle registration offers
+`Y` / `N` / `SKIP`; declining creates no file. Enter filename, title, purpose,
+then body lines. The reconstructed filename rule is 5–64 ASCII characters:
+an alphanumeric first character, then alphanumerics, `_` or `-`, and a `.TXT`
+or `.CSV` suffix (case insensitive), without paths or spaces. Title and purpose
+are nonblank, at most 200 JavaScript string characters each; body is nonblank,
+at most 20,000. Unsafe controls (including tabs), bidi/invisible control text
+and metadata newlines are rejected. Japanese, markup and spaces remain literal.
+Body lines join with LF: an empty final entered line preserves a final LF;
+no final LF is added automatically. `.TEXT MAIN` / `.TEXT .END` enter command-like
+body lines literally; `.END` reviews the complete body, metadata, author and
+UTF-8 byte count. `EDIT` offers `FILENAME name`, `TITLE text`, `PURPOSE text`,
+`LINE number text`, `DELETE number`, `APPEND` and `REVIEW`. Only review `Y` saves;
+`N` there or `CANCEL` / `.CANCEL` discards. `HELP`, `BACK` and `MAIN` retain the
+draft. Settings/About excursions preserve it and its category; return with `BACK`.
+
+Successful registration is immediately browser-local: `LIST` / `READ number` /
+`DOWNLOAD number` refresh saved entries after re-entry, reload, another tab's
+registration or JSON restore. Bundled numbers remain intact; new numbers append
+within the category. Case-insensitive filename collisions (including fixtures)
+fail without overwriting, and failed writes retain editable input for explicit
+retry. Dates retain operational timestamps in storage and use the existing
+historical calendar for presentation; author labels use the current safe handle
+and synthetic identity. Saved entries are separate from forums, mail, conference,
+OLT, NetNews and resident-generation context. JSON includes `osl-local`; older
+backups without it and explicitly empty state mean no authored files. Reset
+removes authored entries; world replacement discards drafts and pending acquisition.
+Drafts are memory-only and excluded from command-history persistence. Viewing
+and cancellation create no OSL state. No model, remote transfer, disk-file upload,
+binaries or execution are involved. Registration capability has historical support;
+applying it to DAISIZEN is a moderate-confidence cross-SIG inference. `REGISTER`,
+the form, restrictions, immediate availability and UTF-8 sizing are reconstruction,
+without historical approval, licensing, fee or protocol claims. See
+[registration evidence and conventions](docs/research/pcvan-1996-1997.md#browser-local-osl-registration-issue-121).
 
 `CONFERENCE` opens a retained electronic conference, separate from forums and OLT.
 Use `LIST` / `HELP` for contributions, `READ number` for a body, `WRITE` for a new
@@ -906,7 +944,8 @@ historical users. See [local AI behavior and limitations](docs/local-ai.md).
 ## Local data and backups
 
 Open **設定 / Options → ローカルデータ・保守 → JSON を保存** for a validated
-snapshot. **JSON から復元** opens the native file picker, validates the file and
+snapshot, including original OSL text entries. **JSON から復元** opens the native
+file picker, validates the file and
 requires explicit replacement confirmation. The warning offers a backup before
 replacing all local data; there is no merge or automatic export. 中止, closing,
 invalid data and transaction failures preserve the old world. Errors stay in the

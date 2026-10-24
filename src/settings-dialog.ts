@@ -71,7 +71,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       <p class="mail-sample-recipient"></p><button type="button" class="load-mail-sample">創作メールをローカルに追加</button>
     </details>
     <details class="storage-panel"><summary>ローカルデータ・保守</summary>
-      <p>JSON は投稿・メール（INET#外部宛先・手紙を含む）・ローカルNetNews記事・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書き、ECOMの郵便内容・模擬受付票は含みません。外部に保存してください。</p>
+      <p>JSON は投稿・メール（INET#外部宛先・手紙を含む）・ローカルNetNews記事・登録OSLテキスト・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書き、ECOMの郵便内容・模擬受付票は含みません。外部に保存してください。</p>
       <div class="settings-buttons"><button type="button" class="export-json">JSON を保存</button>
         <button type="button" class="import-json">JSON から復元</button><button type="button" class="populate-world" hidden>初期会話を追加</button><button type="button" class="reset-world">初期状態に戻す</button></div>
       <h3>オフライン・保存領域</h3><p>端末とモデルの重みは別の保存です。端末の保存ではモデルを取得しません。</p>
@@ -256,7 +256,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     const latest = await actions.read();
     if (accepted !== epoch || !dialog.open) return;
     if (worldContext(latest) !== expected) throw new Error('世界や設定が変わりました。ファイルを選び直してください。');
-    confirm('world', content, ['投稿・メール・ローカルNetNews記事・会員・既読・設定・履歴をこの JSON で置き換えます。取り消せません。',
+    confirm('world', content, ['投稿・メール・ローカルNetNews記事・登録OSLテキスト・会員・既読・設定・履歴をこの JSON で置き換えます。取り消せません。',
       '未送信の下書きも失われます。必要なら先に JSON を保存してください。', 'モデルの重み・端末キャッシュは保持します。'], async () => {
       await actions.run(() => actions.restore(text, expected));
       close();
@@ -284,7 +284,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
   click('.reset-world', async () => {
     const accepted = epoch, content = await actions.read(), expected = worldContext(content);
     if (accepted !== epoch) return;
-    confirm('world', content, ['投稿・メール・ローカルNetNews記事・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴・未送信の下書きを削除します。取り消せません。',
+    confirm('world', content, ['投稿・メール・ローカルNetNews記事・登録OSLテキスト・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴・未送信の下書きを削除します。取り消せません。',
       '必要なら先に JSON を保存してください。最初の10人・72件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。',
       'モデルの重み・端末キャッシュは保持します。AI には再同意が必要です。'], () => actions.run(() => actions.reset(expected)), '初期状態に戻す');
   });

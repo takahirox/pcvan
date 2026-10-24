@@ -32,6 +32,7 @@ export class ConnectionController implements TerminalController {
   get isTelnet() { return this.navigation.isTelnet; }
   get isGopher() { return this.navigation.isGopher; }
   get isArchie() { return this.navigation.isArchie; }
+  get oslCategory() { return this.navigation.oslCategory; }
   get isConference() { return this.navigation.isConference; }
   get oltContext() { return this.navigation.oltContext; }
   get isOlt() { return this.navigation.isOlt; }

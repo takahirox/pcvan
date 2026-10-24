@@ -189,6 +189,7 @@ const commandActions = {
   isEcom: () => controller.isEcom, ecomDrafting: () => controller.ecomDrafting,
   invalidateEcom: () => controller.invalidateEcom(),
   isNetNewsDirectory: () => ['internet-directory', 'netnews-directory'].includes(controller.screen),
+  oslCategory: () => controller.oslCategory,
   selectDownload: (number: number) => controller.selectDownload(number),
   netNews: () => controller.netNewsContext, netNewsSaved: () => navigate('LIST'),
   isConference: () => controller.isConference, oltContext: () => controller.oltContext, destination: () => controller.forum, mailbox: () => controller.mailContext, ai,

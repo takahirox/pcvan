@@ -38,7 +38,7 @@ for (const [input, label, empty] of entries) {
     const directory = controller.submit('HELP');
     const output = controller.submit(`  ${input.toLowerCase()}  `);
     expect(controller.screen).toBe('daisizen-service');
-    expect(controller.needsContent).toBe(['MAIL', 'OLT', 'CONFERENCE'].includes(input));
+    expect(controller.needsContent).toBe(['MAIL', 'OLT', 'CONFERENCE', 'OSL'].includes(input));
     expect(output.join('\n')).toContain(`大自然＆動植物（DAISIZEN） / ${label}`);
     expect(output.join('\n')).toContain(empty);
     expect(output.join('\n')).not.toMatch(/未実装|利用不可/);
@@ -114,7 +114,7 @@ for (const service of ['LIBRARY', 'OSL'] as const) {
             expect(controller.submit('HELP')).toEqual(detail);
           }
           expect(controller.forum).toBeNull(); expect(controller.mailContext).toBeNull();
-          expect(controller.isOlt).toBe(false); expect(controller.needsContent).toBe(false);
+          expect(controller.isOlt).toBe(false); expect(controller.needsContent).toBe(service === 'OSL');
           if (service === 'OSL') {
             for (const output of [listing, detail]) {
               for (const field of [item.filename!, item.purpose!, item.date!, `${Buffer.byteLength(item.body, 'utf8')} bytes（UTF-8）`]) expect(output.join('\n')).toContain(field);

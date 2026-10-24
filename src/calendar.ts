@@ -1,5 +1,5 @@
 import type { AiActivity, Backup, CommunityWorld } from './storage/schema';
-import type { NetNewsState, ConferenceState } from './storage/schema';
+import type { OslState, NetNewsState, ConferenceState } from './storage/schema';
 import type { OltState } from './olt-state';
 
 export const CALENDAR_SETTING = 'historical-calendar';
@@ -35,12 +35,14 @@ export function initialCalendar(content: Backup, now: string): HistoricalCalenda
   if (world && !isHistorical(world.createdAt)) return { version: 1, sourceAnchor: world.createdAt };
   const activity = content.settings.find((s) => s.id === 'ai-activity')?.value as unknown as AiActivity | undefined;
   const conference = content.settings.find((s) => s.id === 'daisizen-conference')?.value as unknown as ConferenceState | undefined;
+  const osl = content.settings.find((s) => s.id === 'osl-local')?.value as unknown as OslState | undefined;
   const netnews = content.settings.find((s) => s.id === 'netnews-local')?.value as unknown as NetNewsState | undefined;
   const olt = content.settings.find((s) => s.id === 'olt-rooms')?.value as unknown as OltState | undefined;
   const stamps = [world?.createdAt, content.session?.lastLoginAt, content.session?.lastLogoutAt,
     ...content.posts.flatMap((p) => [p.createdAt, p.simulation?.simulatedAt]),
     ...(content.mail ?? []).flatMap((m) => [m.createdAt, m.simulation?.simulatedAt, m.readAt, m.recipientConfirmation?.at]),
     ...(conference?.contributions.map((r) => r.createdAt) ?? []),
+    ...(osl?.entries.map((r) => r.createdAt) ?? []),
     ...(netnews?.contributions.map((r) => r.createdAt) ?? []),
     activity?.lastActivityAt, activity?.batch?.from, activity?.batch?.to,
     ...(activity?.batch?.runs.map((r) => r.simulatedAt) ?? []),
