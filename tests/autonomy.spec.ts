@@ -156,8 +156,7 @@ test('a reopened approved model can fail loading without requiring a manual post
   await page.clock.install({ time: epoch }); await mockModel(page); await start(page, '利用者', 'http://127.0.0.1:14374');
   await lifestyles(page); await consent(page); await page.close();
   const reopened = await context.newPage(); await reopened.clock.install({ time: new Date(epoch.getTime() + hour + 60_000) });
-  await mockModel(reopened);
-  await reopened.addInitScript(() => { (window as unknown as { aiMock: { mode: string } }).aiMock.mode = 'load-fail'; });
+  await mockModel(reopened, 'load-fail');
   await reopened.goto('http://127.0.0.1:14374'); await expect(reopened.locator('.output')).toContainText('MAIN');
   await expect.poll(() => reopened.evaluate(() => (window as unknown as { aiMock: { loads: string[] } }).aiMock.loads.length)).toBe(1);
   await reopened.getByRole('button', { name: '設定 / Options', exact: true }).click(); await reopened.locator('.ai-panel > summary').click();

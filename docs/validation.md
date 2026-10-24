@@ -3354,3 +3354,49 @@ Reviewed the complete revision diff; `git diff --check` and
 code fences remain balanced. No real model execution, native IME observation,
 other browser-engine checks, push or merge was performed. No required post-merge
 verification applies.
+
+## PR #124 review correction: cold startup and reset registration (Issue #123)
+
+The review reported **496 passed, 4 failed (7.9m), actual three workers**:
+timestamped Vite module requests bypassed the adapter mock, one startup lost its
+registration prompt, and a reset test navigated while welcome registration still
+owned input. Warm repetitions did not resolve those findings.
+
+The adapter mock now matches the module pathname regardless of query parameters.
+A regression check imports both bare and timestamped URLs and verifies mocked
+cache/load/disposal behavior. Reopened mock state and its initial failure mode
+are initialized together, removing dependence on two init scripts' execution
+order. The reset test completes connection/welcome handling and dismisses any
+invitation in both tabs before navigation; its reset and stale-restore assertions
+are preserved.
+
+Startup inspection found that welcome persists its invitation flag before
+printing the prompt, so a dev-server reload can lose that visit's invitation.
+Vite now explicitly optimizes the sole bare runtime dependency with
+`noDiscovery: true`. Its installed optimizer implementation completes that work
+during initialization and does not perform later discovery-triggered reloads.
+A cold four-case diagnostic before the changes passed; the exact cause of the
+review's missing prompt was not reproduced. No application startup code changed.
+
+Validation on 2026-10-24 with Node.js 24.12.0 on macOS:
+
+- Before changes, `DEBUG=vite:deps` with the four affected autonomy/Settings/reset
+  cases: **4 passed (12.7s), actual three workers**, after `npm ci` using an empty
+  temporary npm cache. This diagnostic is not the acceptance result.
+- `npm test -- --workers=3 tests/ai-adapter.spec.ts tests/autonomy.spec.ts tests/factory-reset.spec.ts tests/settings-dialog.spec.ts`:
+  **41 passed (1.1m), actual three workers**.
+- Reinstalled with `npm ci` using a second empty temporary npm cache. Both
+  installs reported zero vulnerabilities and left the lockfile unchanged;
+  reinstalling also removed Vite's generated dependency cache.
+- `DEBUG=vite:deps npm test -- --workers=3`: **501 passed (8.0m), actual three
+  workers**, with no failures, retries or skips. The cold-start log shows explicit
+  dependency optimization finishing before tests begin, with no discovery reload.
+  All twenty scheduling checks and all four previously failing cases passed.
+  Test/configuration files remained unchanged throughout this complete run.
+
+Both post-change runs included configured TypeScript checking and production
+bundling. Existing Vite chunk-size and Node color warnings remain. Reviewed the
+complete revision diff; unstaged and staged whitespace checks pass. No
+documentation links were added, and Markdown code fences remain balanced. No
+real model execution, native IME observation, other browser-engine checks, push
+or merge was performed. No required post-merge verification applies.
