@@ -23,6 +23,7 @@ import type { ServiceDownload, ReadingService } from './service-collections';
 import { eicReadings, renderEnvironmentalGateway, renderEicList, renderEicItem } from './eic';
 import { bizArticles, bizSetLimit, bizHelp, bizKeywordHelp, renderDatabaseDirectory, renderBizSearch, renderBizTitles, renderBizArticle } from './biz';
 import type { BizSet } from './biz';
+import { publicationInstallments, renderPublicationDirectory, renderPublicationContents, renderPublicationInstallment } from './publications';
 import { newsBriefs, renderNewsDirectory, renderNewsHeadlines, renderNewsBrief } from './news';
 import { netNewsGroup, netNewsGroups, netNewsHelp, netNewsSearchHelp, netNewsResults, renderInternetDirectory, renderNetNewsDirectory, renderNetNewsList, renderNetNewsArticle } from './netnews';
 import type { NetNewsSearch } from './netnews';
@@ -34,6 +35,7 @@ export type Screen = TelnetScreen | 'archie' | 'gopher' | 'main' | 'communicatio
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
   'wakaba' | 'ecom' | 'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
+  'publication-directory' | 'publication-contents' | 'publication-installment' |
   'news-directory' | 'news-headlines' | 'news-brief' |
   'ftp-list' | 'ftp-preview' | 'internet-directory' | 'netnews-directory' | 'netnews-list' | 'netnews-article' |
   'database-directory' | 'biz-search' | 'biz-titles' | 'biz-article';
@@ -101,6 +103,7 @@ export class PcvanController implements TerminalController {
   private serviceItem = 0;
   private eicItem = 0;
   private newsItem = 0;
+  private publicationItem = 0;
   private netNewsGroup = 0;
   private netNewsItem = 0;
   private telnetItem = 0;
@@ -303,6 +306,27 @@ export class PcvanController implements TerminalController {
         return this.invalidCommand('1: fj.questions.fj / 2: fj.news.usage / LIST / BACK / MAIN / HELP');
       case 'netnews-list':
       case 'netnews-article': return this.handleNetNews(line, command);
+      case 'publication-directory':
+        if (command === 'LIST') return this.render();
+        if (command === '1') return this.enter('publication-contents');
+        return this.invalidCommand('1: 目次 / LIST / BACK / MAIN / HELP');
+      case 'publication-contents':
+      case 'publication-installment': {
+        if (command === 'LIST') {
+          if (this.currentScreen === 'publication-installment') this.currentScreen = this.parents.pop()!;
+          return this.render();
+        }
+        const read = /^READ ([1-9]\d*)$/.exec(command);
+        if (read) {
+          const number = Number(read[1]);
+          if (Number.isSafeInteger(number) && publicationInstallments[number - 1]) {
+            this.publicationItem = number - 1;
+            return this.currentScreen === 'publication-installment' ? this.render() : this.enter('publication-installment');
+          }
+          return ['その番号の連載はありません。LIST で目次を確認してください。', demoPrompt];
+        }
+        return this.invalidCommand('READ 1 / READ 2 / LIST / BACK / MAIN / HELP');
+      }
       case 'news-directory':
         if (command === 'LIST') return this.render();
         if (command === '1') return this.enter('news-headlines');
@@ -576,6 +600,10 @@ export class PcvanController implements TerminalController {
   private openSection(entry: typeof mainMenu.entries[number]): readonly string[] {
     this.section = entry;
     if (entry.selector === '16') return [entryText(entry), ...this.enter('wakaba')];
+    if (entry.selector === '10') {
+      this.publicationItem = 0;
+      return [entryText(entry), ...this.enter('publication-directory')];
+    }
     if (entry.selector === '3') {
       this.newsItem = 0;
       return [entryText(entry), ...this.enter('news-directory')];
@@ -637,6 +665,9 @@ export class PcvanController implements TerminalController {
         `${miti.steps[0]!.input}: ${miti.steps[0]!.destination}へ`,
         returnHelp, demoPrompt,
       ];
+      case 'publication-directory': return [...renderPublicationDirectory(), returnHelp, demoPrompt];
+      case 'publication-contents': return [...renderPublicationContents(), returnHelp, demoPrompt];
+      case 'publication-installment': return [...renderPublicationInstallment(this.publicationItem), returnHelp, demoPrompt];
       case 'news-directory': return [...renderNewsDirectory(), returnHelp, demoPrompt];
       case 'telnet-directory':
       case 'telnet-shell':
