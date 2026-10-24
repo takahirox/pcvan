@@ -1213,6 +1213,8 @@ context isolation, individual read markers, two-tab delivery, offline reading,
 old database/backup migration, transactional rollback and reset fences.
 See [the implementation validation record](docs/validation.md) for commands
 actually run and browser checks not performed.
+The [test-suite audit](docs/test-suite-audit.md) inventories the 519-case baseline,
+compares overlapping coverage and records measured costs and proposed follow-ups.
 
 ## Contributing
 
