@@ -1,3 +1,4 @@
+import oslExamples from '../../data/pcvan/daisizen-collections.json' with { type: 'json' };
 import { netNewsGroups, localNetNewsMessageId } from '../netnews';
 import { CALENDAR_SETTING, isHistorical } from '../calendar';
 import { OLT_SETTING, validateOlt, validateOltMembers } from '../olt-state';
@@ -29,6 +30,32 @@ export interface Contribution {
 }
 export interface ConferenceState {
   version: 1; conferenceId: typeof CONFERENCE_ID; nextNumber: number; contributions: Contribution[];
+}
+/** Original human-authored text files; fixtures remain outside the backup. */
+export const OSL_SETTING = 'osl-local';
+export interface OslEntry {
+  id: string; category: 1 | 2; number: number; authorId: string;
+  filename: string; title: string; purpose: string; body: string;
+  createdAt: string; origin: 'local-human';
+}
+export interface OslState { version: 1; nextNumbers: { '1': number; '2': number }; entries: OslEntry[] }
+export const emptyOsl = (): OslState => ({ version: 1, nextNumbers: {
+  '1': oslExamples.OSL['1'].length + 1, '2': oslExamples.OSL['2'].length + 1,
+}, entries: [] });
+export function oslState(content: { settings?: Backup['settings'] }): OslState {
+  return structuredClone(content.settings?.find((s) => s.id === OSL_SETTING)?.value as unknown as OslState | undefined ?? emptyOsl());
+}
+/** The same reconstructed text limits apply on entry, direct writes and restore. */
+export function safeOslText(value: string): boolean {
+  return !/[\u0000-\u0009\u000b-\u001f\u007f-\u009f\p{Cf}\p{Zl}\p{Zp}]/u.test(value);
+}
+export function validOslText(value: string, body = false): boolean {
+  return !!value.trim() && value.length <= (body ? 20000 : 200) &&
+    safeOslText(value) &&
+    (body || !value.includes('\n'));
+}
+export function validOslFilename(value: string): boolean {
+  return value.length <= 64 && /^[A-Za-z0-9][A-Za-z0-9_-]*\.(?:TXT|CSV)$/i.test(value);
 }
 export const NETNEWS_SETTING = 'netnews-local';
 export interface LocalNetNewsArticle {
@@ -337,6 +364,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
+      if (value.id === OSL_SETTING) validateOsl(value.value);
       if (value.id === NETNEWS_SETTING) validateNetNews(value.value);
       if (value.id === CALENDAR_SETTING) {
         fields(value.value, ['version', 'sourceAnchor']);
@@ -405,6 +433,8 @@ export function validateBackup(value: unknown): asserts value is Backup {
   if (olt !== undefined) { validateOlt(olt); validateOltMembers(olt, backup.members); }
   const conference = backup.settings.find((s) => s.id === CONFERENCE_SETTING)?.value;
   if (conference !== undefined) { validateConference(conference); validateConferenceMembers(conference, backup.members); }
+  const osl = backup.settings.find((s) => s.id === OSL_SETTING)?.value;
+  if (osl !== undefined) { validateOsl(osl); validateOslMembers(osl, backup.members); }
   const netnews = backup.settings.find((s) => s.id === NETNEWS_SETTING)?.value;
   if (netnews !== undefined) { validateNetNews(netnews); validateNetNewsMembers(netnews, backup.members); }
   validateMailRelations(backup.mail ?? [], backup.members);
@@ -575,5 +605,42 @@ export function validateNetNews(value: unknown): asserts value is NetNewsState {
 export function validateNetNewsMembers(state: NetNewsState, members: readonly Member[]): void {
   for (const row of state.contributions) {
     if (!members.some((m) => m.id === row.authorId && m.actor === 'human')) invalid('Invalid NetNews human author.');
+  }
+}
+
+/** Contiguous category-local allocation retains all bundled numbers and names. */
+export function validateOsl(value: unknown): asserts value is OslState {
+  fields(value, ['version', 'nextNumbers', 'entries']);
+  if (value.version !== 1 || !Array.isArray(value.entries)) invalid('Invalid OSL state.');
+  fields(value.nextNumbers, ['1', '2']);
+  const expected = emptyOsl().nextNumbers, ids = new Set<string>();
+  const filenames = {
+    '1': new Set(oslExamples.OSL['1'].map((r) => r.filename.toUpperCase())),
+    '2': new Set(oslExamples.OSL['2'].map((r) => r.filename.toUpperCase())),
+  };
+  for (const row of value.entries) {
+    fields(row, ['id', 'category', 'number', 'authorId', 'filename', 'title', 'purpose', 'body', 'createdAt', 'origin']);
+    string(row.id); string(row.authorId); timestamp(row.createdAt); integer(row.number, 1);
+    if (row.category !== 1 && row.category !== 2) invalid('Unsupported OSL category.');
+    const category = String(row.category) as '1' | '2';
+    if (row.id.length > 256 || row.authorId.length > 128 || ids.has(row.id) ||
+        /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(row.id + row.authorId) || row.origin !== 'local-human' ||
+        row.number !== expected[category]++) invalid('Invalid OSL identity or allocation.');
+    string(row.filename);
+    if (!validOslFilename(row.filename) || filenames[category].has(row.filename.toUpperCase())) invalid('Invalid or duplicate OSL filename.');
+    for (const key of ['title', 'purpose', 'body'] as const) {
+      string(row[key]);
+      if (!validOslText(row[key], key === 'body')) invalid('Invalid OSL text.');
+    }
+    ids.add(row.id); filenames[category].add(row.filename.toUpperCase());
+  }
+  for (const category of ['1', '2'] as const) {
+    integer(value.nextNumbers[category], 1);
+    if (value.nextNumbers[category] !== expected[category]) invalid('Invalid OSL counter.');
+  }
+}
+export function validateOslMembers(state: OslState, members: readonly Member[]): void {
+  for (const row of state.entries) {
+    if (!members.some((m) => m.id === row.authorId && m.actor === 'human')) invalid('Invalid OSL human author.');
   }
 }

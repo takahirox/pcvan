@@ -1,3 +1,4 @@
+import { oslState } from '../src/storage/schema';
 import { expect, test } from '@playwright/test';
 import type { Download, Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
@@ -264,4 +265,136 @@ test('production synchronous browser failure, reload, modal restore and reset di
   await page.locator('.reset-world').click(); await page.locator('.confirm-action').click();
   await expect(page.locator('.output')).toContainText('初期状態'); await command(page, 'SKIP', '登録を中止');
   await command(page, 'Y', 'この画面では使えない'); expect(downloads).toHaveLength(0);
+});
+
+
+for (const category of [1, 2]) {
+  test(`production OSL category ${category}: register original text, review/edit, reload/restore and exact acquisition at 320px`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.clock.setFixedTime(new Date('2026-10-24T02:00:00.000Z'));
+    await page.setViewportSize({ width: 320, height: 640 });
+    const remote: string[] = [];
+    page.on('request', (r) => { if (!r.url().startsWith('http://127.0.0.1:14373/')) remote.push(r.url()); });
+    await start(page); const fixture = await snapshot(page);
+    const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
+    activity.maxPosts = 0; activity.consent = false;
+    await restore(page, fixture);
+    const protect = (data: Backup) => ({ ...protectedRecords(data), settings: data.settings.filter((s) => s.id !== 'osl-local') });
+    const before = await snapshot(page);
+    await enter(page, category); await command(page, 'REGISTER', '登録しますか'); await command(page, 'N', '登録を中止');
+    expect(protect(await snapshot(page))).toEqual(protect(before));
+    expect((await snapshot(page)).settings.some((s) => s.id === 'osl-local')).toBe(false);
+    await command(page, 'REGISTER', '登録しますか'); await command(page, 'Y', 'ハンドル名=');
+    await command(page, '記録する人', 'ファイル名='); await command(page, 'CANCEL', 'OSL 登録を中止');
+    const registered = await snapshot(page);
+    await command(page, 'REGISTER', 'ファイル名=');
+    const input = page.locator('#command'), output = page.locator('.output');
+    await input.fill(fixtures[String(category)][0].filename); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+    await expect(input).toHaveValue(fixtures[String(category)][0].filename); await input.dispatchEvent('compositionend');
+    await command(page, fixtures[String(category)][0].filename, 'タイトル=');
+    await command(page, '  新しい観察文書  ', '用途='); await command(page, '  手元の記録  ', '本文を1行ずつ');
+    const literal = '  日本語　ｶﾅ <b>本文</b>  ';
+    await command(page, literal, '本文='); await command(page, '', '本文='); await command(page, '.TEXT MAIN', '本文=');
+    await command(page, '.TEXT .END', '本文='); await command(page, '', '本文=');
+    await command(page, 'BACK', '下書きは保持');
+    const review = await command(page, '.END', 'このブラウザー内に登録しますか');
+    expect(review).toContain(`分類：${category}`); expect(review).toContain('著者：記録する人 (SYN-');
+    expect(review).toContain(`サイズ：${Buffer.byteLength(`${literal}\n\nMAIN\n.END\n`, 'utf8')} bytes（UTF-8）`);
+    await command(page, 'MAIN', '下書きは保持'); await command(page, 'EDIT', 'FILENAME 名前');
+    await command(page, 'TITLE   編集した題  ', 'タイトルを変更'); await command(page, 'PURPOSE   編集した用途  ', '登録情報を変更');
+    await command(page, 'LINE 4   結び  ', '本文を変更'); await command(page, 'APPEND', '本文を1行ずつ');
+    await command(page, '.TEXT SETTINGS', '本文='); await command(page, '', '本文='); await command(page, '.END', 'このブラウザー内に登録しますか');
+    const expectedBody = `${literal}\n\nMAIN\n  結び  \n\nSETTINGS\n`;
+    // A bundled-name collision preserves the complete editable draft.
+    await command(page, 'Y', '再試行'); expect(oslState(await snapshot(page)).entries).toHaveLength(0);
+    await command(page, 'EDIT', 'FILENAME 名前'); await command(page, `FILENAME ORIGINAL${category}.TXT`, '登録情報を変更');
+    const editedReview = await command(page, 'REVIEW', 'このブラウザー内に登録しますか');
+    expect(editedReview).toContain(`${Buffer.byteLength(expectedBody, 'utf8')} bytes（UTF-8）`);
+    await command(page, 'SETTINGS', '設定 / SETTINGS'); await command(page, 'ABOUT', '詳細・出自');
+    await command(page, 'BACK', '設定 / SETTINGS'); await command(page, 'BACK', '下書きは保持');
+    await input.fill('Y'); await input.dispatchEvent('compositionstart'); await input.press('Enter');
+    await expect(input).toHaveValue('Y'); expect(oslState(await snapshot(page)).entries).toHaveLength(0);
+    await input.dispatchEvent('compositionend');
+    const transcript = await output.textContent();
+    await page.getByRole('button', { name: '設定 / Options', exact: true }).click();
+    await expect(page.getByRole('dialog')).toBeVisible(); await page.keyboard.press('Escape');
+    await expect(input).toHaveValue('Y'); expect(await output.textContent()).toBe(transcript);
+    await command(page, 'Y', 'OSL #2 をこのブラウザー内に登録しました');
+    await command(page, 'Y', 'この画面では使えない');
+    await command(page, 'LIST', 'ファイル一覧：2件');
+    const read = await command(page, 'READ 2', expectedBody);
+    expect(read).toContain('著者：記録する人 (SYN-'); expect(read).toContain('96年11月23日 11:00:00');
+    expect(read).toContain(`サイズ：${Buffer.byteLength(expectedBody, 'utf8')} bytes（UTF-8）`);
+    expect(await output.locator('b').count()).toBe(0);
+    const saved = await backup(page), entry = oslState(saved).entries[0]!;
+    expect(entry).toMatchObject({ category, number: 2, filename: `ORIGINAL${category}.TXT`, title: '  編集した題  ', purpose: '  編集した用途  ', body: expectedBody });
+    expect(protect(saved)).toEqual(protect(registered));
+    for (const privateInput of ['  新しい観察文書  ', '  手元の記録  ', literal, `FILENAME ORIGINAL${category}.TXT`, 'TITLE   編集した題  ', 'PURPOSE   編集した用途  '])
+      expect(saved.session!.commandHistory).not.toContain(privateInput);
+    const checkDownload = async () => {
+      await command(page, 'DOWNLOAD 2', `${Buffer.byteLength(expectedBody, 'utf8')} bytes（UTF-8）`);
+      await command(page, 'HELP', `ORIGINAL${category}.TXT`);
+      const waiting = page.waitForEvent('download'); await command(page, 'Y', 'ブラウザーに依頼しました'); const download = await waiting;
+      expect(download.suggestedFilename()).toBe(`ORIGINAL${category}.TXT`);
+      expect(await readFile((await download.path())!)).toEqual(Buffer.from(expectedBody, 'utf8'));
+    };
+    await checkDownload(); await page.reload(); await page.locator('#command').press('Escape');
+    await enter(page, category); await command(page, 'READ 2', expectedBody); await checkDownload();
+    await restore(page, saved); await command(page, 'LIST', 'ファイル一覧：2件'); await command(page, 'READ 2', expectedBody); await checkDownload();
+    expect(oslState(await snapshot(page)).entries).toEqual([entry]);
+    const bounds = await input.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+    const scrolling = await page.getByRole('log').evaluate((el) => ({ height: el.scrollHeight, visible: el.clientHeight, top: el.scrollTop }));
+    expect(scrolling.height).toBeGreaterThan(scrolling.visible); expect(scrolling.top).toBeGreaterThan(0);
+    await input.press('PageUp'); await expect.poll(() => page.getByRole('log').evaluate((el) => el.scrollTop)).toBeLessThan(scrolling.top);
+    await input.press('PageDown');
+    await noOtherUi(page); expect(remote).toEqual([]);
+  });
+}
+
+
+test('production fresh cross-tab OSL selection and world replacement invalidate authored drafts and acquisition', async ({ page, context }) => {
+  test.setTimeout(120_000);
+  await start(page, '観察係'); const fixture = await snapshot(page);
+  const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
+  activity.maxPosts = 0; activity.consent = false; await restore(page, fixture);
+  await enter(page, 3); await command(page, 'REGISTER', 'この画面では使えない');
+  expect((await snapshot(page)).settings.some((s) => s.id === 'osl-local')).toBe(false);
+  await command(page, 'BACK', '1 ＳＩＧの道具箱'); await command(page, '1', 'ファイル一覧：1件');
+  const other = await context.newPage(); await other.goto('/'); await command(other, 'MAIN', 'ＰＣ－ＶＡＮ'); await enter(other);
+  const register = async (filename: string, body: string, number: number) => {
+    await command(other, 'REGISTER', 'ファイル名='); await command(other, filename, 'タイトル=');
+    await command(other, '別タブの記録', '用途='); await command(other, '照合用', '本文を1行ずつ');
+    await command(other, body, '本文='); await command(other, '.END', 'このブラウザー内に登録しますか');
+    await command(other, 'Y', `OSL #${number} をこのブラウザー内に登録しました`);
+  };
+  await register('OTHER.TXT', '別タブ 日本語', 2);
+  await command(page, 'READ 2', '別タブ 日本語'); await command(page, 'BACK', 'ファイル一覧：2件');
+  await register('NEWER.TXT', 'まだ一覧にない本文', 3);
+  // DOWNLOAD must read current storage even before another LIST/READ.
+  await command(page, 'DOWNLOAD 3', 'NEWER.TXT'); const downloading = page.waitForEvent('download');
+  await command(page, 'Y', 'ブラウザーに依頼しました'); const acquired = await downloading;
+  expect(acquired.suggestedFilename()).toBe('NEWER.TXT');
+  expect(await readFile((await acquired.path())!)).toEqual(Buffer.from('まだ一覧にない本文', 'utf8'));
+  const saved = await snapshot(page);
+  await command(page, 'LIST', 'ファイル一覧：3件'); await command(page, 'REGISTER', 'ファイル名=');
+  await command(page, 'STALE.TXT', 'タイトル='); await command(page, '破棄する題', '用途=');
+  await command(page, '破棄する用途', '本文を1行ずつ'); await command(page, '破棄する本文', '本文=');
+  await command(page, '.END', 'このブラウザー内に登録しますか');
+  // Same-tab Settings restore consumes a draft; later Y cannot publish it.
+  await command(page, 'SETTINGS', '設定 / SETTINGS'); await restore(page, saved);
+  await command(page, 'Y', 'この画面では使えない'); expect(oslState(await snapshot(page)).entries).toHaveLength(2);
+  await command(page, 'MAIN', 'ＰＣ－ＶＡＮ'); await enter(page); await command(page, 'REGISTER', 'ファイル名='); await command(page, 'SUSPEND.TXT', 'タイトル=');
+  await restore(other, saved); // Broadcast replacement reloads the composing tab.
+  await expect.poll(() => page.locator('.output').textContent()).not.toContain('SUSPEND.TXT');
+  await command(page, 'MAIN', 'ＰＣ－ＶＡＮ'); await command(page, 'Y', 'この画面では使えない');
+  expect(oslState(await snapshot(page)).entries).toHaveLength(2);
+  await enter(page); await command(page, 'DOWNLOAD 2', 'OTHER.TXT');
+  const downloads: string[] = []; page.on('download', (download) => downloads.push(download.suggestedFilename()));
+  const empty = structuredClone(saved); empty.settings = empty.settings.filter((s) => s.id !== 'osl-local');
+  await restore(other, empty);
+  await expect.poll(() => page.locator('.output').textContent()).not.toContain('OTHER.TXT');
+  await command(page, 'MAIN', 'ＰＣ－ＶＡＮ'); await command(page, 'Y', 'この画面では使えない');
+  await enter(page); await command(page, 'LIST', 'ファイル一覧：1件'); await command(page, 'READ 2', 'その番号の項目はありません');
+  expect(downloads).toEqual([]); expect((await snapshot(page)).settings.some((s) => s.id === 'osl-local')).toBe(false);
+  await other.close();
 });

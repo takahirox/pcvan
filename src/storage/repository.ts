@@ -1,3 +1,5 @@
+import { OSL_SETTING, oslState, validateOsl, validateOslMembers } from './schema';
+import type { OslEntry } from './schema';
 import { bulletin } from '../bulletin';
 import { netNewsState, netNewsGroups, localNetNewsMessageId } from '../netnews';
 import { NETNEWS_SETTING, validateNetNews, validateNetNewsMembers } from './schema';
@@ -203,6 +205,7 @@ export class LocalRepository {
       if (store === 'members') {
         const member = row as Member;
         const content = await this.snapshot(tx);
+        validateOslMembers(oslState(content), [...content.members.filter((m) => m.id !== member.id), member]);
         validateMailRelations(content.mail ?? [], [...content.members.filter((m) => m.id !== member.id), member]);
         validateNetNewsMembers(netNewsState(content), [...content.members.filter((m) => m.id !== member.id), member]);
         validateConferenceMembers(conferenceState(content), [...content.members.filter((m) => m.id !== member.id), member]);
@@ -223,6 +226,10 @@ export class LocalRepository {
         const state = (row as Records['settings']).value; validateOlt(state);
         validateOltMembers(state, (await this.snapshot(tx)).members);
       }
+      if (store === 'settings' && (row as Records['settings']).id === OSL_SETTING) {
+        const state = (row as Records['settings']).value; validateOsl(state);
+        validateOslMembers(state, (await this.snapshot(tx)).members);
+      }
       if (store === 'settings' && (row as Records['settings']).id === NETNEWS_SETTING) {
         const state = (row as Records['settings']).value; validateNetNews(state);
         validateNetNewsMembers(state, (await this.snapshot(tx)).members);
@@ -234,6 +241,27 @@ export class LocalRepository {
       await request(tx.objectStore(store).put(row));
       return row;
     }).then((saved) => { if (store === 'settings') this.notifySetupChanged(); return saved; });
+  }
+
+  /** Allocate, reject filename collisions and deduplicate retries in one transaction. */
+  createOslEntry(input: Pick<OslEntry, 'id' | 'category' | 'authorId' | 'filename' | 'title' | 'purpose' | 'body'>,
+    now = new Date().toISOString()): Promise<OslEntry> {
+    const draft = structuredClone(input);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const content = await this.snapshot(tx), state = oslState(content);
+      const existing = state.entries.find((r) => r.id === draft.id);
+      if (existing) {
+        if ((['id', 'category', 'authorId', 'filename', 'title', 'purpose', 'body'] as const).some((key) => draft[key] !== existing[key]) ||
+            Object.keys(draft).some((key) => !['id', 'category', 'authorId', 'filename', 'title', 'purpose', 'body'].includes(key))) invalid('OSL draft ID is already in use.');
+        return existing;
+      }
+      if (draft.category !== 1 && draft.category !== 2) invalid('Unsupported OSL category.');
+      const row: OslEntry = { ...draft, number: state.nextNumbers[draft.category]++, createdAt: now, origin: 'local-human' };
+      state.entries.push(row);
+      validateOsl(state); validateOslMembers(state, content.members);
+      await request(tx.objectStore('settings').put({ id: OSL_SETTING, value: state }));
+      return row;
+    });
   }
 
   /** One settings transaction allocates numbers, checks parents and deduplicates retries. */
@@ -509,6 +537,7 @@ export class LocalRepository {
       if (store === 'posts') hasChildren = await referenced('posts', 'replyToPostId', key);
       if (store === 'members') {
         const content = await this.snapshot(tx);
+        hasChildren ||= oslState(content).entries.some((row) => row.authorId === key);
         hasChildren ||= netNewsState(content).contributions.some((row) => row.authorId === key);
         hasChildren ||= conferenceState(content).contributions.some((row) => row.authorId === key);
         const state = oltState(content);

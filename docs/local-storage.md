@@ -41,8 +41,8 @@ these application data controls are outside the historical service.
 ## Factory reset
 
 Settings → ローカルデータ・保守 → **初期状態に戻す** explains irreversible
-deletion of members, posts, mail, local NetNews articles, read markers, resident
-edits, preferences, AI consent/deferral, history and live drafts. **先に JSON を保存** exports before approval.
+deletion of members, posts, mail, local NetNews articles, original OSL text entries,
+read markers, resident edits, preferences, AI consent/deferral, history and live drafts. **先に JSON を保存** exports before approval.
 Only the explicit reset confirmation executes deletion; 中止 or closing preserves
 the world. Errors remain in Settings. `RESET` / typed `Y` remains an optional
 shortcut to the same reset method.
@@ -779,3 +779,25 @@ rewrites operational timestamps or bundled dates; legacy calendar initialization
 also considers local NetNews creation timestamps. These display/identity policies
 are reconstruction. NetNews is excluded from resident inference/planning contexts;
 no consent, credentials, external request or network delivery is introduced.
+
+## Original OSL text files (Issue #121)
+
+The optional `settings/osl-local` value has `version: 1`, `nextNumbers` keyed
+by supported category `1` / `2`, and `entries`. Each entry has a stable draft
+`id`, category-local `number`, human `authorId`, `filename`, `title`, `purpose`,
+`body`, operational ISO `createdAt` and `origin: local-human`. Fixtures stay in
+application assets and keep their original numbers. `createOslEntry` serializes
+allocation, case-insensitive filename collision checks (including fixture names),
+validation and persistence in one transaction. The same draft ID and contents
+return the committed entry; conflicting reuse fails. Quota failures roll back both
+entry and counter. Human deletion/actor changes are rejected while referenced.
+
+Direct writes and JSON replacement validate all categories, counters, unique
+IDs/numbers/names, timestamps, text limits and human references before committing.
+The v1 backup envelope and database version stay unchanged. Missing state in a
+legacy backup and explicit empty state both yield an empty authored catalog;
+reading never initializes it. Reset removes it. Display projects operational dates
+through the existing historical calendar without rewriting them. Original OSL
+text stays outside other participation collections and resident-generation context.
+See [usage and exact text representation](../README.md#menu-destinations-and-collections)
+and [research boundaries](research/pcvan-1996-1997.md#browser-local-osl-registration-issue-121).

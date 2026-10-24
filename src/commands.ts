@@ -1,3 +1,5 @@
+import { identityToken, penName } from './member-presentation';
+import { serviceCategories } from './service-collections';
 import { profileArgument, renderResidentProfile } from './resident-profile';
 import type { ServiceDownload } from './service-collections';
 import type { NetNewsArticle } from './netnews';
@@ -28,7 +30,7 @@ import { modelDisclosure } from './ai/setup';
 import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
-type Intent = { multiMail: true } | { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
+type Intent = { osl: true; category: 1 | 2 } | { multiMail: true } | { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
@@ -37,6 +39,7 @@ export interface CommandActions {
   print(...lines: string[]): void;
   navigate(line: string): void;
   destination(): ForumDestination | null;
+  oslCategory?(): 1 | 2 | null;
   selectDownload?(number: number): ServiceDownload | null;
   downloadFile?(body: string, filename: string): void;
   isTelnet?(): boolean;
@@ -103,6 +106,7 @@ export class TerminalCommands {
     this.actions.invalidateEcom?.();
     this.olt.invalidate();
     const active = this.composer?.active || this.mailAddress || this.mailSelection || this.registration || this.confirmation || this.fileRequest || this.profile;
+    this.composer?.invalidate();
     this.composer = undefined; this.mailAddress = false; this.mailSelection = undefined; this.registration = null; this.intent = undefined;
     this.fileRequest = undefined;
     this.confirmation = undefined; this.profile = undefined; this.field = undefined; this.menu = null;
@@ -141,7 +145,7 @@ export class TerminalCommands {
         'AUTO 0〜12: 6時間の自動投稿上限（0で休止）/ RETRY: 未完了を再試行 / RESIDENTS: 住人編集');
     }
     if (menu === 'storage') print('JSON バックアップ・復元・初期化', 'BACKUP: JSON 保存 / IMPORT: ファイル選択・置換確認 / RESET: 初期状態に戻す',
-      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・メール・ローカルNetNews記事・既読・設定・履歴を含みます。モデル・端末キャッシュ・ECOMの郵便内容と模擬受付票は含みません。外部に保存してください。');
+      ...(canPopulateCommunity(data) ? ['POPULATE: 空の掲示板に初期会話を追加'] : []), 'JSON は会員・投稿・メール・ローカルNetNews記事・登録OSLテキスト・既読・設定・履歴を含みます。モデル・端末キャッシュ・ECOMの郵便内容と模擬受付票は含みません。外部に保存してください。');
     if (menu === 'offline') { print('オフライン・容量', 'CACHE: 端末を保存 / STATUS: 保存状態・容量 / PERSIST: 永続保存を要求'); await this.offline.storage(); }
     if (menu === 'profiles') print('住人編集', ...residentProfiles(data).map((row, i) => `${i + 1} ${row.handle}`), '番号: 編集する住人');
     if (menu !== 'settings') print('HELP: この案内 / BACK: 一つ戻る / MAIN: MAIN');
@@ -149,8 +153,23 @@ export class TerminalCommands {
   }
   private startCompose(intent: Intent, data: Backup) {
     const authorId = activeHuman(data);
-    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'mail' in intent || 'multiMail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
-    if ('multiMail' in intent) {
+    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'osl' in intent ? 'OSL 登録' : 'mail' in intent || 'multiMail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
+    if ('osl' in intent) {
+      const id = createRecordId(), revision = this.revision;
+      const author = data.members.find((m) => m.id === authorId);
+      this.composer = new TerminalComposer({ keyword: 'DAISIZEN', name: 'OSL' }, authorId, undefined, {
+        print: this.actions.print,
+        save: async (_target, draft) => {
+          const repo = await this.actions.repository();
+          if (revision !== this.revision) throw new Error('世界が変更されました。REGISTER から操作し直してください。');
+          const row = await repo.createOslEntry({ id, category: intent.category, authorId: draft.authorId,
+            filename: draft.filename!, title: draft.title, purpose: draft.purpose!, body: draft.body });
+          try { await this.actions.read(); } catch { /* Committed: a later LIST refreshes. */ }
+          return row;
+        },
+      }, 'file', '', { category: `${intent.category} ${serviceCategories('OSL')[intent.category - 1]}`,
+        author: `${penName(author)} (${identityToken(author)})` });
+    } else if ('multiMail' in intent) {
       this.mailSelection = { authorId, recipients: [] };
       this.printAddresses(data); this.selectionHelp();
     } else if ('netnews' in intent) {
@@ -235,11 +254,16 @@ export class TerminalCommands {
   private explainDownload() {
     const file = this.fileRequest!;
     this.actions.print(`${file.filename} / ${new TextEncoder().encode(file.body).byteLength} bytes（UTF-8）`,
-      'この同梱ファイルの取得をブラウザーに依頼します。',
+      'このファイルの取得をブラウザーに依頼します。',
       'Y: 取得 / N・BACK・CANCEL: 中止 / MAIN: MAIN / HELP: 説明');
   }
+  private returnToMain() {
+    if (this.composer?.active) this.composer.help();
+    else this.actions.navigate('MAIN');
+  }
   private returnFromMenu() {
-    if (this.fileRequest) { this.actions.print(...this.fileRequest.returnTo()); this.explainDownload(); }
+    if (this.composer?.active) this.composer.help();
+    else if (this.fileRequest) { this.actions.print(...this.fileRequest.returnTo()); this.explainDownload(); }
     else this.actions.navigate('HELP');
   }
   private profileHelp() {
@@ -251,7 +275,7 @@ export class TerminalCommands {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     const print = this.actions.print;
     if (this.actions.ecomDrafting?.()) return false;
-    if (this.composer?.active) { await this.composer.submit(line); return true; }
+    if (this.composer?.active && (!this.composer.isFile || (!this.menu && !['SETTINGS', 'CONFIG', 'ABOUT'].includes(command)))) { await this.composer.submit(line); return true; }
     if (this.mailSelection) {
       const selection = this.mailSelection;
       if (['CANCEL', '.CANCEL'].includes(command)) {
@@ -283,7 +307,7 @@ export class TerminalCommands {
     if (this.registration) {
       if (['N', 'SKIP', 'CANCEL', '.CANCEL', 'BACK', 'MAIN'].includes(command)) {
         this.registration = null; this.intent = undefined; print('登録を中止しました。読むだけでも利用できます。');
-        if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.detailReturns = []; this.actions.navigate('MAIN'); }
+        if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.detailReturns = []; this.returnToMain(); }
         else print('コマンド=');
         return true;
       }
@@ -313,7 +337,7 @@ export class TerminalCommands {
       if (command === 'HELP') { this.explainDownload(); return true; }
       if (['N', 'BACK', 'CANCEL', '.CANCEL', 'MAIN'].includes(command)) {
         this.fileRequest = undefined; print('ファイル取得を中止しました。');
-        if (command === 'MAIN') this.actions.navigate('MAIN'); else print(...file.returnTo());
+        if (command === 'MAIN') this.returnToMain(); else print(...file.returnTo());
         return true;
       }
       if (command !== 'Y') { print('Y / N を入力してください。取得していません。'); return true; }
@@ -335,7 +359,7 @@ export class TerminalCommands {
       if (command === 'HELP') { print('この操作だけを確認しています。Y: 実行 / N・BACK・MAIN・CANCEL: 中止。空入力は承認しません。'); return true; }
       if (['N', 'BACK', 'MAIN', 'CANCEL', '.CANCEL'].includes(command)) {
         this.confirmation = undefined; print('操作を中止しました。');
-        if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.actions.navigate('MAIN'); }
+        if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.returnToMain(); }
         else if (this.menu) await this.show(this.menu); else print('コマンド=');
         return true;
       }
@@ -356,7 +380,7 @@ export class TerminalCommands {
     if (this.profile) {
       if (['BACK', 'CANCEL', '.CANCEL', 'MAIN'].includes(command)) {
         this.profile = undefined; this.field = undefined; print('住人の変更を破棄しました。');
-        if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.actions.navigate('MAIN'); } else await this.show('profiles');
+        if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.returnToMain(); } else await this.show('profiles');
       } else if (command === 'HELP') this.profileHelp();
       else if (this.field) {
         const key = this.field;
@@ -403,14 +427,14 @@ export class TerminalCommands {
         try {
           const parsed: unknown = JSON.parse(text); validateBackup(parsed);
           if (this.confirmation !== waiting) return;
-          this.confirm({ kind: 'import', expected, text }, 'このブラウザー内の全データ（投稿・メール・ローカルNetNews記事・会員・既読・設定・履歴）をファイルで置き換えます。取り消せません。必要なら先に BACKUP。', '置き換えて復元しますか？ (Y/N)=');
+          this.confirm({ kind: 'import', expected, text }, 'このブラウザー内の全データ（投稿・メール・ローカルNetNews記事・登録OSLテキスト・会員・既読・設定・履歴）をファイルで置き換えます。取り消せません。必要なら先に BACKUP。', '置き換えて復元しますか？ (Y/N)=');
         } catch (error) { this.confirmation = undefined; print(`復元できません。${String(error)}`, 'コマンド='); }
       }).catch((error) => { if (this.confirmation === waiting) { this.confirmation = undefined; print(`ファイルを読めません。${String(error)}`); } });
       return true;
     }
     if (command === 'RESET') {
       this.confirm({ kind: 'reset', expected: context(await this.actions.read()) },
-        '投稿・メール・ローカルNetNews記事・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
+        '投稿・メール・ローカルNetNews記事・登録OSLテキスト・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
         '最初の10人・72件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
     }
     // Global application controls above retain ownership. Every service command
@@ -450,7 +474,18 @@ export class TerminalCommands {
       }
     }
     if (!this.menu) {
+      if (command === 'REGISTER' && this.actions.oslCategory?.()) {
+        const category = this.actions.oslCategory()!;
+        const data = await this.actions.read();
+        if (revision === this.revision && submission === this.submission && !this.menu && this.actions.oslCategory?.() === category)
+          this.startCompose({ osl: true, category }, data);
+        return true;
+      }
       const download = /^DOWNLOAD ([1-9]\d*)$/.exec(command);
+      if (download) {
+        await this.actions.read();
+        if (revision !== this.revision || submission !== this.submission || this.menu) return true;
+      }
       const file = download ? this.actions.selectDownload?.(Number(download[1])) : null;
       if (file) { this.fileRequest = file; this.explainDownload(); return true; }
       // Directory errors belong to their navigation screen, not another service.
@@ -493,7 +528,7 @@ export class TerminalCommands {
       return false;
     }
     if (command === 'HELP') { await this.show(this.menu); return true; }
-    if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.detailReturns = []; this.actions.navigate('MAIN'); return true; }
+    if (command === 'MAIN') { this.fileRequest = undefined; this.menu = null; this.detailReturns = []; this.returnToMain(); return true; }
     if (['BACK', 'CANCEL', '.CANCEL'].includes(command)) {
       if (this.menu === 'about' || this.menu === 'help') {
         const caller = this.detailReturns.pop();

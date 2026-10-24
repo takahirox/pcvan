@@ -3101,3 +3101,80 @@ Reviewed the complete revision diff. All eight local Markdown links/anchors in
 checks pass. Native IME and other browser engines were not tested in this review
 fix; the existing simulated IME and Chromium regressions passed. No required
 post-merge verification remains. No push or merge was performed.
+
+### Issue #121: evidence-qualified browser-local OSL text registration
+
+Implemented in the assigned worktree on 2026-10-24. Category 1/2 registration
+reuses terminal composition and optional human registration, with filename/title/
+purpose/body entry, complete review, editing, cancellation and explicit approval.
+Authored files use optional validated `osl-local` state; fixtures remain intact.
+Transaction tests cover category-local numbering, concurrent retries/name collisions,
+quota rollback, author-reference protection, invalid direct writes/imports,
+legacy/empty backups, atomic replacement/reset and stale repository connections.
+Controller checks cover scoped selection, safe names, vanished restored entries,
+draft ownership, literal Japanese/markup/command text, exact limits, retry and
+consumed commits even when refreshing/output fails. Production keyboard tests
+cover both categories, Settings/About returns, simulated IME Enter protection,
+320px input and transcript scrolling, reload/restore, current cross-tab selection,
+world-replacement invalidation and exact download filenames/UTF-8 bytes. Protected
+world records and resident prompts are compared before/after OSL writes; no model
+or external connection is needed for these journeys.
+
+Dependencies were initially absent (`npm run build` could not find `tsc`).
+`npm ci` installed the locked 23 packages with zero audit findings; subsequent
+builds passed TypeScript checking and production bundling. During focused
+validation, outdated bundled-only `needsContent` assertions, a quota-injection
+hook aimed at `put` instead of restore's `add`, the wrong scroll-container selector
+and a cross-tab test's assumption that same-tab restore returns to MAIN were
+corrected. Those runs reported 18/20, 22/24 and 24/25 passing respectively; their
+failures were not waived. Diff review also added a safe vanished-item rendering
+fallback and retained draft context for MAIN from Settings subflows.
+
+```sh
+npm test -- tests/osl-download.spec.ts tests/osl-registration.spec.ts tests/osl-repository.spec.ts tests/services.spec.ts --workers=3
+```
+
+The final focused run passed **25 tests (37.7s), actual 3 workers**, including
+configured type checking and production bundling. No retries or skipped tests.
+The subsequent complete-suite run includes the final Settings-return helper and
+Unicode format-control validation refinements.
+
+The first complete `npm test -- --workers=3` run reported **479 passed, 1 failed
+(8.4m), actual 3 workers**. The existing `multi save waiting for a repository
+cannot write after controller invalidation` regression caught a newly surfaced
+rejection: composer invalidation correctly prevented the stale write, but shared
+`done` handling treated that cancellation like an output failure after commit.
+The composer now distinguishes invalidation and quietly consumes that pending
+rejection, retaining the controller's cancellation notice while preserving
+committed-send consumption and output-failure behavior. The failure was fixed,
+not skipped or retried automatically.
+
+The affected composer regression run passed **29 tests (39.2s), actual 3
+workers**, including configured TypeScript checking/build:
+
+```sh
+npm test -- tests/mail-presentation.spec.ts tests/composition.spec.ts tests/osl-registration.spec.ts tests/osl-repository.spec.ts tests/osl-download.spec.ts --workers=3
+```
+
+The final complete run passed with the fix and strengthened OSL cancellation
+assertion, with no subsequent runtime/test edits:
+
+```sh
+npm test -- --workers=3
+```
+
+**480 passed (7.5m), actual 3 workers**, including TypeScript checking and
+production bundling. No failures, retries or skipped tests. The existing optional
+WebLLM large-chunk warning remains; no real model was downloaded or run.
+
+Reviewed the complete diff, including the shared-composer cancellation fix. All
+four added local/documentation links and anchors resolve; changed Markdown fences
+balance, and final working-tree/staged whitespace checks pass. Historical source
+links were checked on 2026-10-24: the CIARI listing, judgment transcription and
+DAISIZEN memorial were readable; the paper's extraction remained damaged and
+screenshot retrieval failed; CROCUS and the participation guide remained
+inaccessible directly. The research/About record preserves the Issue's excerpt-only
+evidence and confidence limits without claiming a recovered host workflow.
+Optional native IME observation, other browser engines and historical-user feedback
+were not performed. No required post-merge verification remains. No push, pull
+request, merge or external comment was performed.
