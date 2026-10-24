@@ -191,7 +191,7 @@ const commandActions = {
   isNetNewsDirectory: () => ['internet-directory', 'netnews-directory'].includes(controller.screen),
   selectDownload: (number: number) => controller.selectDownload(number),
   netNews: () => controller.netNewsContext, netNewsSaved: () => navigate('LIST'),
-  isConference: () => controller.isConference, isOlt: () => controller.isOlt, destination: () => controller.forum, mailbox: () => controller.mailContext, ai,
+  isConference: () => controller.isConference, oltContext: () => controller.oltContext, destination: () => controller.forum, mailbox: () => controller.mailContext, ai,
   preferences: () => terminal.preferences, applyPreferences: terminal.setPreferences,
   sessionTimes: () => terminal.sessionTimes, log: terminal.logText,
   save: async (target, draft) => {

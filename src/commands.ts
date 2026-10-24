@@ -3,6 +3,7 @@ import type { NetNewsArticle } from './netnews';
 import { calendarSetting } from './calendar';
 import { conferenceState } from './conference';
 import type { Contribution } from './storage/schema';
+import type { OltContext } from './olt-state';
 import { TerminalOlt } from './olt';
 import type { Backup, Mail, Post, TerminalPreferences } from './storage/schema';
 import { resolveMailDestination, validateBackup } from './storage/schema';
@@ -43,7 +44,7 @@ export interface CommandActions {
   isEcom?(): boolean;
   ecomDrafting?(): boolean;
   invalidateEcom?(): void;
-  isOlt?(): boolean;
+  oltContext?(): OltContext | null;
   isConference?(): boolean;
   netNews?(): { group: string; articles: readonly NetNewsArticle[] } | null;
   netNewsSaved?(): void;
@@ -86,7 +87,7 @@ export class TerminalCommands {
   readonly offline;
   readonly settings;
   constructor(private actions: CommandActions) {
-    this.olt = new TerminalOlt({ ...actions, isOlt: () => actions.isOlt?.() ?? false });
+    this.olt = new TerminalOlt({ ...actions, oltContext: () => actions.oltContext?.() ?? null });
     this.offline = createOfflineControls(actions.applicationPrint ?? actions.print);
     this.settings = createSettingsActions(actions);
   }

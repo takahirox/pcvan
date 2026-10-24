@@ -7,6 +7,7 @@ MAIN labels stay intact; `16` now opens the separate Wakaba beginner welcome.
 
 | Route from MAIN | Destination | First-visit conversations |
 | --- | --- | --- |
+| `16` → `2` → `JOIN 1` | わかばマーク / はじめての談話室 | Separate fictional beginner OLT room; quiet reading or speech |
 | `16` → `1` | わかばマーク / はじめての広場 | Three original beginner contributions, pristine worlds only |
 | `J MITI` → `3` → `9` or `13` → `1` → `3` → `9` | MITI 資料室 | Original sixteen posts, unchanged |
 | `13` → `2` → `FORUMS` → `1` | DAISIZEN 自然の森／ＦＲＥＥ | Original fourteen posts, unchanged |
@@ -84,6 +85,15 @@ The original three contributions by 水玉 and タブストップ include a ques
 linked reply; existing and restored/emptied worlds never acquire them automatically.
 The board, selector `1`, `LOCAL-WAKABA:1`, layout, controls and conversation are
 category D choices. This is not an authenticated SIG directory, and `J WAKABA`
-is not accepted. Wakaba OLT and full historical directory reconstruction are outside
-the subset. See [evidence and dates](research/pcvan-1996-1997.md#wakaba-beginner-board-issue-109)
+is not accepted. A full historical directory remains outside the subset.
+
+Welcome `2` opens a separate OLT context, exposing only `1 はじめての談話室`
+(stable ID `wakaba`), with `WHO 1`, `JOIN 1`, HELP/LIST and local attendance.
+`2`, `JOIN 2`, `WHO 2` and in-room `/JOIN 2` never select a DAISIZEN room.
+`/LEAVE` or `/BACK` returns to the Wakaba directory, BACK to the welcome, then
+BACK to the actual MAIN/index caller; `/MAIN` returns directly to MAIN.
+Plain room input is speech; slash controls and anonymous reading reuse OLT.
+DAISIZEN retains `自然の談話室` and `星と道具の部屋` at local selectors 1 and 2.
+The new welcome selector, room identifiers, controls and screens are category D.
+See [Wakaba OLT evidence](research/pcvan-1996-1997.md#wakaba-beginner-olt-issue-113), [board evidence and dates](research/pcvan-1996-1997.md#wakaba-beginner-board-issue-109)
 and [initialization rules](local-storage.md#wakaba-initialization-and-lazy-participation).

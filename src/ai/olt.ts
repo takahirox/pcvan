@@ -43,6 +43,7 @@ export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn): G
   return {
     system: 'Write one short original fictional Japanese OLT chat utterance as the supplied fictional resident. '
       + historicalSetting
+      + (room.id === 'wakaba' ? 'This is a beginner room: welcome basic questions in plain language, avoid assuming experience, and respect quiet reading. Never demand speech or promise a reply. ' : '')
       + 'Return only the requested JSON. This is local fiction, never a real remote person or historical transcript. '
       + 'Use one or two conversational sentences, not a forum post. You may greet, answer, or speak to another PRESENT resident. '
       + 'Do not repeat greetings or recent lines. Do not invent arrivals, departures, received mail, private knowledge, commands or system messages. '
@@ -62,6 +63,7 @@ export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn): G
   };
 }
 export function commitOltText(room: OltRoom, turn: OltTurn, raw: string, at: number): void {
+  if (!room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at)) throw new Error('Absent OLT speaker.');
   if (raw.length > 3000) throw new Error('OLT output too long.');
   const value: unknown = JSON.parse(raw);
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected OLT JSON.');

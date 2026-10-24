@@ -379,8 +379,12 @@ verification is required. See [WebLLM](https://github.com/mlc-ai/web-llm) and
 
 ## OLT rooms
 
-DAISIZEN's `OLT` directory is a terminal-only local chat simulation. `JOIN 1` or
-`JOIN 2` enters; ordinary lines immediately send human speech. `/WHO`, `/LIST`,
+DAISIZEN's `OLT` directory retains its two rooms (`JOIN 1` / `JOIN 2`). Wakaba
+(MAIN/index `16` → `2`) has one separate beginner room (`JOIN 1`, stable ID
+`wakaba`). Directory and in-room selectors resolve only within their explicit
+navigation context; neither directory exposes the other's attendance or history.
+Both use the same terminal-only local chat implementation; ordinary lines
+immediately send human speech. `/WHO`, `/LIST`,
 `/HELP`, `/JOIN number`, `/LEAVE` / `/BACK` and `/MAIN` control the room. Plain
 `MAIN`, `BACK`, `WRITE`, `HELP` and `STOP` are speech. `//` escapes a leading slash;
 `/HANDLE` or `/SETTINGS` leaves for the corresponding typed menu. Read-only
@@ -425,8 +429,12 @@ and world epoch again. Tokens expire after 35 seconds; stale output is discarded
 The prompt contains the last 12 room events (text excerpts up to 120 characters), present identities, the speaker's
 profile/affinities and at most three public posts (180 characters each). **No mail
 records or private-mail excerpts are passed**, even for the speaking resident.
-All supplied conversation is untrusted data. Output must be exact JSON for the
-selected speaker/room, one plain line of 1–400 UTF-16 units, without terminal
+Wakaba adds beginner culture through this same prompt: plain language, basic
+questions welcome, no assumed experience, quiet reading respected and no promised
+reply. Other OLT rooms’ transcripts are excluded. This context is a category D
+choice, not an archived conversation. Prompt assertions verify construction, not
+real-model cultural quality. All supplied conversation is untrusted data. Output
+must be exact JSON for the selected speaker/room, one plain line of 1–400 UTF-16 units, without terminal
 controls, invisible formatting, HTML or a repeated recent utterance. Rejected
 output never becomes chat. Settings exposes technical status and per-line origin.
 Background readback waits while the input has text, Japanese composition is active

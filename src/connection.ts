@@ -33,6 +33,7 @@ export class ConnectionController implements TerminalController {
   get isGopher() { return this.navigation.isGopher; }
   get isArchie() { return this.navigation.isArchie; }
   get isConference() { return this.navigation.isConference; }
+  get oltContext() { return this.navigation.oltContext; }
   get isOlt() { return this.navigation.isOlt; }
   get mailContext() { return this.navigation.mailContext; }
   get forum() { return this.navigation.forum; }

@@ -47,7 +47,7 @@ test('MAIN/index welcome selects only one authored board with exact parents thro
     expect(c.screen).toBe('wakaba'); expect(c.forum).toBeNull();
     expect(welcome.join('\n')).toContain('1 はじめての広場');
     expect(c.submit('HELP')).toEqual(welcome); expect(c.submit('LIST')).toEqual(welcome);
-    for (const invalid of ['0', '2', '01', 'WRITE', 'READ 1', 'REPLY 1', 'J WAKABA']) {
+    for (const invalid of ['0', '3', '01', 'WRITE', 'READ 1', 'REPLY 1', 'J WAKABA']) {
       expect(c.submit(invalid).join('\n')).toContain('この画面では使えない'); expect(c.forum).toBeNull();
     }
     expect(c.submit('1').join('\n')).toContain('WRITE で最初の投稿');
@@ -132,7 +132,7 @@ test('inactive production browsing protects all records; NEXT persists exactly 4
   await start(page); await restore(page, protectedServices(world())); await command(page, 'MAIN', 'MAIN');
   const before = await snapshot(page);
   await command(page, '2', '索引'); await command(page, '16', '通信が初めての方も');
-  for (const cmd of ['LIST', 'HELP', '0', '2', 'READ 1', 'J WAKABA']) await command(page, cmd, 'コマンド=');
+  for (const cmd of ['LIST', 'HELP', '0', '3', 'READ 1', 'J WAKABA']) await command(page, cmd, 'コマンド=');
   await command(page, 'WRITE', '投稿先の掲示板で WRITE');
   await command(page, 'BACK', '索引'); await command(page, 'BACK', 'MAIN'); await enter(page);
   for (const cmd of ['HELP', 'LIST', 'UNREAD', 'READ 2', 'READ 9007199254740992']) await command(page, cmd, 'コマンド=');
