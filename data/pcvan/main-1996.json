@@ -5,6 +5,14 @@
   "status": "provisional",
   "source_url": "https://paradisearmy.com/doujin/pasok3pc-van.htm",
   "scope": "Retrospective MAIN transcription, not an original screen capture or the separate undated NEC variant.",
+  "corroborating_source": {
+    "source_url": "https://www.cis.twcu.ac.jp/~k-oda/AccessBlind/yuasa.html",
+    "inspected_at": "2026-10-24",
+    "claimed_historical_date": "1996-07-26 (page's stated update date)",
+    "evidence_category": "A",
+    "supported_observations": "Preserved participant walkthrough shows eleven paired MAIN rows followed by a standalone row, corroborating the selected row structure.",
+    "limitations": "High confidence in visible structure; moderate confidence in historical applicability because preservation and dating are not independently authenticated. Japanese extraction is damaged; selected labels and full-width typography still derive from the category C reproduction. Exact geometry and the current 44-cell offset remain category D reconstruction. July evidence does not establish November or 1997 continuity, especially for seasonal entries. Entry statuses and primary transcription provenance remain unchanged."
+  },
   "normalization": "Canonical selectors use ASCII; MAIN displays full-width selectors with full-width periods. Decorative gaps in labels 15/16 use single spaces. The reproduction shows consecutive row pairs 1/2 through 21/X, standalone Q, and the PC-VAN banner with (MAIN). Exact padding, terminal width and line-break geometry are reconstructed.",
   "prompt": {
     "text": "番号またはコマンド=",
