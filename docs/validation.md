@@ -2355,3 +2355,83 @@ warnings remain informational. Additional browser engines, native IME, real-mode
 hardware and historical-user checks were not run; they are optional. No required
 post-merge verification applies. No push, PR, comment, merge or deployment was
 performed.
+
+## Browser-local Gopher browsing and search (#103)
+
+Implemented against live open [Issue #103](https://github.com/takahirox/pcvan/issues/103)
+and evaluation baseline `0da2372dcb7640898f990b8e5d8914203bf301a6`, after reading
+repository development/review guidance. Historical scope, confidence, source URLs,
+access dates and category D choices are recorded in the
+[Gopher research section](research/pcvan-1996-1997.md#browser-local-gopher-browsing-and-search-issue-103),
+README and discoverable About. No new dependency, persistence/schema, endpoint,
+transport or model work was added.
+
+Validation on 2026-10-24 used Node.js 24.12.0, npm 11.6.2 and the existing Chromium
+production Playwright setup:
+
+- `npm ci`: passed, 24 packages audited, zero reported vulnerabilities.
+- `npx playwright install chromium`: passed (existing browser available).
+- `npm run build`: passed TypeScript checking and production bundling. Existing
+  large WebLLM chunk warnings remain; no worker was launched by Gopher browsing.
+- First `npm test -- tests/gopher.spec.ts --workers=3`: test collection failed
+  because the new test's direct JSON import lacked Node's `type: 'json'` import
+  attribute. Corrected the test import. Configured build had passed.
+- Second identical focused command: **7 passed, 1 failed (31.8s)**, using one
+  worker for this file. Both 320px production worlds and all controller checks
+  passed. The lifecycle test tried to cancel an unattended native file picker
+  after Chromium had already cancelled it. Corrected the test to use the existing
+  import helper to reach replacement confirmation before explicitly cancelling.
+
+- Broader command,
+  `npm test -- tests/gopher.spec.ts tests/navigation.spec.ts tests/connection.spec.ts tests/netnews.spec.ts tests/telnet.spec.ts tests/ftp.spec.ts tests/journey.spec.ts tests/storage-controls.spec.ts tests/repository.spec.ts tests/composition.spec.ts tests/terminal.spec.ts tests/progressive-output.spec.ts tests/ai-controls.spec.ts tests/settings-dialog.spec.ts --workers=3`:
+  **141 passed, 1 failed (4.2m)**, with three workers. All 134 existing checks
+  passed. The one failure was the new lifecycle test using the transcript-slicing
+  helper across a reset/reload, which clears the transcript. Corrected the test
+  to assert the fresh output directly, following existing reset checks. No product
+  behavior or existing behavioral assertion was weakened.
+
+- Corrected `npm test -- tests/gopher.spec.ts --workers=3`: **8 passed (27.5s)**,
+  using one worker for this file, with no failures, retries or skips. Configured
+  TypeScript checking and production build passed.
+
+- Final complete `npm test -- --workers=3`: **375 passed (6.8m)** with three
+  workers, no failures, retries or skips. All 367 existing checks and eight added
+  checks pass, including configured TypeScript checking and production build.
+  Existing Internet/navigation, functional, storage, consent, composition, IME,
+  terminal, offline and mocked model regressions pass. This does not establish
+  default/eight-worker reliability.
+- Reviewed the complete implementation, corpus, tests and documentation diff
+  against #103. Checked all five historical source URLs through read-only opens
+  and all **112 local Markdown targets/heading anchors** across README, research
+  and this record. Final working-tree and staged `git diff --check` pass.
+
+The eight new checks exercise both actual MAIN/index entry parents, root and
+nested directory openings of the same document, both original document bodies,
+search from both menu depths, exact result/query/order returns, repeated
+selection, replacement queries, zero results, strict selector validation,
+malformed/empty queries, case-insensitive title/body matching and preserved
+internal double spaces. Regex/Boolean-looking queries are literal, and corpus IDs
+and renderer guidance are not searched. All Gopher depths reject unrelated
+forum/mail/OLT/conference/TELNET/FTP/BiZ/composition/download commands without
+acquiring another context. Connection forwarding and MAIN/re-entry are checked
+at every depth; ordinary MAIN → Q → RECONNECT returns cleanly.
+
+Production journeys use a restored-empty anonymous world and a registered world
+with protected posts, mail/read markers, conference, OLT and NetNews settings.
+Before/after snapshots and downloaded JSON compare members, SIGs, forums, posts,
+mail, read states and all settings exactly, allowing ordinary session/history
+updates. Missing imported records remain missing. Both worlds exercise 320px
+keyboard reading, synthetic composition events (including `isComposing`),
+Settings/About returns, unsent input through modern Options, literal Japanese,
+indentation/double spaces/blank lines/full-width/half-width/markup, exact document
+bodies in exported UTF-8 terminal logs, scrolling and focus. No service command
+requests a browser download; only explicitly requested JSON and log exports do.
+With AI consent disabled, observers see no external/model requests, workers or
+popups. Lifecycle checks retain query after cancelled restore/reset and discard
+visits after identical same-tab restore, cross-tab world replacement and reset.
+
+Native Japanese IME, other engines, historical-user feedback and real-model or
+hardware validation were not performed; the first three are optional and the
+last two are unnecessary for this bundled service. Default/eight-worker
+reliability is unresolved and is not inferred from three-worker success. No
+post-merge verification is required.

@@ -30,6 +30,7 @@ export class ConnectionController implements TerminalController {
   get ecomDrafting() { return this.navigation.ecomDrafting; }
   invalidateEcom() { this.navigation.invalidateEcom(); }
   get isTelnet() { return this.navigation.isTelnet; }
+  get isGopher() { return this.navigation.isGopher; }
   get isConference() { return this.navigation.isConference; }
   get isOlt() { return this.navigation.isOlt; }
   get mailContext() { return this.navigation.mailContext; }

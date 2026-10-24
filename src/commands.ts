@@ -38,6 +38,7 @@ export interface CommandActions {
   selectDownload?(number: number): ServiceDownload | null;
   downloadFile?(body: string, filename: string): void;
   isTelnet?(): boolean;
+  isGopher?(): boolean;
   isEcom?(): boolean;
   ecomDrafting?(): boolean;
   invalidateEcom?(): void;
@@ -357,8 +358,8 @@ export class TerminalCommands {
         '最初の10人・66件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
     }
     // Global application controls above retain ownership. Every service command
-    // in TELNET belongs to its local navigation, including unsupported input.
-    if (!this.menu && (this.actions.isTelnet?.() || this.actions.isEcom?.())) return false;
+    // in these bounded services belongs to navigation, including unsupported input.
+    if (!this.menu && (this.actions.isTelnet?.() || this.actions.isEcom?.() || this.actions.isGopher?.())) return false;
     if (!this.menu && this.actions.mailbox?.()) {
       const data = await this.actions.read(), human = activeHuman(data);
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }

@@ -186,7 +186,7 @@ live drafts. OLT room history is included as world data.
 | `4` | データベース | Database directory; `1` opens 日経テレコン BiZ |
 | `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
-| `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo; `3` opens restricted FTP examples |
+| `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo; `3` opens restricted FTP examples; `4` opens local Gopher |
 | `8` | コンピュータ | Article list; `SIGS` opens the community directory |
 | `9` | ショッピングモール | Product catalog, 0 products |
 | `10` | 電子出版 | Publication list, 0 publications |
@@ -316,6 +316,62 @@ do not imply historical FTP carried only text. The
 [FTP research record](docs/research/pcvan-1996-1997.md#restricted-browser-local-ftp-acquisition-issue-99)
 and Settings/About explain the dated restriction, assumed November continuity,
 unknown endpoint mapping and reconstructed controls.
+
+For browser-local Gopher, use MAIN or index `7` → `4 Gopher` →
+`1 [ディレクトリ] 紙野の読み物` → `1` or `2 [文書]`. The two original
+Japanese readings, **川辺の小さな観察帳** and **星空と紙の地図**, were written
+for this application; no archived messages, identities, screenshots or software
+are copied. Root `2` opens the first document directly. Root or nested `3 [検索]`
+opens guidance for `SEARCH <query>`; for example, `SEARCH 川辺` returns two
+numbered, selectable documents. Unmatched text returns an honest zero-result menu.
+
+Search examines only these bundled titles and bodies, using deterministic,
+case-insensitive literal substring matching in corpus order. Outer whitespace is
+trimmed; internal whitespace and Japanese text are retained. `SEARCH 水面  風`
+(two spaces) matches, while one space does not. Regex/Boolean-looking text is
+literal: `SEARCH .*` finds that exact text, while `SEARCH 川辺 OR 星空` finds
+nothing. Empty/malformed queries retain the current view with guidance. This
+small matching rule is reconstruction, not RFC search-expression support.
+
+Numbered selection applies only to the displayed directory/results. `HELP`
+redisplays the current view; document `BACK` and `LIST` restore its opening
+directory or exact results, query and ordering. Results `BACK` restores the search
+view, then its containing directory, root, Internet directory and actual MAIN or
+index parent. Replacement searches replace the current results. `MAIN` clears
+the path; re-entry starts at the root. Settings/About preserve the view and modern
+Options preserves unsent input. Successful restore, reset, reload and cross-tab
+world replacement discard the visit; cancelled operations retain it.
+
+Gopher works anonymously without AI consent, models or network requests. Browsing
+does not alter members, SIGs, forums, posts, mail, read markers or settings, or
+seed missing imported records. Bundled documents and navigation add no storage
+schema or JSON fields; ordinary session/input history and explicitly exported
+terminal logs continue. There is no Gopher endpoint entry, transport, browser
+download action, live retrieval, complete historical coverage or protocol
+conformance claim. Archie, host paging and graphical clients are outside scope.
+
+Sources accessed **2026-10-24**:
+[Internet White Paper 1996 p.111](https://iwparchives.jp/files/pdf/iwp1996/iwp1996-ch04-01-p110.pdf)
+reports PC-VAN Gopher capability in its January comparison (moderate-to-high
+confidence), separately listing Navigator, Mosaic and WorldTALK. It includes
+planned later changes and supplies neither an activation date nor a terminal
+route. [Internet Magazine January 1996 p.229](https://iwparchives.jp/wp-content/themes/twentytwelve/bn/pdf/im199601-216-news.pdf)
+describes Navigator launching Mosaic and client-specific software/Archie server
+restrictions (high confidence in that account); it proves neither independent
+terminal access nor a service-wide Gopher prohibition.
+[RFC 1436](https://www.rfc-editor.org/rfc/rfc1436.html) supports hierarchical
+directories, documents and distinct search items returning selectable menus
+(high confidence), not PC-VAN controls.
+[White Paper 1996 p.14](https://iwparchives.jp/files/pdf/iwp1996/iwp1996-ch01-01-p014.pdf)
+provides general Japanese Gopher context;
+[White Paper 1997 p.29](https://iwparchives.jp/files/pdf/iwp1997/iwp1997-ch01-06-p028.pdf)
+offers limited BIGLOBE continuity context. Extending reported capability into
+fictional November 1996 is a **moderate-confidence inference**. The original
+host/client access path remains unknown. Selector `4`, every control/layout,
+Japanese label, corpus organization and matching behavior are accepted
+**category D reconstruction**; there is no `J GOPHER` jump. See the
+[Gopher research record](docs/research/pcvan-1996-1997.md#browser-local-gopher-browsing-and-search-issue-103)
+and discoverable `ABOUT` for the evidence boundaries.
 
 For a browser-local outbound TELNET journey, use `7` → `2 TELNET` →
 `OPEN mail.demo.example.invalid` → `MAIL` → `READ 1` or `READ 2`. The single
@@ -829,6 +885,7 @@ it is resolved.
 - `src/ftp.ts` and `data/pcvan/ftp-examples.json`: restricted info.mac list/preview and original bundled text files, outside persistence.
 - `src/telnet.ts`: bundled fictional host/account/letters and browser-local TELNET views, outside persistence.
 - `src/netnews.ts`: fixed-date NetNews examples, merged local articles, header matching and group/list/article rendering.
+- `src/gopher.ts`: in-memory directory/search/document paths over two bundled original readings in `data/pcvan/gopher-documents.json`.
 - `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
 - `tests/`: controller/session checks and browser interaction checks.
 
@@ -867,7 +924,8 @@ failed writes, and read markers across members, forums, connections and reloads.
 Section/service checks cover every MAIN and index destination, all five service views,
 mailbox browsing, news providers/headlines/briefs, NetNews groups/header
 searches/articles and isolated browsing, local TELNET login/mail/logout and parent
-returns, restricted FTP previews/exact confirmed downloads,
+returns, restricted FTP previews/exact confirmed downloads, Gopher directories,
+literal title/body searches and exact document/result/query returns,
 BiZ search/sets/titles/articles and fresh visits, empty collections,
 OLT conversation/presence, preserved fixture
 evidence, scoped helpers,
