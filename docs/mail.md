@@ -296,7 +296,10 @@ those two on boards both have used. Catch-up filters future material before
 prompting. No other human's mail, other resident's mailbox, complete backup,
 settings, history or global transcript enters the mail request. Profiles, names
 and excerpts are explicitly untrusted discussion data. The model returns only
-strict JSON with pinned sender/recipient/parent IDs and bounded plain text.
+strict JSON with pinned sender/recipient IDs, a fixed prompt-local reply-target
+reference when replying, and bounded plain text. Stored parent IDs, including
+multi-recipient retry identities and selection ordinals, stay out of both prompt
+text and output schemas. Saving binds the reply to the validated stored target.
 Invalid output, extra fields, wrong routing, HTML/control characters and exact
 copies of existing pair letters fail without delivery. These checks constrain
 routing and context; they cannot guarantee model truthfulness or perfect tone.

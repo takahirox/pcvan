@@ -8,6 +8,10 @@ import { random } from './activity';
 import { historicalSetting } from './setting';
 
 const time = (m: Mail) => Date.parse(m.simulation?.simulatedAt ?? m.createdAt);
+// There is one reply target per generation. Keep storage IDs (which may encode
+// batch retry bookkeeping) private; commitAiRun binds this reference to its
+// validated, stored MailTarget when saving the reply and confirmation.
+const replyTargetReference = 'reply-target';
 export function pairMail(content: Backup, residentId: string, humanId: string): Mail[] {
   return (content.mail ?? []).filter((m) => m.internetAddress === undefined && m.senderInternetAddress === undefined && ((m.senderId === residentId && m.recipientId === humanId) ||
     (m.senderId === humanId && m.recipientId === residentId))).sort((a, b) => a.number - b.number);
@@ -61,7 +65,7 @@ function checkTarget(content: Backup, personaId: string, target: MailTarget) {
 export function buildMailPrompt(content: Backup, personaId: string, target: MailTarget): GenerationPrompt {
   const { persona, human, residentId, mail, parent, publicPost } = checkTarget(content, personaId, target);
   const properties = { personaId: { type: 'string', enum: [personaId] }, recipientId: { type: 'string', enum: [human.id] },
-    ...(parent ? { replyToMailId: { type: 'string', enum: [parent.id] } } : {}),
+    ...(parent ? { replyToMailId: { type: 'string', enum: [replyTargetReference] } } : {}),
     subject: { type: 'string', minLength: 1, maxLength: 120 }, body: { type: 'string', minLength: 1, maxLength: 1200 } };
   const publicPosts = content.posts.filter((p) => localConversation(p) && [human.id, residentId].includes(p.authorId) &&
     // Restrict public context to boards where both correspondents have participated.
@@ -77,7 +81,7 @@ export function buildMailPrompt(content: Backup, personaId: string, target: Mail
       + 'Use only the provided context. Do not claim knowledge of other correspondents or quote archives. '
       + 'Subject: 1–120 code units, one line. Body: 1–1200 code units. Plain text; no HTML or terminal/invisible controls. Do not copy existing letters.',
     user: JSON.stringify({ kind: 'mail', personaId, recipientId: human.id,
-      ...(parent ? { replyToMailId: parent.id } : {}),
+      ...(parent ? { replyToMailId: replyTargetReference } : {}),
       persona: `${persona.handle}: ${persona.profile}`, occupation: persona.occupation, routine: persona.routine,
       interests: persona.interests, affinities: persona.affinities, correspondent: human.handle.slice(0, 80),
       replyTarget: parent ? { subject: parent.subject.slice(0, 120), body: parent.body.slice(0, 240) } : undefined,
@@ -90,13 +94,13 @@ export function buildMailPrompt(content: Backup, personaId: string, target: Mail
   };
 }
 export function validateMailGeneration(raw: string, content: Backup, personaId: string, target: MailTarget): { subject: string; body: string } {
-  const { mail } = checkTarget(content, personaId, target);
+  const { mail, parent } = checkTarget(content, personaId, target);
   if (raw.length > 8000) invalid('Mail output is too long.');
   const value = JSON.parse(raw) as Record<string, unknown> | null;
   const keys = ['personaId', 'recipientId', 'subject', 'body', ...(target.replyToMailId ? ['replyToMailId'] : [])];
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== keys.length ||
       keys.some((k) => !Object.hasOwn(value, k)) || value.personaId !== personaId || value.recipientId !== target.humanId ||
-      value.replyToMailId !== target.replyToMailId) invalid('Mail output identity/fields mismatch.');
+      value.replyToMailId !== (parent ? replyTargetReference : undefined)) invalid('Mail output identity/fields mismatch.');
   for (const [key, max] of [['subject', 120], ['body', 1200]] as const) {
     const text = value[key];
     if (typeof text !== 'string' || !text.trim() || text.length > max ||

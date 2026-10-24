@@ -90,7 +90,7 @@ for (const [personaId, keyword] of [['hankote', 'LOCAL-DOSV'], ['soroban', 'LOCA
     expect(mail.publicPosts).toHaveLength(4);
     expect(mail.publicPosts.every((p: { title: string; body: string }) => p.title.length === 40 && p.body.length === 100)).toBe(true);
     expect(JSON.parse(result.mail.schema).properties).toMatchObject({
-      recipientId: { enum: ['human'] }, replyToMailId: { enum: ['letter-6'] }, body: { maxLength: 1200 } });
+      recipientId: { enum: ['human'] }, replyToMailId: { enum: ['reply-target'] }, body: { maxLength: 1200 } });
     expect(result.olt.system).toContain('one or two conversational sentences');
     expect(result.olt.system).toContain('PRESENT resident');
     expect(olt.recent).toEqual(result.expectedRecent);

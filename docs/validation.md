@@ -3059,3 +3059,45 @@ Historical provenance preserves the accepted Issue investigation's 2026-10-24
 URLs, confidence and access limitations; no new live historical-source inspection
 is claimed here. Optional native IME, other browser engines, hardware testing and
 new dated host transcripts were not performed. No required post-merge check remains.
+
+### Issue #119 review fix: keep batch identities out of resident prompts
+
+The review identified that multi-mail copy IDs exposed the shared retry identity
+and selection ordinal through both the reply prompt and its output schema.
+Reply generation now uses the same fixed `reply-target` reference for ordinary
+and multi-recipient letters. The repository still validates its stored target
+and uses that target's actual ID for the saved reply and recipient confirmation;
+complete-set retry identities and storage formats are unchanged.
+
+The extended pair-isolation regression inspects the full prompt and schema for
+both recipients, including the second selected copy, and checks that neither
+copy ID, the batch prefix nor the shared retry identity appears. Existing mocked
+scheduled inference and repository checks retain independent parent confirmations.
+Output validation also rejects a stored parent ID in place of the prompt-local
+reference.
+
+Validation in the assigned worktree on 2026-10-24:
+
+- The first test attempt could not find `playwright`; `npm ci` installed the
+  locked dependencies (23 packages, zero audit findings).
+- Before the source fix, the strengthened pair-isolation regression failed on
+  the exposed `local-multi:invitation:0` identity as expected (one selected test,
+  one actual worker with `--workers=3`).
+- Focused command below: **93 passed (2.7m), actual 3 workers**, including
+  configured TypeScript checking and production bundling, without retries or
+  skipped tests.
+
+```sh
+npm test -- tests/mail.spec.ts tests/mail-repository.spec.ts tests/mail-presentation.spec.ts tests/mail-autonomy.spec.ts tests/composition.spec.ts tests/terminal.spec.ts tests/ai-generation.spec.ts --workers=3
+```
+
+The complete `npm test -- --workers=3` run passed **473 tests (7.5m), actual
+3 workers**, including TypeScript checking and production bundling, with no
+failures, retries or skipped tests. The existing optional-runtime large-chunk
+warning remained. No real model download or inference was performed.
+
+Reviewed the complete revision diff. All eight local Markdown links/anchors in
+`docs/mail.md` resolve; changed Markdown fences and working-tree/staged whitespace
+checks pass. Native IME and other browser engines were not tested in this review
+fix; the existing simulated IME and Chromium regressions passed. No required
+post-merge verification remains. No push or merge was performed.

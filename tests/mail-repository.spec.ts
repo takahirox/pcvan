@@ -19,7 +19,7 @@ async function prepareConfirmation(page: Page) {
     await repo.put('settings', { id: 'ai-activity', value: { ...activity, consent: true, batch: {
       id: 'confirm-batch', from: epoch, to: '2026-10-21T01:00:00.000Z', modelId: activity.modelId, runs: [run],
     } } as never });
-    const raw = JSON.stringify({ personaId: run.personaId, recipientId: humanId, replyToMailId: parent.id,
+    const raw = JSON.stringify({ personaId: run.personaId, recipientId: humanId, replyToMailId: 'reply-target',
       subject: 'Re: 星の手紙', body: '星のお便りをありがとう。' });
     return { parent, context, run, raw };
   }, epoch);
@@ -85,7 +85,7 @@ test('mail backup strictness, individual recipient read markers, replies, import
     const activity = await repo.openActivity();
     const run = { id: 'mail-batch:one', personaId: 'hoshimori', simulatedAt: '2026-10-21T01:00:00.000Z', status: 'running', mail: { humanId, replyToMailId: sent.id } };
     await repo.put('settings', { id: 'ai-activity', value: { ...activity, consent: true, batch: { id: 'mail-batch', from: '2026-10-21T00:00:00.000Z', to: '2026-10-21T02:00:00.000Z', modelId: activity.modelId, runs: [run] } } as never });
-    const raw = JSON.stringify({ personaId: 'hoshimori', recipientId: humanId, replyToMailId: sent.id, subject: 'Re: 便り', body: 'お便りありがとう。' });
+    const raw = JSON.stringify({ personaId: 'hoshimori', recipientId: humanId, replyToMailId: 'reply-target', subject: 'Re: 便り', body: 'お便りありがとう。' });
     const path = '/src/storage/repository.ts';
     const other = await (await import(path)).openRepository('mail-world') as LocalRepository;
     const deliveries = await Promise.all([repo.commitAiRun(run.id, raw), other.commitAiRun(run.id, raw)]);
@@ -722,14 +722,15 @@ test('multi-mail copies keep pair prompts and explicit-parent confirmations inde
     for (const [index, personaId] of ['hoshimori', 'kusabue'].entries()) {
       const parent = parents[index]!, target = { humanId, replyToMailId: parent.id };
       const before = await repo.exportBackup();
-      prompts.push(buildMailPrompt(before, personaId, target).user);
+      prompts.push(buildMailPrompt(before, personaId, target));
       const activity = await repo.openActivity();
       const batchId = `batch:${personaId}`;
       const run = { id: `${batchId}:one`, personaId, simulatedAt: epoch, status: 'running' as const, mail: target };
       await repo.put('settings', { id: 'ai-activity', value: { ...activity, consent: true, batch: {
         id: batchId, from: epoch, to: '2026-10-21T01:00:00.000Z', modelId: activity.modelId, runs: [run],
       } } as never });
-      const raw = JSON.stringify({ personaId, recipientId: humanId, replyToMailId: parent.id, subject: 'Re: 観望会', body: `${personaId}からの返事です。楽しみです。` });
+      const raw = JSON.stringify({ personaId, recipientId: humanId, replyToMailId: JSON.parse(prompts[index]!.user).replyToMailId,
+        subject: 'Re: 観望会', body: `${personaId}からの返事です。楽しみです。` });
       const saved = await repo.commitAiRun(run.id, raw);
       const after = await repo.exportBackup();
       stages.push({ saved, confirmations: parents.map((p) => after.mail!.find((m) => m.id === p.id)!.recipientConfirmation),
@@ -737,10 +738,16 @@ test('multi-mail copies keep pair prompts and explicit-parent confirmations inde
     }
     return { prompts, parents, stages, after: await repo.exportBackup() };
   }, epoch);
-  expect(result.prompts[0]).toContain('週末、一緒に星を見ませんか。');
-  expect(result.prompts[0]).not.toMatch(/草笛だけへの私信|秘密の草笛|kusabue|recipientIds|copies/);
-  expect(result.prompts[0]).not.toContain(result.parents[1]!.id);
-  expect(result.prompts[1]).not.toContain(result.parents[0]!.id);
+  expect(result.prompts[0]!.user).toContain('週末、一緒に星を見ませんか。');
+  expect(JSON.stringify(result.prompts[0])).not.toMatch(/草笛だけへの私信|秘密の草笛|kusabue|recipientIds|copies/);
+  for (const prompt of result.prompts) {
+    // Inspect the full model input, including schema enums, for either copy's
+    // batch prefix, shared retry identity and ordinal-bearing storage ID.
+    expect(JSON.stringify(prompt)).not.toMatch(/local-multi|invitation|recipientIds|copies/);
+    for (const parent of result.parents) expect(JSON.stringify(prompt)).not.toContain(parent.id);
+    expect(JSON.parse(prompt.user).replyToMailId).toBe('reply-target');
+    expect(JSON.parse(prompt.schema).properties.replyToMailId.enum).toEqual(['reply-target']);
+  }
   expect(result.stages[0]!.confirmations[0]).toBeTruthy(); expect(result.stages[0]!.confirmations[1]).toBeUndefined();
   expect(result.stages[1]!.confirmations.every(Boolean)).toBe(true);
   for (let i = 0; i < 2; i++) {
