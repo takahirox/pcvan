@@ -3322,3 +3322,35 @@ Reviewed the revision diff and checked whitespace with `git diff --check` and
 `git diff --cached --check`. No documentation links were added. No real model
 execution, native IME observation, other browser-engine checks, push or merge was
 performed. No required post-merge verification applies.
+
+## PR #124 review correction: reload-safe mail reset approval (Issue #123)
+
+The review reported **499 passed, 1 failed (8.2m), actual three workers**.
+All twenty scheduling checks passed. The existing multi-mail reset test used
+`command(page, 'Y')`, which waited for an approval echo in the document that reset
+replaces. The replacement document showed successful reset, but that wait prevented
+the test from reaching its stale-approval assertions. Five isolated repetitions
+passed during review, demonstrating the intermittent synchronization failure.
+
+Reset approval now fills `Y` and presses Enter directly while awaiting both tabs'
+load events, matching the scheduling tests. The subsequent queued-command and
+empty-mail assertions remain unchanged. No runtime code was changed.
+
+Validation on 2026-10-24 with Node.js 24.12.0 on macOS:
+
+- The first focused launch could not start because Playwright dependencies were
+  absent (`playwright: command not found`); no checks ran. `npm ci` then passed
+  with no reported vulnerabilities or lockfile changes.
+- `npm test -- tests/mail.spec.ts tests/scheduled-mail.spec.ts --workers=3`:
+  **41 passed (2.7m), actual two workers** for the two selected files. Both
+  corrected reset cases and all twenty scheduling checks passed.
+- `npm test -- --workers=3`: **500 passed (7.9m), actual three workers**,
+  with no failures, retries or skips. Both runs included configured TypeScript
+  checking and production bundling. Existing Vite chunk-size and Node color
+  warnings remain. Test/runtime files were unchanged throughout the full run.
+
+Reviewed the complete revision diff; `git diff --check` and
+`git diff --cached --check` passed. No documentation links were added, and Markdown
+code fences remain balanced. No real model execution, native IME observation,
+other browser-engine checks, push or merge was performed. No required post-merge
+verification applies.
