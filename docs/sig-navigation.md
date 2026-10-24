@@ -7,6 +7,7 @@ MAIN labels stay intact; `16` now opens the separate Wakaba beginner welcome.
 
 | Route from MAIN | Destination | First-visit conversations |
 | --- | --- | --- |
+| `13` → `6` | 一般掲示板 / 募集とお知らせ | Three original public notices, pristine worlds only |
 | `16` → `2` → `JOIN 1` | わかばマーク / はじめての談話室 | Separate fictional beginner OLT room; quiet reading or speech |
 | `16` → `1` | わかばマーク / はじめての広場 | Three original beginner contributions, pristine worlds only |
 | `J MITI` → `3` → `9` or `13` → `1` → `3` → `9` | MITI 資料室 | Original sixteen posts, unchanged |
@@ -97,3 +98,18 @@ DAISIZEN retains `自然の談話室` and `星と道具の部屋` at local selec
 The new welcome selector, room identifiers, controls and screens are category D.
 See [Wakaba OLT evidence](research/pcvan-1996-1997.md#wakaba-beginner-olt-issue-113), [board evidence and dates](research/pcvan-1996-1997.md#wakaba-beginner-board-issue-109)
 and [initialization rules](local-storage.md#wakaba-initialization-and-lazy-participation).
+
+## General public bulletin board
+
+MAIN/index → `13` → `6` opens **募集とお知らせ** directly. Communication
+selectors 1–5 retain their SIG destinations and have no board composition target.
+The general board uses the forum commands above and returns with BACK to
+communication and then its actual caller. MAIN clears the stack. It is separate
+from both SIGs and the beginner Wakaba board.
+
+The selector, placement, board name, internal `LOCAL-BULLETIN:1` container,
+anonymous reading, header, replies and controls are category D reconstruction.
+Earlier purpose evidence supports a late-1996 general-board experience with
+moderate confidence; no authenticated shortcut or complete directory is claimed.
+See [sources inspected 2026-10-24](research/pcvan-1996-1997.md#general-public-bulletin-board-issue-117)
+and [initialization and lazy participation](local-storage.md#general-bulletin-initialization-and-lazy-participation).

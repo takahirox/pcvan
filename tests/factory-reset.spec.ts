@@ -70,10 +70,10 @@ test('repository reset reuses the exact first-visit fixture, clears all local st
     for (const key of ['members', 'forums', 'sigs', 'posts', 'readStates', 'session'] as const) {
       expect(fresh[key]).toEqual(result.expected[key]);
     }
-    expect(fresh.posts).toHaveLength(69);
-    expect(fresh.posts.filter((p) => !p.replyToPostId)).toHaveLength(20);
+    expect(fresh.posts).toHaveLength(72);
+    expect(fresh.posts.filter((p) => !p.replyToPostId)).toHaveLength(22);
     expect(fresh.members).toHaveLength(10);
-    expect(fresh.forums).toHaveLength(11);
+    expect(fresh.forums).toHaveLength(12);
     expect(fresh.settings.map((s) => s.id)).toEqual(result.expected.settings.map((s) => s.id));
     for (const id of ['ai-residents', 'community-world']) {
       expect(fresh.settings.find((s) => s.id === id)).toEqual(result.expected.settings.find((s) => s.id === id));
@@ -155,7 +155,7 @@ test('typed reset refusal/invalid/blank preserves data; confirmed reset reloads 
     await command(page, 'RESET', '取り消せません');
     await command(page, '', 'Y / N'); await command(page, 'YES', 'Y / N');
     await command(page, refusal, '操作を中止');
-    expect((await snapshot(page)).posts).toHaveLength(70);
+    expect((await snapshot(page)).posts).toHaveLength(73);
   }
   const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
   await enterForum(other); await command(other, 'REPLY 1', 'タイトル='); await command(other, '古い下書き', '本文');
@@ -164,7 +164,7 @@ test('typed reset refusal/invalid/blank preserves data; confirmed reset reloads 
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
   await expect(other.locator('.output')).toContainText('MAIN');
   const reset = await snapshot(page);
-  expect(reset.posts).toHaveLength(69); expect(reset.members).toHaveLength(10); expect(reset.readStates).toEqual([]);
+  expect(reset.posts).toHaveLength(72); expect(reset.members).toHaveLength(10); expect(reset.readStates).toEqual([]);
   expect(reset.settings.find((s) => s.id === 'ai-activity')!.value).toMatchObject({ consent: false, maxPosts: 4 });
   expect(await page.evaluate(async () => !!await (await caches.open('unrelated-test')).match('/keep'))).toBe(true);
   await command(page, 'SKIP'); await restore(page, saved); expect((await snapshot(page)).posts).toEqual(saved.posts);
@@ -196,14 +196,14 @@ test('a suspended tab missing notifications cannot approve old consent after res
   const reloading = page.waitForEvent('load');
   await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter'); await reloading;
   await expect(page.locator('.output')).toContainText('MAIN');
-  expect((await snapshot(other)).posts).toHaveLength(69);
+  expect((await snapshot(other)).posts).toHaveLength(72);
   expect((await snapshot(other)).settings.find((s) => s.id === 'ai-activity')!.value).toMatchObject({ consent: false });
   await enterForum(page); await command(page, 'WRITE', '登録しますか');
   await command(page, 'Y', 'ハンドル名='); await command(page, '新しい人', 'タイトル=');
   await command(page, '古い下書き', '本文'); await command(page, '保存しない', '本文='); await command(page, '.END', '投稿しますか');
   await command(other, 'SKIP', '登録を中止'); await restore(other, saved);
   const reloadAfterRestore = page.waitForEvent('load'); await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter'); await reloadAfterRestore;
-  expect((await snapshot(other)).posts).toHaveLength(69);
+  expect((await snapshot(other)).posts).toHaveLength(72);
 });
 
 for (const work of ['load', 'generate'] as const) {
@@ -218,7 +218,7 @@ for (const work of ['load', 'generate'] as const) {
     await command(page, 'RESET', '初期状態に戻しますか');
     await Promise.all([page.waitForEvent('load'), command(page, 'Y')]);
     await expect(page.locator('.output')).toContainText('初期状態に戻しました');
-    expect((await snapshot(page)).posts).toHaveLength(69);
+    expect((await snapshot(page)).posts).toHaveLength(72);
     expect((await snapshot(page)).settings.find((s) => s.id === 'ai-activity')!.value).toMatchObject({ consent: false });
   });
 }

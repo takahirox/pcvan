@@ -1,3 +1,4 @@
+import { bulletin } from '../bulletin';
 import { wakaba } from '../wakaba';
 import expansion from '../../data/pcvan/expanded-community.json' with { type: 'json' };
 import fixture from '../../data/pcvan/fictional-community.json' with { type: 'json' };
@@ -13,7 +14,7 @@ export const communityBoards = [
 
 /** Seeds are eligible conversation, but never claims of model inference. */
 export function localConversation(post: Post): boolean {
-  return post.origin === 'local-human' || post.origin === SEED_ORIGIN || post.origin === wakaba.origin || post.origin === expansion.origin || post.origin.startsWith('local-ai:webllm:');
+  return post.origin === 'local-human' || post.origin === SEED_ORIGIN || post.origin === bulletin.origin || post.origin === wakaba.origin || post.origin === expansion.origin || post.origin.startsWith('local-ai:webllm:');
 }
 
 /** Conservatively accept only unambiguous empty legacy worlds; never rewrite directories. */
@@ -81,5 +82,17 @@ export function wakabaPosts(anchor: string, forumId: string): Post[] {
     title: p.title, body: p.body, origin: wakaba.origin,
     createdAt: new Date(midnight - p.daysAgo * day + (p.hour * 60 + p.minute) * 60_000).toISOString(),
     ...(p.replyTo ? { replyToPostId: `seed:wakaba-v1:${p.replyTo}` } : {}),
+  }));
+}
+
+/** Called only inside pristine bootstrap, never legacy population or expansion. */
+export function bulletinPosts(anchor: string, forumId: string): Post[] {
+  const day = 86_400_000;
+  const midnight = Math.floor((Date.parse(anchor) + 9 * 3_600_000) / day) * day - 9 * 3_600_000;
+  return bulletin.posts.map((p, i) => ({
+    id: `seed:bulletin-v1:${p.id}`, forumId, number: i + 1, authorId: personaMemberId(p.author),
+    title: p.title, body: p.body, origin: bulletin.origin,
+    createdAt: new Date(midnight - p.daysAgo * day + (p.hour * 60 + p.minute) * 60_000).toISOString(),
+    ...(p.replyTo ? { replyToPostId: `seed:bulletin-v1:${p.replyTo}` } : {}),
   }));
 }

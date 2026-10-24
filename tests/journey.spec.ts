@@ -17,7 +17,7 @@ test('production keyboard journey preserves all MAIN mappings, Japanese posts, r
   await post(page, '旅の記録', '一行目\n\n  日本語　ｶﾅ  ');
   await post(page, '返信', 'キーボードだけで書いた返信。', 'REPLY 17');
   await command(page, 'READ 18', '返信先：#17');
-  const saved = await backup(page); expect(saved.posts).toHaveLength(71);
+  const saved = await backup(page); expect(saved.posts).toHaveLength(74);
   await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
   await enterForum(page); await command(page, 'READ 18', 'キーボードだけ');
   await command(page, 'MAIN', 'MAIN'); await command(page, 'Q', '接続を終了');
@@ -94,13 +94,13 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   await page.clock.setFixedTime(returnTime); await command(page, 'RECONNECT', '接続中');
   await expect.poll(() => page.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)).toBe(2);
   const interrupted = await backup(page), generated = interrupted.posts.filter((p) => p.simulation);
-  expect(generated).toHaveLength(1); expect(interrupted.posts).toHaveLength(71);
+  expect(generated).toHaveLength(1); expect(interrupted.posts).toHaveLength(74);
   const batch = (interrupted.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity).batch!;
   expect(batch.runs.map((run) => run.status)).toEqual(['committed', 'running']);
   expect(batch.runs[1]).toMatchObject({ personaId: batch.runs[0]!.personaId, forumId: batch.runs[0]!.forumId });
   await page.close(); const resumed = await context.newPage(); await resumed.clock.setFixedTime(returnTime); await mockWorker(resumed, 'ok');
   await resumed.goto('/');
-  await expect.poll(async () => (await snapshot(resumed)).posts.length).toBe(72);
+  await expect.poll(async () => (await snapshot(resumed)).posts.length).toBe(75);
   const recovered = await backup(resumed);
   expect(recovered.posts.filter((p) => p.simulation)).toHaveLength(2);
   const recoveredBatch = (recovered.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity).batch!;
