@@ -8,6 +8,7 @@ import type { TelnetScreen } from './telnet';
 import { calendarSetting } from './calendar';
 import { conferenceState, conferenceHelp, renderConference, renderContribution } from './conference';
 import { additionalSigs, boardCulture } from './communities';
+import type { OltContext } from './olt-state';
 import { renderOltDirectory } from './olt';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
@@ -33,7 +34,7 @@ const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = TelnetScreen | 'archie' | 'gopher' | 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
-  'wakaba' | 'ecom' | 'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
+  'wakaba' | 'wakaba-olt' | 'ecom' | 'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
   'publication-directory' | 'publication-contents' | 'publication-installment' |
   'news-directory' | 'news-headlines' | 'news-brief' |
@@ -160,7 +161,11 @@ export class PcvanController implements TerminalController {
 
   get isConference(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'CONFERENCE'; }
 
-  get isOlt(): boolean { return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'OLT'; }
+  get oltContext(): OltContext | null {
+    if (this.currentScreen === 'wakaba-olt') return 'wakaba';
+    return this.currentScreen === 'daisizen-service' && this.service.demo_entry!.input === 'OLT' ? 'daisizen' : null;
+  }
+  get isOlt(): boolean { return this.oltContext !== null; }
 
   get needsContent(): boolean {
     return this.isConference || this.isOlt || !!this.mailContext ||
@@ -428,7 +433,11 @@ export class PcvanController implements TerminalController {
       case 'wakaba':
         if (command === 'LIST') return this.render();
         if (command === '1') { this.boardNo = wakaba.boardNo; this.forumKeyword = wakaba.keyword; return this.enter('forum'); }
-        return this.invalidCommand('1 / LIST / BACK / MAIN / HELP');
+        if (command === '2') return this.enter('wakaba-olt');
+        return this.invalidCommand('1 / 2 OLT / LIST / BACK / MAIN / HELP');
+      case 'wakaba-olt':
+        if (command === 'LIST') return this.render();
+        return this.invalidCommand('JOIN 1 / WHO 1 / LIST / BACK / MAIN / HELP');
       case 'community': {
         const board = this.community.boards.find((b) => String(b.number) === command);
         if (board) { this.boardNo = board.number; this.forumKeyword = this.community.keyword; return this.enter('forum'); }
@@ -657,8 +666,9 @@ export class PcvanController implements TerminalController {
       ];
       case 'wakaba': return [
         '☆★☆ わかばマーク ☆★☆', '通信が初めての方も、読むところからどうぞ。',
-        `1 ${wakaba.name}`, 'LIST: 案内を再表示', returnHelp, demoPrompt,
+        `1 ${wakaba.name}`, '2 OLT', 'LIST: 案内を再表示', returnHelp, demoPrompt,
       ];
+      case 'wakaba-olt': return renderOltDirectory({ settings: this.content.settings ?? [] }, 'wakaba');
       case 'index': return [
         '索引', ...indexEntries.map(entryText),
         'J ECOM: 電子郵便（紙の郵便を模擬体験）',
@@ -696,7 +706,7 @@ export class PcvanController implements TerminalController {
       case 'eic-item': return [...renderEicItem(this.eicItem), returnHelp, demoPrompt];
       case 'section':
       case 'daisizen-service': if (this.isConference) return renderConference(this.content);
-        if (this.isOlt) return renderOltDirectory({ settings: this.content.settings ?? [] });
+        if (this.isOlt) return renderOltDirectory({ settings: this.content.settings ?? [] }, this.oltContext!);
         if (this.readingService) return [this.collectionTitle, ...renderServiceDirectory(this.readingService), returnHelp, demoPrompt];
         return [
         ...(this.collectionKind === 'mail' ? [this.collectionTitle,

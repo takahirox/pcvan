@@ -4,9 +4,12 @@ import { random, routineFactor } from './ai/activity';
 
 export const OLT_SETTING = 'olt-rooms';
 export const roomDefinitions = [
-  { id: 'lounge', name: '自然の談話室', board: 'DAISIZEN:1' },
-  { id: 'night', name: '星と道具の部屋', board: 'MITI:9' },
+  { id: 'lounge', name: '自然の談話室', board: 'DAISIZEN:1', context: 'daisizen' },
+  { id: 'night', name: '星と道具の部屋', board: 'MITI:9', context: 'daisizen' },
+  { id: 'wakaba', name: 'はじめての談話室', board: 'LOCAL-WAKABA:1', context: 'wakaba' },
 ] as const;
+export type OltContext = typeof roomDefinitions[number]['context'];
+export const contextRooms = (context: OltContext) => roomDefinitions.filter((r) => r.context === context);
 export type RoomId = typeof roomDefinitions[number]['id'];
 export interface OltLine {
   id: string; number: number; authorId: string; createdAt: string;
@@ -35,10 +38,16 @@ export function emptyOlt(now: string): OltState {
     nextTurnAt: iso(Date.parse(now) + 10_000), handledNumber: 0, chain: 0, pending: null,
   })) };
 }
-export function oltState(content: Pick<Backup, 'settings'>, now = new Date().toISOString()): OltState {
+export function oltState(content: Pick<Backup, 'settings'> & Partial<Pick<Backup, 'members'>>, now = new Date().toISOString()): OltState {
   const saved = content.settings.find((s) => s.id === OLT_SETTING)?.value;
-  if (saved) validateOlt(saved);
-  return saved ? structuredClone(saved) as unknown as OltState : emptyOlt(now);
+  if (saved === undefined) return emptyOlt(now);
+  // Validate the complete legacy record before adding anything. No reseeding,
+  // budget reset or clock-dependent migration; reads are pure and idempotent.
+  validateOlt(saved);
+  if (content.members) validateOltMembers(saved, content.members);
+  const state = structuredClone(saved) as unknown as OltState;
+  if (state.rooms.length === 2) state.rooms.push(emptyOlt(state.windowAt).rooms.find((r) => r.id === 'wakaba')!);
+  return state;
 }
 export function oltAuthorization(content: Pick<Backup, 'settings'>): string {
   const ai = content.settings.find((s) => s.id === 'ai-activity')?.value as unknown as AiActivity | undefined;
@@ -130,7 +139,7 @@ export function validateOlt(value: unknown): asserts value is OltState {
   const int = (v: unknown, min = 0) => { if (!Number.isSafeInteger(v) || (v as number) < min) fail(); };
   const state = obj(value, ['version', 'windowAt', 'attempts', 'rooms']);
   if (state.version !== 1) fail(); time(state.windowAt); int(state.attempts);
-  if ((state.attempts as number) > 24 || !Array.isArray(state.rooms) || state.rooms.length !== 2) fail();
+  if ((state.attempts as number) > 24 || !Array.isArray(state.rooms) || ![2, 3].includes(state.rooms.length)) fail();
   const roomIds = new Set();
   const residentIds = new Set();
   for (const raw of state.rooms as unknown[]) {
@@ -169,6 +178,7 @@ export function validateOlt(value: unknown): asserts value is OltState {
       if (typeof p.context !== 'string' || p.context.length > 100_000) fail();
     }
   }
+  if (!roomIds.has('lounge') || !roomIds.has('night') || (roomIds.size === 3 && !roomIds.has('wakaba'))) fail();
 }
 export function validateOltMembers(state: OltState, members: readonly Member[]) {
   for (const room of state.rooms) {

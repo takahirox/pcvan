@@ -2717,3 +2717,89 @@ former-user feedback and a subsequently recovered dated manual/session remain
 optional. No model download or real inference was used. Default/eight-worker
 reliability is not assessed by three-worker checks. No post-merge verification
 is required.
+
+## Wakaba beginner OLT (Issue #113)
+
+Validated in the assigned worktree on 2026-10-24 with Node.js 24.12.0,
+Playwright 1.64.1 and Chromium on macOS.
+
+- Initial standalone build could not find `tsc` because dependencies were absent.
+  `npm ci` then passed (23 packages, zero reported vulnerabilities), and the
+  standalone TypeScript check/production build passed. No dependency or lockfile
+  change was needed.
+- Initial focused coverage with three workers: **98 passed, 1 failed (58.5s)**.
+  An existing inactive Wakaba board fixture still treated welcome `2` as invalid;
+  changed that invalid-input case to `3`, preserving its protection assertions.
+- Expanding two repository checks across both contexts exposed a test harness
+  error: **97 passed, 4 failed (56.6s)**. Browser `page.evaluate` callbacks cannot
+  capture the outer room variables. Passing the room ID/index explicitly fixed
+  all four ReferenceErrors; no runtime safeguard was relaxed.
+- Two subsequent focused runs passed **103 checks** with three workers (57.0s
+  and 56.1s), including stronger populated protected-record coverage. Review then
+  improved invalid in-room selector guidance to suggest slash commands.
+- Final focused run after the slash-guidance correction: **103 passed (57.2s)**
+  with three workers, configured TypeScript checking and production build, and no
+  failures, retries or skips.
+- Complete `npm test -- --workers=3`: **424 passed (8.4m)**, including configured
+  TypeScript checking and production build, with no failures, retries or skips.
+  The 407 baseline checks plus 17 new/expanded checks pass together. Existing
+  functional, storage, consent, IME, terminal, calendar, mail, offline and service
+  regressions pass. Existing Vite large-chunk and Node NO_COLOR/FORCE_COLOR
+  warnings remain informational.
+- Reviewed the complete staged diff against #113: one new context and room,
+  bounded version-1 compatibility, shared OLT safeguards and affected tests/docs;
+  no database version, dependency, backup format or model subsystem redesign.
+- Local Markdown validation: all **168 local links** and **seven Settings
+  research anchors** resolve; code fences are balanced. The staged whitespace
+  check caught an extra blank line at the new helper file’s end; removed it.
+  Working-tree and staged whitespace checks now pass, including all new files.
+
+The focused command includes the two new specs alongside the Issue's requested
+controller, OLT, Wakaba and storage checks:
+
+```sh
+npm test -- tests/olt.spec.ts tests/olt-repository.spec.ts tests/wakaba.spec.ts tests/wakaba-repository.spec.ts tests/navigation.spec.ts tests/connection.spec.ts tests/storage-controls.spec.ts tests/wakaba-olt.spec.ts tests/wakaba-olt-repository.spec.ts --workers=3
+npm test -- --workers=3
+```
+
+New checks cover MAIN/index entry and exact parents, the untouched board route,
+context-local WHO/JOIN/LIST/HELP and invalid cross-context selectors, anonymous
+and registered quiet/speaking visits, literal commands and escaped slashes, IME,
+handle rename/Settings transitions, departures, re-entry and JSON readback.
+Two tabs share deduplicated human attendance and commit each resident turn once.
+Pending mocked workers are cancelled by departure, handle settings and hidden
+tabs. Delayed unit-level mock output is fenced both when the navigation context
+changes without a new submission and when the same room is revisited. Existing
+DAISIZEN terminal identity, bounded replay, input/focus, log and pacing/skip
+coverage remains applicable through the shared implementation.
+
+IndexedDB checks cover missing OLT settings, valid legacy version-1 pairs, pure
+repeated normalization, concurrent connections, reopen/reload, new-state JSON
+round trips, malformed legacy/new imports and write/import quota rollback.
+Legacy transcripts, IDs, sequence counters, timestamps, pending reservations and
+budget windows/attempts are preserved by normalization. Populated inactive
+fixtures compare all protected records before/after compatibility and visits:
+Wakaba/SIG posts and counters, private mail/replies/read confirmations, read
+markers, conference contributions, NetNews, unrelated settings, resident
+preferences and consent. Only the intended OLT setting changes in repository
+visits; browser visits also permit ordinary session/history/activity bookkeeping.
+
+Shared-cap coverage sets 23 attempts, arbitrates the last available Wakaba turn
+across two connections, then rejects further claims in all three rooms at 24.
+Both old-room and Wakaba repository checks reject stale/duplicate commits,
+activity-zero output and output following model-consent withdrawal. Prompt/output
+checks enforce the current room and present speaker, bounded public memory,
+beginner guidance, no private mail or other OLT transcripts, and rejection of
+wrong speakers/rooms, invalid text and duplicate utterances. Assertions establish
+prompt construction, not real-model cultural quality.
+
+The four historical sources were re-opened: client-author capability description,
+participant reference, NEC PDF text (including printed page 232) and the circa-1996
+MAIN reproduction. A PDF screenshot attempt returned an internal tool error;
+no new page-image confirmation is claimed. Upstream research's inaccessible
+package metadata and unsuccessful target-year secondary-menu search remain
+qualified in the research record. Native Japanese IME, former-user feedback,
+dated manual/session comparison and real generated-language assessment remain
+optional. No model download, GPU inference or external inference service was used.
+Default/eight-worker reliability remains unresolved; three-worker success does
+not resolve it. No required post-merge verification.

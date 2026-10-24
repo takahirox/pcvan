@@ -557,11 +557,30 @@ the established ten residents/69 forum posts and three conference contributions;
 OLT has no seeded transcript.
 
 The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly
-two rooms (`lounge`, `night`). Each room stores a monotonic `nextNumber`, the last
+three rooms (`lounge`, `night`, `wakaba`). Each room stores a monotonic
+`nextNumber`, the last
 **200 lines**, resident leases, human visitor leases, `observedAt`, `nextTurnAt`,
 `handledNumber`, bounded consecutive-resident `chain`, and an optional pending
 turn token. `/LIST` displays the most recent 40 lines; terminal scrollback retains
 what this session has displayed. Pruning never reuses a sequence or ID.
+
+Compatibility keeps the same version-1 representation: the validator accepts
+exactly the legacy `lounge`/`night` pair or the complete three-room set, with
+strict shapes, bounds, unique/known IDs and member references. `oltState` first
+validates the saved structure (and member references when supplied), clones it,
+then adds only an empty `wakaba` room
+to a valid legacy pair. Its initial timestamps derive from the saved `windowAt`,
+so repeated reads are pure and deterministic. No existing fields, transcripts,
+sequence counters, budget window/attempts or pending reservations are rewritten.
+Repository mutations validate member references before lifecycle reconciliation
+and persist the normalized set in the same transaction as the operation.
+Concurrent tabs serialize that write; reload and JSON restore do not add a second
+room or refill allowances. Import validates legacy references before any clears;
+legacy JSON stays valid and normalizes on use. Malformed two-room subsets (such
+as `lounge`/`wakaba`), unknown/duplicate rooms and malformed complete states are
+rejected. Write/import failure rolls back the entire transaction. Ordinary
+consent, presence expiry, departure and cancellation still apply to old leases
+and pending turns. Compatibility does not reseed any community records.
 
 Every line has `{id, number, authorId, createdAt, kind, text, origin}`. IDs are
 `olt:<roomId>:<number>`; timestamps are canonical UTC ISO strings, nondecreasing

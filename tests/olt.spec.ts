@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { TerminalOlt } from '../src/olt';
 import { about } from '../src/settings';
@@ -7,46 +6,10 @@ import { renderPost } from '../src/forums';
 import { emptyOlt, appendOlt } from '../src/olt-state';
 import { backupFixture } from './backup-fixture';
 import type { AiActivity } from '../src/storage/schema';
-import type { ResidentSettings } from '../src/ai/personas';
-import type { OltState } from '../src/olt-state';
-import { random } from '../src/ai/activity';
 import { mockWorker, mockPendingWorker } from './ai-helpers';
 import { consent } from './autonomy-helpers';
 import { command, start, snapshot, noOtherUi, enterForum, post, backup, restore } from './terminal-helpers';
-
-const epoch = new Date('2026-10-21T13:04:00Z'); // 22:04 JST, inside the visit window.
-const state = async (page: Page) => (await snapshot(page)).settings.find((s) => s.id === 'olt-rooms')?.value as unknown as OltState | undefined;
-const speech = async (page: Page) => (await state(page))?.rooms.flatMap((r) => r.lines).filter((l) => l.origin.startsWith('local-ai:')) ?? [];
-async function directory(page: Page) {
-  await command(page, 'MAIN', 'MAIN'); await command(page, '13', 'コミュニケーション');
-  await command(page, '2', '大自然'); await command(page, 'OLT', '部屋一覧');
-}
-async function room(page: Page, n = 2) { await directory(page); await command(page, `JOIN ${n}`, '発言='); }
-async function advance(page: Page, ticks: number) {
-  // Let the command queue, worker microtasks and IDB settle between paced ticks.
-  for (let i = 0; i < ticks; i++) {
-    await page.clock.runFor(3000);
-    await page.evaluate(() => new Promise<void>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => { r.result.close(); resolve(); }; }));
-  }
-}
-async function residents(page: Page, quiet = false) {
-  const data = await snapshot(page), aiRow = data.settings.find((r) => r.id === 'ai-activity')!, residentRow = data.settings.find((r) => r.id === 'ai-residents')!;
-  const ai = aiRow.value as unknown as AiActivity, profiles = (residentRow.value as unknown as ResidentSettings).profiles;
-  const slot = Math.floor(epoch.getTime() / 1_200_000), day = Math.floor(epoch.getTime() / 86_400_000);
-  const selected = profiles.slice(0, 2);
-  let seed = '';
-  for (let i = 0; i < 10000; i++) {
-    seed = `olt-test-${i}`;
-    if (selected.every((p) => random(`${seed}:olt:${p.id}:${slot}:visit`) < .9 && random(`${seed}:olt:${p.id}:away:${day}`) >= .12)) break;
-  }
-  Object.assign(ai, { seed, batch: null, nextDue: Object.fromEntries(profiles.map((p) => [p.id, new Date(epoch.getTime() + 3_600_000).toISOString()])) });
-  for (const [i, p] of profiles.entries()) Object.assign(p, { frequency: i < 2 ? 1 : 0, participation: 1,
-    preferredBoards: ['MITI:9'], weekdayHours: [22], weekendHours: [22], reply: 1, inactivity: quiet ? 1 : 0 });
-  await page.evaluate(async (rows) => {
-    const r = indexedDB.open('pcvan-local'); const db = await new Promise<IDBDatabase>((resolve) => { r.onsuccess = () => resolve(r.result); });
-    await new Promise<void>((resolve) => { const tx = db.transaction('settings', 'readwrite'); for (const row of rows) tx.objectStore('settings').put(row); tx.oncomplete = () => resolve(); }); db.close();
-  }, [aiRow, residentRow]);
-}
+import { epoch, state, speech, directory, room, advance, residents } from './olt-helpers';
 
 test('terminal directory, literal commands, IME, history, transitions, handles, reentry and forum posting', async ({ page }) => {
   await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '夜の客'); await room(page);
@@ -210,7 +173,7 @@ test('presentation reuses forum tokens and safe names for every line kind withou
   const olt = new TerminalOlt({
     read: async () => data,
     repository: async () => ({ observeRoom: async () => roomState }) as never,
-    print: (...lines) => printed.push(...lines), navigate: () => {}, isOlt: () => true, ai: {} as never,
+    print: (...lines) => printed.push(...lines), navigate: () => {}, oltContext: () => 'daisizen', ai: {} as never,
   });
   const before = structuredClone({ data, roomState });
   await olt.submit('JOIN 2');

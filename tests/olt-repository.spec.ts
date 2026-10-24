@@ -78,58 +78,70 @@ test('bounded monotonic lines, same-identity leases, atomic failure, strict rest
   expect(result.reset.settings.some((s) => s.id === 'olt-rooms')).toBe(false);
 });
 
-test('transactional turn reservations, persistent independent budget, privacy, duplicate commit and withdrawn consent', async ({ page }) => {
-  const result = await page.evaluate(async (now) => {
-    const repo = window.oltRepo, rp = '/src/storage/repository.ts', op = '/src/olt-state.ts', ap = '/src/ai/olt.ts';
-    const { oltState, iso } = await import(op) as typeof import('../src/olt-state');
-    const { buildOltPrompt } = await import(ap) as typeof import('../src/ai/olt');
-    const other = await (await import(rp)).openRepository('olt-world') as LocalRepository;
-    const initial = await repo.exportBackup(), human = initial.members.find((m) => m.actor === 'human')!;
-    await repo.createHumanMail({ id: 'private-1', senderId: human.id, recipient: 'hoshimori', subject: 'TOP_SECRET', body: 'PRIVATE_CORRESPONDENCE' });
-    let ai = await repo.authorizeModel((await repo.openActivity()).modelId);
-    const profiles = initial.settings.find((r) => r.id === 'ai-residents')!;
-    const residents = (profiles.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
-    residents.forEach((r) => { r.reply = 1; r.inactivity = 0; r.participation = 0; r.weekdayHours = [22]; });
-    await repo.put('settings', profiles);
-    const at = Date.parse(now);
-    await repo.observeRoom('human-tab', 'night', human.id, now);
-    await repo.speakRoom('night', 'human-tab', '星の話', now);
-    let state = oltState(await repo.exportBackup());
-    state.rooms[1]!.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: iso(at + 60_000) }];
-    await repo.put('settings', { id: 'olt-rooms', value: state as never });
-    const claims = await Promise.all([repo.claimRoomTurn('night', iso(at + 10_000)), other.claimRoomTurn('night', iso(at + 10_000))]);
-    const turn = claims.find(Boolean)!;
-    const snapshot = await repo.exportBackup(); state = oltState(snapshot);
-    const prompt = buildOltPrompt(snapshot, state.rooms[1]!, turn);
-    const raw = JSON.stringify({ kind: 'olt', roomId: 'night', personaId: 'hoshimori', text: '星の光がきれいですね。' });
-    await Promise.all([repo.finishRoomTurn('night', turn.id, raw, undefined, iso(at + 11_000)), other.finishRoomTurn('night', turn.id, raw, undefined, iso(at + 11_000))]);
-    const committed = oltState(await repo.exportBackup());
-    // Replay cannot append a second line. Cancellation also consumes an attempt.
-    await repo.finishRoomTurn('night', turn.id, raw, undefined, iso(at + 12_000));
-    state = oltState(await repo.exportBackup()); state.attempts = 24;
-    state.rooms[1]!.handledNumber = 0; state.rooms[1]!.nextTurnAt = now;
-    await repo.put('settings', { id: 'olt-rooms', value: state as never });
-    const capped = await repo.claimRoomTurn('night', iso(at + 20_000));
-    await repo.speakRoom('night', 'human-tab', '別の星', iso(at + 20_000));
-    state = oltState(await repo.exportBackup()); state.attempts = 0;
-    await repo.put('settings', { id: 'olt-rooms', value: state as never });
-    const withdrawn = await repo.claimRoomTurn('night', iso(at + 30_000));
-    ai = await repo.configureActivity(0, ai.modelId, iso(at + 30_000));
-    if (withdrawn) await repo.finishRoomTurn('night', withdrawn.id, raw, undefined, iso(at + 31_000));
-    const after = await repo.exportBackup(); other.close();
-    return { claims, prompt, committed, capped, withdrawn, after, initial, ai };
-  }, now);
-  expect(result.claims.filter(Boolean)).toHaveLength(1);
-  expect(result.prompt.user).not.toMatch(/TOP_SECRET|PRIVATE_CORRESPONDENCE|private-1/);
-  expect(JSON.parse(result.prompt.user).recent).toHaveLength(2);
-  expect(result.committed.rooms[1]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
-  expect(result.capped).toBeUndefined(); expect(result.withdrawn).toBeTruthy();
-  const after = result.after.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState;
-  expect(after.rooms[1]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
-  expect(result.after.posts).toEqual(result.initial.posts);
-  expect(result.ai.batch).toBeNull();
-});
+for (const roomId of ['night', 'wakaba'] as const) {
+  const roomIndex = roomId === 'night' ? 1 : 2;
 
+  test(`transactional turn reservations, persistent independent budget, privacy, duplicate commit and withdrawn consent (${roomId})`, async ({ page }) => {
+    const result = await page.evaluate(async ({ now, roomId, roomIndex }) => {
+      const repo = window.oltRepo, rp = '/src/storage/repository.ts', op = '/src/olt-state.ts', ap = '/src/ai/olt.ts';
+      const { oltState, iso } = await import(op) as typeof import('../src/olt-state');
+      const { buildOltPrompt } = await import(ap) as typeof import('../src/ai/olt');
+      const other = await (await import(rp)).openRepository('olt-world') as LocalRepository;
+      const initial = await repo.exportBackup(), human = initial.members.find((m) => m.actor === 'human')!;
+      await repo.createHumanMail({ id: 'private-1', senderId: human.id, recipient: 'hoshimori', subject: 'TOP_SECRET', body: 'PRIVATE_CORRESPONDENCE' });
+      let ai = await repo.authorizeModel((await repo.openActivity()).modelId);
+      const profiles = initial.settings.find((r) => r.id === 'ai-residents')!;
+      const residents = (profiles.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
+      residents.forEach((r) => { r.reply = 1; r.inactivity = 0; r.participation = 0; r.weekdayHours = [22]; });
+      await repo.put('settings', profiles);
+      const at = Date.parse(now);
+      await repo.observeRoom('human-tab', roomId, human.id, now);
+      await repo.speakRoom(roomId, 'human-tab', '星の話', now);
+      let state = oltState(await repo.exportBackup());
+      state.rooms[roomIndex]!.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: iso(at + 60_000) }];
+      await repo.put('settings', { id: 'olt-rooms', value: state as never });
+      const claims = await Promise.all([repo.claimRoomTurn(roomId, iso(at + 10_000)), other.claimRoomTurn(roomId, iso(at + 10_000))]);
+      const turn = claims.find(Boolean)!;
+      const snapshot = await repo.exportBackup(); state = oltState(snapshot);
+      const prompt = buildOltPrompt(snapshot, state.rooms[roomIndex]!, turn);
+      const raw = JSON.stringify({ kind: 'olt', roomId, personaId: 'hoshimori', text: '星の光がきれいですね。' });
+      await Promise.all([repo.finishRoomTurn(roomId, turn.id, raw, undefined, iso(at + 11_000)), other.finishRoomTurn(roomId, turn.id, raw, undefined, iso(at + 11_000))]);
+      const committed = oltState(await repo.exportBackup());
+      // Replay cannot append a second line. Cancellation also consumes an attempt.
+      await repo.finishRoomTurn(roomId, turn.id, raw, undefined, iso(at + 12_000));
+      state = oltState(await repo.exportBackup()); state.attempts = 24;
+      state.rooms[roomIndex]!.handledNumber = 0; state.rooms[roomIndex]!.nextTurnAt = now;
+      await repo.put('settings', { id: 'olt-rooms', value: state as never });
+      const capped = await repo.claimRoomTurn(roomId, iso(at + 20_000));
+      await repo.speakRoom(roomId, 'human-tab', '別の星', iso(at + 20_000));
+      state = oltState(await repo.exportBackup()); state.attempts = 0;
+      await repo.put('settings', { id: 'olt-rooms', value: state as never });
+      const withdrawn = await repo.claimRoomTurn(roomId, iso(at + 30_000));
+      ai = await repo.configureActivity(0, ai.modelId, iso(at + 30_000));
+      if (withdrawn) await repo.finishRoomTurn(roomId, withdrawn.id, raw, undefined, iso(at + 31_000));
+      // A model change separately withdraws consent while a turn is reserved.
+      await repo.configureActivity(5, ai.modelId, iso(at + 32_000));
+      await repo.observeRoom('human-tab', roomId, human.id, iso(at + 32_000));
+      await repo.speakRoom(roomId, 'human-tab', '同意変更前の質問', iso(at + 32_000));
+      const pending = await repo.claimRoomTurn(roomId, iso(at + 42_000));
+      const pp = '/src/ai/personas.ts'; const { models } = await import(pp) as typeof import('../src/ai/personas');
+      const changed = await repo.configureActivity(5, models.find((m) => m.id !== ai.modelId)!.id, iso(at + 42_000));
+      if (pending) await repo.finishRoomTurn(roomId, pending.id, raw, undefined, iso(at + 43_000));
+      const after = await repo.exportBackup(); other.close();
+      return { claims, prompt, committed, capped, withdrawn, pending, changed, after, initial, ai };
+    }, { now, roomId, roomIndex });
+    expect(result.claims.filter(Boolean)).toHaveLength(1);
+    expect(result.prompt.user).not.toMatch(/TOP_SECRET|PRIVATE_CORRESPONDENCE|private-1/);
+    expect(JSON.parse(result.prompt.user).recent).toHaveLength(2);
+    expect(result.committed.rooms[roomIndex]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
+    expect(result.capped).toBeUndefined(); expect(result.withdrawn).toBeTruthy();
+    expect(result.pending).toBeTruthy(); expect(result.changed.consent).toBe(false);
+    const after = result.after.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState;
+    expect(after.rooms[roomIndex]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
+    expect(result.after.posts).toEqual(result.initial.posts);
+    expect(result.ai.batch).toBeNull();
+  });
+}
 test('default evening routines allow both populated and empty visits without duplicate arrivals or off-hour crowds', async ({ page }) => {
   const result = await page.evaluate(async (now) => {
     const op = '/src/olt-state.ts';
@@ -155,32 +167,36 @@ test('default evening routines allow both populated and empty visits without dup
   expect(result.offHours.every((n) => n <= 1)).toBe(true);
 });
 
-test('OLT prompts bound public context and malformed, impersonated or repeated model output never appends', async ({ page }) => {
-  const result = await page.evaluate(async (now) => {
-    const op = '/src/olt-state.ts', ap = '/src/ai/olt.ts';
-    const { emptyOlt, appendOlt } = await import(op) as typeof import('../src/olt-state');
-    const { buildOltPrompt, commitOltText } = await import(ap) as typeof import('../src/ai/olt');
-    const content = await window.oltRepo.exportBackup(), state = emptyOlt(now), room = state.rooms[1]!;
-    const human = content.members.find((m) => m.actor === 'human')!;
-    room.residents.push({ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: '2026-10-21T13:10:00.000Z' });
-    for (let i = 0; i < 20; i++) appendOlt(room, human.id, 'say', `${i}${'星'.repeat(399)}`, 'local-human', Date.parse(now));
-    const turn = { id: 'turn', authorId: 'fictional-ai:hoshimori', modelId: 'test-model', context: '', until: '2026-10-21T13:10:00.000Z' };
-    const prompt = buildOltPrompt(content, room, turn);
-    const good = { kind: 'olt', personaId: 'hoshimori', roomId: 'night', text: '星を見つけたんですね。' };
-    const invalid = ['{}', JSON.stringify({ ...good, personaId: ['hoshimori'] }), JSON.stringify({ ...good, personaId: 'kusabue' }),
-      JSON.stringify({ ...good, roomId: 'lounge' }), JSON.stringify({ ...good, text: '\u001b[2J' }),
-      JSON.stringify({ ...good, text: '<b>hello</b>' }), JSON.stringify({ ...good, text: '星'.repeat(401) }),
-      JSON.stringify({ ...good, text: 'line\nbreak' }), JSON.stringify({ ...good, unknown: true }),
-      JSON.stringify({ ...good, text: room.lines.at(-1)!.text })];
-    const before = room.lines.length;
-    const failures = invalid.map((raw) => { try { commitOltText(room, turn, raw, Date.parse(now)); return false; } catch { return true; } });
-    const after = room.lines.length;
-    commitOltText(room, turn, JSON.stringify(good), Date.parse(now));
-    return { prompt, failures, before, after, final: room.lines.at(-1)! };
-  }, now);
-  const prompt = JSON.parse(result.prompt.user);
-  expect(prompt.recent).toHaveLength(12); expect(prompt.recent.every((l: { text: string }) => l.text.length <= 120)).toBe(true);
-  expect(prompt.publicMemory.length).toBeLessThanOrEqual(3);
-  expect(result.failures).toEqual(Array(10).fill(true)); expect(result.after).toBe(result.before);
-  expect(result.final).toMatchObject({ authorId: 'fictional-ai:hoshimori', kind: 'say', origin: 'local-ai:webllm:test-model' });
-});
+for (const roomId of ['night', 'wakaba'] as const) {
+  const roomIndex = roomId === 'night' ? 1 : 2;
+
+  test(`OLT prompts bound public context and malformed, impersonated or repeated model output never appends (${roomId})`, async ({ page }) => {
+    const result = await page.evaluate(async ({ now, roomId, roomIndex }) => {
+      const op = '/src/olt-state.ts', ap = '/src/ai/olt.ts';
+      const { emptyOlt, appendOlt } = await import(op) as typeof import('../src/olt-state');
+      const { buildOltPrompt, commitOltText } = await import(ap) as typeof import('../src/ai/olt');
+      const content = await window.oltRepo.exportBackup(), state = emptyOlt(now), room = state.rooms[roomIndex]!;
+      const human = content.members.find((m) => m.actor === 'human')!;
+      room.residents.push({ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: '2026-10-21T13:10:00.000Z' });
+      for (let i = 0; i < 20; i++) appendOlt(room, human.id, 'say', `${i}${'星'.repeat(399)}`, 'local-human', Date.parse(now));
+      const turn = { id: 'turn', authorId: 'fictional-ai:hoshimori', modelId: 'test-model', context: '', until: '2026-10-21T13:10:00.000Z' };
+      const prompt = buildOltPrompt(content, room, turn);
+      const good = { kind: 'olt', personaId: 'hoshimori', roomId, text: '星を見つけたんですね。' };
+      const invalid = ['{}', JSON.stringify({ ...good, personaId: ['hoshimori'] }), JSON.stringify({ ...good, personaId: 'kusabue' }),
+        JSON.stringify({ ...good, roomId: 'lounge' }), JSON.stringify({ ...good, text: '\u001b[2J' }),
+        JSON.stringify({ ...good, text: '<b>hello</b>' }), JSON.stringify({ ...good, text: '星'.repeat(401) }),
+        JSON.stringify({ ...good, text: 'line\nbreak' }), JSON.stringify({ ...good, unknown: true }),
+        JSON.stringify({ ...good, text: room.lines.at(-1)!.text })];
+      const before = room.lines.length;
+      const failures = invalid.map((raw) => { try { commitOltText(room, turn, raw, Date.parse(now)); return false; } catch { return true; } });
+      const after = room.lines.length;
+      commitOltText(room, turn, JSON.stringify(good), Date.parse(now));
+      return { prompt, failures, before, after, final: room.lines.at(-1)! };
+    }, { now, roomId, roomIndex });
+    const prompt = JSON.parse(result.prompt.user);
+    expect(prompt.recent).toHaveLength(12); expect(prompt.recent.every((l: { text: string }) => l.text.length <= 120)).toBe(true);
+    expect(prompt.publicMemory.length).toBeLessThanOrEqual(3);
+    expect(result.failures).toEqual(Array(10).fill(true)); expect(result.after).toBe(result.before);
+    expect(result.final).toMatchObject({ authorId: 'fictional-ai:hoshimori', kind: 'say', origin: 'local-ai:webllm:test-model' });
+  });
+}

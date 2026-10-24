@@ -402,7 +402,7 @@ export function validateBackup(value: unknown): asserts value is Backup {
     }
   }
   const olt = backup.settings.find((s) => s.id === OLT_SETTING)?.value;
-  if (olt) { validateOlt(olt); validateOltMembers(olt, backup.members); }
+  if (olt !== undefined) { validateOlt(olt); validateOltMembers(olt, backup.members); }
   const conference = backup.settings.find((s) => s.id === CONFERENCE_SETTING)?.value;
   if (conference !== undefined) { validateConference(conference); validateConferenceMembers(conference, backup.members); }
   const netnews = backup.settings.find((s) => s.id === NETNEWS_SETTING)?.value;

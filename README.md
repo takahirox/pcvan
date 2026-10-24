@@ -195,7 +195,7 @@ live drafts. OLT room history is included as world data.
 | `13` | コミュニケーション | Five-community directory |
 | `14` | ＰＣ－ＶＡＮ利用情報（無料） | Article list, 0 articles |
 | `15` | ☆★☆ おすすめ ☆★☆ | Article list, 0 articles |
-| `16` | ☆★☆ わかばマーク ☆★☆ | Beginner welcome → `1` はじめての広場; read, unread, write and reply |
+| `16` | ☆★☆ わかばマーク ☆★☆ | Beginner welcome → `1` はじめての広場 (board) / `2` OLT (beginner room) |
 | `17` | ＢＩＧＬＯＢＥガイド | Article list, 0 articles |
 | `18` | インターサイト | Information article list, 0 articles |
 | `19` | ＢＩＧＬＯＢＥイベント（無料） | Article list, 0 articles |
@@ -618,7 +618,17 @@ documentation supports beginner communication with moderate historical confidenc
 Exact 1996 secondary screens/controls have low confidence. Board name, selector `1`,
 `LOCAL-WAKABA:1`, wording, navigation, controls and conversation are **category D
 reconstruction**, not an authenticated SIG directory or `J WAKABA` shortcut.
-Wakaba OLT and a full historical directory remain outside this subset. Settings →
+The welcome also offers `2 OLT` → `WHO 1` / `JOIN 1` → **はじめての談話室**
+(stable room ID `wakaba`). Quiet reading and basic questions are welcome;
+attendance and transcript are separate from DAISIZEN. `/LEAVE` or `/BACK` returns
+to this directory, then `BACK` restores the welcome and the actual caller.
+Welcome selector `2`, the room name/ID, local selectors, controls and presentation
+are category D reconstruction. The client author explicitly describes Wakaba OLT
+attendance/participation separately from retained messages (high capability
+confidence, unresolved release date); a separate beginner synchronous experience
+has moderate historical confidence, exact late-1996 configuration low confidence.
+Sources rechecked 2026-10-24; see the [Wakaba OLT record](docs/research/pcvan-1996-1997.md#wakaba-beginner-olt-issue-113).
+A full historical directory remains outside this subset. Settings →
 Details/About and the [research record](docs/research/pcvan-1996-1997.md#wakaba-beginner-board-issue-109)
 provide source scope, access dates and limitations.
 
@@ -655,7 +665,10 @@ descriptions support unread retrieval, with unresolved release dating; the
 1995 publisher comparison describes other services' unread controls. See the
 [dated sources and access limits](docs/research/pcvan-1996-1997.md#forum-unread-reading-issue-107).
 
-OLT accepts `JOIN 1` / `JOIN 2` (or a room number), `WHO number` and `LIST`.
+DAISIZEN OLT accepts `JOIN 1` / `JOIN 2`; Wakaba OLT accepts only `JOIN 1`
+(or the local room number). Both support `WHO number`, `WHO`, `HELP` and `LIST`.
+Selectors are resolved only within the current directory, including `/JOIN` and
+`/WHO` inside rooms; Wakaba never exposes the other rooms through selector `2`.
 Inside a room, ordinary lines are speech, including literal `MAIN`, `BACK`,
 `WRITE` and `HELP`. Use `/HELP`, `/WHO`, `/LIST` (last 40 lines), `/JOIN number`,
 `/LEAVE` / `/BACK`, or `/MAIN`. `//text` sends a leading slash literally.
@@ -686,7 +699,12 @@ empty rooms are normal. No consent or usable WebGPU means no generated speech;
 human chat, navigation and persisted readback still work. No remote users connect.
 Presence and bounded transcripts survive reload and JSON backup, while closed
 or hidden tabs never generate a backlog of chat. Setup, provenance and maintenance
-remain in Options. See [OLT behavior](docs/local-ai.md#olt-rooms) and
+remain in Options. All three rooms share the existing 24-attempt hourly OLT cap
+and inference lock. Valid version-1 two-room saves are checked before an empty
+Wakaba room is added; existing lines, counters, timestamps, reservations and
+budget remain intact, subject to normal presence/turn expiry and cancellation.
+Normalization is lazy and idempotent, with no database/backup version change.
+See [OLT behavior](docs/local-ai.md#olt-rooms) and
 [storage contract](docs/local-storage.md#olt-persistence).
 
 Mail directories accept `INBOX`, `SENT`, `MEMBERS`, `WRITE address` (or `WRITE`
