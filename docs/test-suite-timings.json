@@ -1,0 +1,563 @@
+{
+  "baselineCommit": "663c2a4d113687a4e5b0df80834f5f12d3bef27f",
+  "sourceEquivalentCommit": "23576a5dbd97b143f95448538ab54d5e93f4494e",
+  "dateUtc": "2026-10-24",
+  "host": {
+    "os": "macOS 26.6.2 (Darwin arm64)",
+    "logicalCpus": 16,
+    "memoryGiB": 64,
+    "node": "24.12.0",
+    "npm": "11.6.2",
+    "playwright": "1.64.1",
+    "chromium": "156.0.8078.4 (revision 1248)"
+  },
+  "fullRun": {
+    "command": "npm test -- --workers=3 --reporter=json,<phase-reporter>",
+    "workers": 3,
+    "passed": 519,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "elapsedMs": 496364,
+    "playwrightDurationMs": 495765.103,
+    "launchToOnBeginMs": 5573,
+    "onBeginToOnEndMs": 490729,
+    "sumTestDurationMs": 1350954,
+    "workerTestDurationMs": {
+      "0": 426169,
+      "1": 489284,
+      "2": 435501
+    },
+    "files": [
+      {
+        "file": "activity.spec.ts",
+        "cases": 6,
+        "sumDurationMs": 1288,
+        "maxDurationMs": 409
+      },
+      {
+        "file": "ai-adapter.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 1106,
+        "maxDurationMs": 436
+      },
+      {
+        "file": "ai-controls.spec.ts",
+        "cases": 2,
+        "sumDurationMs": 5335,
+        "maxDurationMs": 4029
+      },
+      {
+        "file": "ai-generation.spec.ts",
+        "cases": 5,
+        "sumDurationMs": 538,
+        "maxDurationMs": 137
+      },
+      {
+        "file": "ai-setup.spec.ts",
+        "cases": 4,
+        "sumDurationMs": 9655,
+        "maxDurationMs": 4117
+      },
+      {
+        "file": "archie.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 20328,
+        "maxDurationMs": 7524
+      },
+      {
+        "file": "autonomy.spec.ts",
+        "cases": 12,
+        "sumDurationMs": 25322,
+        "maxDurationMs": 5181
+      },
+      {
+        "file": "biz.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 34523,
+        "maxDurationMs": 17721
+      },
+      {
+        "file": "bulletin-repository.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 621,
+        "maxDurationMs": 257
+      },
+      {
+        "file": "bulletin.spec.ts",
+        "cases": 9,
+        "sumDurationMs": 22957,
+        "maxDurationMs": 7353
+      },
+      {
+        "file": "calendar.spec.ts",
+        "cases": 7,
+        "sumDurationMs": 27572,
+        "maxDurationMs": 12537
+      },
+      {
+        "file": "community.spec.ts",
+        "cases": 2,
+        "sumDurationMs": 383,
+        "maxDurationMs": 215
+      },
+      {
+        "file": "composition.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 11336,
+        "maxDurationMs": 4338
+      },
+      {
+        "file": "conference-repository.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 497,
+        "maxDurationMs": 185
+      },
+      {
+        "file": "conference.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 26077,
+        "maxDurationMs": 8263
+      },
+      {
+        "file": "connection.spec.ts",
+        "cases": 22,
+        "sumDurationMs": 52454,
+        "maxDurationMs": 9195
+      },
+      {
+        "file": "ecom.spec.ts",
+        "cases": 7,
+        "sumDurationMs": 34233,
+        "maxDurationMs": 12797
+      },
+      {
+        "file": "eic.spec.ts",
+        "cases": 6,
+        "sumDurationMs": 15910,
+        "maxDurationMs": 8085
+      },
+      {
+        "file": "expanded-community.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 6638,
+        "maxDurationMs": 6230
+      },
+      {
+        "file": "factory-reset.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 18580,
+        "maxDurationMs": 7801
+      },
+      {
+        "file": "forums.spec.ts",
+        "cases": 19,
+        "sumDurationMs": 23721,
+        "maxDurationMs": 7716
+      },
+      {
+        "file": "ftp.spec.ts",
+        "cases": 7,
+        "sumDurationMs": 27295,
+        "maxDurationMs": 11832
+      },
+      {
+        "file": "gopher.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 23623,
+        "maxDurationMs": 8399
+      },
+      {
+        "file": "immersive.spec.ts",
+        "cases": 4,
+        "sumDurationMs": 6192,
+        "maxDurationMs": 3908
+      },
+      {
+        "file": "journey.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 14982,
+        "maxDurationMs": 6020
+      },
+      {
+        "file": "mail-autonomy.spec.ts",
+        "cases": 14,
+        "sumDurationMs": 39365,
+        "maxDurationMs": 9723
+      },
+      {
+        "file": "mail-file-controller.spec.ts",
+        "cases": 1,
+        "sumDurationMs": 149,
+        "maxDurationMs": 149
+      },
+      {
+        "file": "mail-file.spec.ts",
+        "cases": 14,
+        "sumDurationMs": 82448,
+        "maxDurationMs": 7790
+      },
+      {
+        "file": "mail-presentation.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 389,
+        "maxDurationMs": 79
+      },
+      {
+        "file": "mail-repository.spec.ts",
+        "cases": 36,
+        "sumDurationMs": 5649,
+        "maxDurationMs": 755
+      },
+      {
+        "file": "mail.spec.ts",
+        "cases": 21,
+        "sumDurationMs": 155195,
+        "maxDurationMs": 12953
+      },
+      {
+        "file": "navigation.spec.ts",
+        "cases": 30,
+        "sumDurationMs": 6922,
+        "maxDurationMs": 3500
+      },
+      {
+        "file": "netnews-posting.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 21528,
+        "maxDurationMs": 9621
+      },
+      {
+        "file": "netnews-repository.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 413,
+        "maxDurationMs": 188
+      },
+      {
+        "file": "netnews.spec.ts",
+        "cases": 8,
+        "sumDurationMs": 161022,
+        "maxDurationMs": 53544
+      },
+      {
+        "file": "news.spec.ts",
+        "cases": 7,
+        "sumDurationMs": 62944,
+        "maxDurationMs": 21589
+      },
+      {
+        "file": "offline.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 9140,
+        "maxDurationMs": 7203
+      },
+      {
+        "file": "olt-repository.spec.ts",
+        "cases": 6,
+        "sumDurationMs": 1028,
+        "maxDurationMs": 439
+      },
+      {
+        "file": "olt.spec.ts",
+        "cases": 14,
+        "sumDurationMs": 27380,
+        "maxDurationMs": 7386
+      },
+      {
+        "file": "osl-download.spec.ts",
+        "cases": 9,
+        "sumDurationMs": 37733,
+        "maxDurationMs": 9893
+      },
+      {
+        "file": "osl-registration.spec.ts",
+        "cases": 2,
+        "sumDurationMs": 85,
+        "maxDurationMs": 83
+      },
+      {
+        "file": "osl-repository.spec.ts",
+        "cases": 2,
+        "sumDurationMs": 342,
+        "maxDurationMs": 200
+      },
+      {
+        "file": "progressive-output.spec.ts",
+        "cases": 5,
+        "sumDurationMs": 2784,
+        "maxDurationMs": 1836
+      },
+      {
+        "file": "publications.spec.ts",
+        "cases": 7,
+        "sumDurationMs": 56338,
+        "maxDurationMs": 19459
+      },
+      {
+        "file": "repository.spec.ts",
+        "cases": 12,
+        "sumDurationMs": 1312,
+        "maxDurationMs": 191
+      },
+      {
+        "file": "resident-profile.spec.ts",
+        "cases": 21,
+        "sumDurationMs": 19919,
+        "maxDurationMs": 2226
+      },
+      {
+        "file": "residents.spec.ts",
+        "cases": 2,
+        "sumDurationMs": 211,
+        "maxDurationMs": 126
+      },
+      {
+        "file": "scheduled-mail.spec.ts",
+        "cases": 20,
+        "sumDurationMs": 29959,
+        "maxDurationMs": 3935
+      },
+      {
+        "file": "sections.spec.ts",
+        "cases": 19,
+        "sumDurationMs": 43,
+        "maxDurationMs": 9
+      },
+      {
+        "file": "services.spec.ts",
+        "cases": 12,
+        "sumDurationMs": 11069,
+        "maxDurationMs": 5487
+      },
+      {
+        "file": "session.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 2,
+        "maxDurationMs": 1
+      },
+      {
+        "file": "settings-dialog.spec.ts",
+        "cases": 18,
+        "sumDurationMs": 60472,
+        "maxDurationMs": 9719
+      },
+      {
+        "file": "storage-controls.spec.ts",
+        "cases": 6,
+        "sumDurationMs": 7516,
+        "maxDurationMs": 3903
+      },
+      {
+        "file": "telnet.spec.ts",
+        "cases": 9,
+        "sumDurationMs": 102495,
+        "maxDurationMs": 33940
+      },
+      {
+        "file": "terminal.spec.ts",
+        "cases": 4,
+        "sumDurationMs": 1473,
+        "maxDurationMs": 640
+      },
+      {
+        "file": "wakaba-olt-repository.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 522,
+        "maxDurationMs": 212
+      },
+      {
+        "file": "wakaba-olt.spec.ts",
+        "cases": 12,
+        "sumDurationMs": 20479,
+        "maxDurationMs": 4507
+      },
+      {
+        "file": "wakaba-repository.spec.ts",
+        "cases": 3,
+        "sumDurationMs": 694,
+        "maxDurationMs": 315
+      },
+      {
+        "file": "wakaba.spec.ts",
+        "cases": 7,
+        "sumDurationMs": 12768,
+        "maxDurationMs": 5142
+      }
+    ],
+    "slowestCases": [
+      {
+        "file": "netnews.spec.ts",
+        "line": 181,
+        "title": "production NetNews preserves anonymous empty records and literal headers/body at 320px",
+        "duration": 53544,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "netnews.spec.ts",
+        "line": 181,
+        "title": "production NetNews preserves registered empty records and literal headers/body at 320px",
+        "duration": 51904,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "netnews.spec.ts",
+        "line": 181,
+        "title": "production NetNews preserves registered populated records and literal headers/body at 320px",
+        "duration": 51649,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "telnet.spec.ts",
+        "line": 115,
+        "title": "production TELNET keyboard journey preserves registered populated, literal Japanese and input at 320px",
+        "duration": 33940,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "telnet.spec.ts",
+        "line": 115,
+        "title": "production TELNET keyboard journey preserves anonymous empty, literal Japanese and input at 320px",
+        "duration": 32570,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "telnet.spec.ts",
+        "line": 115,
+        "title": "production TELNET keyboard journey preserves registered empty, literal Japanese and input at 320px",
+        "duration": 31749,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "news.spec.ts",
+        "line": 108,
+        "title": "production news journey preserves registered populated records and literal text at 320px",
+        "duration": 21589,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "news.spec.ts",
+        "line": 108,
+        "title": "production news journey preserves registered empty records and literal text at 320px",
+        "duration": 20527,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "news.spec.ts",
+        "line": 108,
+        "title": "production news journey preserves anonymous empty records and literal text at 320px",
+        "duration": 20384,
+        "status": "passed",
+        "retry": 0
+      },
+      {
+        "file": "publications.spec.ts",
+        "line": 110,
+        "title": "production publishing journey preserves registered populated records and literal text at 320px",
+        "duration": 19459,
+        "status": "passed",
+        "retry": 0
+      }
+    ]
+  },
+  "standaloneWarmBuilds": [
+    {
+      "durationMs": 1201,
+      "status": 0
+    },
+    {
+      "durationMs": 1009,
+      "status": 0
+    }
+  ],
+  "repeatedSample": {
+    "command": "npx playwright test tests/news.spec.ts --grep \"production news journey preserves registered populated\" --workers=3 --reporter=<step-reporter>",
+    "requestedWorkers": 3,
+    "executingWorkers": 1,
+    "notes": "One selected case; repeated with new processes/servers/browser, warm dependencies, Vite and OS caches. Nested step durations overlap and must not be summed as phases.",
+    "runs": [
+      {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "retries": 0,
+        "elapsedMs": 24955,
+        "launchToOnBeginMs": 2904,
+        "onBeginToOnEndMs": 22022,
+        "testDurationMs": 21549,
+        "browserFixture": {
+          "count": 1,
+          "sumDurationMs": 158
+        },
+        "navigation": {
+          "count": 1,
+          "sumDurationMs": 75
+        },
+        "press": {
+          "count": 382,
+          "sumDurationMs": 11242
+        },
+        "fill": {
+          "count": 372,
+          "sumDurationMs": 519
+        },
+        "evaluate": {
+          "count": 1491,
+          "sumDurationMs": 5359
+        },
+        "expectPoll": {
+          "count": 729,
+          "sumDurationMs": 6406
+        }
+      },
+      {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "retries": 0,
+        "elapsedMs": 24581,
+        "launchToOnBeginMs": 2873,
+        "onBeginToOnEndMs": 21683,
+        "testDurationMs": 21290,
+        "browserFixture": {
+          "count": 1,
+          "sumDurationMs": 82
+        },
+        "navigation": {
+          "count": 1,
+          "sumDurationMs": 36
+        },
+        "press": {
+          "count": 382,
+          "sumDurationMs": 11204
+        },
+        "fill": {
+          "count": 372,
+          "sumDurationMs": 499
+        },
+        "evaluate": {
+          "count": 1491,
+          "sumDurationMs": 5270
+        },
+        "expectPoll": {
+          "count": 729,
+          "sumDurationMs": 6342
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "One local full run, two repetitions of one selected case; no cold CI/worker-count comparison.",
+    "Full-run summed test durations are not parallel wall time.",
+    "Launch-to-onBegin includes npm/discovery/build/server readiness; standalone builds were warm and cannot be subtracted to isolate server cost.",
+    "Sample nested reporter step durations overlap.",
+    "No model weights downloaded or real inference measured; no test or config changes."
+  ]
+}
