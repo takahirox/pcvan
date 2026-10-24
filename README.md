@@ -189,7 +189,7 @@ live drafts. OLT room history is included as world data.
 | `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo; `3` opens restricted FTP examples; `4` opens local Gopher; `5` opens local Archie |
 | `8` | コンピュータ | Article list; `SIGS` opens the community directory |
 | `9` | ショッピングモール | Product catalog, 0 products |
-| `10` | 電子出版 | Publication list, 0 publications |
+| `10` | 電子出版 | Publication directory; `1` opens 架空文芸誌「灯窓」 with two connected fiction installments |
 | `11` | 趣味 | Article list; `SIGS` opens the community directory |
 | `12` | 生活 | Article list, 0 articles |
 | `13` | コミュニケーション | Five-community directory |
@@ -203,6 +203,29 @@ live drafts. OLT room history is included as world data.
 | `21` | オリンピック特設コーナー | Article list, 0 articles |
 | `X` | 旧電子メール | Separate legacy entry to the same local mailbox |
 | `Q` | 終了 | Disconnect; `RECONNECT` starts again at MAIN |
+
+For electronic publishing, use MAIN or `2 索引` → `10` → `1 架空文芸誌「灯窓」`
+→ `READ 1` / `READ 2`. The two short original Japanese installments tell one
+connected story. The publication is fictional and undated, with no real byline;
+it does not impersonate an authentic PC-VAN Journal issue. No handle, AI, model,
+subscription or external service is needed.
+
+`HELP` preserves the current view; `LIST` returns a body to contents (or repeats
+the current directory/contents). `BACK` follows body → contents → publication
+directory → actual MAIN/index caller. Repeated or different `READ` selections
+replace the body without adding parents. `MAIN` clears the path and reopening
+starts at the directory. Invalid selections and unrelated service commands leave
+the view intact. Settings/About, HANDLE, STOP and terminal input keep their
+existing behavior; Settings can return with unfinished input.
+
+Readings are bundled application content, outside IndexedDB, world backups and
+resident-generation context. Browsing preserves populated, imported, anonymous
+and deliberately emptied worlds, without creating posts, mail, read markers,
+subscriptions or schedules. Ordinary session/history recording continues and
+terminal logs include the displayed bodies. Selector `20` retains its empty
+publication list. The [publishing research record](docs/research/pcvan-1996-1997.md#electronic-publishing-issue-111)
+and Settings/About explain the earlier online-magazine evidence, the uncertain
+relationship to PC-VAN Journal and all category D controls and content choices.
 
 For news, use `3` → `1 時事通信ニュース` → `READ 1`, `READ 2` or `READ 3`.
 The three short, original Japanese briefs describe fictional places and events

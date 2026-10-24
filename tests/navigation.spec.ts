@@ -114,6 +114,9 @@ for (const entry of mainMenu.entries) {
     } else if (entry.selector === '3') {
       expect(controller.screen).toBe('news-directory');
       expect(result).toContain('1 時事通信ニュース');
+    } else if (entry.selector === '10') {
+      expect(controller.screen).toBe('publication-directory');
+      expect(result).toContain('1 架空文芸誌「灯窓」');
     } else if (entry.selector === '4') {
       expect(controller.screen).toBe('database-directory');
       expect(result).toContain('1 日経テレコン BiZ');

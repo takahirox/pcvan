@@ -2654,3 +2654,66 @@ The journey requires no real inference, model download or external service.
 Native Japanese IME, former-user feedback and dated manual/session comparison
 remain optional. Default/eight-worker reliability remains unresolved;
 three-worker success does not resolve it. No required post-merge verification.
+
+## Electronic publishing (Issue #111)
+
+Validated in the assigned worktree on 2026-10-24 with Node.js 24.12.0,
+Playwright 1.64.1 and Chromium on macOS.
+
+- `npm ci`: passed, 23 packages added, zero reported vulnerabilities; no
+  dependency or lockfile changes.
+- Initial focused run,
+  `npm test -- tests/publications.spec.ts tests/news.spec.ts tests/sections.spec.ts tests/navigation.spec.ts --workers=3`:
+  **60 passed, 3 failed (1.4m)**. The three new production tests expected error
+  guidance for an empty Enter. The application intentionally echoes blank input
+  without navigating. Corrected the tests to preserve that existing behavior;
+  missing READ operands still require guidance. No runtime safeguard was changed.
+- Final focused run with the same command and three workers: **63 passed (1.4m)**,
+  including configured TypeScript checking and production build, with no failures,
+  retries or skips. Strengthened populated-fixture checks retain an imported
+  private letter and read marker; only the requested terminal log and backup are
+  downloaded.
+- Complete `npm test -- --workers=3`: **407 passed (8.3m)**, including configured
+  TypeScript checking and production build, with no failures, retries or skips.
+  The 401 baseline checks become 400 applicable checks (MAIN 10 leaves the generic
+  empty-collection parameterization) plus seven dedicated publishing checks.
+  Existing functional, storage, consent, calendar, mail, OLT, composition, IME,
+  terminal and offline regressions pass. Existing Vite large-chunk and Node
+  NO_COLOR/FORCE_COLOR warnings remain informational.
+- All **130 local Markdown targets/heading anchors** in the changed documents
+  and **six Settings research anchors** resolve; code fences are balanced.
+  Working-tree and staged whitespace checks pass, including the new source/test
+  files. Reviewed the complete diff against #111: no schema, dependency, model,
+  network subsystem or unrelated service behavior changes.
+
+Seven dedicated checks cover MAIN and index entry, both complete original bodies,
+stable contents numbers/titles, repeated and different READ selections, HELP,
+LIST/BACK/MAIN at every depth, actual callers, invalid/missing/malformed/oversized
+selectors, re-entry, separate controllers and previous service contexts. Existing
+MAIN mapping and empty-collection tests now distinguish selector 10 from selector
+20 and other unaffected destinations.
+
+Three production journeys at 320×640 use restored populated registered,
+restored-empty registered and populated anonymous worlds, disabled consent and
+a fixed operational clock. They compare all protected members/SIGs/forums/posts,
+mail, read markers and settings before/after and against exported backups,
+allowing ordinary session/history changes. They verify literal Japanese bodies
+and line breaks in rendered output and downloaded logs, including `<連絡待ち>`
+as text; simulated IME Enter guards; typed Settings/About/HANDLE/STOP return;
+modal Settings return with unfinished Japanese input and focus; narrow-terminal
+horizontal scrolling and page/input bounds. Unsupported write/reply, acquisition,
+purchase and connection attempts leave reading intact. No external requests or
+unintended downloads occur, and neither the publication title nor body text
+enters backups. Static review confirms generation prompts use persisted world
+records rather than bundled readings; no new storage or inference path exists.
+
+The NEC PDF text, retrospective MAIN reproduction and Vector client description
+were re-opened. The white paper timed out again; ASCII retrieval again failed.
+The [research record](research/pcvan-1996-1997.md#electronic-publishing-issue-111)
+and Settings/About retain source dates, scopes, confidence, access failures,
+unknown Journal/earlier-magazine relationship and category D choices. No new
+historical session or page-image recovery is claimed. Native Japanese IME,
+former-user feedback and a subsequently recovered dated manual/session remain
+optional. No model download or real inference was used. Default/eight-worker
+reliability is not assessed by three-worker checks. No post-merge verification
+is required.
