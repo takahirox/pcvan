@@ -801,3 +801,47 @@ through the existing historical calendar without rewriting them. Original OSL
 text stays outside other participation collections and resident-generation context.
 See [usage and exact text representation](../README.md#menu-destinations-and-collections)
 and [research boundaries](research/pcvan-1996-1997.md#browser-local-osl-registration-issue-121).
+
+## Scheduled local mail (Issue #123)
+
+Database version 2 and backup envelope version 1 remain unchanged. The optional
+reserved `scheduled-mail` setting has `{ version: 1, letters: [...] }`. Each letter
+stores a stable `P-…` retry reference, human sender ID, existing resident ID and
+pinned safe label, exact subject/body, `submittedAt`, operational `dueAt` and a
+`pending`, `cancelled` or `released` status. Cancellation adds `cancelledAt` before
+due; release adds actual `releasedAt` at/after due. These terminal records remain
+until reset/whole-world replacement and cannot be mutated/deleted through generic
+setting writes, preventing cancellation resurrection after uncertain submission
+acknowledgements. Referenced actors and released mail cannot be individually
+removed while the schedule record exists. No schedules are seeded.
+
+`scheduleHumanMail()` validates the complete request, actors, minute-resolution
+calendar mapping and future/30-day horizon; exact retries return the existing
+record even after cancellation or release. `cancelScheduledMail()` and
+`reconcileScheduledMail()` serialize in the existing all-store transaction. Due
+ordering is due instant, submission instant, then stable reference. Release inserts
+`scheduled:P-…` ordinary mail and advances `mail-next-number` atomically with the
+queue status. Any quota/constraint failure rolls back all released rows and
+numbering. Pending submission and cancellation allocate no ordinary number.
+
+Released Mail has `delivery: { scheduleId, submittedAt, availableAt }`. Its
+`createdAt` is actual processing time; `availableAt` is the saved due instant, not
+a fabricated creation timestamp. Backup validation checks metadata, exact queue/mail
+correspondence, actors, fields, terminal-state timestamps and scheduled-parent
+reply chronology. `mailAvailableAt()` supplies availability to resident selection,
+catch-up prompt filtering and commitment validation, with the ordinary effective
+time fallback for other mail. Queue settings and references never enter prompts.
+Release itself neither runs AI nor writes recipient confirmation.
+
+Startup/resume, active-minute ticks, content refresh and planning reconcile without
+terminal output. Closed/suspended browsers run no delivery service; overdue letters
+remain recoverable and release at the next active visit regardless of the AI
+catch-up limit. Original due instants survive reload and JSON replacement.
+Private world-generation transactions fence stale repository handles, even after
+identical replacement. Legacy/empty backups can omit the queue. Reset removes all
+pending and terminal records; restoration replaces rather than merges them.
+
+Backups contain the complete queue, private text and delivery metadata; terminal
+logs may contain drafted/inspected text. Address/time/body input is excluded from
+persistent recall, including inline `WRITE-AT`. Browser storage is local and
+unencrypted, subject to normal eviction. See [mail behavior and evidence](mail.md#scheduled-local-delivery-issue-123).

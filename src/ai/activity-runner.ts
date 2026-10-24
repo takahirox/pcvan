@@ -1,4 +1,5 @@
 import type { LocalRepository } from '../storage/repository';
+import { mailAvailableAt } from '../storage/schema';
 import type { AiActivity, AiRun, Backup } from '../storage/schema';
 import { ACTIVITY_SETTING, MAX_SESSION_POSTS } from './activity';
 import { buildMailPrompt } from './mail';
@@ -39,7 +40,7 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
         ...(current.replyToPostId === undefined ? {} : { replyToPostId: current.replyToPostId }) };
       const context = { ...snapshot, posts: snapshot.posts.filter((post) =>
         Date.parse(post.simulation?.simulatedAt ?? post.createdAt) <= Date.parse(current!.simulatedAt)),
-        mail: (snapshot.mail ?? []).filter((m) => Date.parse(m.simulation?.simulatedAt ?? m.createdAt) <= Date.parse(current!.simulatedAt)) };
+        mail: (snapshot.mail ?? []).filter((m) => Date.parse(mailAvailableAt(m)) <= Date.parse(current!.simulatedAt)) };
       budget.attempts++;
       const raw = await engine.generate(current.mail ? buildMailPrompt(context, current.personaId, current.mail) : buildPrompt(context, request), signal);
       signal.throwIfAborted();

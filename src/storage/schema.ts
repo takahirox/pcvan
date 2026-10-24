@@ -1,6 +1,6 @@
 import oslExamples from '../../data/pcvan/daisizen-collections.json' with { type: 'json' };
 import { netNewsGroups, localNetNewsMessageId } from '../netnews';
-import { CALENDAR_SETTING, isHistorical } from '../calendar';
+import { CALENDAR_SETTING, isHistorical, calendarSetting, scheduleInstant, scheduleTime, SCHEDULE_HORIZON } from '../calendar';
 import { OLT_SETTING, validateOlt, validateOltMembers } from '../olt-state';
 import { personas, personaMemberId, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentSettings } from '../ai/personas';
@@ -74,9 +74,23 @@ export type Mail = MailIdentity & {
   id: string; number: number;
   subject: string; body: string; createdAt: string; origin: string;
   replyToMailId?: string; readAt?: string;
+  delivery?: { scheduleId: string; submittedAt: string; availableAt: string };
   recipientConfirmation?: { at: string; replyMailId: string; provenance: 'local-resident-reply-v1' };
   simulation?: { runId: string; simulatedAt: string; fictional: true };
 }
+export const SCHEDULED_MAIL_SETTING = 'scheduled-mail';
+export interface ScheduledLetter {
+  id: string; senderId: string; recipientId: string; recipientLabel: string;
+  subject: string; body: string; submittedAt: string; dueAt: string;
+  status: 'pending' | 'cancelled' | 'released'; cancelledAt?: string; releasedAt?: string;
+}
+export interface ScheduledMail { version: 1; letters: ScheduledLetter[] }
+export function scheduledMail(content: Pick<Backup, 'settings'>): ScheduledMail {
+  return (content.settings.find((s) => s.id === SCHEDULED_MAIL_SETTING)?.value as unknown as ScheduledMail | undefined)
+    ?? { version: 1, letters: [] };
+}
+/** Intended availability, independent of the later transaction that persisted delivery. */
+export const mailAvailableAt = (mail: Mail): string => mail.delivery?.availableAt ?? mail.simulation?.simulatedAt ?? mail.createdAt;
 export interface MailTarget { humanId: string; replyToMailId?: string; publicPostId?: string }
 export type AiRunStatus = 'pending' | 'running' | 'committed' | 'failed' | 'cancelled';
 export interface AiRun {
@@ -316,7 +330,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'mail':
       fields(value, ['id', 'number', 'subject', 'body', 'createdAt', 'origin'],
-        ['senderId', 'senderInternetAddress', 'recipientId', 'internetAddress', 'replyToMailId', 'readAt', 'simulation', 'recipientConfirmation']);
+        ['senderId', 'senderInternetAddress', 'recipientId', 'internetAddress', 'replyToMailId', 'readAt', 'simulation', 'recipientConfirmation', 'delivery']);
       string(value.id); integer(value.number, 1);
       if (Object.hasOwn(value, 'senderInternetAddress')) {
         validateInternetAddress(value.senderInternetAddress); string(value.recipientId);
@@ -344,6 +358,14 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       }
       if (value.replyToMailId !== undefined) { string(value.replyToMailId); if (value.replyToMailId.length > 256) invalid('Mail reference is too long.'); }
       if (value.readAt !== undefined) { timestamp(value.readAt); if (Date.parse(value.readAt as string) < Date.parse(value.createdAt as string)) invalid('Invalid read time.'); }
+      if (value.delivery !== undefined) {
+        fields(value.delivery, ['scheduleId', 'submittedAt', 'availableAt']);
+        string(value.delivery.scheduleId); timestamp(value.delivery.submittedAt); timestamp(value.delivery.availableAt);
+        if (value.id !== `scheduled:${value.delivery.scheduleId}` || value.origin !== 'local-human' ||
+            value.replyToMailId !== undefined || value.simulation !== undefined || value.internetAddress !== undefined ||
+            value.senderInternetAddress !== undefined || Date.parse(value.delivery.submittedAt as string) >= Date.parse(value.delivery.availableAt as string) ||
+            Date.parse(value.delivery.availableAt as string) > Date.parse(value.createdAt as string)) invalid('Invalid scheduled delivery metadata.');
+      }
       if (value.recipientConfirmation !== undefined) {
         fields(value.recipientConfirmation, ['at', 'replyMailId', 'provenance']);
         const confirmation = value.recipientConfirmation;
@@ -364,6 +386,7 @@ export function validateRecord<S extends Store>(store: S, value: unknown): asser
       break;
     case 'settings':
       fields(value, ['id', 'value']); string(value.id); json(value.value);
+      if (value.id === SCHEDULED_MAIL_SETTING) validateScheduledMail(value.value);
       if (value.id === OSL_SETTING) validateOsl(value.value);
       if (value.id === NETNEWS_SETTING) validateNetNews(value.value);
       if (value.id === CALENDAR_SETTING) {
@@ -438,6 +461,7 @@ export function validateBackup(value: unknown): asserts value is Backup {
   const netnews = backup.settings.find((s) => s.id === NETNEWS_SETTING)?.value;
   if (netnews !== undefined) { validateNetNews(netnews); validateNetNewsMembers(netnews, backup.members); }
   validateMailRelations(backup.mail ?? [], backup.members);
+  validateScheduledRelations(backup);
   for (const read of backup.readStates) {
     if (!members.has(read.memberId) || !forums.has(read.forumId)) invalid('Read state references a missing member or forum.');
   }
@@ -490,7 +514,8 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
       const parent = mail.find((m) => m.id === row.replyToMailId);
       if (!parent || parent.senderInternetAddress !== undefined || parent.internetAddress !== undefined ||
           parent.number >= row.number || parent.senderId !== row.recipientId ||
-          parent.recipientId !== row.senderId) invalid('Mail replies require an earlier letter from the correspondent.');
+          parent.recipientId !== row.senderId || (parent.delivery !== undefined &&
+            Date.parse(mailAvailableAt(row)) < Date.parse(mailAvailableAt(parent)) + 20 * 60_000)) invalid('Mail replies require an earlier letter from the correspondent.');
     }
   }
 }
@@ -643,4 +668,50 @@ export function validateOslMembers(state: OslState, members: readonly Member[]):
   for (const row of state.entries) {
     if (!members.some((m) => m.id === row.authorId && m.actor === 'human')) invalid('Invalid OSL human author.');
   }
+}
+
+/** Queue records are never ordinary mail and never input to generation prompts. */
+export function validateScheduledMail(value: unknown): asserts value is ScheduledMail {
+  fields(value, ['version', 'letters']);
+  if (value.version !== 1 || !Array.isArray(value.letters)) invalid('Invalid scheduled mail.');
+  const ids = new Set<string>();
+  for (const row of value.letters) {
+    fields(row, ['id', 'senderId', 'recipientId', 'recipientLabel', 'subject', 'body', 'submittedAt', 'dueAt', 'status'], ['cancelledAt', 'releasedAt']);
+    string(row.id); string(row.recipientLabel); timestamp(row.submittedAt); timestamp(row.dueAt);
+    const submitted = Date.parse(row.submittedAt as string), due = Date.parse(row.dueAt as string);
+    if (!/^P-[a-zA-Z0-9-]{1,128}$/.test(row.id) || ids.has(row.id.toUpperCase()) ||
+        !validOslText(row.recipientLabel) || due <= submitted || due > submitted + SCHEDULE_HORIZON ||
+        !['pending', 'cancelled', 'released'].includes(row.status as string)) invalid('Invalid scheduled letter.');
+    ids.add(row.id.toUpperCase());
+    validateRecord('mail', { id: row.id, senderId: row.senderId, recipientId: row.recipientId,
+      subject: row.subject, body: row.body, number: 1, createdAt: row.submittedAt, origin: 'local-human' });
+    if (row.status === 'cancelled') {
+      timestamp(row.cancelledAt);
+      if (Date.parse(row.cancelledAt as string) < submitted || Date.parse(row.cancelledAt as string) >= due || row.releasedAt !== undefined) invalid('Invalid cancellation time.');
+    } else if (row.status === 'released') {
+      timestamp(row.releasedAt);
+      if (Date.parse(row.releasedAt as string) < due || row.cancelledAt !== undefined) invalid('Invalid release time.');
+    } else if (row.cancelledAt !== undefined || row.releasedAt !== undefined) invalid('Pending letter has terminal state.');
+  }
+}
+export function validateScheduledRelations(content: Pick<Backup, 'settings' | 'members' | 'mail'>): void {
+  const queue = scheduledMail(content); validateScheduledMail(queue);
+  for (const letter of queue.letters) {
+    const calendar = calendarSetting(content);
+    if (!calendar) invalid('Schedules require the durable service calendar.');
+    try {
+      if (scheduleInstant(scheduleTime(letter.dueAt, calendar), calendar, letter.submittedAt) !== letter.dueAt) invalid('Schedule must use minute-resolution service time.');
+    } catch { invalid('Schedule must use minute-resolution service time.'); }
+    if (!content.members.some((m) => m.id === letter.senderId && m.actor === 'human') ||
+        resolveMailResident(content.members, letter.recipientId).id !== letter.recipientId) invalid('Invalid scheduled correspondents.');
+    const mail = content.mail?.find((m) => m.id === `scheduled:${letter.id}`);
+    if (letter.status === 'released') {
+      if (!mail || mail.senderId !== letter.senderId || mail.recipientId !== letter.recipientId ||
+          mail.subject !== letter.subject || mail.body !== letter.body || mail.createdAt !== letter.releasedAt ||
+          mail.delivery?.scheduleId !== letter.id || mail.delivery.submittedAt !== letter.submittedAt ||
+          mail.delivery.availableAt !== letter.dueAt) invalid('Scheduled release does not match delivered letter.');
+    } else if (mail) invalid('Undelivered schedule is in ordinary mail.');
+  }
+  for (const mail of content.mail ?? []) if (mail.delivery && !queue.letters.some((l) => l.id === mail.delivery!.scheduleId && l.status === 'released'))
+    invalid('Delivery references a missing released schedule.');
 }

@@ -326,3 +326,72 @@ notifications, old-backup migration and reset/restore generation fences. Reset
 removes all mail. Restoring replaces mail alongside the rest of the world and
 invalidates open drafts/model work in other tabs. Prior forum records are never
 converted, rewritten or used as a mail store.
+
+## Scheduled local delivery (Issue #123)
+
+All three mail entries offer `WRITE-AT address`, `PENDING`,
+`READ-PENDING reference` and `CANCEL-PENDING reference`. These are intentionally
+reconstructed product controls, not recovered PC-VAN commands. Scheduling accepts
+a new plain-text letter from the selected human to **one existing local resident**.
+Replies, multiple recipients, attachments and Internet destinations are excluded.
+Registration, address resolution and pinned safe recipient labels reuse ordinary
+composition. Renaming a resident cannot redirect a draft or approved schedule.
+
+`WRITE-AT hoshimori` prompts for `YYYY-MM-DD HH:mm` in the shared simulated JST
+calendar, with the current time and upper limit. The time must be strictly future
+and at most **30 elapsed days** away. Impossible dates and out-of-range values are
+rejected. Conversion uses the durable calendar anchor and UTC arithmetic, independent
+of browser timezone, midnight, year rollover and daylight-saving changes. The
+operational due instant is stored once; reload/restore do not rebase it.
+
+Enter the subject and literal multiline body, `.END`, optionally `EDIT` and
+`REVIEW`, then `Y`. Every review identifies the recipient and intended time.
+`TIME` while editing selects a replacement time and returns to review. If the
+chosen time expires before approval, the text stays in memory and a new time and
+fresh review are required. Existing `.TEXT`, limits, IME protection, retry and
+consumed-save behavior apply. Address/time/body entry, including inline `WRITE-AT`,
+is excluded from persistent command recall. The transcript and exported terminal
+log can still contain it.
+
+Approval saves a pending reference beginning `P-`, **without allocating a mail
+number**. `PENDING` and `READ-PENDING P-…` expose only the selected human's pending
+letters. Ordinary SENT/INBOX, resident selection, reply parents, pair memory and
+all generation prompts exclude pending subject/body. `CANCEL-PENDING P-…` shows
+the letter and requires `Y`; `N` abandons the cancellation. Cancellation succeeds
+only before due and serializes with release. To replace an approved schedule or
+change its recipient, cancel before due and compose a new letter.
+
+Due letters release deterministically without AI, model consent or inference.
+Startup, focus/resume, mailbox/content refresh and the visible-minute boundary
+reconcile the queue; resident planning also reconciles before reading context.
+There is **no background service while the browser is closed**. Suspension or a
+closed browser postpones processing until the next active visit, even beyond the
+AI catch-up window. Reconciliation prints nothing and preserves composition, IME
+input and output ownership. Storage failure rolls back the entire release and
+number allocation, leaving pending letters retryable. Concurrent tabs and repeated
+reconciliation cannot duplicate delivery. Equal due times sort by submission time,
+then stable reference.
+
+A released letter enters ordinary SENT/READ with an allocated number. `createdAt`
+records actual processing time; separate delivery metadata records submission and
+intended availability. READ displays both intended and processing times. Catch-up
+visits use **intended availability**, even if actual persistence occurred later;
+visits before that instant exclude the letter. Resident replies retain the existing
+20-minute minimum delay from availability, rechecked at commitment. Release alone
+creates no read confirmation and promises no reply.
+
+Versioned JSON backups include pending letters, pinned labels, exact text and
+instants, cancellation/release records and delivery metadata. Completed records
+remain until reset or whole-world replacement, preventing uncertain retries from
+resurrecting cancelled letters. Pending lifetime has no automatic expiry; storage
+retention/eviction rules still apply. Nothing is encrypted or uploaded. Reload
+keeps approved schedules but loses unapproved drafts. Restore preserves overdue
+instants and reconciles on the next active refresh. Reset/restore, including an
+identical JSON replacement, invalidate old drafts, cancellation approvals and
+repository callbacks through the private world generation. Empty/legacy backups
+remain valid and receive no seeded schedules.
+
+The [research record](research/pcvan-1996-1997.md#scheduled-local-mail-issue-123)
+distinguishes high-confidence March 1993 date/time delivery evidence from the
+moderate-confidence inference of continuity into late 1996. Commands, cancellation,
+limits, timezone presentation and mailbox relationships remain category D choices.

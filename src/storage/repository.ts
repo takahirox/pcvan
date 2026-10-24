@@ -13,9 +13,10 @@ import { OLT_SETTING, oltState, observeOlt, appendOlt, attendance, VISITOR_LEASE
 import type { OltRoom, OltState, OltTurn, RoomId } from '../olt-state';
 import { planOltTurn, commitOltText } from '../ai/olt';
 import {
+  SCHEDULED_MAIL_SETTING, scheduledMail, validateScheduledMail, validateScheduledRelations, mailAvailableAt,
   invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailDestination, resolveMailResident,
 } from './schema';
-import type { AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailIdentity, Member, NewPost, Post, Records, Session, Store } from './schema';
+import type { ScheduledLetter, AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailIdentity, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
 import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
 import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
@@ -197,6 +198,7 @@ export class LocalRepository {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!['members', 'sigs', 'forums', 'readStates', 'settings'].includes(store)) invalid('This store does not support put.');
       validateRecord(store, row);
+      if (store === 'settings' && (row as Records['settings']).id === SCHEDULED_MAIL_SETTING) invalid('Use scheduled mail operations to change the queue.');
       if (store === 'settings' && (row as Records['settings']).id === CALENDAR_SETTING) {
         const existing = await request(tx.objectStore('settings').get(CALENDAR_SETTING));
         if (existing && existing.value.sourceAnchor !== ((row as Records['settings']).value as { sourceAnchor: string }).sourceAnchor)
@@ -205,6 +207,7 @@ export class LocalRepository {
       if (store === 'members') {
         const member = row as Member;
         const content = await this.snapshot(tx);
+        validateScheduledRelations({ ...content, members: [...content.members.filter((m) => m.id !== member.id), member] });
         validateOslMembers(oslState(content), [...content.members.filter((m) => m.id !== member.id), member]);
         validateMailRelations(content.mail ?? [], [...content.members.filter((m) => m.id !== member.id), member]);
         validateNetNewsMembers(netNewsState(content), [...content.members.filter((m) => m.id !== member.id), member]);
@@ -393,6 +396,64 @@ export class LocalRepository {
     });
   }
 
+  /** Stable retry identity includes terminal tombstones, so cancellation cannot resurrect a letter. */
+  scheduleHumanMail(draft: Pick<ScheduledLetter, 'id' | 'senderId' | 'recipientId' | 'recipientLabel' | 'subject' | 'body' | 'dueAt'>,
+    now?: string): Promise<ScheduledLetter> {
+    const input = structuredClone(draft);
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (!input || Object.keys(input).length !== 7 || ['id', 'senderId', 'recipientId', 'recipientLabel', 'subject', 'body', 'dueAt'].some((k) => typeof input[k as keyof typeof input] !== 'string')) invalid('Invalid scheduled draft.');
+      const content = await this.snapshot(tx), queue = scheduledMail(content);
+      const previous = queue.letters.find((l) => l.id === input.id);
+      if (previous) {
+        if (Object.keys(input).some((k) => input[k as keyof typeof input] !== previous[k as keyof ScheduledLetter])) invalid('Schedule ID collision.');
+        return previous;
+      }
+      const letter: ScheduledLetter = { ...input, submittedAt: now ?? new Date().toISOString(), status: 'pending' };
+      queue.letters.push(letter);
+      validateScheduledMail(queue);
+      validateScheduledRelations({ ...content, settings: [...content.settings.filter((s) => s.id !== SCHEDULED_MAIL_SETTING),
+        { id: SCHEDULED_MAIL_SETTING, value: queue as unknown as JsonValue }] });
+      await request(tx.objectStore('settings').put({ id: SCHEDULED_MAIL_SETTING, value: queue }));
+      return letter;
+    }).then((letter) => { this.notifySetupChanged(); return letter; });
+  }
+
+  cancelScheduledMail(senderId: string, reference: string, now?: string): Promise<boolean> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const queue = scheduledMail(await this.snapshot(tx));
+      const letter = queue.letters.find((l) => l.id === reference && l.senderId === senderId);
+      const at = now ?? new Date().toISOString();
+      if (!letter || letter.status !== 'pending' || Date.parse(at) >= Date.parse(letter.dueAt)) return false;
+      letter.status = 'cancelled'; letter.cancelledAt = at;
+      validateScheduledMail(queue);
+      await request(tx.objectStore('settings').put({ id: SCHEDULED_MAIL_SETTING, value: queue }));
+      return true;
+    }).then((cancelled) => { if (cancelled) this.notifySetupChanged(); return cancelled; });
+  }
+
+  /** No inference, output or catch-up window. The queue and ordinary numbering commit together. */
+  reconcileScheduledMail(now?: string): Promise<Mail[]> {
+    return this.transaction(allStores, 'readwrite', (tx) => this.releaseScheduledMail(tx, now ?? new Date().toISOString()));
+  }
+  private async releaseScheduledMail(tx: IDBTransaction, now: string): Promise<Mail[]> {
+    const content = await this.snapshot(tx), queue = scheduledMail(content);
+    const due = queue.letters.filter((l) => l.status === 'pending' && Date.parse(l.dueAt) <= Date.parse(now))
+      .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt) || Date.parse(a.submittedAt) - Date.parse(b.submittedAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const released: Mail[] = [];
+    for (const letter of due) {
+      released.push(await this.insertMail(tx, { id: `scheduled:${letter.id}`, senderId: letter.senderId,
+        recipientId: letter.recipientId, subject: letter.subject, body: letter.body, origin: 'local-human',
+        delivery: { scheduleId: letter.id, submittedAt: letter.submittedAt, availableAt: letter.dueAt } }, now));
+      letter.status = 'released'; letter.releasedAt = now;
+    }
+    if (due.length) {
+      validateScheduledMail(queue);
+      await request(tx.objectStore('settings').put({ id: SCHEDULED_MAIL_SETTING, value: queue }));
+      validateScheduledRelations(await this.snapshot(tx));
+    }
+    return released;
+  }
+
   /** Resolve a resident or explicit Internet address and allocate the number atomically. */
   createHumanMail(draft: { id: string; senderId: string; recipient: string; subject: string; body: string; replyToMailId?: string }): Promise<Mail> {
     const input = structuredClone(draft);
@@ -469,11 +530,12 @@ export class LocalRepository {
     }).then((mail) => { this.notifySetupChanged(); return mail; });
   }
 
-  private async insertMail(tx: IDBTransaction, input: Omit<Mail, 'number' | 'createdAt' | keyof MailIdentity> & MailIdentity): Promise<Mail> {
+  private async insertMail(tx: IDBTransaction, input: Omit<Mail, 'number' | 'createdAt' | keyof MailIdentity> & MailIdentity, now = new Date().toISOString()): Promise<Mail> {
     const content = await this.snapshot(tx);
+    if (!input.delivery && scheduledMail(content).letters.some((l) => input.id === `scheduled:${l.id}`)) invalid('Mail ID belongs to a schedule.');
     const maximum = (content.mail ?? []).reduce((n, m) => Math.max(n, m.number), 0);
     const number = Math.max(maximum + 1, (await request(tx.objectStore('session').get('mail-next-number'))) ?? 1);
-    const row: Mail = { ...input, number, createdAt: new Date().toISOString() };
+    const row: Mail = { ...input, number, createdAt: now };
     validateRecord('mail', row);
     validateMailRelations([...(content.mail ?? []), row], content.members);
     await request(tx.objectStore('mail').add(row));
@@ -519,6 +581,7 @@ export class LocalRepository {
 
   delete<S extends Store>(store: S, key: Key<S>): Promise<void> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
+      if (store === 'settings' && key === SCHEDULED_MAIL_SETTING) invalid('Schedules are retained until world replacement.');
       if (store === 'settings' && key === CALENDAR_SETTING) invalid('The world calendar can only be removed by import or reset.');
       const referenced = async (table: Store, index: string, match: IDBValidKey) =>
         (await request(tx.objectStore(table).index(index).count(match))) > 0;
@@ -531,12 +594,14 @@ export class LocalRepository {
           .count(IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER])))) > 0 || await referenced('readStates', 'forumId', key);
       }
       if (store === 'mail') {
+        if ((await request<Mail | undefined>(tx.objectStore('mail').get(key)))?.delivery) invalid('Scheduled delivery is retained until world replacement.');
         hasChildren = await referenced('mail', 'replyToMailId', key) ||
           (await request<Mail[]>(tx.objectStore('mail').getAll())).some((m) => m.recipientConfirmation?.replyMailId === key);
       }
       if (store === 'posts') hasChildren = await referenced('posts', 'replyToPostId', key);
       if (store === 'members') {
         const content = await this.snapshot(tx);
+        hasChildren ||= scheduledMail(content).letters.some((l) => l.senderId === key || l.recipientId === key);
         hasChildren ||= oslState(content).entries.some((row) => row.authorId === key);
         hasChildren ||= netNewsState(content).contributions.some((row) => row.authorId === key);
         hasChildren ||= conferenceState(content).contributions.some((row) => row.authorId === key);
@@ -796,6 +861,7 @@ export class LocalRepository {
   /** Plan and resident due times share a transaction, including across tabs. */
   openActivity(now = new Date().toISOString()): Promise<AiActivity> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
+      await this.releaseScheduledMail(tx, now);
       const state = await this.readActivity(tx, now);
       return this.writeActivity(tx, scheduleActivity(await this.snapshot(tx), state, now));
     });
@@ -845,7 +911,11 @@ export class LocalRepository {
       if (!state.consent || state.batch!.modelId !== state.modelId || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && p.frequency > 0)) invalid('Mail/model activity is no longer authorized.');
       if (run.mail) {
         const content = await this.snapshot(tx);
-        const generated = validateMailGeneration(raw, content, run.personaId, run.mail);
+        const at = Date.parse(run.simulatedAt);
+        const parent = content.mail?.find((m) => m.id === run.mail!.replyToMailId);
+        if (parent?.delivery && Date.parse(mailAvailableAt(parent)) + 20 * 60_000 > at) invalid('Scheduled parent is not available for this visit.');
+        const context = { ...content, mail: content.mail?.filter((m) => !m.delivery || Date.parse(mailAvailableAt(m)) <= at) };
+        const generated = validateMailGeneration(raw, context, run.personaId, run.mail);
         const senderId = personaMemberId(run.personaId);
         const previous = (content.mail ?? []).find((m) => m.senderId === senderId && m.recipientId === run.mail!.humanId &&
           (run.mail!.replyToMailId ? m.replyToMailId === run.mail!.replyToMailId : true));

@@ -850,6 +850,18 @@ backup/restore. This is separate from TELNET remote mail. See the
 [incoming-mail contract](docs/mail.md#opt-in-incoming-internet-sample-and-replies-issue-97)
 and [historical evidence](docs/research/pcvan-1996-1997.md#incoming-internet-mail-issue-97).
 
+All three mail entries also offer `WRITE-AT resident` → future simulated-JST
+`YYYY-MM-DD HH:mm` → compose/review/edit → explicit `Y`. `PENDING`,
+`READ-PENDING P-…` and confirmed `CANCEL-PENDING P-…` inspect/cancel the selected
+human's pending letters before due. This reconstructed subset supports one existing
+local resident and at most 30 elapsed days. Pending text stays outside delivered
+mail and resident knowledge. Deterministic release needs no AI: active startup,
+resume/refresh and minute boundaries process due letters exactly once. Nothing
+runs while the browser is closed; overdue letters release on the next active visit.
+Actual processing time and intended availability remain separate in JSON backups.
+See [scheduling, retention and privacy](docs/mail.md#scheduled-local-delivery-issue-123)
+and [dated evidence and confidence](docs/research/pcvan-1996-1997.md#scheduled-local-mail-issue-123).
+
 Residents may privately initiate or reply at their scheduled visits after model
 consent, with quiet periods and bounded shared generation budgets. They use only
 bounded correspondence with the recipient and limited public context. Reading
