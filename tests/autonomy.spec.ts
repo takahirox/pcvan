@@ -7,7 +7,7 @@ import type { AiActivity } from '../src/storage/schema';
 // Every generation below comes from the real startup/timer path, never an AI command.
 test('visible timer saves delayed human and resident replies, preserves input, renews bounds and catches up after reopening', async ({ page, context }) => {
   await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '星を見る人');
-  expect((await snapshot(page)).posts).toHaveLength(66);
+  expect((await snapshot(page)).posts).toHaveLength(69);
   await lifestyles(page); await consent(page);
   await expect(page.locator('.generate-ai, .preview-ai, .save-ai, .discard-ai, .persona-select, .forum-select')).toHaveCount(0);
   await enterForum(page); await post(page, '人間の星', '人間の星を眺めました。');
@@ -68,7 +68,7 @@ for (const mode of ['invalid', 'failure'] as const) {
     await expect(page.locator('.ai-status')).toContainText('停止・失敗');
     await page.getByRole('button', { name: '閉じる', exact: true }).click();
     await enterForum(page); await post(page, '人間の投稿', 'モデル失敗後も使えます。');
-    expect((await snapshot(page)).posts).toHaveLength(67);
+    expect((await snapshot(page)).posts).toHaveLength(70);
   });
 }
 

@@ -160,7 +160,7 @@ test('JSON backup, import and reset preserve transcript and shared authors, then
   // Approval reloads the page; its old transcript echo can disappear before polling.
   await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter');
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
-  expect(await state(page)).toBeUndefined(); expect((await snapshot(page)).posts).toHaveLength(66);
+  expect(await state(page)).toBeUndefined(); expect((await snapshot(page)).posts).toHaveLength(69);
 });
 
 test('pending OLT generation times out, releases its worker, and keeps navigation usable', async ({ page }) => {

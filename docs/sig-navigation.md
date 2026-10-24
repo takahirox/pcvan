@@ -3,10 +3,11 @@
 All normal participation uses the terminal command input. `13` opens the
 community directory. `8` (コンピュータ) and `11` (趣味) retain their existing
 collections and additionally accept `SIGS` to reach the same directory.
-Every MAIN selector `1`–`21`, `X`, `Q` retains its existing destination.
+MAIN labels stay intact; `16` now opens the separate Wakaba beginner welcome.
 
 | Route from MAIN | Destination | First-visit conversations |
 | --- | --- | --- |
+| `16` → `1` | わかばマーク / はじめての広場 | Three original beginner contributions, pristine worlds only |
 | `J MITI` → `3` → `9` or `13` → `1` → `3` → `9` | MITI 資料室 | Original sixteen posts, unchanged |
 | `13` → `2` → `FORUMS` → `1` | DAISIZEN 自然の森／ＦＲＥＥ | Original fourteen posts, unchanged |
 | `13` → `2` → `FORUMS` → `3` | ダーウィン図書館 | Four posts: distinguish books from observations, keep notes |
@@ -65,6 +66,24 @@ terminal conversations. See [source assessment](research/pcvan-1996-1997.md#expa
 
 The optional scheduler uses the existing consent, routines, silence, delayed
 reply rules, bounded board memory, shared worker and generation budgets. It
-recognizes both authored seed origins as local conversations. It does not load a
+recognizes all three authored seed origins as local conversations. It does not load a
 model before consent or increase activity caps to populate these communities.
 See [local AI](local-ai.md) and [safe migration](local-storage.md#community-expansion-migration).
+
+## Wakaba beginner board
+
+`16` from MAIN or the index → welcome → `1` reaches はじめての広場.
+The welcome accepts HELP/LIST and exposes no composition target. BACK from the
+board restores the welcome, then the actual MAIN/index caller. MAIN returns
+directly to MAIN. Existing LIST/READ/UNREAD/NEXT and WRITE/REPLY review/save/cancel
+controls apply; missing boards offer WRITE, which creates the directory/board only
+on successful save. Anonymous readers can browse; HANDLE enables personal unread
+tracking and participation. Ambiguous mappings never choose arbitrary posts.
+
+The original three contributions by 水玉 and タブストップ include a question and
+linked reply; existing and restored/emptied worlds never acquire them automatically.
+The board, selector `1`, `LOCAL-WAKABA:1`, layout, controls and conversation are
+category D choices. This is not an authenticated SIG directory, and `J WAKABA`
+is not accepted. Wakaba OLT and full historical directory reconstruction are outside
+the subset. See [evidence and dates](research/pcvan-1996-1997.md#wakaba-beginner-board-issue-109)
+and [initialization rules](local-storage.md#wakaba-initialization-and-lazy-participation).

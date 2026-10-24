@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "provenance": "Original Japanese beginner-board fiction for this application. Board name, selector, mapping, controls and conversation are category D reconstruction, not historical identifiers or archived messages. Only pristine initialization inserts these rows.",
+  "keyword": "LOCAL-WAKABA",
+  "boardNo": 1,
+  "name": "はじめての広場",
+  "culture": "初めての質問を歓迎します。短い挨拶や試したことを添えて、返信は相手の歩幅でどうぞ。",
+  "origin": "local-seed:wakaba-v1",
+  "posts": [
+    {
+      "id": "question",
+      "author": "mizutama",
+      "daysAgo": 2,
+      "hour": 19,
+      "minute": 10,
+      "title": "返信の前にひとつ質問",
+      "body": "はじめまして、水玉です。読んだお話に返事をしたいのですが、どのお話への返事か伝えるにはどうしたらいいですか。"
+    },
+    {
+      "id": "reply",
+      "author": "tabstop",
+      "daysAgo": 2,
+      "hour": 20,
+      "minute": 5,
+      "title": "Re: 返信の前にひとつ質問",
+      "body": "水玉さん、ようこそ。返事をしたい投稿の番号を確かめて、REPLY 番号から書けます。最後の確認で読み直せるので、ゆっくり試してみてください。",
+      "replyTo": "question"
+    },
+    {
+      "id": "greeting",
+      "author": "mizutama",
+      "daysAgo": 1,
+      "hour": 19,
+      "minute": 30,
+      "title": "小さな挨拶から",
+      "body": "教えてくださってありがとうございます。まずは短い挨拶を書いてみました。まだ読むだけの日もありますが、少しずつ慣れていきたいです。"
+    }
+  ]
+}

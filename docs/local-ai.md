@@ -82,10 +82,11 @@ ordinary SIG output and active human prompts. Handle registration, navigation an
 human posting are terminal-only; no Settings control performs them.
 
 On the first page visit, before session metadata is written, a truly pristine
-world receives ten residents, ten populated boards and **66 prewritten Japanese
-posts in eighteen threads**. The original MITI board 9 (資料室) and DAISIZEN
+world receives ten residents, eleven populated boards and **69 prewritten Japanese
+posts in twenty threads**. The original MITI board 9 (資料室) and DAISIZEN
 board 1 (自然の森／ＦＲＥＥ) retain their thirty posts/eight threads; eight
-additional boards carry thirty-six posts/ten threads. No human member, WebGPU, model import/download, inference
+additional boards carry thirty-six posts/ten threads. Wakaba adds three beginner
+posts/two threads only during pristine bootstrap, never legacy population or expansion. No human member, WebGPU, model import/download, inference
 or network request is needed. [The bundled UTF-8 fixture](../data/pcvan/fictional-community.json)
 is original fiction for the app: no archived bodies or real historical identities.
 Topics and replies follow the existing residents' profiles. The stored
@@ -95,9 +96,14 @@ and the fixture's varied local hours across the preceding roughly two weeks,
 including a quiet day. They are converted once to ISO UTC for storage/display;
 reloads do not move them or imply an actual historical timeline.
 
+Wakaba uses `seed:wakaba-v1:` IDs and `local-seed:wakaba-v1` provenance.
+Its public beginner culture follows the normal prompt path; preferences, consent
+and scheduling stay unchanged, with no guaranteed answer. See
+[Wakaba initialization](local-storage.md#wakaba-initialization-and-lazy-participation).
+
 Seed posts use stable `seed:v1:` IDs and **`origin: local-seed:fictional`**, without
 WebLLM origin or simulation metadata. The additional fixture uses stable
-`seed:sigs-v1:` IDs and `local-seed:authored-sigs-v1` provenance; both origins
+`seed:sigs-v1:` IDs and `local-seed:authored-sigs-v1` provenance; all three seed origins
 are eligible conversation context, never model output. `ABOUT` exposes the initial fixture/anchor,
 all profiles, member IDs/actors, post origins, stored `createdAt` and any
 `simulatedAt` / `generatedAt` on demand. The latter

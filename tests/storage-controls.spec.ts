@@ -6,7 +6,7 @@ test('typed backup/import preserves real Japanese multiline posts, identities, r
   await start(page, '保存する人'); await enterForum(page); await post(page, '保存', '  一行目  \n\n二行目');
   await command(page, 'READ 17', '★内容');
   const original = await backup(page);
-  expect(original.posts).toHaveLength(67); expect(original.readStates[0]!.lastReadNumber).toBe(17);
+  expect(original.posts).toHaveLength(70); expect(original.readStates[0]!.lastReadNumber).toBe(17);
   await importFile(page, backupFixture());
   await command(page, '', 'Y / N'); await command(page, 'BACK', '操作を中止');
   expect((await snapshot(page)).posts).toEqual(original.posts);
@@ -45,12 +45,12 @@ test('a world changed while a native file picker is pending cannot consume old a
   await command(page, 'N', '操作を中止');
   await (await picker).setFiles({ name: 'late.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
   await command(page, 'Y', 'この画面では使えない');
-  expect((await snapshot(page)).posts).toHaveLength(66);
+  expect((await snapshot(page)).posts).toHaveLength(69);
   const other = await context.newPage(); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
   await importFile(page, data);
   await enterForum(other); await post(other, '別タブの投稿', '保持する');
   await command(page, 'Y', '世界や設定が変わりました');
-  expect((await snapshot(page)).posts).toHaveLength(67);
+  expect((await snapshot(page)).posts).toHaveLength(70);
 });
 
 for (const operation of ['RESET', 'IMPORT']) {

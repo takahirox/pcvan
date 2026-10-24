@@ -119,7 +119,7 @@ test('mail backup strictness, individual recipient read markers, replies, import
   expect(result.good.mail).toHaveLength(3); expect(result.good.mail!.find((m) => m.id === 'mail-batch:one')!.readAt).toBeTruthy();
   expect(result.failures).toEqual(Array(12).fill('validation'));
   expect(result.preserved).toEqual(result.good); expect(result.restored).toEqual(result.good);
-  expect(result.stale).toBe('stale'); expect(result.reset.mail).toEqual([]); expect(result.reset.posts).toHaveLength(66);
+  expect(result.stale).toBe('stale'); expect(result.reset.mail).toEqual([]); expect(result.reset.posts).toHaveLength(69);
 });
 
 test('v1 database upgrade and pre-mail backup import retain original posts and read states', async ({ page }) => {

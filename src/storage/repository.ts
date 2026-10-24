@@ -17,10 +17,11 @@ import { COMMAND_HISTORY_LIMIT } from '../history';
 import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
 import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
+import { wakaba } from '../wakaba';
 import { expandedBoards, additionalSigs } from '../communities';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { WORLD_SETTING, INTERNET_SAMPLE_ORIGIN } from './schema';
-import { canPopulateCommunity, communityBoards, communityPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
+import { canPopulateCommunity, communityBoards, communityPosts, wakabaPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
 import { validateMailGeneration } from '../ai/mail';
 import { postInput, validateGeneration } from '../ai/generation';
 
@@ -569,6 +570,13 @@ export class LocalRepository {
     }
     if (migrated.bootstrap) {
       await this.populateCommunity(tx, now);
+      const sig = { id: `resident-sig:${wakaba.keyword}`, keyword: wakaba.keyword, title: 'わかばマーク' };
+      const forum: Forum = { id: `resident-forum:${wakaba.keyword}:${wakaba.boardNo}`, sigId: sig.id,
+        boardNo: wakaba.boardNo, name: wakaba.name, nextPostNumber: wakaba.posts.length + 1 };
+      await request(tx.objectStore('sigs').add(sig));
+      await request(tx.objectStore('forums').add(forum));
+      for (const post of wakabaPosts(now, forum.id)) await request(tx.objectStore('posts').add(post));
+      validateBackup(await this.snapshot(tx));
       const state = starterConference(now);
       validateConference(state); validateConferenceMembers(state, (await this.snapshot(tx)).members);
       await request(settings.add({ id: CONFERENCE_SETTING, value: state }));

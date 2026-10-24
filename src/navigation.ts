@@ -1,3 +1,4 @@
+import { wakaba } from './wakaba';
 import { EcomVisit } from './ecom';
 import { GopherVisit } from './gopher';
 import { ArchieVisit } from './archie';
@@ -31,7 +32,7 @@ const services = daisizen.sections.filter((section) => section.demo_entry);
 
 export type Screen = TelnetScreen | 'archie' | 'gopher' | 'main' | 'communication' | 'miti' | 'miti-forums' | 'miti-materials' |
   'daisizen' | 'daisizen-forums' | 'daisizen-service' | 'forum' | 'disconnected' |
-  'ecom' | 'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
+  'wakaba' | 'ecom' | 'index' | 'section' | 'mailbox' | 'community' | 'service-category' | 'service-item' |
   'environmental-gateway' | 'eic-list' | 'eic-item' |
   'news-directory' | 'news-headlines' | 'news-brief' |
   'ftp-list' | 'ftp-preview' | 'internet-directory' | 'netnews-directory' | 'netnews-list' | 'netnews-article' |
@@ -160,7 +161,7 @@ export class PcvanController implements TerminalController {
 
   get needsContent(): boolean {
     return this.isConference || this.isOlt || !!this.mailContext ||
-      ['netnews-directory', 'netnews-list', 'netnews-article', 'miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
+      ['wakaba', 'netnews-directory', 'netnews-list', 'netnews-article', 'miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
   }
 
   get screen(): Screen {
@@ -400,6 +401,10 @@ export class PcvanController implements TerminalController {
         if (forum) { this.boardNo = forum.number; this.forumKeyword = 'DAISIZEN'; return this.enter('forum'); }
         return this.invalidCommand('1–7 / BACK / MAIN / HELP');
       }
+      case 'wakaba':
+        if (command === 'LIST') return this.render();
+        if (command === '1') { this.boardNo = wakaba.boardNo; this.forumKeyword = wakaba.keyword; return this.enter('forum'); }
+        return this.invalidCommand('1 / LIST / BACK / MAIN / HELP');
       case 'community': {
         const board = this.community.boards.find((b) => String(b.number) === command);
         if (board) { this.boardNo = board.number; this.forumKeyword = this.community.keyword; return this.enter('forum'); }
@@ -550,7 +555,7 @@ export class PcvanController implements TerminalController {
     const data = forumPosts(this.content, keyword, boardNo);
     const posts = unread ? unreadPosts(this.content, data.posts, this.memberId!) : data.posts;
     return [
-      `${additionalSigs.find((s) => s.keyword === keyword)?.name ?? keyword} / ${forumName(keyword, boardNo)} / ${unread ? '未読一覧' : '投稿一覧'}（番号順）`,
+      `${keyword === wakaba.keyword ? 'わかばマーク' : additionalSigs.find((s) => s.keyword === keyword)?.name ?? keyword} / ${forumName(keyword, boardNo)} / ${unread ? '未読一覧' : '投稿一覧'}（番号順）`,
       ...(boardCulture(keyword, boardNo) ? [boardCulture(keyword, boardNo)!] : []),
       ...(!data.available ? [this.forumUnavailable]
         : posts.length ? posts.map((post) => {
@@ -559,7 +564,7 @@ export class PcvanController implements TerminalController {
             ? ` RE#${parent.number}` : '';
           const lastRead = this.content.readStates?.find((state) => state.memberId === this.memberId && state.forumId === post.forumId)?.lastReadNumber ?? 0;
           return `#${post.number} ${post.title}${reference}${data.source === 'local' && this.memberId ? ` [${post.number <= lastRead ? '既読' : '未読'}]` : ''}`;
-        }) : [unread ? '未読の投稿はありません。' : '投稿はありません。']),
+        }) : [unread ? '未読の投稿はありません。' : keyword === wakaba.keyword ? '投稿はありません。WRITE で最初の投稿をどうぞ。' : '投稿はありません。']),
       this.forumHelp,
     ];
   }
@@ -570,6 +575,7 @@ export class PcvanController implements TerminalController {
 
   private openSection(entry: typeof mainMenu.entries[number]): readonly string[] {
     this.section = entry;
+    if (entry.selector === '16') return [entryText(entry), ...this.enter('wakaba')];
     if (entry.selector === '3') {
       this.newsItem = 0;
       return [entryText(entry), ...this.enter('news-directory')];
@@ -620,6 +626,10 @@ export class PcvanController implements TerminalController {
       case 'disconnected': return [
         '接続を終了しました。',
         'RECONNECT で MAIN から再接続できます。',
+      ];
+      case 'wakaba': return [
+        '☆★☆ わかばマーク ☆★☆', '通信が初めての方も、読むところからどうぞ。',
+        `1 ${wakaba.name}`, 'LIST: 案内を再表示', returnHelp, demoPrompt,
       ];
       case 'index': return [
         '索引', ...indexEntries.map(entryText),

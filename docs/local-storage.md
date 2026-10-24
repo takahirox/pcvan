@@ -6,11 +6,11 @@ upgrading version 1 preserves every existing store and record. The repository ha
 no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. Before starting the first
 session, `openActivity()` initializes a pristine world with ten fictional residents,
-ten populated boards and 66 original static Japanese forum posts in eighteen threads,
+eleven populated boards and 69 original static Japanese forum posts in twenty threads,
 plus three electronic-conference contributions. Model consent remains
 separate. The world anchor and fiction provenance live in `community-world`;
 seeds use `local-seed:fictional` (original thirty) or `local-seed:authored-sigs-v1`
-(additional thirty-six), while later inference uses `local-ai:webllm:`.
+(additional thirty-six) or `local-seed:wakaba-v1` (three beginner contributions), while later inference uses `local-ai:webllm:`.
 See [first-visit and population semantics](local-ai.md#setup-and-controls).
 
 Storage belongs to the browser profile and origin (scheme, hostname, and port).
@@ -49,7 +49,7 @@ shortcut to the same reset method.
 
 Reset clears and recreates the normal first-visit world in one IndexedDB
 transaction, using the same bootstrap as `openActivity()`: ten default residents,
-ten populated forums, 66 original forum posts/eighteen threads, three electronic-conference
+eleven populated forums, 69 original forum posts/twenty threads, three electronic-conference
 contributions and `community-world`
 provenance. The default auto-activity cap is four, with no model consent or setup
 deferral. No model, WebGPU or network is needed. Failure rolls back both clears
@@ -107,6 +107,39 @@ under its existing eligibility/confirmation rules and now supplies the expanded
 baseline (up to 66 posts when customized additional boards are skipped); reset
 explicitly recreates the full baseline for any world.
 
+## Wakaba initialization and lazy participation
+
+MAIN/index `16` is a welcome screen, with no `forum` target. Selector `1` exposes
+`LOCAL-WAKABA:1` through the same forum/content-refresh path and connection wrapper
+as other boards; its name resolves explicitly without joining the SIG directory.
+The welcome refreshes content before selecting its board. BACK keeps the actual
+board → welcome → MAIN/index stack, and MAIN clears it.
+
+Only `readActivity`'s pristine `bootstrap` branch inserts the authored directory,
+board and three `seed:wakaba-v1:` posts from [wakaba.json](../data/pcvan/wakaba.json),
+with `local-seed:wakaba-v1` provenance. Members already exist; dates use the same
+creation anchor and JST day convention. The all-store transaction validates foreign
+keys and ordered replies before commit. Failure rolls back the entire starter
+world; competing tabs serialize and seed once. There is no new world marker,
+database version or backup-format migration. The legacy population and v1 expansion
+helpers never insert Wakaba records. Reopen, reconnect, consent and JSON restore
+cannot infer eligibility from missing posts/boards. Reset explicitly recreates the
+pristine 69-post baseline; legacy opt-in still supplies at most 66 posts.
+
+Existing/imported/deleted/missing Wakaba boards stay empty and navigable. `WRITE`
+uses `createForumPost`: only successful human submission can create an absent
+local directory/board together with its first post. Draft opening, cancellation,
+invalid input, foreign-board reply parents and failed writes allocate nothing.
+Duplicate keywords or board numbers reject selection/submission rather than picking
+an arbitrary board. Existing numbering, counter rollback and concurrent allocation
+apply unchanged. JSON round-trips preserve posts, references, provenance and per-human
+read markers. Public prompt data adds beginner culture via `boardCulture` and
+recognizes this seed origin via `localConversation`; no private mail or OLT is added
+and no consent, preference, budget or scheduling rule changes.
+
+All names, controls and mapping here are
+[category D choices](research/pcvan-1996-1997.md#wakaba-beginner-board-issue-109).
+
 ## Forum reading
 
 The historical directory in `src/navigation.ts` uses the unchanged evidence
@@ -140,9 +173,9 @@ are [category D assumptions](research/pcvan-1996-1997.md#forum-unread-reading-is
 not authenticated historical commands or tracking rules.
 
 `src/forums.ts` maps stored SIGs by case-insensitive `keyword` (`MITI` or
-`DAISIZEN`, `LOCAL-DOSV`, `LOCAL-GAMES`, `LOCAL-GV`) and stored forums by
-`sigId` plus `boardNo`. See [SIG navigation](sig-navigation.md). Stored record IDs do not need to match fixture IDs. One matching SIG
-and board are required: a missing or ambiguous mapping reports unavailability,
+`DAISIZEN`, `LOCAL-DOSV`, `LOCAL-GAMES`, `LOCAL-GV`, `LOCAL-WAKABA`) and stored forums by
+`sigId` plus `boardNo`. See [SIG navigation](sig-navigation.md). Stored record IDs do not need to match fixture IDs. A matching SIG with a missing board, or an ambiguous mapping, reports unavailability;
+an absent SIG offers an empty board for lazy first submission,
 and an empty stored forum stays empty. Posts are sorted by ascending `number`;
 allocation gaps and missing read numbers do not change the active screen.
 
@@ -520,7 +553,7 @@ settings store. IndexedDB remains version 2; JSON remains `pcvan-local` version 
 Pre-OLT backups omit this setting and lazily get empty rooms on their first OLT
 operation. No store-number migration can collide with SIG/mail work. Existing
 members, posts, mail and counters are preserved. Reset removes OLT and recreates
-the established ten residents/66 forum posts and three conference contributions;
+the established ten residents/69 forum posts and three conference contributions;
 OLT has no seeded transcript.
 
 The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly
