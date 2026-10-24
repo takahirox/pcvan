@@ -4,7 +4,7 @@ import { mountTerminal } from './terminal';
 import { openRepository, RepositoryError, DATABASE_NAME } from './storage/repository';
 import type { Session } from './storage/repository';
 import type { Backup } from './storage/schema';
-import { activeHuman, forumPosts } from './forums';
+import { activeHuman, forumPosts, unreadPosts } from './forums';
 import { TerminalCommands } from './commands';
 import { createAiControls } from './ai/controls';
 import { mountSettings } from './settings-dialog';
@@ -110,21 +110,27 @@ const terminal = mountTerminal(root, {
       print(`> ${line}`); terminal.reveal();
       const before = controller.screen;
       if (!await commands.submit(line)) {
+        let navigationLine = line;
         if (line.trim() && controller.needsContent && !['MAIN', 'BACK'].includes(line.trim().toUpperCase())) {
           const content = await refreshContent();
           const target = controller.forum;
           const read = /^READ ([1-9]\d*)$/i.exec(line.trim().replace(/\s+/g, ' '));
-          if (target && read) {
+          const next = line.trim().toUpperCase() === 'NEXT';
+          if (target && (read || next)) {
             const data = forumPosts(content, target.keyword, target.boardNo);
-            const post = data.posts.find((p) => p.number === Number(read[1]));
             const memberId = activeHuman(content);
+            const post = read ? data.posts.find((p) => p.number === Number(read[1]))
+              : memberId && data.source === 'local' ? unreadPosts(content, data.posts, memberId)[0] : undefined;
             if (post && data.source === 'local' && memberId) {
               try { await (await repository).markRead(memberId, post.id); }
               catch (error) { reportError(error); print('既読の保存に失敗しました。再試行してください。'); return; }
+              // Do not reselect NEXT after advancing the marker. Render the same
+              // number from this command's refreshed snapshot via normal READ.
+              navigationLine = `READ ${post.number}`;
             }
           }
         }
-        if (line.trim() || controller.isEcom || controller.isArchie) navigate(line);
+        if (line.trim() || controller.isEcom || controller.isArchie) navigate(navigationLine);
       }
       if (resetting) return;
       // Commands queued in a departed visit cannot operate a subsequent visit.

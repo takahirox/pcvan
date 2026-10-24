@@ -1,4 +1,5 @@
 import type { Backup } from '../src/storage/schema';
+import { ACTIVE_MEMBER_SETTING } from '../src/storage/repository';
 
 // Synthetic data, including allocation gaps and fields with no historical interpretation.
 export function backupFixture(): Backup {
@@ -19,4 +20,27 @@ export function backupFixture(): Backup {
     session: { lastLoginAt: '2026-10-20T01:00:00.000Z', lastLogoutAt: '2026-10-20T02:00:00.000Z', commandHistory: ['help', 'echo  日本語'] },
     settings: [{ id: 'preferences', value: { nested: ['日本語', true, 42, null], width: 80 } }],
   };
+}
+
+/** Gapped unread journey, deliberately unrelated timestamps and storage order. */
+export function unreadFixture(): Backup {
+  const data = backupFixture();
+  data.sigs[0]!.keyword = 'MITI';
+  data.forums[0]!.boardNo = 9;
+  data.forums[0]!.nextPostNumber = 10;
+  data.members.push({ id: 'human2', handle: '別の人', actor: 'human' });
+  data.members[0]!.handle = '今の筆名';
+  data.posts[0]!.createdAt = '1996-11-23T01:02:03.000Z';
+  data.posts[1]!.createdAt = '1996-11-20T01:03:04.567Z';
+  data.posts.push({ ...data.posts[0]!, id: 'ninth', number: 9, title: '最後の便り', body: '  <i>最後</i>　ｶﾅ  \n\n末尾  ', createdAt: '1996-11-21T01:00:00.000Z' });
+  data.posts.reverse();
+  data.readStates = [
+    { memberId: 'human', forumId: 'forum', lastReadNumber: 3 },
+    { memberId: 'human2', forumId: 'forum', lastReadNumber: 1 },
+    { memberId: 'human', forumId: 'other', lastReadNumber: 1 },
+  ];
+  data.settings.push({ id: ACTIVE_MEMBER_SETTING, value: 'human' });
+  data.mail = [{ id: 'protected-mail', number: 1, senderId: 'human', internetAddress: 'protected@example.invalid', subject: '私信', body: '変更しない',
+    createdAt: '2026-10-20T01:02:03.000Z', origin: 'local-human' }];
+  return data;
 }

@@ -2514,3 +2514,71 @@ Native Japanese IME, additional browser engines and historical-user feedback wer
 not performed and remain optional. No real-model/hardware validation is needed.
 Default/eight-worker reliability remains unresolved; three-worker success does
 not resolve it. No post-merge test or deployment verification is required.
+
+# Forum unread listing and next-unread reading (Issue #107)
+
+Validated on 2026-10-24 with Node.js 24.12.0 on macOS.
+
+- `npm ci`: passed, 23 packages added, zero reported vulnerabilities; no
+  dependency or lockfile changes.
+- `npx playwright install chromium`: passed; existing browser available.
+- `npm run build`: passed TypeScript checking and the production build.
+- Initial focused run: **35 passed, 6 failed (38.6s)**. New restored fixtures
+  violated existing mail provenance/recipient validation, and the anonymous
+  fixture removed a reply parent. Corrected the fixtures to use a valid outgoing
+  local Internet letter and preserve reply relationships.
+- Forum-only rerun with `--workers=3` (one worker for the file): **16 passed,
+  2 failed (18.5s)**. Corrected new expectations for HANDLE's existing Settings
+  return path and the composer's numbered preview lines.
+- Expanded focused rerun: **41 passed, 1 failed (26.9s)**. Corrected the new
+  terminal-log expectation to include the echo prefix's space in addition to
+  both literal leading command spaces. Existing behavioral assertions were
+  not changed or weakened.
+- Final focused command,
+  `npm test -- tests/forums.spec.ts tests/composition.spec.ts tests/journey.spec.ts tests/repository.spec.ts --workers=3`:
+  **42 passed (27.8s)** using three workers, including configured type checking
+  and production build. No failures, retries or skips.
+- Final complete `npm test -- --workers=3`: **392 passed (7.7m)** using three
+  workers, including all 383 existing checks and nine added checks. Configured
+  TypeScript checking/build passed, with no failures, retries or skips. Existing
+  functional, storage, consent, composition/IME, terminal pacing/skip and offline
+  regression coverage passed. Real model inference was not used.
+- Reviewed the complete final diff against #107. All **139 local Markdown
+  targets/heading anchors** across README, storage, SIG navigation, research and
+  this record passed, along with balanced code fences and the Settings research
+  anchor. Working-tree and staged whitespace checks passed. No existing test
+  expectation was weakened. Existing WebLLM large-bundle and
+  NO_COLOR/FORCE_COLOR environment warnings remain informational.
+
+Nine added controller/production checks cover the gapped 1/4/9 fixture with marker
+3, ascending unread numbers independent of timestamps/storage order, parent
+references outside the unread list, exact current name/date/body rendering,
+absent and exhausted markers, full LIST/HELP, malformed/blank commands, every
+existing forum route and actual BACK/MAIN parents. The production journey passes
+through the connection wrapper; queued NEXT reads 4 then 9 exactly once, and
+instrumented read-state writes prove exhaustion, lists/help and invalid commands
+write nothing. Protected comparisons include all members, SIGs, forums, posts,
+mail and settings; only the expected selected human/forum marker plus normal
+session/history bookkeeping changes in these inactive fixtures.
+
+Additional production coverage exercises numbered READ high-water behavior,
+human/forum isolation, another tab's content/name/selection/new post/marker
+changes without notifications, monotonic older reads, marker quota failure and
+retry, refresh failure, reload/downloaded JSON restore, anonymous reading,
+restored-empty collections, and unavailable/ambiguous controller mappings.
+Disabling BroadcastChannel verifies stale-world generation checks stop queued
+NEXT after another tab's replacement. Same-tab restore and reset discard old
+markers. Composition owns literal UNREAD/NEXT input; mail, conference and NetNews
+reject these forum commands. Simulated IME guards, literal Japanese/markup,
+focus, terminal log export and discoverable typed/modern About are checked.
+The observed reading journey makes no external requests and needs no model
+consent, download or inference.
+
+The client-author page and publisher PDF text were rechecked. ATPMAC/catalog
+direct retrieval and publisher page images failed; their access limitations and
+Issue-research snippet status remain explicit in the
+[research record](research/pcvan-1996-1997.md#forum-unread-reading-issue-107).
+No historical PC-VAN unread command sequence is claimed. Native Japanese IME,
+additional browser engines and former-user feedback remain optional.
+Default/eight-worker reliability remains unresolved; three-worker success does
+not resolve it. No post-merge or deployment verification is required.

@@ -11,7 +11,7 @@ import { renderOltDirectory } from './olt';
 import mainMenu from '../data/pcvan/main-1996.json' with { type: 'json' };
 import sigEvidence from '../data/pcvan/sig-evidence.json' with { type: 'json' };
 import type { TerminalController } from './controller';
-import { emptyContent, forumName, forumPosts, renderPost, replyReference } from './forums';
+import { emptyContent, forumName, forumPosts, renderPost, replyReference, unreadPosts } from './forums';
 import type { ForumContent } from './forums';
 import type { ForumDestination } from './storage/repository';
 import { mainCollections, serviceCollections, mailboxes, renderCollection } from './sections';
@@ -517,6 +517,17 @@ export class PcvanController implements TerminalController {
 
   private handleForum(command: string, keyword: string, boardNo: number): readonly string[] {
     if (command === 'LIST') return this.render();
+    if (command === 'UNREAD' || command === 'NEXT') {
+      const data = forumPosts(this.content, keyword, boardNo);
+      if (!data.available) return [this.forumUnavailable, this.forumHelp, returnHelp, demoPrompt];
+      if (data.source !== 'local' || !this.content.members?.some((member) => member.id === this.memberId && member.actor === 'human'))
+        return ['未読の確認には HANDLE で利用者を選択してください。', this.forumHelp, returnHelp, demoPrompt];
+      if (command === 'UNREAD') return [...this.renderForum(keyword, boardNo, true), returnHelp, demoPrompt];
+      const posts = unreadPosts(this.content, data.posts, this.memberId!);
+      if (!posts.length) return ['未読の投稿はありません。', this.forumHelp, returnHelp, demoPrompt];
+      // The app persists this exact candidate before forwarding a numbered READ.
+      return this.handleForum(`READ ${posts[0]!.number}`, keyword, boardNo);
+    }
     const read = /^READ ([1-9]\d*)$/.exec(command);
     if (read && Number.isSafeInteger(Number(read[1]))) {
       const data = forumPosts(this.content, keyword, boardNo);
@@ -529,24 +540,26 @@ export class PcvanController implements TerminalController {
         demoPrompt,
       ] : ['その番号の投稿はありません。画面は変わりません。', this.forumHelp, returnHelp, demoPrompt];
     }
-    return this.invalidCommand('LIST / READ 番号 / WRITE / REPLY 番号 / BACK / MAIN / HELP');
+    return this.invalidCommand('LIST / UNREAD / NEXT / READ 番号 / WRITE / REPLY 番号 / BACK / MAIN / HELP');
   }
 
-  private readonly forumHelp = 'LIST: 投稿一覧 / READ 番号: 本文 / WRITE: 新規投稿 / REPLY 番号: 返信 / BACK: フォーラム一覧';
+  private readonly forumHelp = 'LIST: 投稿一覧 / UNREAD: 未読一覧 / NEXT: 次の未読 / READ 番号: 本文 / WRITE: 新規投稿 / REPLY 番号: 返信';
+  private readonly forumUnavailable = '対応するローカルフォーラムが見つからないか、重複しています。';
 
-  private renderForum(keyword: string, boardNo: number): string[] {
+  private renderForum(keyword: string, boardNo: number, unread = false): string[] {
     const data = forumPosts(this.content, keyword, boardNo);
+    const posts = unread ? unreadPosts(this.content, data.posts, this.memberId!) : data.posts;
     return [
-      `${additionalSigs.find((s) => s.keyword === keyword)?.name ?? keyword} / ${forumName(keyword, boardNo)} / 投稿一覧（番号順）`,
+      `${additionalSigs.find((s) => s.keyword === keyword)?.name ?? keyword} / ${forumName(keyword, boardNo)} / ${unread ? '未読一覧' : '投稿一覧'}（番号順）`,
       ...(boardCulture(keyword, boardNo) ? [boardCulture(keyword, boardNo)!] : []),
-      ...(!data.available ? ['対応するローカルフォーラムが見つからないか、重複しています。']
-        : data.posts.length ? data.posts.map((post) => {
+      ...(!data.available ? [this.forumUnavailable]
+        : posts.length ? posts.map((post) => {
           const parent = replyReference(post, data.posts);
           const reference = parent && post.title !== `RE#${parent.number}` && !post.title.startsWith(`RE#${parent.number} `)
             ? ` RE#${parent.number}` : '';
           const lastRead = this.content.readStates?.find((state) => state.memberId === this.memberId && state.forumId === post.forumId)?.lastReadNumber ?? 0;
           return `#${post.number} ${post.title}${reference}${data.source === 'local' && this.memberId ? ` [${post.number <= lastRead ? '既読' : '未読'}]` : ''}`;
-        }) : ['投稿はありません。']),
+        }) : [unread ? '未読の投稿はありません。' : '投稿はありません。']),
       this.forumHelp,
     ];
   }
