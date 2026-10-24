@@ -782,3 +782,143 @@ for (const failure of ['validation', 'abort'] as const) {
     expect(result.retry.map((m) => m.number)).toEqual([1, 2]);
   });
 }
+
+test('native files: canonical bytes, complete retry identity, rollback and mixed scheduled/text/file numbering', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, senderId = (await repo.list('members')).find((m) => m.actor === 'human')!.id;
+    const fp = '/src/storage/mail-file.ts', { encodeMailBytes, decodeMailFile } = await import(fp);
+    const bytes = Uint8Array.from({ length: 262144 }, (_, i) => i % 256);
+    const draft = { id: 'file', senderId, recipientId: 'fictional-ai:hoshimori', subject: 'private-file-subject',
+      file: { encoding: 'base64' as const, filename: 'original.bin', size: bytes.length, data: encodeMailBytes(bytes) } };
+    const rp = '/src/storage/repository.ts', other = await (await import(rp)).openRepository('mail-world') as LocalRepository;
+    const copies = await Promise.all([repo.createHumanFileMail(draft), other.createHumanFileMail(draft)]);
+    const collisions = [];
+    for (const change of [{ subject: 'changed' }, { recipientId: 'fictional-ai:kusabue' },
+      { file: { ...draft.file, filename: 'other.bin' } }, { file: { ...draft.file, data: encodeMailBytes(new Uint8Array(bytes.length)) } }]) {
+      try { await repo.createHumanFileMail({ ...draft, ...change }); collisions.push('saved'); } catch (e) { collisions.push((e as { code: string }).code); }
+    }
+    try { await repo.createHumanMail({ id: draft.id, senderId, recipient: 'hoshimori', subject: draft.subject, body: 'different kind' }); collisions.push('saved'); }
+    catch (e) { collisions.push((e as { code: string }).code); }
+    const before = await repo.exportBackup(), failures = [];
+    const native = IDBObjectStore.prototype.put;
+    for (const mode of ['quota', 'abort']) {
+      IDBObjectStore.prototype.put = function (value, key) {
+        if (this.name === 'session' && key === 'mail-next-number') {
+          if (mode === 'quota') throw new DOMException('quota', 'QuotaExceededError');
+          this.transaction.abort();
+        }
+        return key === undefined ? native.call(this, value) : native.call(this, value, key);
+      };
+      try { await repo.createHumanFileMail({ ...draft, id: 'retry' }); failures.push('saved'); }
+      catch (e) { failures.push((e as { code: string }).code); }
+      finally { IDBObjectStore.prototype.put = native; }
+      if (JSON.stringify(await repo.exportBackup()) !== JSON.stringify(before)) throw new Error('Failure changed world or bytes');
+    }
+    const retry = await repo.createHumanFileMail({ ...draft, id: 'retry' });
+    const cp = '/src/calendar.ts', { calendarSetting, scheduleTime, scheduleInstant } = await import(cp);
+    const now = new Date().toISOString(), calendar = calendarSetting(before)!;
+    const dueAt = scheduleInstant(scheduleTime(new Date(Date.now() + 3600000).toISOString(), calendar), calendar, now);
+    await repo.scheduleHumanMail({ id: 'P-fileconcurrent', senderId, recipientId: draft.recipientId, recipientLabel: '星守', subject: '予約', body: '本文', dueAt }, now);
+    const [file, text, scheduled] = await Promise.all([
+      repo.createHumanFileMail({ ...draft, id: 'concurrent-file' }),
+      other.createHumanMail({ id: 'text', senderId, recipient: 'hoshimori', subject: 'text', body: 'body' }),
+      other.reconcileScheduledMail(dueAt),
+    ]);
+    const good = await repo.exportBackup();
+    await repo.replaceFromJson(JSON.stringify(good), { confirmReplace: true });
+    const restored = await repo.exportBackup();
+    const exact = encodeMailBytes(decodeMailFile(restored.mail!.find((m) => m.id === draft.id)!.file)) === draft.file.data;
+    let stale = ''; try { await other.createHumanFileMail({ ...draft, id: 'stale' }); } catch (e) { stale = (e as { code: string }).code; }
+    other.close();
+    return { copiesEqual: JSON.stringify(copies[0]) === JSON.stringify(copies[1]), collisions, failures, retry: retry.number,
+      numbers: [file, text, ...scheduled].map((m) => m.number).sort((a, b) => a - b), exact, roundtrip: JSON.stringify(good) === JSON.stringify(restored), stale };
+  });
+  expect(result).toMatchObject({ copiesEqual: true, collisions: Array(5).fill('validation'), failures: ['quota', 'storage'],
+    retry: 2, numbers: [3, 4, 5], exact: true, roundtrip: true, stale: 'stale' });
+});
+
+test('native files reject malformed bytes, unsafe names, invalid actors and unsupported combinations before writes or restore', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const repo = window.mailRepo, senderId = (await repo.list('members')).find((m) => m.actor === 'human')!.id;
+    const draft = { id: 'file', senderId, recipientId: 'fictional-ai:hoshimori', subject: 'file',
+      file: { encoding: 'base64' as const, filename: 'original.bin', size: 1, data: '/w==' } };
+    const letter = await repo.createHumanFileMail(draft), good = await repo.exportBackup();
+    const badFiles: unknown[] = [null, {}, { ...draft.file, encoding: 'utf8' }, { ...draft.file, size: -1 },
+      { ...draft.file, size: 1.1 }, { ...draft.file, size: 262145 }, { ...draft.file, size: 0 }, { ...draft.file, size: '1' },
+      { ...draft.file, data: '/w' }, { ...draft.file, data: '/x==' }, { ...draft.file, data: '/w==\n' },
+      { ...draft.file, data: '☃===' }, { ...draft.file, extra: true }, { ...draft.file, data: 'A'.repeat(349532) },
+      ...['../x', '/x.bin', 'C:\\x.bin', '.hidden', 'a..b', 'a.', 'NUL', 'com1.txt', 'a b', '日本.bin', 'a\n.bin', 'a'.repeat(65), ''].map((filename) => ({ ...draft.file, filename }))];
+    const failures: string[] = [];
+    const rejectRestore = async (mail: unknown, backup = good) => {
+      try { await repo.replaceFromJson(JSON.stringify({ ...backup, mail: [mail] }), { confirmReplace: true }); failures.push('saved'); }
+      catch (e) { failures.push((e as { code: string }).code); }
+      if (JSON.stringify(await repo.exportBackup()) !== JSON.stringify(good)) throw new Error('Invalid backup changed world');
+    };
+    for (const file of badFiles) {
+      try { await repo.createHumanFileMail({ ...draft, id: 'bad', file } as never); failures.push('saved'); }
+      catch (e) { failures.push((e as { code: string }).code); }
+      await rejectRestore({ ...letter, file });
+    }
+    for (const change of [{ body: 'mixed' }, { replyToMailId: 'file' }, { readAt: letter.createdAt },
+      { recipientConfirmation: { at: letter.createdAt, replyMailId: 'r', provenance: 'local-resident-reply-v1' } },
+      { recipientId: 'missing' }, { senderId: 'missing' }, { recipientId: senderId },
+      { senderId: letter.recipientId, recipientId: senderId },
+      { recipientId: undefined, internetAddress: 'a@letters.example.invalid' },
+      { senderId: undefined, senderInternetAddress: 'a@letters.example.invalid', origin: 'local-sample:internet-letter-v1', recipientId: senderId },
+      { delivery: { scheduleId: 'P-x', submittedAt: letter.createdAt, availableAt: letter.createdAt } },
+      { file: undefined }, { extra: true }]) await rejectRestore({ ...letter, ...change });
+    for (const change of [{ recipientId: 'hoshimori' }, { recipientId: 'missing' }, { senderId: 'missing' },
+      { senderId: 'fictional-ai:kusabue' }, { subject: '' }, { subject: '\u001bfile' }, { extra: true }, { body: '' }]) {
+      try { await repo.createHumanFileMail({ ...draft, id: 'invalid-draft', ...change } as never); failures.push('saved'); }
+      catch (e) { failures.push((e as { code: string }).code); }
+    }
+    const parentReply = { ...letter, id: 'resident-reply', number: 2, file: undefined, body: 'reply', subject: 'reply',
+      senderId: letter.recipientId, recipientId: senderId, replyToMailId: letter.id, origin: 'local-ai:webllm:fixture',
+      simulation: { runId: 'resident-reply', simulatedAt: letter.createdAt, fictional: true } };
+    try { await repo.replaceFromJson(JSON.stringify({ ...good, mail: [letter, parentReply] }), { confirmReplace: true }); failures.push('saved'); }
+    catch (e) { failures.push((e as { code: string }).code); }
+    let read = ''; try { await repo.markMailRead(senderId, letter.id); } catch (e) { read = (e as { code: string }).code; }
+    const empty = await repo.createHumanFileMail({ ...draft, id: 'empty', file: { ...draft.file, size: 0, data: '' } });
+    await repo.resetWorld({ confirmReset: true }); const reset = await repo.list('mail');
+    const legacy = { ...good }; delete legacy.mail;
+    await repo.replaceFromJson(JSON.stringify(legacy), { confirmReplace: true });
+    return { failures, read, empty: empty.file, reset, legacy: await repo.list('mail') };
+  });
+  expect(result.failures.length).toBeGreaterThan(60); expect(new Set(result.failures)).toEqual(new Set(['validation']));
+  expect(result.read).toBe('validation'); expect(result.empty).toMatchObject({ size: 0, data: '' });
+  expect(result.reset).toEqual([]); expect(result.legacy).toEqual([]);
+});
+
+test('native files remain outside prompts and planning; direct, restored and already-planned reply parents fail closed', async ({ page }) => {
+  const result = await page.evaluate(async (epoch) => {
+    const repo = window.mailRepo, initial = await repo.exportBackup(), humanId = initial.members.find((m) => m.actor === 'human')!.id;
+    const file = await repo.createHumanFileMail({ id: 'excluded-file', senderId: humanId, recipientId: 'fictional-ai:hoshimori', subject: 'PRIVATE-FILE-SUBJECT',
+      file: { encoding: 'base64', filename: 'PRIVATE-FILE-NAME.bin', size: 1, data: '/w==' } });
+    const text = await repo.createHumanMail({ id: 'text-parent', senderId: humanId, recipient: 'hoshimori', subject: 'ordinary', body: 'text only' });
+    const mp = '/src/ai/mail.ts', { pairMail, buildMailPrompt, chooseMail } = await import(mp);
+    const pp = '/src/ai/personas.ts', { residentProfiles } = await import(pp);
+    const gp = '/src/ai/generation.ts', { buildPrompt } = await import(gp);
+    const content = await repo.exportBackup(), profile = residentProfiles(content).find((p) => p.id === 'hoshimori')!;
+    const prompt = buildMailPrompt(content, 'hoshimori', { humanId, replyToMailId: text.id });
+    const forumPrompt = buildPrompt(content, { personaId: 'hoshimori', forumId: content.forums[0]!.id });
+    const choices = Array.from({ length: 100 }, (_, i) => chooseMail({ ...content, mail: [file] }, profile, Date.parse(epoch) + 3600000, String(i), []));
+    const failures: string[] = [];
+    try { buildMailPrompt(content, 'hoshimori', { humanId, replyToMailId: file.id }); failures.push('prompted'); }
+    catch (e) { failures.push((e as { code: string }).code); }
+    const activity = await repo.openActivity(), run = { id: 'file-batch:one', personaId: 'hoshimori', simulatedAt: epoch, status: 'running' as const, mail: { humanId, replyToMailId: file.id } };
+    const value = { ...activity, consent: true, batch: { id: 'file-batch', from: epoch, to: '2026-10-21T01:00:00.000Z', modelId: activity.modelId, runs: [run] } };
+    try { await repo.put('settings', { id: 'ai-activity', value: value as never }); failures.push('planned'); } catch (e) { failures.push((e as { code: string }).code); }
+    try { await repo.replaceFromJson(JSON.stringify({ ...content, settings: [...content.settings.filter((s) => s.id !== 'ai-activity'), { id: 'ai-activity', value }] }), { confirmReplace: true }); failures.push('restored'); }
+    catch (e) { failures.push((e as { code: string }).code); }
+    // Simulate an already-planned run from unguarded old code; commitment must revalidate.
+    const db = await new Promise<IDBDatabase>((resolve) => { const request = indexedDB.open('mail-world'); request.onsuccess = () => resolve(request.result); });
+    await new Promise<void>((resolve) => { const tx = db.transaction('settings', 'readwrite'); tx.objectStore('settings').put({ id: 'ai-activity', value }); tx.oncomplete = () => resolve(); }); db.close();
+    try { await repo.commitAiRun(run.id, JSON.stringify({ personaId: 'hoshimori', recipientId: humanId, replyToMailId: 'reply-target', subject: 'Re', body: 'reply' })); failures.push('committed'); }
+    catch (e) { failures.push((e as { code: string }).code); }
+    return { pair: pairMail(content, file.recipientId!, humanId).map((m: Mail) => m.id), prompt, forumPrompt, choices, failures,
+      savedFile: (await repo.list('mail')).find((m) => m.id === file.id), count: (await repo.list('mail')).length };
+  }, epoch);
+  expect(result.pair).toEqual(['text-parent']); expect(JSON.stringify([result.prompt, result.forumPrompt])).not.toMatch(/PRIVATE-FILE|excluded-file|\/w==/);
+  expect(result.choices.every((m) => m === null)).toBe(true); expect(result.failures).toEqual(Array(4).fill('validation'));
+  expect(result.savedFile).not.toHaveProperty('recipientConfirmation'); expect(result.count).toBe(2);
+});

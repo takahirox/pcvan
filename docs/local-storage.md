@@ -845,3 +845,40 @@ Backups contain the complete queue, private text and delivery metadata; terminal
 logs may contain drafted/inspected text. Address/time/body input is excluded from
 persistent recall, including inline `WRITE-AT`. Browser storage is local and
 unencrypted, subject to normal eviction. See [mail behavior and evidence](mail.md#scheduled-local-delivery-issue-123).
+
+## Native file mail (Issue #125)
+
+Database v2 and backup `pcvan-local` v1 are unchanged. A native file letter is an
+ordinary globally numbered `mail` record with `body: ""` and an optional `file`
+object containing **exactly** `{ encoding: "base64", filename, size, data }`.
+Presence of `file` distinguishes the letter from text. `size` is an integer
+0–262144; `data` is canonical RFC 4648 base64, including canonical padding bits,
+with no whitespace. Validation bounds encoded length before decoding, then checks
+actual decoded length and canonical re-encoding. An empty file uses size 0/data
+`""`. Filenames and export names follow the [bounded basename rule](mail.md#native-browser-local-file-mail-issue-125).
+
+`createHumanFileMail` accepts only ID, human sender ID, pinned existing resident
+ID, subject and file. It clones caller data, validates complete payload and actors
+inside the existing world-fenced all-store transaction, and uses `insertMail` and
+`mail-next-number`. Identical retry IDs return the same record; changed kind,
+recipient, subject or any file field fails. The terminal additionally checks the
+selected human at commit. Concurrent text, schedule release and file writes share
+the same allocator. Payload is embedded in the mail record, so there is no separate
+orphan payload store and no extra number to coordinate. Quota/abort rolls back the
+letter, bytes and allocation together.
+
+Direct repository calls and pure backup validation reject malformed encoding,
+counts, names, actor references, mixed nonempty bodies, Internet fields, replies,
+read/confirmation evidence, simulation and scheduled-delivery metadata on file
+letters. Text/reply APIs cannot reuse a file retry identity. Relations reject any
+reply whose parent is a file. Backup validation and direct activity-setting writes
+also reject planned file reply parents; prompt construction and AI commitment
+revalidate them, including already-planned work. Pair excerpts and target planning
+exclude file mail before choosing excerpts or applying pair history.
+
+Exports retain exact bytes across JSON/reload. Legacy backups without file fields
+or without `mail` remain valid. Restore validates before any world mutation and
+atomically replaces records; reset and individual file-letter deletion remove the
+embedded bytes. Member deletion/actor changes cannot invalidate retained mail.
+Existing reset/restore generation fences apply across tabs even when restored
+JSON is identical. No payload enters terminal output, command history or inference.

@@ -1,3 +1,4 @@
+import { TerminalFileMail } from './file-mail';
 import { identityToken, penName } from './member-presentation';
 import { serviceCategories } from './service-collections';
 import { profileArgument, renderResidentProfile } from './resident-profile';
@@ -30,7 +31,7 @@ import { modelDisclosure } from './ai/setup';
 import { createSettingsActions } from './settings-actions';
 
 type Menu = 'settings' | 'display' | 'handles' | 'ai' | 'storage' | 'offline' | 'profiles' | 'about' | 'help';
-type Intent = { osl: true; category: 1 | 2 } | { multiMail: true } | { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail; scheduled?: boolean };
+type Intent = { fileMail: true; recipient: string } | { osl: true; category: 1 | 2 } | { multiMail: true } | { netnews: true; group: string; parent?: NetNewsArticle } | { conference: true; parent?: Contribution } | { target: ForumDestination; parent?: Post } | { mail: true; recipient: string; parent?: Mail; scheduled?: boolean };
 type Confirmation = { kind: 'model' | 'import' | 'reset' | 'populate'; expected: string; text?: string; modelId?: string };
 export interface CommandActions {
   applicationPrint?(...lines: string[]): void;
@@ -78,6 +79,7 @@ export class TerminalCommands {
   private registration: 'offer' | 'name' | null = null;
   private intent: Intent | undefined;
   private composer: TerminalComposer | TerminalComposer<{ keyword: string; name: string }> | undefined;
+  private nativeFile?: TerminalFileMail;
   private mailAddress = false;
   private scheduledAddress = false;
   private pendingCancellation: { senderId: string; reference: string } | undefined;
@@ -100,14 +102,17 @@ export class TerminalCommands {
     this.settings = createSettingsActions(actions);
   }
   applicationOutput(kind: 'ai' | 'offline') {
-    return !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.pendingCancellation && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
+    return !this.nativeFile?.active && !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.pendingCancellation && (kind === 'ai' ? this.menu === 'ai' : this.menu === 'offline');
   }
-  get recordsHistory() { return !this.actions.isEcom?.() && !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.confirmation && !this.pendingCancellation && !this.fileRequest && !this.profile; }
+  observeFileMail(data: Backup) { this.nativeFile?.observe(data); }
+  get fileInputContext() { return this.nativeFile?.active ? this.nativeFile.inputContext : undefined; }
+  get recordsHistory() { return !this.actions.isEcom?.() && !this.nativeFile?.active && !this.composer?.active && !this.mailAddress && !this.mailSelection && !this.registration && !this.confirmation && !this.pendingCancellation && !this.fileRequest && !this.profile; }
   invalidate() {
     this.revision++;
     this.actions.invalidateEcom?.();
     this.olt.invalidate();
-    const active = this.composer?.active || this.mailAddress || this.mailSelection || this.registration || this.pendingCancellation || this.confirmation || this.fileRequest || this.profile;
+    const active = this.nativeFile?.active || this.composer?.active || this.mailAddress || this.mailSelection || this.registration || this.pendingCancellation || this.confirmation || this.fileRequest || this.profile;
+    this.nativeFile?.invalidate(); this.nativeFile = undefined;
     this.composer?.invalidate();
     this.pendingCancellation = undefined; this.scheduledAddress = false;
     this.composer = undefined; this.mailAddress = false; this.mailSelection = undefined; this.registration = null; this.intent = undefined;
@@ -156,8 +161,14 @@ export class TerminalCommands {
   }
   private startCompose(intent: Intent, data: Backup) {
     const authorId = activeHuman(data);
-    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'osl' in intent ? 'OSL 登録' : 'mail' in intent || 'multiMail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
-    if ('osl' in intent) {
+    if (!authorId) { this.intent = intent; this.registration = 'offer'; this.actions.print(`${'osl' in intent ? 'OSL 登録' : 'mail' in intent || 'multiMail' in intent || 'fileMail' in intent ? 'メール' : '投稿'}にはハンドルが必要です。登録しますか？ (Y/N/SKIP)=`); return; }
+    if ('fileMail' in intent) {
+      this.startFileMail(authorId);
+      if (intent.recipient) {
+        try { this.nativeFile!.selectRecipient(resolveMailResident(data.members, intent.recipient.trim())); }
+        catch { this.actions.print('既存のローカル住人1人の宛先IDを入力してください。宛先='); }
+      }
+    } else if ('osl' in intent) {
       const id = createRecordId(), revision = this.revision;
       const author = data.members.find((m) => m.id === authorId);
       this.composer = new TerminalComposer({ keyword: 'DAISIZEN', name: 'OSL' }, authorId, undefined, {
@@ -239,6 +250,13 @@ export class TerminalCommands {
       } : undefined);
     } else this.composer = new TerminalComposer(intent.target, authorId, intent.parent, this.actions);
   }
+  private startFileMail(senderId: string, saved?: Mail) {
+    const revision = this.revision;
+    const flow = new TerminalFileMail(senderId, { ...this.actions,
+      current: () => this.revision === revision && this.nativeFile === flow,
+    }, saved);
+    this.nativeFile = flow;
+  }
   private selectionHelp() {
     this.actions.print('WRITE-MULTI：ローカル住人を1行に1人選択（再構成）。',
       ...this.mailSelection!.recipients.map((m) => `選択済み：${m.label}`),
@@ -295,6 +313,7 @@ export class TerminalCommands {
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     const print = this.actions.print;
     if (this.actions.ecomDrafting?.()) return false;
+    if (this.nativeFile?.active) { await this.nativeFile.submit(line); return true; }
     if (this.composer?.active && (!this.composer.isFile || (!this.menu && !['SETTINGS', 'CONFIG', 'ABOUT'].includes(command)))) { await this.composer.submit(line); return true; }
     if (this.mailSelection) {
       const selection = this.mailSelection;
@@ -488,6 +507,15 @@ export class TerminalCommands {
       const data = await this.actions.read(), human = activeHuman(data);
       if (revision !== this.revision) return true;
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }
+      const fileWrite = /^ *WRITE-FILE(?: ([\s\S]*))?$/i.exec(line);
+      if (fileWrite) { this.startCompose({ fileMail: true, recipient: fileWrite[1] ?? '' }, data); return true; }
+      const acquire = /^ACQUIRE ([1-9]\d*)$/.exec(command);
+      if (acquire) {
+        const saved = mailboxRows(data.mail ?? [], human, this.actions.mailbox!()!.box).find((m) => m.number === Number(acquire[1]) && m.file && m.senderId === human);
+        if (!saved) print('その番号のファイルメールはこの箱にありません。SENT で確認してください。');
+        else this.startFileMail(human!, saved);
+        return true;
+      }
       if (command === 'WRITE-MULTI') { this.startCompose({ multiMail: true }, data); return true; }
       if (command === 'PENDING' || /^(READ-PENDING|CANCEL-PENDING)(?: |$)/.test(command)) {
         const letters = scheduledMail(data).letters.filter((l) => l.senderId === human && l.status === 'pending');
@@ -514,7 +542,8 @@ export class TerminalCommands {
         const mail = rows.find((m) => m.number === Number(selected[2]));
         if (!mail) { print('その番号のメールはこの箱にありません。INBOX / SENT / LIST で確認してください。'); return true; }
         if (selected[1] === 'REPLY') {
-          if (mail.recipientId !== human) print('受信したメールに返信してください。INBOX / REPLY 番号');
+          if (mail.file) print('ファイルメールには返信できません。');
+          else if (mail.recipientId !== human) print('受信したメールに返信してください。INBOX / REPLY 番号');
           else this.startCompose({ mail: true, recipient: mail.senderInternetAddress !== undefined ? `INET#${mail.senderInternetAddress}` : mail.senderId!, parent: mail }, data);
         } else {
           if (mail.recipientId === human) await (await this.actions.repository()).markMailRead(human!, mail.id);

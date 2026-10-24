@@ -395,3 +395,67 @@ The [research record](research/pcvan-1996-1997.md#scheduled-local-mail-issue-123
 distinguishes high-confidence March 1993 date/time delivery evidence from the
 moderate-confidence inference of continuity into late 1996. Commands, cancellation,
 limits, timezone presentation and mailbox relationships remain category D choices.
+
+## Native browser-local file mail (Issue #125)
+
+All three mail routes support `WRITE-FILE [resident]`. Omit the address to enter
+one existing resident's short ID, full local ID or exact unambiguous handle.
+Optional human registration works as for text letters. The recipient ID and safe
+identity label are pinned before the subject; renames or directory ordering cannot
+retarget the letter. Enter a 1–200-unit subject, then explicitly enter `PICK` to
+open the browser picker. Selecting a file alone never saves it.
+
+This is a distinct one-file letter, without a text body or MIME attachment
+semantics. The application accepts **0 through 262,144 bytes**, inclusive. The
+basename must contain 1–64 ASCII letters, digits, `_`, `-`, or `.`, begin with a
+letter/digit, and not end with a dot or contain `..`. Windows device basenames
+`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9` (also before an extension)
+are rejected case-insensitively. No path, whitespace, Unicode or control characters
+are accepted. Names are rejected rather than silently rewritten. The download
+name is exactly `pcvan-mail-` followed by that basename. These bounds and names
+are reconstructed application rules, **not historical PC-VAN limits**.
+
+Review shows the pinned correspondent, exact subject, export name and exact byte
+count. `EDIT` changes the subject; `PICK` replaces the file. Either requires a new
+review. Only review `Y` saves. `N`, `BACK`, `MAIN`, `CANCEL`, or `.CANCEL` ends the
+operation in its current mailbox context; subsequent `BACK`/`MAIN` navigation is
+unchanged. Cancellation, empty selection, read errors, unsafe names and oversize
+files create no letter or payload. Errors permit `PICK` again or cancellation.
+During a pending native picker/read, terminal input remains available for cancel.
+
+`SENT`/`LIST` identifies file letters and their size. `READ number` shows metadata
+without rendering or printing bytes. **`ACQUIRE number` → `Y`** separately asks
+the browser to download the sender's saved copy. Acquisition pins the complete
+saved record and selected human; it fails closed if either changes. Cancelled,
+repeated, failed or stale approvals do not reuse a download authorization. List,
+read, help, reload and restoration never download. Files use
+`application/octet-stream`; bytes are never text-decoded, transcoded, decompressed,
+executed or rendered inline. Existing OSL/FTP text downloads retain their UTF-8
+behavior.
+
+Letter, metadata, bytes and number allocation commit in one IndexedDB transaction.
+Quota/abort failures roll everything back. `REVIEW` → `Y` intentionally retries
+exactly the same draft identity/content, including after uncertain acknowledgement;
+queued `Y` does not retry a failure. Once a save has been attempted, editing and
+reselection are blocked until its result is resolved or cancelled. Repository
+retry collisions reject any changed subject, recipient, filename, size or bytes.
+Unsent selections live in tab memory. Reload, reset, restore, changed selected
+human and controller invalidation discard pending operations, including late
+picker/read callbacks. Input ownership also fences queued pre-review approvals;
+simulated IME protection remains shared with the terminal.
+
+JSON includes exact canonical base64 bytes alongside metadata in the mail record;
+legacy text backups remain valid. Reset/removal removes the corresponding bytes;
+restore replaces them atomically. Backups are unencrypted and include private
+files. Terminal logs show entered/reviewed metadata, never the payload; draft
+input and approval stay outside persistent recall. Same-browser profiles do not
+provide authentication or isolation.
+
+File letters, including subjects, names, sizes and bytes, are excluded from all
+resident-generation excerpts and automatic mail-target selection. They cannot be
+reply/read-confirmation parents, including restored or already-planned work.
+Sending, reading or acquiring creates no recipient-read evidence and promises no
+reply. Incoming resident files, file replies, scheduled/multi-recipient files,
+Internet transport/uuencoding, OSL expansion, retention changes and
+XMODEM/Quick-VAN emulation remain deferred. See [qualified historical evidence](research/pcvan-1996-1997.md#native-file-mail-issue-125)
+and [storage representation](local-storage.md#native-file-mail-issue-125).

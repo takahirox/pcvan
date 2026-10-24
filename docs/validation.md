@@ -3400,3 +3400,49 @@ complete revision diff; unstaged and staged whitespace checks pass. No
 documentation links were added, and Markdown code fences remain balanced. No
 real model execution, native IME observation, other browser-engine checks, push
 or merge was performed. No required post-merge verification applies.
+
+# Issue #125: browser-local native file mail
+
+Implementation and validation on 2026-10-24 with Node.js 24.12.0 on macOS.
+
+- `npm ci`: passed, zero reported vulnerabilities; no dependency/lockfile changes.
+- `npx playwright install chromium`: completed. No model download or real inference.
+- `npm run build`: passed TypeScript checking and production bundling.
+- `npm test -- --workers=3 tests/mail-file.spec.ts tests/mail-repository.spec.ts`:
+  **50 passed (1.4m), actual two workers** because these are two serial test files.
+- Broader focused run over mail/file mail, scheduled mail, OSL downloads,
+  storage controls, composition and terminal tests: **118 passed, 1 failed (2.7m),
+  actual three workers**. The new controller fixture omitted `openActivity()`,
+  so no resident existed and no picker was installed. Corrected initialization.
+- Isolated controller rerun: **1 failed, actual one worker**, because its delayed
+  read assertion ran before the picker promise callback. Added an explicit
+  microtask wait and an explicit repository-entry signal for the save-await fence.
+  Corrected rerun: **1 passed (3.0s), actual one worker**. No acceptance criteria
+  were removed or relaxed.
+- Final `npm test -- --workers=3`: **519 passed (8.4m), actual three workers**,
+  with no failures, retries or skips. The configured servers performed TypeScript
+  checking and production bundling. Application and test files were unchanged
+  throughout this complete run; only documentation was edited while it ran.
+- Reviewed the final diff against Issue #125. All seven new local Markdown
+  links/heading anchors resolve; changed documentation has balanced code fences.
+  Unstaged and staged whitespace checks pass, including all new files.
+
+New coverage compares actual downloaded bytes against synthetic NUL/all-byte-value,
+invalid-UTF-8 and mixed-line-ending fixtures, including 0 and 262144 bytes. All
+three production keyboard routes exercise explicit picker, optional registration,
+review/edit, simulated IME, duplicate approvals, SENT/READ, confirmed acquisition,
+reload and JSON restore with contextual returns. Rejected names/oversize/read
+failure/empty selection/cancellation and quota rollback preserve empty mail.
+Real IndexedDB checks cover canonical encoding, malformed/legacy restore,
+unsupported combinations/references, rollback/retry collisions, shared concurrent
+text/file/scheduled numbering and prompt/parent isolation. Controller checks cover
+uncertain save acknowledgement, pinned renamed resident, changed human, late-read
+cancellation, repository/read await invalidation, deleted saved mail and repeated
+or failed acquisition. Cross-tab production checks cover reset and identical
+restore during picker, read, review and acquisition.
+
+Optional native IME observation and another browser engine were not performed.
+Historical sources are the Issue's 2026-10-24 evidence record, not a new manual
+recovery or an independent historical re-verification. Existing Vite large-chunk
+and Node color warnings remain. No push, PR, merge or comment is performed by this
+implementation node, and no required post-merge verification applies.
