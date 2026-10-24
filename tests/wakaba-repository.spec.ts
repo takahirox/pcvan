@@ -43,7 +43,7 @@ test('Wakaba pristine initialization is atomic/concurrent; reopen, consent, dele
     return { failed, empty, rollback, pristine, repeat, deleted, afterConsent, populated, restored, restoredEmpty, reset };
   }, anchor);
   expect(result.failed).toBe(true); expect(result.rollback).toEqual(result.empty);
-  expect(result.pristine.posts).toHaveLength(69); expect(result.pristine.forums).toHaveLength(11);
+  expect(result.pristine.posts).toHaveLength(72); expect(result.pristine.forums).toHaveLength(12);
   expect(result.repeat).toEqual(result.pristine);
   const starters = result.pristine.posts.filter((p) => p.origin === wakaba.origin).sort((a, b) => a.number - b.number);
   expect(starters.map((p) => p.number)).toEqual([1, 2, 3]); expect(starters[1]!.replyToPostId).toBe(starters[0]!.id);
@@ -58,7 +58,7 @@ test('Wakaba pristine initialization is atomic/concurrent; reopen, consent, dele
     expect(data.posts).toEqual(result.deleted.posts); expect(data.forums).toEqual(result.deleted.forums); expect(data.sigs).toEqual(result.deleted.sigs);
   }
   expect(result.populated).toBe(false); expect(result.restoredEmpty.posts).toEqual([]); expect(result.restoredEmpty.forums).toEqual([]);
-  expect(result.reset.posts.filter((p) => p.origin === wakaba.origin)).toHaveLength(3); expect(result.reset.posts).toHaveLength(69);
+  expect(result.reset.posts.filter((p) => p.origin === wakaba.origin)).toHaveLength(3); expect(result.reset.posts).toHaveLength(72);
 });
 
 test('existing/legacy population and v1 expansion never insert Wakaba examples', async ({ page }) => {

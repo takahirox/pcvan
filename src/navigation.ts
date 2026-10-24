@@ -1,3 +1,4 @@
+import { bulletin } from './bulletin';
 import { wakaba } from './wakaba';
 import { EcomVisit } from './ecom';
 import { GopherVisit } from './gopher';
@@ -169,7 +170,7 @@ export class PcvanController implements TerminalController {
 
   get needsContent(): boolean {
     return this.isConference || this.isOlt || !!this.mailContext ||
-      ['wakaba', 'netnews-directory', 'netnews-list', 'netnews-article', 'miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
+      ['communication', 'wakaba', 'netnews-directory', 'netnews-list', 'netnews-article', 'miti-forums', 'miti-materials', 'daisizen-forums', 'forum'].includes(this.currentScreen);
   }
 
   get screen(): Screen {
@@ -402,11 +403,12 @@ export class PcvanController implements TerminalController {
         // Bridge selectors are documented in Settings, not historical data.
         if (command === '1') return this.enter('miti');
         if (command === '2') return this.enter('daisizen');
+        if (command === '6') { this.boardNo = bulletin.boardNo; this.forumKeyword = bulletin.keyword; return this.enter('forum'); }
         {
           const sig = additionalSigs.find((s) => s.selector === command);
           if (sig) { this.community = sig; return this.enter('community'); }
         }
-        return this.invalidCommand('1–5 / BACK / MAIN / HELP');
+        return this.invalidCommand('1–6 / BACK / MAIN / HELP');
       case 'miti':
         if (command === miti.steps[1]!.input) return this.enter('miti-forums');
         return this.invalidCommand(`${miti.steps[1]!.input} / BACK / MAIN / HELP`);
@@ -588,7 +590,7 @@ export class PcvanController implements TerminalController {
     const data = forumPosts(this.content, keyword, boardNo);
     const posts = unread ? unreadPosts(this.content, data.posts, this.memberId!) : data.posts;
     return [
-      `${keyword === wakaba.keyword ? 'わかばマーク' : additionalSigs.find((s) => s.keyword === keyword)?.name ?? keyword} / ${forumName(keyword, boardNo)} / ${unread ? '未読一覧' : '投稿一覧'}（番号順）`,
+      `${keyword === bulletin.keyword ? '一般掲示板' : keyword === wakaba.keyword ? 'わかばマーク' : additionalSigs.find((s) => s.keyword === keyword)?.name ?? keyword} / ${forumName(keyword, boardNo)} / ${unread ? '未読一覧' : '投稿一覧'}（番号順）`,
       ...(boardCulture(keyword, boardNo) ? [boardCulture(keyword, boardNo)!] : []),
       ...(!data.available ? [this.forumUnavailable]
         : posts.length ? posts.map((post) => {
@@ -597,7 +599,7 @@ export class PcvanController implements TerminalController {
             ? ` RE#${parent.number}` : '';
           const lastRead = this.content.readStates?.find((state) => state.memberId === this.memberId && state.forumId === post.forumId)?.lastReadNumber ?? 0;
           return `#${post.number} ${post.title}${reference}${data.source === 'local' && this.memberId ? ` [${post.number <= lastRead ? '既読' : '未読'}]` : ''}`;
-        }) : [unread ? '未読の投稿はありません。' : keyword === wakaba.keyword ? '投稿はありません。WRITE で最初の投稿をどうぞ。' : '投稿はありません。']),
+        }) : [unread ? '未読の投稿はありません。' : [wakaba.keyword, bulletin.keyword].includes(keyword) ? '投稿はありません。WRITE で最初の投稿をどうぞ。' : '投稿はありません。']),
       this.forumHelp,
     ];
   }
@@ -734,6 +736,7 @@ export class PcvanController implements TerminalController {
         `1 ${miti.name}（MITI）へ`,
         `2 ${daisizen.name}へ`,
         ...additionalSigs.map((s) => `${s.selector} ${s.name}へ`),
+        '6 一般掲示板',
         returnHelp,
         demoPrompt,
       ];

@@ -1,3 +1,4 @@
+import { bulletin } from '../bulletin';
 import { netNewsState, netNewsGroups, localNetNewsMessageId } from '../netnews';
 import { NETNEWS_SETTING, validateNetNews, validateNetNewsMembers } from './schema';
 import type { LocalNetNewsArticle } from './schema';
@@ -21,7 +22,7 @@ import { wakaba } from '../wakaba';
 import { expandedBoards, additionalSigs } from '../communities';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { WORLD_SETTING, INTERNET_SAMPLE_ORIGIN } from './schema';
-import { canPopulateCommunity, communityBoards, communityPosts, wakabaPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
+import { canPopulateCommunity, communityBoards, communityPosts, wakabaPosts, bulletinPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
 import { validateMailGeneration } from '../ai/mail';
 import { postInput, validateGeneration } from '../ai/generation';
 
@@ -570,12 +571,17 @@ export class LocalRepository {
     }
     if (migrated.bootstrap) {
       await this.populateCommunity(tx, now);
-      const sig = { id: `resident-sig:${wakaba.keyword}`, keyword: wakaba.keyword, title: 'わかばマーク' };
-      const forum: Forum = { id: `resident-forum:${wakaba.keyword}:${wakaba.boardNo}`, sigId: sig.id,
-        boardNo: wakaba.boardNo, name: wakaba.name, nextPostNumber: wakaba.posts.length + 1 };
-      await request(tx.objectStore('sigs').add(sig));
-      await request(tx.objectStore('forums').add(forum));
-      for (const post of wakabaPosts(now, forum.id)) await request(tx.objectStore('posts').add(post));
+      for (const { board, title, posts } of [
+        { board: wakaba, title: 'わかばマーク', posts: wakabaPosts },
+        { board: bulletin, title: '一般掲示板', posts: bulletinPosts },
+      ]) {
+        const sig = { id: `resident-sig:${board.keyword}`, keyword: board.keyword, title };
+        const forum: Forum = { id: `resident-forum:${board.keyword}:${board.boardNo}`, sigId: sig.id,
+          boardNo: board.boardNo, name: board.name, nextPostNumber: board.posts.length + 1 };
+        await request(tx.objectStore('sigs').add(sig));
+        await request(tx.objectStore('forums').add(forum));
+        for (const post of posts(now, forum.id)) await request(tx.objectStore('posts').add(post));
+      }
       validateBackup(await this.snapshot(tx));
       const state = starterConference(now);
       validateConference(state); validateConferenceMembers(state, (await this.snapshot(tx)).members);

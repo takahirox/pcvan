@@ -2880,3 +2880,95 @@ additional browser engines, dated-manual comparison and former-user feedback
 remain optional and were not performed. Default/eight-worker reliability remains
 unresolved; three-worker success does not resolve it. No required post-merge
 verification.
+
+## General public bulletin board (Issue #117)
+
+Implemented MAIN/index → 13 → 6 一般掲示板 → 募集とお知らせ through the
+existing refreshed forum/composer/repository path. The three original examples
+are pristine-only `local-seed:bulletin-v1` records. Starter totals are now 72 posts,
+22 threads and 12 boards with the same ten fictional residents; legacy population
+remains at most 66. Existing regression assertions changed only for these totals
+and the pre-expansion fixture filter; reset copy now states 72. No database, backup or
+resident scheduling format changed.
+
+Validation performed in the assigned worktree on 2026-10-24:
+
+- `npm ci`: succeeded, zero reported vulnerabilities.
+- `npm run build`: TypeScript and production build passed. Vite emitted the
+  existing large-chunk advisory; Node emitted NO_COLOR/FORCE_COLOR warnings during
+  Playwright runs.
+- Initial focused run: 72 passed, six failed. Four existing composition checks
+  needed the new total after one human post (73 instead of 70). The two new-test
+  failures came from an unfinished connection wrapper setup and an About check
+  run before the new provenance copy existed. Corrected those expectations/setup;
+  the next focused run passed all 78 checks.
+- Expanded focused command below: **120 passed (58.3s)**. Final review also
+  corrected a copied deletion test to target `LOCAL-BULLETIN`, added explicit
+  deletion assertions, and strengthened the pristine protected-record comparison;
+  these refinements are included in subsequent validation.
+- The first full-suite attempt was stopped to fix a final-review freshness gap:
+  communication must request content before selector 6 renders its initial list.
+  At interruption it reported 117 passed, one failed, three interrupted and 336
+  not run. The failure was the existing pre-expansion fixture deleting board
+  records while retaining the new bulletin posts. Its seed-removal filter now
+  includes the new origin; migration assertions remain intact. A focused regression
+  now changes another tab's heading/human before entry and fails the entry refresh
+  once, confirming that failure displays neither stale headings nor bodies.
+
+```sh
+npm test -- tests/bulletin.spec.ts tests/bulletin-repository.spec.ts tests/navigation.spec.ts tests/connection.spec.ts tests/sections.spec.ts tests/forums.spec.ts tests/wakaba.spec.ts tests/wakaba-repository.spec.ts tests/composition.spec.ts --workers=3
+```
+
+Final focused run, adding `tests/expanded-community.spec.ts` to the command
+above: **123 passed (57.4s)**, including the entry freshness fix and all review
+refinements.
+
+The first completed final-code `npm test -- --workers=3` run reported
+**455 passed, two failed (9.6m)**. The existing registered BiZ 320px journey
+exceeded its 30-second whole-test timeout. The existing identity journey timed
+out after five seconds waiting for MAIN during reload (the transcript was still
+advancing through connection stages). Every new-board check passed. Assertions
+and timeouts are unchanged; failed-journey rechecks and the final full rerun are
+recorded below.
+
+```sh
+npm test -- tests/biz.spec.ts tests/journey.spec.ts --grep 'production BiZ journey.*資料検索の人|production READ → HANDLE' --workers=3
+```
+
+Both failed journeys passed unchanged: **2 passed (27.2s)**. BiZ took 24.5s;
+the identity journey took 6.1s. The earlier interrupted run had also passed the
+registered BiZ case in 26.3s. Final unchanged-code rerun of `npm test -- --workers=3`: **457 passed (9.0m)**.
+Both previously failing cases passed within the full run (registered BiZ 23.8s,
+identity journey 5.7s). No assertions, timeouts or test selection were changed.
+The earlier timing failures remain evidence of timing sensitivity even with
+three workers; this successful rerun does not establish default-worker reliability.
+
+The twelve focused new-board checks cover actual MAIN/index callers, preserved
+selectors 1–5, HELP/BACK/MAIN and re-entry; all examples and their reply link;
+current pen names, literal markup, dates, gapped/monotonic unread and exact rapid
+NEXT candidates; cross-tab selection/content refresh and fail-closed marker/read
+errors; title/body/review/edit/submit/cancel, IME input ownership, new posts and
+replies; Settings/About return, log export and JSON/reload; anonymous and empty
+restores, registration cancellation, missing-board lazy save/retry/rollback,
+concurrent numbering, cross-board reply rejection and duplicate mappings;
+pristine seed atomicity/concurrency, existing-world/legacy/expansion exclusion,
+reopen/consent/deletion/restore/reset; and a 320px keyboard replacement journey
+with stale drafts/queued commands fenced out. Public notice prompt coverage
+excludes private mail, conference and OLT content.
+
+With activity controlled, protected-record comparisons allow only the intended
+board/post/read-marker changes and ordinary session/activity bookkeeping. They
+preserve unrelated SIG/Wakaba posts, mail, conference/OLT state, consent,
+residents and budgets. Anonymous and pristine no-consent journeys assert no
+external requests; all model-related regression coverage uses existing stubs.
+No real model download or inference was performed.
+
+The five evidence URLs were reopened. PDF screenshot requests failed with cache
+misses; text and publisher metadata were available. Original screen geometry is
+not claimed. All **12 added local Markdown links/anchors** resolve; changed Markdown fences
+are balanced. Final working-tree/staged whitespace checks and diff review pass,
+including the new fixture, source and test files. See [research scope](research/pcvan-1996-1997.md#general-public-bulletin-board-issue-117).
+Default/eight-worker reliability remains unresolved: the required three-worker
+run does not establish it. Optional native Japanese IME, other browser engines,
+former-user feedback and dated manual/session comparison were not performed.
+No required post-merge verification remains.

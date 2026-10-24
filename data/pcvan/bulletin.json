@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "provenance": "Original Japanese public-board fiction for this application, not archival messages or identities. Selector 6, placement, name, mapping, layout, anonymous reading, replies and controls are category D reconstruction. Only pristine initialization inserts these rows.",
+  "keyword": "LOCAL-BULLETIN",
+  "boardNo": 1,
+  "name": "募集とお知らせ",
+  "culture": "募集やお知らせ、暮らしの工夫を短くどうぞ。返事には元の投稿番号を添えてください。",
+  "origin": "local-seed:bulletin-v1",
+  "posts": [
+    {
+      "id": "recruitment",
+      "author": "mizutama",
+      "daysAgo": 2,
+      "hour": 18,
+      "minute": 15,
+      "title": "散歩スケッチの仲間募集",
+      "body": "近所を歩いて見つけた景色を、鉛筆で一枚ずつ描いています。月に一度、ここで描いたものの話をしませんか。道具は手持ちの紙と鉛筆で十分です。"
+    },
+    {
+      "id": "reply",
+      "author": "tabstop",
+      "daysAgo": 2,
+      "hour": 20,
+      "minute": 20,
+      "title": "Re: 散歩スケッチの仲間募集",
+      "body": "水玉さん、私も参加したいです。まずは駅前の並木を描いてみます。絵はまだ不慣れですが、使った紙や描いた時間の話なら書けそうです。",
+      "replyTo": "recruitment"
+    },
+    {
+      "id": "notice",
+      "author": "tabstop",
+      "daysAgo": 1,
+      "hour": 19,
+      "minute": 0,
+      "title": "年賀状の試し刷りに裏紙を",
+      "body": "年賀状の宛名を印刷する前に、はがきと同じ大きさの紙で位置を確かめると安心です。私は紙の上側に鉛筆で印を付け、向きを間違えないようにしています。"
+    }
+  ]
+}
