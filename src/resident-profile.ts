@@ -23,9 +23,10 @@ export function renderResidentProfile(data: Pick<Backup, 'members' | 'settings'>
   // cannot silently select a supported namesake. Never choose by array order.
   const key = personas.find((p) => argument === p.id || argument === personaMemberId(p.id));
   const byId = data.members.filter((m) => m.id === (key ? personaMemberId(key.id) : argument));
+  const byToken = /^SYN-[0-9A-V]{13}$/i.test(argument)
+    ? data.members.filter((m) => identityToken(m) === argument.toUpperCase()) : [];
   const matches = key || byId.length ? byId
-    : /^SYN-[0-9A-V]{13}$/i.test(argument)
-      ? data.members.filter((m) => identityToken(m) === argument.toUpperCase())
+    : byToken.length ? byToken
       : data.members.filter((m) => penName(m) === argument);
   if (matches.length > 1) return ['同じ表示の会員が複数います。宛先IDまたはSYN-表示IDを指定してください。'];
   const member = matches[0];

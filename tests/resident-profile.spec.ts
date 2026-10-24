@@ -43,6 +43,19 @@ test('public projection uses actual members, current fields, exact arguments, bo
   }
 });
 
+test('unmatched token-shaped identities fall back to exact safe handles and reject ambiguity', () => {
+  const data = fixture(), first = data.members.find((m) => m.id === 'fictional-ai:hoshimori')!;
+  first.handle = 'SYN-0000000000000';
+  expect(data.members.some((m) => identityToken(m) === first.handle)).toBe(false);
+  expect(renderResidentProfile(data, first.handle)).toEqual(renderResidentProfile(data, 'hoshimori'));
+  expect(renderResidentProfile(data, first.handle.toLowerCase())).toEqual(['プロフィールを利用できません。']);
+  data.members.find((m) => m.id === 'human')!.handle = first.handle;
+  for (const reverse of [false, true]) {
+    if (reverse) data.members.reverse();
+    expect(renderResidentProfile(data, first.handle)[0]).toContain('複数');
+  }
+});
+
 test('reserved keys and tokens precede handles, ambiguity is independent of order and restored absences stay absent', () => {
   const data = fixture(), first = data.members.find((m) => m.id === 'fictional-ai:hoshimori')!, other = data.members.find((m) => m.id === 'fictional-ai:kusabue')!;
   other.handle = 'hoshimori'; expect(renderResidentProfile(data, 'hoshimori')[1]).toContain(identityToken(first));
