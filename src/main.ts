@@ -178,6 +178,7 @@ const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   isTelnet: () => controller.isTelnet,
+  isGopher: () => controller.isGopher,
   isEcom: () => controller.isEcom, ecomDrafting: () => controller.ecomDrafting,
   invalidateEcom: () => controller.invalidateEcom(),
   isNetNewsDirectory: () => ['internet-directory', 'netnews-directory'].includes(controller.screen),
@@ -196,7 +197,7 @@ const commandActions = {
       const repo = await repository;
       await repo.replaceFromJson(text, { confirmReplace: true, expectedContext });
       commands.invalidate(); terminal.clearInput(); revision++;
-      if (controller.isTelnet) navigate('MAIN');
+      if (controller.isTelnet || controller.isGopher) navigate('MAIN');
       if (!settingsDialog?.open) print('バックアップを復元しました。コマンド=');
       try { await refreshContent(); } catch (error) { reportError(error); }
       return repo.getSession();
