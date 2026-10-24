@@ -1,0 +1,6 @@
+[
+  { "filename": "river-notes.txt", "host": "cedar.archive.invalid", "directory": "/pub/paper-rivers", "size": 2048, "modified": "1996-09-12" },
+  { "filename": "river-notes.txt", "host": "harbor.archive.invalid", "directory": "/mirrors/field-pages", "size": 2048, "modified": "1996-09-12" },
+  { "filename": "star  map[1].txt", "host": "cedar.archive.invalid", "directory": "/pub/night-sketches", "size": 1536, "modified": "1996-10-03" },
+  { "filename": "andromeda.txt", "host": "harbor.archive.invalid", "directory": "/pub/sky-notebooks", "size": 3072, "modified": "1996-08-21" }
+]

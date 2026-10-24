@@ -186,7 +186,7 @@ live drafts. OLT room history is included as world data.
 | `4` | データベース | Database directory; `1` opens 日経テレコン BiZ |
 | `5` | 公共情報と政治 | Environmental gateway directory; `1` opens EIC NET's two readings |
 | `6` | ビジネス | Article list, 0 articles |
-| `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo; `3` opens restricted FTP examples; `4` opens local Gopher |
+| `7` | インターネット | Internet directory; `1` opens NetNews; `2` opens the local TELNET demo; `3` opens restricted FTP examples; `4` opens local Gopher; `5` opens local Archie |
 | `8` | コンピュータ | Article list; `SIGS` opens the community directory |
 | `9` | ショッピングモール | Product catalog, 0 products |
 | `10` | 電子出版 | Publication list, 0 publications |
@@ -348,7 +348,8 @@ seed missing imported records. Bundled documents and navigation add no storage
 schema or JSON fields; ordinary session/input history and explicitly exported
 terminal logs continue. There is no Gopher endpoint entry, transport, browser
 download action, live retrieval, complete historical coverage or protocol
-conformance claim. Archie, host paging and graphical clients are outside scope.
+conformance claim. Archie has a separate local example below; host paging and
+graphical clients are outside scope.
 
 Sources accessed **2026-10-24**:
 [Internet White Paper 1996 p.111](https://iwparchives.jp/files/pdf/iwp1996/iwp1996-ch04-01-p110.pdf)
@@ -372,6 +373,66 @@ Japanese label, corpus organization and matching behavior are accepted
 **category D reconstruction**; there is no `J GOPHER` jump. See the
 [Gopher research record](docs/research/pcvan-1996-1997.md#browser-local-gopher-browsing-and-search-issue-103)
 and discoverable `ABOUT` for the evidence boundaries.
+
+For browser-local Archie filename/location lookup, use MAIN or index `7` →
+`5 Archie` → `PROG river`. The bundled, original index has four illustrative
+locations and three filenames: `river-notes.txt` appears at two distinct
+locations, alongside `star  map[1].txt` (two spaces) and `andromeda.txt`.
+All `.invalid` hosts, directory paths, byte sizes and August–October 1996
+modification dates are authored examples, not historical files or recovered
+metadata. No historical identities, messages or screenshots are imported.
+
+`PROG <filename fragment>` searches **only filenames**, with deterministic
+case-insensitive literal substring matching in index order. It trims outer
+whitespace and preserves internal whitespace and the submitted spelling.
+`PROG rIvEr` reports two locations with filename, host, directory, size and
+modification date. `PROG star  map` matches; `PROG star map`, `PROG .*`,
+`PROG river OR star`, hostnames, paths and dates do not. Japanese and markup
+queries display literally. Unmatched queries report zero locations; empty or
+malformed commands preserve the current view with guidance.
+
+`HELP` and `LIST` redisplay the current view. Replacement `PROG` queries replace
+results. `BACK` returns results → query view → Internet directory → actual MAIN
+or index parent; `MAIN` and re-entry clear the query. Settings/About retain context,
+and Options retains unsent input. Cancelled restore/reset retains the visit;
+successful same-tab restore, cross-tab replacement and reset discard it.
+Locations are informational: there is no numbered selection, download or FTP
+handoff. The existing restricted FTP journey remains separate.
+
+Archie is available anonymously, without AI consent, model loading or network
+lookup. It changes no protected world records or settings, never seeds imported
+records and adds no schema/backup fields. The index stays outside persistence;
+ordinary session/input history may include submitted commands, and explicit log
+exports include displayed results. No transport, endpoint entry, live index,
+complete historical coverage or protocol conformance is claimed.
+
+Sources accessed **2026-10-24**:
+[Internet White Paper 1996 p.111](https://iwparchives.jp/files/pdf/iwp1996/iwp1996-ch04-01-p110.pdf)
+reports PC-VAN Archie capability in its January comparison, separately listing
+graphical clients and restricting FTP to info.mac (moderate-to-high confidence
+in the extracted capability table). Later planned changes mean its label is not
+an activation date; no usable page-image comparison was obtained.
+[Internet Magazine January 1996 p.229](https://iwparchives.jp/wp-content/themes/twentytwelve/bn/pdf/im199601-216-news.pdf)
+describes Navigator/Mosaic software and Archie-server selection restrictions
+(high confidence in the passage), not a service-wide prohibition or November
+behavior. [RFC 1580 §5](https://www.rfc-editor.org/rfc/rfc1580.html)
+supports general filename/location lookup separate from acquisition and the
+result metadata (high confidence). Its documented default is case-sensitive
+**exact matching**; this example deliberately chooses the available alternative
+of case-insensitive substring matching. These are general semantics, not
+PC-VAN-specific authentication or commands.
+
+Extending reported capability into fictional November 1996 is a
+**moderate-confidence continuity assumption**. Original PC-VAN host/client
+access remains unresolved. Selector `5`, Japanese presentation, controls,
+`PROG <filename fragment>`, index, ordering and matching mode are **category D
+reconstruction**. PROG is a disclosed local control inspired by general Archie
+documentation, not authenticated PC-VAN syntax. Focused searches found no
+qualifying host sequence; other-provider examples and an inaccessible later
+announcement do not establish one. See the
+[Archie research record](docs/research/pcvan-1996-1997.md#browser-local-archie-filename-and-location-search-issue-105)
+and discoverable `ABOUT`. Host paging, graphical clients and other MAIN
+destinations remain outside this Issue.
 
 For a browser-local outbound TELNET journey, use `7` → `2 TELNET` →
 `OPEN mail.demo.example.invalid` → `MAIL` → `READ 1` or `READ 2`. The single
@@ -886,6 +947,7 @@ it is resolved.
 - `src/telnet.ts`: bundled fictional host/account/letters and browser-local TELNET views, outside persistence.
 - `src/netnews.ts`: fixed-date NetNews examples, merged local articles, header matching and group/list/article rendering.
 - `src/gopher.ts`: in-memory directory/search/document paths over two bundled original readings in `data/pcvan/gopher-documents.json`.
+- `src/archie.ts`: visit-local filename lookup over original location metadata in `data/pcvan/archie-index.json`, outside persistence and acquisition.
 - `src/biz.ts`: original database articles and BiZ rendering; navigation owns transient result sets.
 - `tests/`: controller/session checks and browser interaction checks.
 
@@ -925,7 +987,8 @@ Section/service checks cover every MAIN and index destination, all five service 
 mailbox browsing, news providers/headlines/briefs, NetNews groups/header
 searches/articles and isolated browsing, local TELNET login/mail/logout and parent
 returns, restricted FTP previews/exact confirmed downloads, Gopher directories,
-literal title/body searches and exact document/result/query returns,
+literal title/body searches and exact document/result/query returns, Archie
+filename-only searches, duplicate locations/metadata and query replacement,
 BiZ search/sets/titles/articles and fresh visits, empty collections,
 OLT conversation/presence, preserved fixture
 evidence, scoped helpers,

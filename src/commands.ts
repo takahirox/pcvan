@@ -39,6 +39,7 @@ export interface CommandActions {
   downloadFile?(body: string, filename: string): void;
   isTelnet?(): boolean;
   isGopher?(): boolean;
+  isArchie?(): boolean;
   isEcom?(): boolean;
   ecomDrafting?(): boolean;
   invalidateEcom?(): void;
@@ -359,7 +360,7 @@ export class TerminalCommands {
     }
     // Global application controls above retain ownership. Every service command
     // in these bounded services belongs to navigation, including unsupported input.
-    if (!this.menu && (this.actions.isTelnet?.() || this.actions.isEcom?.() || this.actions.isGopher?.())) return false;
+    if (!this.menu && (this.actions.isTelnet?.() || this.actions.isEcom?.() || this.actions.isGopher?.() || this.actions.isArchie?.())) return false;
     if (!this.menu && this.actions.mailbox?.()) {
       const data = await this.actions.read(), human = activeHuman(data);
       if (command === 'MEMBERS') { this.printAddresses(data); return true; }

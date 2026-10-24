@@ -2435,3 +2435,82 @@ hardware validation were not performed; the first three are optional and the
 last two are unnecessary for this bundled service. Default/eight-worker
 reliability is unresolved and is not inferred from three-worker success. No
 post-merge verification is required.
+
+## Browser-local Archie filename and location search (#105)
+
+Coordinator pre-merge evidence for Issue #105, **2026-10-24**. The source Issue
+was read through the GitHub connector and matched the supplied snapshot. This
+extends #103's deliberately deferred coverage, rather than repairing a proven
+regression. The
+[research record](research/pcvan-1996-1997.md#browser-local-archie-filename-and-location-search-issue-105),
+[README](../README.md) and discoverable About qualify the historical capability,
+unknown host/client access, deliberate substring/default-exact distinction and
+category D controls. The four index rows are original authored metadata, with
+three filenames and two distinct locations for `river-notes.txt`.
+
+Commands and outcomes:
+
+- `npm ci`: passed, 23 packages added, zero audit vulnerabilities.
+- `npx playwright install chromium`: passed, existing browser available.
+- `npm test -- tests/archie.spec.ts --workers=3`: **8 passed (29.2s)** using one
+  worker for this file. Configured TypeScript checking and production build
+  passed. No failures, retries, skips or test corrections. Existing WebLLM bundle
+  size and NO_COLOR/FORCE_COLOR environment warnings remain.
+- Broader command,
+  `npm test -- tests/archie.spec.ts tests/gopher.spec.ts tests/navigation.spec.ts tests/connection.spec.ts tests/netnews.spec.ts tests/telnet.spec.ts tests/ftp.spec.ts tests/journey.spec.ts tests/storage-controls.spec.ts tests/repository.spec.ts tests/composition.spec.ts tests/terminal.spec.ts tests/progressive-output.spec.ts tests/ai-controls.spec.ts tests/settings-dialog.spec.ts --workers=3`:
+  **150 passed (4.2m)** using three workers, including all 142 existing checks in
+  these files. No failures, retries or skips; configured type checking/build
+  passed. During review, added Archie-only forwarding of blank lines at the app
+  boundary and explicit blank-input guidance/assertions. The final full run below
+  validates this additional change. No existing behavioral assertion or selector
+  expectation was changed.
+- Final complete `npm test -- --workers=3`: **383 passed (7.1m)** using three
+  workers, including all 375 existing checks and eight Archie checks. Configured
+  TypeScript checking and production build passed. No failures, retries or skips.
+  This includes the blank-input refinement and existing Internet/navigation,
+  functional, storage, consent, composition, IME, terminal, offline and mocked
+  model coverage. It does not establish default/eight-worker reliability.
+- Reviewed the final implementation, index, integration, tests and documentation
+  diff against #105. All **118 local Markdown targets/heading anchors** across
+  README, research and this record passed the read-only link check. Working-tree
+  and staged `git diff --check` passed, including newly added files. No mandatory
+  check was skipped, and no existing test assertion was weakened.
+
+The eight new controller/production checks cover actual MAIN/index entry parents,
+all five Internet selectors remaining visible, duplicate locations and metadata,
+mixed-case filename matching, filename-only negative controls (host, directory,
+bytes, date and guidance), literal punctuation/Boolean-looking text, internal
+double spaces, Japanese/markup rendering, malformed/empty queries and zero
+results. Replacement queries do not add return steps. HELP/LIST preserve the view;
+BACK restores query → Internet → actual parent. MAIN/re-entry and normal
+disconnect/reconnect start cleanly. Both query/results reject unrelated selectors,
+forum/mail/OLT/conference/Gopher/TELNET/FTP/BiZ/composition/acquisition commands,
+without acquiring another context or download target. Connection forwarding is
+explicitly checked.
+
+Production journeys run at 320px with AI consent disabled, in a restored-empty
+anonymous world and a registered world containing protected posts, mail, read
+states, conference, OLT and NetNews settings. Exact before/after snapshots and
+downloaded JSON compare members, SIGs, forums, posts, mail, read states and all
+settings, allowing normal session/history updates. Missing imported records stay
+missing; metadata is not seeded or exported as index records, and no schema or
+backup keys are added. Submitted query text can appear in ordinary input history.
+Observers see no external/model requests, workers, popups or unsolicited downloads.
+Explicit JSON and UTF-8 terminal-log exports remain available; logs retain result
+metadata, query spelling, double spaces and Japanese/markup text literally.
+
+The browser checks cover Settings/About returns, discoverable modern About and
+unsent input through Options, synthetic IME events and `isComposing`, terminal
+scrolling, keyboard focus and input bounds. Cancelled restore/reset preserves
+results; identical same-tab restore, cross-tab restore, same-tab reset and the
+other tab's reset notification discard visits through existing safeguards.
+
+All three historical source URLs were opened read-only; relevant extracted
+White Paper, Magazine and RFC passages were checked. No usable White Paper page
+image comparison was obtained or claimed. Source-Issue research limitations remain
+explicit; implementation checks do not authenticate PC-VAN syntax.
+
+Native Japanese IME, additional browser engines and historical-user feedback were
+not performed and remain optional. No real-model/hardware validation is needed.
+Default/eight-worker reliability remains unresolved; three-worker success does
+not resolve it. No post-merge test or deployment verification is required.
