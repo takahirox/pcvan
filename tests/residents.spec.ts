@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { backupFixture } from './backup-fixture';
+import { activityFixture, backupFixture } from './backup-fixture';
 
 const start = '2026-10-21T00:00:00.000Z';
 const modelId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
@@ -43,7 +43,7 @@ test('all ten seeded profiles are distinct; routines obey local dates and seeded
     const silent = scheduleActivity(muted as never, state, '2026-10-24T00:00:00.000Z');
     const long = scheduleActivity(fixture, state, '2030-10-24T00:00:00.000Z');
     return { profiles: personas, all: [...all], hours: [...hours], factors, zero, silent, long, topics, replies, quiet, quietHours };
-  }, { fixture: backupFixture(), start });
+  }, { fixture: activityFixture(), start });
   expect(result.profiles).toHaveLength(10);
   for (const field of ['id', 'handle', 'occupation', 'routine', 'profile'] as const) {
     expect(new Set(result.profiles.map((p) => p[field])).size).toBe(10);

@@ -2,7 +2,7 @@ import type { AiActivity, AiBatch, AiRun, Backup, Post } from '../storage/schema
 import { WORLD_SETTING } from '../storage/schema';
 import { models, personas, personaMemberId, residentProfiles } from './personas';
 import { localConversation } from '../storage/community';
-import { chooseMail } from './mail';
+import { chooseMail, mailPlanningIndex } from './mail';
 import type { ResidentProfile } from './personas';
 
 export const ACTIVITY_SETTING = 'ai-activity';
@@ -114,7 +114,7 @@ function attendHumanPosts(content: Backup, state: AiActivity, at: number): void 
   state.attention = [...handled].slice(-64);
 }
 
-interface PlanningIndex { forums: Backup['forums']; boards: Map<string, string>; posts: Map<string, Post[]>; mailContent: Backup }
+interface PlanningIndex { forums: Backup['forums']; boards: Map<string, string>; posts: Map<string, Post[]>; mailContent: Backup; mail: ReturnType<typeof mailPlanningIndex> }
 function planningIndex(content: Backup): PlanningIndex {
   const sigs = new Map(content.sigs.map((s) => [s.id, s.keyword.toUpperCase()]));
   const forums = content.forums.filter((f) => f.id.length <= 128 && sigs.has(f.sigId));
@@ -126,7 +126,8 @@ function planningIndex(content: Backup): PlanningIndex {
   // Bound subsequent per-person consideration; the archive is indexed once.
   for (const [id, list] of posts) posts.set(id, list.sort((a, b) => b.number - a.number).slice(0, 128));
   return { forums, boards: new Map(forums.map((f) => [f.id, `${sigs.get(f.sigId)}:${f.boardNo}`])), posts,
-    mailContent: { ...content, posts: [...posts.values()].flat().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 512), mail: content.mail?.slice(-256) } };
+    mailContent: { ...content, posts: [...posts.values()].flat().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 512) },
+    mail: mailPlanningIndex(content) };
 }
 function chooseAction(index: PlanningIndex, profile: ResidentProfile, at: number, seed: string, planned: readonly AiRun[], mailLimit: number): Omit<AiRun, 'id' | 'status' | 'simulatedAt'> | null {
   const draw = (key: string) => random(`${seed}:${profile.id}:${at}:${key}`);
@@ -135,7 +136,7 @@ function chooseAction(index: PlanningIndex, profile: ResidentProfile, at: number
   if (!profile.frequency || random(`${seed}:${profile.id}:away:${Math.floor(localDay / 3)}`) < (profile.absence ?? .12) ||
       draw('visit') >= profile.participation * routineFactor(profile, at)) return null;
   if (planned.filter((r) => r.mail).length < mailLimit) {
-    const mail = chooseMail(index.mailContent, profile, at, seed, planned);
+    const mail = chooseMail(index.mailContent, profile, at, seed, planned, index.mail);
     if (mail) return { personaId: profile.id, mail };
   }
   const total = profile.reading + profile.newThread + profile.reply + profile.inactivity;
@@ -170,8 +171,8 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
     Date.parse(now) - Date.parse(r.simulatedAt) <= 10 * 60_000);
   const to = Math.max(Date.parse(now), Date.parse(state.lastActivityAt));
   const timestamp = new Date(to).toISOString();
-  const savedRoster = content.settings.find((s) => s.id === 'ai-residents')?.value as unknown as { version: number } | undefined;
   const existingMembers = new Set(content.members.filter((m) => m.actor === 'ai').map((m) => m.id));
+  if (state.batch) state.batch.runs = state.batch.runs.filter((r) => r.status === 'committed' || existingMembers.has(personaMemberId(r.personaId)));
   const profiles = residentProfiles(content);
   state.nextDue = Object.fromEntries(profiles.map((p) => [p.id, state.nextDue?.[p.id] ?? initialDue(timestamp, state.seed!, [p])[p.id]!]));
   if (!state.maxPosts || !state.consent) {
@@ -186,7 +187,7 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
   const offset = profiles.length > 128 ? Math.floor(to / (24 * HOUR)) * 127 % profiles.length : 0;
   const candidates = Array.from({ length: Math.min(128, profiles.length) }, (_, i) => profiles[(offset + i) % profiles.length]!);
   for (const profile of candidates) {
-    if (savedRoster?.version === 2 && !existingMembers.has(personaMemberId(profile.id))) continue;
+    if (!existingMembers.has(personaMemberId(profile.id))) continue;
     let due = Date.parse(state.nextDue![profile.id] ?? initialDue(timestamp, state.seed!, [profile])[profile.id]!);
     if (due < floor) due = Math.floor(floor + random(`${state.seed}:${profile.id}:${floor}:resume`) * HOUR);
     // <= 73 opportunities per resident; no queue grows with weeks of absence.

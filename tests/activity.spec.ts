@@ -1,11 +1,69 @@
 import { expect, test } from '@playwright/test';
 import type { AiActivity, Backup } from '../src/storage/schema';
-import { backupFixture } from './backup-fixture';
+import { activityFixture as backupFixture } from './backup-fixture';
 
 const from = '2026-10-21T00:00:00.000Z';
 const oneHour = '2026-10-21T01:00:00.000Z';
 const threeDays = '2026-10-24T00:00:00.000Z';
 const modelId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+
+test('legacy imported rosters retain deliberate removals in planning, retained runs and in-flight commits', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(oneHour)); await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async ({ fixture, from, oneHour, modelId }) => {
+    const rp = '/src/storage/repository.ts', ap = '/src/ai/activity.ts', pp = '/src/ai/personas.ts', bp = '/src/ai/activity-runner.ts';
+    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
+    const { emptyActivity, scheduleActivity } = await import(ap) as typeof import('../src/ai/activity');
+    const { originalPersonas } = await import(pp) as typeof import('../src/ai/personas');
+    const { runActivityBatch } = await import(bp) as typeof import('../src/ai/activity-runner');
+    const profiles = originalPersonas.map((p) => ({ ...p, frequency: p.id === 'hoshimori' ? 1 : 0,
+      participation: 1, absence: 0, reading: 0, inactivity: 0, reply: 0, newThread: 1,
+      weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i) }));
+    fixture.posts = fixture.posts.map((p) => ({ ...p, authorId: p.authorId === 'ai' ? 'human' : p.authorId }));
+    fixture.members = fixture.members.filter((m) => !['ai', 'fictional-ai:hoshimori'].includes(m.id));
+    fixture.settings.push({ id: 'ai-residents', value: { version: 1, profiles } as never });
+    const state = { ...emptyActivity(from, 'removed-legacy'), consent: true,
+      nextDue: Object.fromEntries(profiles.map((p) => [p.id, from])) };
+    const repo = await openRepository('removed-legacy');
+    await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+    await repo.put('settings', { id: 'ai-activity', value: state as never });
+    const planned = await repo.openActivity(oneHour);
+    const run = { id: 'retained:hoshimori', personaId: 'hoshimori', forumId: 'forum', simulatedAt: oneHour, status: 'pending' as const };
+    const retained = { ...state, lastActivityAt: oneHour, batch: { id: 'retained', from, to: oneHour, modelId, runs: [run] } };
+    const calls: string[] = [];
+    const budget = { attempts: 0, committed: 0 };
+    const engine = { async load() {}, dispose() {}, async generate() {
+      calls.push(run.personaId);
+      // Deletion in a second connection while inference is already running.
+      const other = await openRepository('removed-legacy');
+      await other.delete('members', 'fictional-ai:hoshimori'); other.close();
+      return JSON.stringify({ personaId: run.personaId, forumId: run.forumId, title: '活動', body: '住人の話題' });
+    } };
+    await repo.put('settings', { id: 'ai-activity', value: retained as never });
+    await runActivityBatch(repo, () => repo.exportBackup(), retained, engine, new AbortController().signal, budget, () => {});
+    const skippedCalls = calls.length;
+    const pruned = scheduleActivity(await repo.exportBackup(), retained, oneHour);
+    // A retained running result also cannot recreate the absent identity.
+    await repo.put('settings', { id: 'ai-activity', value: { ...retained,
+      batch: { ...retained.batch, runs: [{ ...run, status: 'running' }] } } as never });
+    const late = await repo.commitAiRun(run.id, '{}');
+    repo.close();
+    const reopened = await openRepository('removed-legacy');
+    const recovered = await reopened.openActivity(oneHour);
+    // Once explicitly restored, the resident can start; deletion during inference
+    // must still prevent the generated post from restoring that member.
+    await reopened.put('members', { id: 'fictional-ai:hoshimori', handle: profiles[0]!.handle, actor: 'ai' });
+    await reopened.put('settings', { id: 'ai-activity', value: retained as never });
+    await runActivityBatch(reopened, () => reopened.exportBackup(), retained, engine, new AbortController().signal, budget, () => {});
+    const saved = await reopened.exportBackup(); reopened.close();
+    return { planned, skippedCalls, pruned, late, recovered, calls, budget, saved, originalPosts: fixture.posts };
+  }, { fixture: backupFixture(), from, oneHour, modelId });
+  expect(result.planned.batch).toBeNull(); expect(result.skippedCalls).toBe(0);
+  expect(result.pruned.batch).toBeNull(); expect(result.recovered.batch).toBeNull(); expect(result.late).toBeUndefined();
+  expect(result.calls).toEqual(['hoshimori']); expect(result.budget).toEqual({ attempts: 1, committed: 0 });
+  expect(result.saved.members.filter((m) => m.actor === 'ai')).toHaveLength(9);
+  expect(result.saved.members.some((m) => m.id === 'fictional-ai:hoshimori')).toBe(false);
+  expect(result.saved.posts).toEqual(result.originalPosts);
+});
 
 test('model authorization survives cap/pause edits but never transfers to another model or its pending batch', async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');

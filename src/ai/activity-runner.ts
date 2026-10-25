@@ -27,8 +27,7 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
       if (!planned.userResponse && budget.committed >= latest.maxPosts) continue;
       current = latest.batch.runs.find((row) => row.id === planned.id);
       if (!current || current.status === 'committed' || !canAttempt(latest, current, Date.now())) { current = undefined; continue; }
-      const roster = snapshot.settings.find((s) => s.id === 'ai-residents')?.value as unknown as { version: number } | undefined;
-      if (roster?.version === 2 && !snapshot.members.some((m) => m.id === personaMemberId(current!.personaId) && m.actor === 'ai')) { current = undefined; continue; }
+      if (!snapshot.members.some((m) => m.id === personaMemberId(current!.personaId) && m.actor === 'ai')) { current = undefined; continue; }
       if (!residentProfiles(snapshot).some((profile) => profile.id === current!.personaId && profile.frequency > 0 &&
         (!current!.userResponse || (routineFactor(profile, Date.now()) === 1 && Date.now() - Date.parse(current!.simulatedAt) <= 10 * 60_000)))) {
         current = undefined; continue;

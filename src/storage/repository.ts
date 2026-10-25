@@ -966,8 +966,8 @@ export class LocalRepository {
       if (run.status === 'committed') return undefined; // A later explicit deletion stays deleted.
       if (run.status !== 'running') invalid('AI run is not running.');
       if (!state.consent || state.batch!.modelId !== state.modelId || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && p.frequency > 0)) invalid('Mail/model activity is no longer authorized.');
-      const roster = (await this.snapshot(tx)).settings.find((s) => s.id === RESIDENTS_SETTING)?.value as unknown as ResidentSettings | undefined;
-      if (roster?.version === 2 && !await request(tx.objectStore('members').get(personaMemberId(run.personaId)))) return undefined;
+      const member: Member | undefined = await request(tx.objectStore('members').get(personaMemberId(run.personaId)));
+      if (member?.actor !== 'ai') return undefined;
       if (run.userResponse && (Date.now() - Date.parse(run.simulatedAt) > 10 * 60_000 || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && routineFactor(p, Date.now()) === 1))) return undefined;
       if (run.mail) {
         const content = await this.snapshot(tx);

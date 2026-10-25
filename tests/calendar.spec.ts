@@ -6,7 +6,7 @@ import { identityToken } from '../src/member-presentation';
 import { renderMail, renderMailList } from '../src/mail';
 import { renderContribution, starterConference, conferenceState } from '../src/conference';
 import { validateRecord } from '../src/storage/schema';
-import { backupFixture } from './backup-fixture';
+import { activityFixture, backupFixture } from './backup-fixture';
 import { backup, command, enterForum, post, restore, snapshot, start } from './terminal-helpers';
 
 const anchor = '2026-10-23T01:02:03.000Z';
@@ -199,7 +199,7 @@ test('atomic initialization, pending catch-up legacy imports, historical imports
     const a = calendarSetting(await concurrent.exportBackup()), b = calendarSetting(await other.exportBackup());
     concurrent.close(); other.close();
     return { first, second, rolledBack, immutable, catchUp, committed, committedDisplay, historical, historicalAgain, eraDisplay, fresh, reset, a, b };
-  }, { fixture: backupFixture(), anchor });
+  }, { fixture: activityFixture(), anchor });
   expect(calendarSetting(result.first)).toEqual({ version: 1, sourceAnchor: '2026-10-18T00:00:00.000Z' });
   expect(calendarSetting(result.second)).toEqual(calendarSetting(result.first));
   expect(result.first.posts).toEqual(backupFixture().posts); expect(result.first.session).toEqual(backupFixture().session);
