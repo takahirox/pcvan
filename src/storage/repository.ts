@@ -20,8 +20,8 @@ import {
 } from './schema';
 import type { ScheduledLetter, AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailIdentity, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
-import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext } from '../ai/activity';
-import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
+import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext, canAttempt, activityAllowance, routineFactor } from '../ai/activity';
+import { aiOrigin, models, personas, originalPersonas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
 import { wakaba } from '../wakaba';
 import { expandedBoards, quietBoards, additionalSigs } from '../communities';
@@ -713,15 +713,16 @@ export class LocalRepository {
       else migrated.bootstrap = false;
     } else migrated.bootstrap = false;
     if (!content.settings.some((r) => r.id === RESIDENTS_SETTING)) {
-      const profiles = structuredClone(personas).map((profile) => ({ ...profile,
+      const profiles = structuredClone(migrated.bootstrap ? personas : originalPersonas).map((profile) => ({ ...profile,
         handle: content.members.find((m) => m.id === personaMemberId(profile.id) && m.actor === 'ai')?.handle ?? profile.handle }));
-      validateResidents({ version: 1, profiles });
-      await request(settings.put({ id: RESIDENTS_SETTING, value: { version: 1, profiles } }));
+      validateResidents({ version: migrated.bootstrap ? 2 : 1, profiles });
+      await request(settings.put({ id: RESIDENTS_SETTING, value: { version: migrated.bootstrap ? 2 : 1, profiles } }));
     }
     const profiles = residentProfiles(await this.snapshot(tx));
+    migrated.nextDue = Object.fromEntries(profiles.map((p) => [p.id, migrated.nextDue?.[p.id] ?? initialDue(now, migrated.seed!, [p])[p.id]!]));
     // Restored membership is authoritative, including deliberately absent residents.
     // Timer/reconnect initialization must not refill an imported community.
-    if (!await request(tx.objectStore('session').get('imported'))) {
+    if (!content.settings.some((r) => r.id === RESIDENTS_SETTING) && !await request(tx.objectStore('session').get('imported'))) {
       for (const profile of profiles) {
         const id = personaMemberId(profile.id);
         if (!await request(tx.objectStore('members').get(id))) {
@@ -854,7 +855,7 @@ export class LocalRepository {
       const state = await this.readActivity(tx, now);
       return this.writeActivity(tx, { ...state, maxPosts, modelId, lastActivityAt: now,
         consent: state.consent && state.modelId === modelId,
-        nextDue: initialDue(now, state.seed!) });
+        nextDue: initialDue(now, state.seed!, residentProfiles(await this.snapshot(tx))) });
     }).then((state) => { this.notifySetupChanged(); return state; });
   }
 
@@ -885,7 +886,7 @@ export class LocalRepository {
       const state = await this.readActivity(tx, now);
       const content = await this.snapshot(tx);
       if (expected !== undefined && residentContext(content) !== expected) invalid('世界や住人設定が変わりました。変更を破棄してから編集し直してください。');
-      const settings: ResidentSettings = { version: 1,
+      const settings: ResidentSettings = { version: (content.settings.find((r) => r.id === RESIDENTS_SETTING)?.value as unknown as ResidentSettings)?.version ?? 1,
         profiles: residentProfiles(content).map((p) => p.id === input.id ? input : p) };
       if (!settings.profiles.some((p) => p.id === input.id)) invalid('Unknown resident.');
       validateResidents(settings);
@@ -893,7 +894,7 @@ export class LocalRepository {
       if (member?.actor === 'human') invalid('Resident identity collides with a human.');
       await request(tx.objectStore('members').put({ id: personaMemberId(input.id), handle: input.handle, actor: 'ai' }));
       await request(tx.objectStore('settings').put({ id: RESIDENTS_SETTING, value: settings }));
-      state.nextDue![input.id] = initialDue(now, state.seed!)[input.id]!;
+      state.nextDue![input.id] = initialDue(now, state.seed!, [input])[input.id]!;
       removePausedRuns(state, settings.profiles);
       return this.writeActivity(tx, state);
     }).then((state) => { this.notifySetupChanged(); return state; });
@@ -927,7 +928,22 @@ export class LocalRepository {
       // A settings change in another tab may have withdrawn this queued action.
       if (!run && status === 'running') return this.writeActivity(tx, state);
       if (!run || !state.maxPosts) invalid('AI activity is disabled or the run is missing.');
-      if (run.status !== 'committed') run.status = status;
+      if (run.status !== 'committed') {
+        if (status === 'running') {
+          if (!canAttempt(state, run, Date.now())) {
+            if (run.status === 'running') run.status = 'pending';
+            return this.writeActivity(tx, state);
+          }
+          if (run.userResponse) {
+            const parent: Post | undefined = await request(tx.objectStore('posts').get(run.replyToPostId!));
+            const author: Member | undefined = parent && await request(tx.objectStore('members').get(parent.authorId));
+            if (!parent || parent.origin !== 'local-human' || parent.forumId !== run.forumId || author?.actor !== 'human') invalid('Human attention requires a human public post.');
+          }
+          const allowance = activityAllowance(state, Date.now());
+          if (run.userResponse) allowance.responses++; else allowance.attempts++;
+        }
+        run.status = status;
+      }
       return this.writeActivity(tx, state);
     });
   }
@@ -950,6 +966,9 @@ export class LocalRepository {
       if (run.status === 'committed') return undefined; // A later explicit deletion stays deleted.
       if (run.status !== 'running') invalid('AI run is not running.');
       if (!state.consent || state.batch!.modelId !== state.modelId || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && p.frequency > 0)) invalid('Mail/model activity is no longer authorized.');
+      const roster = (await this.snapshot(tx)).settings.find((s) => s.id === RESIDENTS_SETTING)?.value as unknown as ResidentSettings | undefined;
+      if (roster?.version === 2 && !await request(tx.objectStore('members').get(personaMemberId(run.personaId)))) return undefined;
+      if (run.userResponse && (Date.now() - Date.parse(run.simulatedAt) > 10 * 60_000 || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && routineFactor(p, Date.now()) === 1))) return undefined;
       if (run.mail) {
         const content = await this.snapshot(tx);
         const at = Date.parse(run.simulatedAt);
@@ -979,7 +998,7 @@ export class LocalRepository {
             await request(tx.objectStore('mail').put(confirmed));
           }
         }
-        run.status = 'committed'; await this.writeActivity(tx, state); return mail;
+        run.status = 'committed'; activityAllowance(state, Date.now()).committed++; await this.writeActivity(tx, state); return mail;
       }
       const target = { personaId: run.personaId, forumId: run.forumId!,
         ...(run.replyToPostId === undefined ? {} : { replyToPostId: run.replyToPostId }) };
@@ -989,6 +1008,7 @@ export class LocalRepository {
       await this.registerAi(tx, input.member, input.post);
       const post = await this.insertPost(tx, input.post, id);
       run.status = 'committed';
+      if (!run.userResponse) activityAllowance(state, Date.now()).committed++;
       await this.writeActivity(tx, state);
       return post;
     }, signal).then((result) => { if (result && 'senderId' in result) this.notifySetupChanged(); return result; });

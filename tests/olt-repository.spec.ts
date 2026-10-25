@@ -142,13 +142,16 @@ for (const roomId of ['night', 'wakaba'] as const) {
     expect(result.ai.batch).toBeNull();
   });
 }
-test('default evening routines allow both populated and empty visits without duplicate arrivals or off-hour crowds', async ({ page }) => {
+test('legacy ten-resident evening routines retain quiet visits and repeatable attendance', async ({ page }) => {
   const result = await page.evaluate(async (now) => {
     const op = '/src/olt-state.ts';
     const { emptyOlt, observeOlt } = await import(op) as typeof import('../src/olt-state');
     const repo = window.oltRepo, content = await repo.exportBackup();
     await repo.authorizeModel((await repo.openActivity()).modelId);
     const data = await repo.exportBackup(), activity = data.settings.find((s) => s.id === 'ai-activity')!;
+    const roster = data.settings.find((s) => s.id === 'ai-residents')!;
+    (roster.value as any).profiles = (roster.value as any).profiles.slice(0, 10);
+    (roster.value as any).version = 1;
     const counts: number[] = [], duplicates: boolean[] = [], offHours: number[] = [];
     for (let i = 0; i < 100; i++) {
       (activity.value as unknown as import('../src/storage/schema').AiActivity).seed = `evening-${i}`;

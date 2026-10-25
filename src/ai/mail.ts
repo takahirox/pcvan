@@ -35,12 +35,16 @@ export function chooseMail(content: Backup, profile: ResidentProfile, at: number
   if (mail.length) return null;
   // Initiate only after a direct public exchange with this human. A stranger's
   // unrelated public post is not enough to manufacture an acquaintance.
-  const exchanges = content.posts.filter((p) => localConversation(p) && p.replyToPostId &&
-    Date.parse(p.simulation?.simulatedAt ?? p.createdAt) <= at - 60 * 60_000 &&
-    Date.parse(p.simulation?.simulatedAt ?? p.createdAt) >= at - 14 * 24 * 3_600_000 &&
-    content.posts.some((parent) => parent.id === p.replyToPostId && parent.forumId === p.forumId && localConversation(parent) &&
+  const postsById = new Map(content.posts.map((p) => [p.id, p]));
+  const exchanges = content.posts.filter((p) => {
+    if (!localConversation(p) || !p.replyToPostId ||
+      Date.parse(p.simulation?.simulatedAt ?? p.createdAt) > at - 60 * 60_000 ||
+      Date.parse(p.simulation?.simulatedAt ?? p.createdAt) < at - 14 * 24 * 3_600_000) return false;
+    const parent = postsById.get(p.replyToPostId);
+    return !!parent && parent.forumId === p.forumId && localConversation(parent) &&
       Date.parse(parent.simulation?.simulatedAt ?? parent.createdAt) <= at &&
-      ((p.authorId === human.id && parent.authorId === residentId) || (p.authorId === residentId && parent.authorId === human.id))))
+      ((p.authorId === human.id && parent.authorId === residentId) || (p.authorId === residentId && parent.authorId === human.id));
+  })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const familiarity = 1 + Math.min(2, exchanges.length) * .25;
   return exchanges[0] && draw < .15 * profile.newThread * familiarity

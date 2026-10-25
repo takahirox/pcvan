@@ -66,12 +66,12 @@ export interface CommandActions {
 }
 const inviteSetting = 'terminal-handle-invited';
 export const profileFields: (keyof ResidentProfile)[] = ['handle', 'occupation', 'routine', 'profile', 'interests', 'preferredBoards',
-  'weekdayHours', 'weekendHours', 'utcOffsetMinutes', 'frequency', 'participation', 'reading', 'newThread', 'reply', 'inactivity', 'affinities'];
+  'weekdayHours', 'weekendHours', 'utcOffsetMinutes', 'frequency', 'participation', 'reading', 'newThread', 'reply', 'inactivity', 'affinities', 'absence', 'sessionMinutes'];
 
 export const profileLabels = ['ハンドル', '職業', '生活・仕事・睡眠の習慣', '人物像・文体', '興味（カンマ区切り）',
   '好みの掲示板（MITI:9, DAISIZEN:1 またはID）', '平日の接続時間（0〜23）', '休日の接続時間（0〜23）',
   'UTCからの時差（分 -720〜840、日本は540）', '活動頻度（0〜3、0で休止）', '訪問の確率（0〜1）',
-  '読む重み（0〜1）', '新しい話題の重み（0〜1）', '返信の重み（0〜1）', '何もしない重み（0〜1）', '住人との親しさ（IDと0〜1のJSON）'];
+  '読む重み（0〜1）', '新しい話題の重み（0〜1）', '返信の重み（0〜1）', '何もしない重み（0〜1）', '住人との親しさ（IDと0〜1のJSON）', '留守の確率（0〜1）', '標準の滞在時間（分 7〜240）'];
 
 /** One screen owner interprets each line; navigation cannot leak into a prompt. */
 export class TerminalCommands {
@@ -440,7 +440,7 @@ export class TerminalCommands {
         try {
           if (['interests', 'preferredBoards', 'weekdayHours', 'weekendHours'].includes(key)) {
             value = line.trim() ? line.split(',').map((part) => key.endsWith('Hours') ? Number(part.trim()) : part.trim()) : [];
-          } else if (typeof this.profile[key] === 'number') value = Number(line);
+          } else if (typeof this.profile[key] === 'number' || key === 'absence' || key === 'sessionMinutes') value = Number(line);
           else if (key === 'affinities') value = JSON.parse(line);
           Object.assign(this.profile, { [key]: value }); this.field = undefined; this.profileHelp();
         } catch { print('値を解釈できません。再入力してください。'); }
@@ -487,7 +487,7 @@ export class TerminalCommands {
     if (command === 'RESET') {
       this.confirm({ kind: 'reset', expected: context(await this.actions.read()) },
         '投稿・メール・ローカルNetNews記事・登録OSLテキスト・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴をすべて削除します。取り消せません。必要なら先に BACKUP。',
-        '最初の10人・82件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
+        '最初の100人・82件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。モデル重み・端末キャッシュは保持します。AI には再同意が必要です。', '初期状態に戻しますか？ (Y/N)='); return true;
     }
     // Global application controls above retain ownership. Every service command
     // in these bounded services belongs to navigation, including unsupported input.

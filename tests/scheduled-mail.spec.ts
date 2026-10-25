@@ -211,7 +211,7 @@ test.describe('scheduled repository', () => {
       for (const simulatedAt of ['2026-10-23T01:03:59.999Z', '2026-10-23T01:24:00.000Z']) {
         const batch = { id: 'catchup', from: epoch, to: '2026-10-24T00:00:00.000Z', modelId: state.modelId,
           runs: [{ id: 'catchup:one', personaId: 'hoshimori', simulatedAt, status: 'pending' as const, mail: target }] };
-        const activity = { ...state, maxPosts: 4, batch }, content = { ...released, settings: [...released.settings.filter((s) => s.id !== 'ai-activity'), { id: 'ai-activity', value: activity as never }] };
+        const activity = { ...state, maxPosts: 4, consent: true, batch }, content = { ...released, settings: [...released.settings.filter((s) => s.id !== 'ai-activity'), { id: 'ai-activity', value: activity as never }] };
         const actions = { setAiRunStatus: async () => ({ ...activity, batch: { ...batch, runs: [{ ...batch.runs[0]!, status: 'running' as const }] } }), commitAiRun: async () => undefined };
         await runActivityBatch(actions as never, async () => content, activity,
           { generate: async (prompt: { user: string }) => { prompts.push(prompt.user); return '{}'; } } as never,

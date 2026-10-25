@@ -12,7 +12,7 @@ const anchor = '2026-10-21T00:00:00.000Z';
 test('expanded baseline preserves original fiction and shares ten authors across distinct conversations', async ({ page }) => {
   await start(page);
   const data = await snapshot(page);
-  expect(data.posts).toHaveLength(82); expect(data.forums).toHaveLength(15); expect(data.members).toHaveLength(10);
+  expect(data.posts).toHaveLength(82); expect(data.forums).toHaveLength(15); expect(data.members).toHaveLength(100);
   expect(data.posts.filter((p) => !p.replyToPostId)).toHaveLength(26);
   for (const p of original.posts) {
     expect(data.posts.find((old) => old.id === `seed:v1:${p.id}`)).toMatchObject({
@@ -76,7 +76,7 @@ test('v1 expansion is atomic, concurrent, conservative with custom boards and ne
     const settings = await repo.get('settings', 'ai-residents');
     const profiles = (settings!.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
     profiles[0]!.preferredBoards = ['MITI:9']; profiles[0]!.frequency = 0;
-    await repo.put('settings', { ...settings!, value: { version: 1, profiles } as never });
+    await repo.put('settings', { ...settings!, value: { version: 2, profiles } as never });
     await repo.put('forums', { id: 'custom-library', sigId: 'resident-sig:DAISIZEN', boardNo: 3, name: '私の書庫', nextPostNumber: 80 });
     const before = await repo.exportBackup();
     const add = IDBObjectStore.prototype.add; let writes = 0; let failed = false;
@@ -141,6 +141,14 @@ test('terminal human identity, read/write/reply, reload and scheduled replies wo
   const saved = await snapshot(page), humans = saved.posts.filter((p) => p.origin === 'local-human');
   expect(humans).toHaveLength(4); expect(new Set(humans.map((p) => p.authorId)).size).toBe(1);
   expect(saved.members.filter((m) => m.actor === 'human')).toHaveLength(1);
+  // Exercise the slower organic visits here; near-term attention is covered in
+  // autonomy/community-scale. These parents have already had their opportunity.
+  await page.evaluate(async (ids) => {
+    const db = await new Promise<IDBDatabase>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => resolve(r.result); });
+    const tx = db.transaction('settings', 'readwrite'), store = tx.objectStore('settings');
+    const r = store.get('ai-activity'); r.onsuccess = () => { const row = r.result; row.value.attention = ids; store.put(row); };
+    await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); }); db.close();
+  }, humans.map((p) => p.id));
   await page.clock.fastForward(20 * 60_000); expect(await generated(page)).toEqual([]);
   await page.clock.fastForward(41 * 60_000);
   await expect.poll(async () => (await generated(page)).length).toBe(1);

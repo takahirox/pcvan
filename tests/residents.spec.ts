@@ -8,7 +8,7 @@ test('all ten seeded profiles are distinct; routines obey local dates and seeded
   const result = await page.evaluate(async ({ fixture, start }) => {
     const a = '/src/ai/activity.ts'; const p = '/src/ai/personas.ts';
     const { emptyActivity, scheduleActivity, routineFactor, HOUR } = await import(a) as typeof import('../src/ai/activity');
-    const { personas } = await import(p) as typeof import('../src/ai/personas');
+    const { originalPersonas: personas } = await import(p) as typeof import('../src/ai/personas');
     const all = new Set<string>(); const hours = new Set<number>(); let quiet = 0; let topics = 0; let replies = 0;
     for (let day = 0; day < 40; day++) {
       const from = new Date(Date.parse(start) + day * 24 * HOUR).toISOString();

@@ -27,7 +27,7 @@ export interface OltRoom {
   pending: OltTurn | null;
 }
 export interface OltState {
-  version: 1; windowAt: string; attempts: number; rooms: OltRoom[];
+  version: 1; windowAt: string; attempts: number; organicAttempts?: number; rooms: OltRoom[];
 }
 export const RETAIN_LINES = 200;
 export const VISITOR_LEASE = 45_000;
@@ -51,7 +51,7 @@ export function oltState(content: Pick<Backup, 'settings'> & Partial<Pick<Backup
 }
 export function oltAuthorization(content: Pick<Backup, 'settings'>): string {
   const ai = content.settings.find((s) => s.id === 'ai-activity')?.value as unknown as AiActivity | undefined;
-  return JSON.stringify([ai?.modelId, !!ai?.consent, !!ai?.maxPosts, residentProfiles(content)]);
+  return JSON.stringify([ai?.modelId, !!ai?.consent, !!ai?.maxPosts, rosterFingerprint(content)]);
 }
 export function oltEnabled(content: Pick<Backup, 'settings'>) {
   const ai = content.settings.find((s) => s.id === 'ai-activity')?.value as unknown as AiActivity | undefined;
@@ -74,10 +74,23 @@ export function attendance(room: OltRoom, at = Date.now()): string[] {
     ...room.visitors.filter((p) => Date.parse(p.until) > at).map((p) => p.memberId)])];
 }
 
+// A compact stale-configuration fence, never the full roster in a pending turn.
+function rosterFingerprint(content: Pick<Backup, 'settings'>): string {
+  const text = JSON.stringify(residentProfiles(content));
+  let a = 2166136261, b = 5381;
+  for (let i = 0; i < text.length; i++) { a = Math.imul(a ^ text.charCodeAt(i), 16777619); b = Math.imul(b, 33) ^ text.charCodeAt(i); }
+  return `${text.length}:${a >>> 0}:${b >>> 0}`;
+}
+export const MAX_PRESENT = 32;
+export const MAX_ROOM_PRESENT = 16;
+
 /** One observation, no elapsed-time loop and no closed-tab dialogue. */
 export function observeOlt(state: OltState, content: Backup, at: number): void {
   const ai = oltEnabled(content);
   const profiles = residentProfiles(content);
+  const byMember = new Map(profiles.map((p) => [personaMemberId(p.id), p]));
+  const members = new Set(content.members.filter((m) => m.actor === 'ai').map((m) => m.id));
+  const present = new Set<string>();
   for (const room of state.rooms) {
     const previous = new Set(room.visitors.map((v) => v.memberId));
     room.visitors = room.visitors.filter((v) => Date.parse(v.until) > at);
@@ -86,39 +99,49 @@ export function observeOlt(state: OltState, content: Backup, at: number): void {
       appendOlt(room, id, 'leave', '', 'local-presence', expired);
     }
     room.residents = room.residents.filter((p) => {
-      const profile = profiles.find((r) => personaMemberId(r.id) === p.memberId);
-      if (ai && profile?.frequency && Date.parse(p.until) > at && routineFactor(profile, at) === 1) return true;
+      const profile = byMember.get(p.memberId);
+      if (ai && members.has(p.memberId) && profile?.frequency && Date.parse(p.until) > at && routineFactor(profile, at) === 1) {
+        present.add(p.memberId); return true;
+      }
       appendOlt(room, p.memberId, 'leave', '', 'local-presence', Math.min(at, Date.parse(p.until)));
       return false;
     });
     if (room.pending && !room.residents.some((p) => p.memberId === room.pending!.authorId)) room.pending = null;
     if (at - Date.parse(room.observedAt) > 90_000) {
-      // On return, a fresh quiet interval; never infer against stale attendance.
       room.pending = null; room.handledNumber = room.nextNumber - 1;
       room.nextTurnAt = iso(at + 15_000); room.chain = 0;
     }
     room.observedAt = iso(Math.max(at, Date.parse(room.observedAt)));
   }
   if (!ai) return;
-  // A resident chooses one room per twenty-minute visit window. Reentry/refresh
-  // does not roll another chance; routine, absence, interest and silence persist.
-  const slot = Math.floor(at / 1_200_000);
-  for (const p of profiles) {
-    if (!p.frequency || routineFactor(p, at) !== 1) continue;
+  // At most 128 identities considered for new arrivals per observation. Existing
+  // attendance is always retained. A larger future roster rotates daily.
+  const offset = profiles.length > 128 ? Math.floor(at / 86_400_000) * 127 % profiles.length : 0;
+  for (let index = 0; index < Math.min(128, profiles.length) && present.size < MAX_PRESENT; index++) {
+    const p = profiles[(offset + index) % profiles.length]!;
+    const memberId = personaMemberId(p.id);
+    if (!members.has(memberId) || present.has(memberId) || !p.frequency || routineFactor(p, at) !== 1) continue;
+    // Individual visit cycles, not a synchronized twenty-minute exodus. Long-stay
+    // regulars still have a daily absence chance and finite sessions.
+    const minutes = p.sessionMinutes ?? 14;
+    const cycle = (minutes + 5) * 60_000;
+    const phase = random(`${ai.seed}:olt:${p.id}:phase`) * cycle;
+    const slot = Math.floor((at - phase) / cycle);
     const draw = (key: string) => random(`${ai.seed}:olt:${p.id}:${slot}:${key}`);
-    if (draw('visit') >= Math.min(.9, p.participation * p.frequency) ||
-        random(`${ai.seed}:olt:${p.id}:away:${Math.floor(at / 86_400_000)}`) < .12) continue;
+    if (draw('visit') >= Math.min(.95, p.participation * p.frequency) ||
+      random(`${ai.seed}:olt:${p.id}:away:${Math.floor((at + p.utcOffsetMinutes * 60_000) / 86_400_000)}`) < (p.absence ?? .12)) continue;
     const preferred = roomDefinitions.filter((r) => p.preferredBoards.includes(r.board));
     const pool = preferred.length && draw('explore') > .15 ? preferred : roomDefinitions;
     const selected = pool[Math.floor(draw('room') * pool.length)]!;
     const room = state.rooms.find((r) => r.id === selected.id)!;
-    const start = slot * 1_200_000 + Math.floor(draw('arrival') * 120_000);
-    const end = Math.min((slot + 1) * 1_200_000, start + (7 + draw('duration') * 11) * 60_000);
-    const memberId = personaMemberId(p.id);
-    if (at < start || at >= end || state.rooms.some((r) => r.residents.some((v) => v.memberId === memberId))) continue;
-    // Do not repeat a departed visit in the same slot.
-    if (room.lines.some((l) => l.authorId === memberId && l.kind === 'enter' && Date.parse(l.createdAt) >= slot * 1_200_000)) continue;
-    room.residents.push({ memberId, joinedAt: iso(at), until: iso(end) });
+    if (room.residents.length >= MAX_ROOM_PRESENT) continue;
+    const start = slot * cycle + phase;
+    const end = start + minutes * (.7 + draw('duration') * .3) * 60_000;
+    if (at >= end) continue;
+    // Reentry never rolls again or repeats a visit that ended in this cycle.
+    if (room.lines.some((l) => l.authorId === memberId && l.kind === 'enter' && Date.parse(l.createdAt) >= start)) continue;
+    room.residents.push({ memberId, joinedAt: iso(start), until: iso(end) });
+    present.add(memberId);
     appendOlt(room, memberId, 'enter', '', 'local-presence', at);
   }
 }
@@ -130,14 +153,15 @@ export function validOltText(value: unknown): value is string {
 /** Strict reserved-setting validation, including bounds before atomic import. */
 export function validateOlt(value: unknown): asserts value is OltState {
   const fail = () => { throw new Error('Invalid bounded OLT state.'); };
-  const obj = (v: unknown, keys: string[]): Record<string, unknown> => {
-    if (!v || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).length !== keys.length || keys.some((k) => !Object.hasOwn(v, k))) fail();
+  const obj = (v: unknown, keys: string[], optional: string[] = []): Record<string, unknown> => {
+    if (!v || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).some((k) => !keys.includes(k) && !optional.includes(k)) || keys.some((k) => !Object.hasOwn(v, k))) fail();
     return v as Record<string, unknown>;
   };
   const time = (v: unknown) => { if (typeof v !== 'string' || !Number.isFinite(Date.parse(v)) || iso(Date.parse(v)) !== v) fail(); };
   const text = (v: unknown) => { if (typeof v !== 'string' || !v.trim() || v.length > 256 || controlText.test(v)) fail(); };
   const int = (v: unknown, min = 0) => { if (!Number.isSafeInteger(v) || (v as number) < min) fail(); };
-  const state = obj(value, ['version', 'windowAt', 'attempts', 'rooms']);
+  const state = obj(value, ['version', 'windowAt', 'attempts', 'rooms'], ['organicAttempts']);
+  if (state.organicAttempts !== undefined) { int(state.organicAttempts); if ((state.organicAttempts as number) > 16 || (state.organicAttempts as number) > (state.attempts as number)) fail(); }
   if (state.version !== 1) fail(); time(state.windowAt); int(state.attempts);
   if ((state.attempts as number) > 24 || !Array.isArray(state.rooms) || ![2, 3].includes(state.rooms.length)) fail();
   const roomIds = new Set();
@@ -160,7 +184,7 @@ export function validateOlt(value: unknown): asserts value is OltState {
       previous = l.number as number; previousTime = l.createdAt as string;
     }
     for (const key of ['residents', 'visitors']) {
-      if (!Array.isArray(r[key]) || (r[key] as unknown[]).length > (key === 'residents' ? 10 : 16)) fail();
+      if (!Array.isArray(r[key]) || (r[key] as unknown[]).length > (key === 'residents' ? MAX_ROOM_PRESENT : 16)) fail();
       const ids = new Set();
       for (const rawPresence of r[key] as unknown[]) {
         const p = obj(rawPresence, key === 'residents' ? ['memberId', 'joinedAt', 'until'] : ['clientId', 'memberId', 'until']);
@@ -178,6 +202,7 @@ export function validateOlt(value: unknown): asserts value is OltState {
       if (typeof p.context !== 'string' || p.context.length > 100_000) fail();
     }
   }
+  if (residentIds.size > MAX_PRESENT) fail();
   if (!roomIds.has('lounge') || !roomIds.has('night') || (roomIds.size === 3 && !roomIds.has('wakaba'))) fail();
 }
 export function validateOltMembers(state: OltState, members: readonly Member[]) {

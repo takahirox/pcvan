@@ -272,7 +272,7 @@ test('atomic result/status, concurrent commits, rollback, interrupted retry, cap
     await resumed.replaceFromJson(JSON.stringify(completed), { confirmReplace: true });
     const roundTrip = JSON.stringify(completed) === await resumed.exportJson().then((json) => JSON.stringify(JSON.parse(json)));
     const statuses = (await resumed.openActivity('2026-10-27T00:00:00.000Z')).batch;
-    // Reducing the configured cap also limits a larger interrupted plan.
+    // Reducing the cap below already persisted saves blocks work even with a fresh in-memory budget.
     await resumed.configureActivity(3, modelId, from);
     const larger = await resumed.openActivity(threeDays);
     await resumed.configureActivity(1, modelId, threeDays);
@@ -296,7 +296,7 @@ test('atomic result/status, concurrent commits, rollback, interrupted retry, cap
   expect(result.simPosts.every((post) => post.createdAt === '2026-10-24T01:00:00.000Z' &&
     post.simulation!.fictional && post.simulation!.simulatedAt < post.createdAt && post.id === post.simulation!.runId)).toBe(true);
   expect(result.roundTrip).toBe(true);
-  expect(result.cappedCalls).toBe(1); expect(result.disabledAfter.maxPosts).toBe(0);
+  expect(result.cappedCalls).toBe(0); expect(result.disabledAfter.maxPosts).toBe(0);
 });
 
 declare global {

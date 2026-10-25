@@ -1,11 +1,11 @@
 import type { LocalRepository } from '../storage/repository';
 import { mailAvailableAt } from '../storage/schema';
 import type { AiActivity, AiRun, Backup } from '../storage/schema';
-import { ACTIVITY_SETTING, MAX_SESSION_POSTS } from './activity';
+import { ACTIVITY_SETTING, MAX_SESSION_POSTS, canAttempt, routineFactor } from './activity';
 import { buildMailPrompt } from './mail';
 import { buildPrompt } from './generation';
 import type { LocalLlmAdapter } from './generation';
-import { residentProfiles } from './personas';
+import { residentProfiles, personaMemberId } from './personas';
 
 export type ActivityActions = Pick<LocalRepository, 'openActivity' | 'configureActivity' | 'authorizeModel' | 'configureResident' | 'setAiRunStatus' | 'commitAiRun'>;
 
@@ -17,17 +17,20 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
   if (!state.maxPosts || !batch) return;
   let current: AiRun | undefined;
   try {
-    for (const planned of batch.runs) {
+    for (const planned of [...batch.runs].sort((a, b) => Number(!!b.userResponse) - Number(!!a.userResponse))) {
       signal.throwIfAborted();
-      if (budget.attempts >= MAX_SESSION_POSTS || budget.committed >= state.maxPosts) break;
+      if (!planned.userResponse && (budget.attempts >= MAX_SESSION_POSTS || budget.committed >= state.maxPosts)) continue;
       const snapshot = await read();
       signal.throwIfAborted();
       const latest = snapshot.settings.find((row) => row.id === ACTIVITY_SETTING)?.value as unknown as AiActivity | undefined;
       if (!latest?.maxPosts || latest.batch?.id !== batch.id) break;
-      if (budget.committed >= latest.maxPosts) break;
+      if (!planned.userResponse && budget.committed >= latest.maxPosts) continue;
       current = latest.batch.runs.find((row) => row.id === planned.id);
-      if (!current || current.status === 'committed') { current = undefined; continue; }
-      if (!residentProfiles(snapshot).some((profile) => profile.id === current!.personaId && profile.frequency > 0)) {
+      if (!current || current.status === 'committed' || !canAttempt(latest, current, Date.now())) { current = undefined; continue; }
+      const roster = snapshot.settings.find((s) => s.id === 'ai-residents')?.value as unknown as { version: number } | undefined;
+      if (roster?.version === 2 && !snapshot.members.some((m) => m.id === personaMemberId(current!.personaId) && m.actor === 'ai')) { current = undefined; continue; }
+      if (!residentProfiles(snapshot).some((profile) => profile.id === current!.personaId && profile.frequency > 0 &&
+        (!current!.userResponse || (routineFactor(profile, Date.now()) === 1 && Date.now() - Date.parse(current!.simulatedAt) <= 10 * 60_000)))) {
         current = undefined; continue;
       }
       const started = await actions.setAiRunStatus(current.id, 'running');
@@ -41,11 +44,11 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
       const context = { ...snapshot, posts: snapshot.posts.filter((post) =>
         Date.parse(post.simulation?.simulatedAt ?? post.createdAt) <= Date.parse(current!.simulatedAt)),
         mail: (snapshot.mail ?? []).filter((m) => Date.parse(mailAvailableAt(m)) <= Date.parse(current!.simulatedAt)) };
-      budget.attempts++;
+      if (!current.userResponse) budget.attempts++;
       const raw = await engine.generate(current.mail ? buildMailPrompt(context, current.personaId, current.mail) : buildPrompt(context, request), signal);
       signal.throwIfAborted();
       const post = await actions.commitAiRun(current.id, raw, signal);
-      if (post) budget.committed++;
+      if (post && !current.userResponse) budget.committed++;
       current = undefined;
       const updated = await read();
       report(updated.settings.find((row) => row.id === ACTIVITY_SETTING)!.value as unknown as AiActivity);

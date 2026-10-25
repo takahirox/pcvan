@@ -98,13 +98,15 @@ export interface MailTarget { humanId: string; replyToMailId?: string; publicPos
 export type AiRunStatus = 'pending' | 'running' | 'committed' | 'failed' | 'cancelled';
 export interface AiRun {
   id: string; personaId: string; forumId?: string; replyToPostId?: string;
-  simulatedAt: string; status: AiRunStatus; mail?: MailTarget;
+  simulatedAt: string; status: AiRunStatus; mail?: MailTarget; userResponse?: true;
 }
 export interface AiBatch { id: string; from: string; to: string; modelId: string; runs: AiRun[] }
 export interface AiActivity {
   version: 1 | 2; maxPosts: number; modelId: string; lastActivityAt: string; batch: AiBatch | null;
   consent?: boolean; seed?: string; nextDue?: Record<string, string>;
   truncated?: boolean; bootstrap?: boolean; setupDeferred?: boolean;
+  allowance?: { windowAt: string; attempts: number; responses: number; committed: number };
+  attention?: string[];
 }
 export interface ReadState { memberId: string; forumId: string; lastReadNumber: number }
 export interface Session {
@@ -205,7 +207,7 @@ function json(value: unknown): void {
 export function validateActivity(value: unknown): asserts value is AiActivity {
   object(value);
   const extra = value.version === 2 ? ['consent', 'seed', 'nextDue', 'truncated', 'bootstrap'] : [];
-  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch', ...extra], value.version === 2 ? ['setupDeferred'] : []);
+  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch', ...extra], value.version === 2 ? ['setupDeferred', 'allowance', 'attention'] : []);
   if (value.setupDeferred !== undefined && typeof value.setupDeferred !== 'boolean') invalid('Invalid AI setup deferral.');
   if (value.version !== 1 && value.version !== 2) invalid('Unknown AI activity version.');
   if (value.version === 2) {
@@ -213,8 +215,16 @@ export function validateActivity(value: unknown): asserts value is AiActivity {
         typeof value.bootstrap !== 'boolean') invalid('Invalid AI consent/state.');
     string(value.seed);
     if (value.seed.length > 128) invalid('AI seed is too long.');
-    fields(value.nextDue, personas.map((row) => row.id));
+    object(value.nextDue);
+    if (Object.keys(value.nextDue).length > 1000 || Object.keys(value.nextDue).some((id) => !personas.some((p) => p.id === id))) invalid('Unknown due resident.');
     Object.values(value.nextDue).forEach(timestamp);
+    if (value.allowance !== undefined) {
+      fields(value.allowance, ['windowAt', 'attempts', 'responses', 'committed']); timestamp(value.allowance.windowAt);
+      integer(value.allowance.attempts, 0); integer(value.allowance.responses, 0); integer(value.allowance.committed, 0);
+      if ((value.allowance.attempts as number) > 12 || (value.allowance.responses as number) > 6 || (value.allowance.committed as number) > 12) invalid('Invalid resident allowance.');
+    }
+    if (value.attention !== undefined && (!Array.isArray(value.attention) || value.attention.length > 64 ||
+      new Set(value.attention).size !== value.attention.length || value.attention.some((id) => typeof id !== 'string' || id.length > 128))) invalid('Invalid attention history.');
   }
   integer(value.maxPosts, 0);
   if ((value.maxPosts as number) > 12) invalid('AI activity cap exceeds 12.');
@@ -227,7 +237,8 @@ export function validateActivity(value: unknown): asserts value is AiActivity {
       !Array.isArray(batch.runs) || batch.runs.length > 12) invalid('Invalid AI activity batch.');
   const ids = new Set<string>();
   for (const run of batch.runs as unknown[]) {
-    fields(run, ['id', 'personaId', 'simulatedAt', 'status'], ['forumId', 'replyToPostId', 'mail']);
+    fields(run, ['id', 'personaId', 'simulatedAt', 'status'], ['forumId', 'replyToPostId', 'mail', 'userResponse']);
+    if (run.userResponse !== undefined && (run.userResponse !== true || !run.replyToPostId || run.mail)) invalid('Invalid human response.');
     if (run.mail !== undefined) {
       fields(run.mail, ['humanId'], ['replyToMailId', 'publicPostId']);
       string(run.mail.humanId);
@@ -251,7 +262,8 @@ export function validateActivity(value: unknown): asserts value is AiActivity {
 /** Reserved settings are validated before either direct writes or atomic restore. */
 export function validateResidents(value: unknown): asserts value is ResidentSettings {
   fields(value, ['version', 'profiles']);
-  if (value.version !== 1 || !Array.isArray(value.profiles) || value.profiles.length !== 10) invalid('Expected ten residents.');
+  if (![1, 2].includes(value.version as number) || !Array.isArray(value.profiles) ||
+    (value.version === 1 ? value.profiles.length !== 10 : value.profiles.length < 1 || value.profiles.length > 1000)) invalid('Invalid resident roster.');
   const ids = new Set<string>();
   const boundedText = (text: unknown, max: number) => {
     string(text);
@@ -260,9 +272,11 @@ export function validateResidents(value: unknown): asserts value is ResidentSett
   for (const row of value.profiles) {
     fields(row, ['id', 'handle', 'occupation', 'routine', 'profile', 'interests', 'preferredBoards',
       'utcOffsetMinutes', 'weekdayHours', 'weekendHours', 'frequency', 'participation',
-      'reading', 'newThread', 'reply', 'inactivity', 'affinities']);
+      'reading', 'newThread', 'reply', 'inactivity', 'affinities'], ['absence', 'sessionMinutes']);
+    if (row.absence !== undefined && (typeof row.absence !== 'number' || !Number.isFinite(row.absence) || row.absence < 0 || row.absence > 1)) invalid('Invalid absence.');
+    if (row.sessionMinutes !== undefined && (typeof row.sessionMinutes !== 'number' || !Number.isFinite(row.sessionMinutes) || row.sessionMinutes < 7 || row.sessionMinutes > 240)) invalid('Invalid session length.');
     string(row.id);
-    if (!personas.some((p) => p.id === row.id) || ids.has(row.id)) invalid('Unknown/duplicate resident.');
+    if (!(value.version === 1 ? personas.slice(0, 10) : personas).some((p) => p.id === row.id) || ids.has(row.id)) invalid('Unknown/duplicate resident.');
     ids.add(row.id);
     boundedText(row.handle, 40); boundedText(row.occupation, 80);
     boundedText(row.routine, 240); boundedText(row.profile, 300);

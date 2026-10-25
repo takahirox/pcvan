@@ -198,7 +198,7 @@ test('separate timer batches reserve forum saves until the six-hour mail allowan
     const profiles = residentProfiles(await repo.exportBackup()).map((profile) => ({ ...profile,
       participation: 1, reading: 0, inactivity: 0, newThread: 1, reply: 1,
       weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i) }));
-    await repo.put('settings', { id: 'ai-residents', value: { version: 1, profiles } as never });
+    await repo.put('settings', { id: 'ai-residents', value: { version: 2, profiles } as never });
     for (const profile of profiles.slice(0, 4)) {
       await repo.createHumanMail({ id: `letter:${profile.id}`, senderId: human.id, recipient: profile.id,
         subject: '近況', body: 'またお話を聞かせてください。' });

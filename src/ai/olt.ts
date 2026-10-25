@@ -12,15 +12,19 @@ export function planOltTurn(state: OltState, room: OltRoom, content: Backup, at:
   const ai = oltEnabled(content);
   if (!ai || !room.visitors.some((v) => Date.parse(v.until) > at) || at < Date.parse(room.nextTurnAt) ||
       (room.pending && Date.parse(room.pending.until) > at)) return;
-  if (at - Date.parse(state.windowAt) >= 3_600_000) { state.windowAt = iso(at); state.attempts = 0; }
+  if (at - Date.parse(state.windowAt) >= 3_600_000) { state.windowAt = iso(at); state.attempts = 0; state.organicAttempts = 0; }
   if (state.attempts >= 24) return;
-  const last = room.lines.at(-1);
+  const utterance = [...room.lines].reverse().find((l) => l.kind === 'say');
+  const last = utterance && utterance.number > room.handledNumber ? utterance : room.lines.at(-1);
   if (!last || room.chain >= 3 || last.number <= room.handledNumber) return;
-  const profiles = residentProfiles(content).filter((p) => p.frequency > 0 &&
-    room.residents.some((v) => v.memberId === personaMemberId(p.id) && Date.parse(v.until) > at) && personaMemberId(p.id) !== last.authorId);
+  if (last.origin !== 'local-human' && (state.organicAttempts ?? 0) >= 16) return;
+  const byId = new Map(residentProfiles(content).map((p) => [personaMemberId(p.id), p]));
+  const profiles = room.residents.slice(0, 16).filter((v) => Date.parse(v.until) > at && v.memberId !== last.authorId)
+    .map((v) => byId.get(v.memberId)).filter((p): p is NonNullable<typeof p> => !!p && p.frequency > 0);
   const score = (p: typeof profiles[number]) => (p.affinities[last.authorId.replace('fictional-ai:', '')] ?? 0) * 2 +
     p.interests.filter((i) => last.text.includes(i)).length +
-    random(`${ai.seed}:olt:${last.id}:${p.id}:score`);
+    random(`${ai.seed}:olt:${last.id}:${p.id}:score`) -
+    room.lines.slice(-12).filter((l) => l.kind === 'say' && l.authorId === personaMemberId(p.id)).length * .5;
   profiles.sort((a, b) => score(b) - score(a));
   const persona = profiles[0];
   room.handledNumber = last.number;
@@ -29,6 +33,7 @@ export function planOltTurn(state: OltState, room: OltRoom, content: Backup, at:
   if (!persona || random(`${ai.seed}:olt:${last.id}:${persona.id}:silence`) < persona.inactivity ||
       random(`${ai.seed}:olt:${last.id}:${persona.id}:reply`) > persona.reply) return;
   state.attempts++;
+  if (last.origin !== 'local-human') state.organicAttempts = (state.organicAttempts ?? 0) + 1;
   const turn = { id: token, authorId: personaMemberId(persona.id), modelId: ai.modelId,
     context: oltAuthorization(content), until: iso(at + 35_000) };
   room.pending = turn;
@@ -52,7 +57,7 @@ export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn): G
       room: roomDefinitions.find((r) => r.id === room.id)!.name,
       persona: { handle: persona.handle, profile: persona.profile, occupation: persona.occupation,
         routine: persona.routine, interests: persona.interests, affinities: persona.affinities },
-      present: content.members.filter((m) => present.includes(m.id)).map((m) => ({ id: m.id, handle: m.handle.slice(0, 80) })),
+      present: content.members.filter((m) => present.includes(m.id)).slice(0, 16).map((m) => ({ id: m.id, handle: m.handle.slice(0, 80) })),
       recent: room.lines.slice(-12).map((l) => ({ authorId: l.authorId, kind: l.kind, text: l.text.slice(0, 120) })),
       // Public material only. No mail records are ever passed to OLT inference.
       publicMemory: content.posts.filter((p) => localConversation(p) && (p.authorId === turn.authorId || present.includes(p.authorId)))

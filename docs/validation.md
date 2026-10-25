@@ -3485,3 +3485,65 @@ Historical sources are the Issue's 2026-10-24 evidence record, not a new manual
 recovery or an independent historical re-verification. Existing Vite large-chunk
 and Node color warnings remain. No push, PR, merge or comment is performed by this
 implementation node, and no required post-merge verification applies.
+
+## Issue #133 community scale
+
+Measured locally on 2026-10-25 in the same macOS/Node 24 worktree and Playwright
+Chromium 156 environment. Browser metadata is emulated Desktop Chrome; no real
+WebGPU/model download was performed. `community-performance.spec.ts` warms each
+operation and reports per-operation means (100 planning / 200 OLT and navigation /
+1,000 profile-lookup iterations). The two sizes use identical 82-post content.
+IndexedDB hydration measures JSON validation/replacement plus `openActivity`;
+this is the supported legacy-ten versus new-hundred comparison, not a claim to
+run the old binary's pristine bootstrap. Pristine 100-person bootstrap is measured
+separately.
+
+| Operation | 10 profiles | 100 profiles |
+| --- | ---: | ---: |
+| Profile lookup | <0.001 ms | <0.001 ms |
+| 72-hour deterministic planning | 0.137 ms | 0.553 ms |
+| Fresh OLT observation (all rooms) | 0.0075 ms | 0.0405 ms |
+| Nine-command controller navigation | 0.0185 ms | 0.0165 ms |
+| JSON/IndexedDB hydration and open | 11.1 ms | 21.3 ms |
+| Serialized UTF-8 roster | 6,673 bytes | 60,363 bytes |
+| Serialized UTF-8 backup | 55,067 bytes | 114,683 bytes |
+
+Pristine 100-person bootstrap took 48.9 ms. Chromium reported about 24.5 MB used JS
+heap after both workloads, including the harness/module graph; this is a coarse
+whole-page observation, not isolated per-roster retained memory. Another warmed
+run measured 57.2 ms bootstrap and 19.3 MB heap; GC/timing differences are expected.
+The test uses generous regression bounds: planning <100 ms/pass, OLT and controller
+navigation <20 ms/operation, hydration/bootstrap <2 seconds. These are local CI
+bounds, not low-end hardware or inference latency promises. The optional synthetic
+1,000-profile trial was not run; actual authored content remains exactly 100.
+
+Week sampling in `community-scale.spec.ts`: seven days × 24 JST hours × eight
+seeds × three rooms = **4,032 room visits**. **3,484 (86.4%)** had residents and
+**548** were empty. The minimum hourly aggregate encounter rate was **72.6%**;
+maximum simultaneous population across rooms was **17**, and all **100** identities
+appeared. Thirteen people appeared overnight without appearing in the sampled
+noon group. Weekday totals ranged 1,274–1,311 resident observations across the
+seeds, versus 1,123 Saturday / 1,092 Sunday. Same-time observations were identical
+and every person appeared in at most one room. Gates are >70% populated overall,
+>45% in every hour aggregate, real quiet rooms, >85 identities and >12 night-only
+participants; individual rooms/visits can still be empty. Measurements involve
+metadata only and never create a model worker.
+
+Focused browser checks use authorized mock inference and controlled time for a
+human forum reply at two minutes with an active Japanese IME draft; slower organic
+continuation remains eligible after twenty minutes. OLT planning checks 03:00,
+08:00, 13:00 and 22:00 JST with an actually present interested resident and a
+nine-second opportunity; intervening arrivals do not consume unanswered speech.
+Representative repository/browser checks cover persisted independent allowances,
+shared leases, atomic commit/retry, strict restore/reset, quiet/absent speakers,
+consent, hide/leave cancellation and bounded prompts excluding private mail.
+Real-model latency/Japanese quality and lower-end hardware checks remain optional
+and were not performed. No post-merge verification is required by this Issue.
+
+Final verification: `npm test -- --workers=8` completed with **533 passed** in
+4.9 minutes, with no failures or runtime skips. `npm run build` passed TypeScript
+and the Vite production build; Vite retains the existing large-WebLLM-chunk
+warning. `git diff --cached --check` passed, and all 153 local file links checked
+in the affected README/AI/storage/SIG/E2E/validation documentation resolved.
+Earlier development runs exposed outdated count/timing/consent and fixed-seed
+fixtures; these were corrected and are included in the passing full run.

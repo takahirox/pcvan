@@ -132,11 +132,15 @@ test('Settings model selector, refusal, affirmative consent, pause and on-demand
   await command(page, 'SETTINGS', '設定 / SETTINGS'); await command(page, '3', 'Qwen2.5-1.5B');
 });
 
-test('all ten resident profiles and schedule fields are editable, validated, cancellable and restored on reload', async ({ page }) => {
+test('filtered resident profiles and schedule fields are editable, validated, cancellable and restored on reload', async ({ page }) => {
   await start(page); await open(page, 'ai'); const modal = dialog(page);
   await modal.getByText('住人のプロフィール・生活時間', { exact: true }).click();
-  expect(await modal.locator('.resident-select option').count()).toBe(10);
-  for (const id of await modal.locator('.resident-select option').evaluateAll((rows) => rows.map((o) => (o as HTMLOptionElement).value))) {
+  expect(await modal.locator('.resident-select option').count()).toBe(100);
+  await modal.locator('.resident-filter').fill('夜間');
+  expect(await modal.locator('.resident-select option').count()).toBeLessThan(15);
+  await modal.locator('.resident-filter').fill('');
+  const editedIds = ['hoshimori', 'akari', 'hibari', 'aozora', 'hakobera'];
+  for (const id of editedIds) {
     await modal.getByRole('combobox', { name: '編集する住人', exact: true }).selectOption(id);
     await modal.locator('textarea[name="routine"]').fill(`生活時間 ${id}`);
     await modal.locator('textarea[name="frequency"]').fill('0.5');
@@ -153,7 +157,7 @@ test('all ten resident profiles and schedule fields are editable, validated, can
   await modal.getByRole('button', { name: '住人の設定を保存', exact: true }).click();
   await expect(modal.locator('.settings-message')).toContainText('住人の設定を保存');
   const saved = await snapshot(page), profiles = (saved.settings.find((r) => r.id === 'ai-residents')!.value as unknown as ResidentSettings).profiles;
-  expect(profiles.every((p) => p.routine === `生活時間 ${p.id}`)).toBe(true);
+  expect(profiles.filter((p) => editedIds.includes(p.id)).every((p) => p.routine === `生活時間 ${p.id}`)).toBe(true);
   expect(profiles.at(-1)).toMatchObject({ frequency: 0, weekdayHours: [6,18,22], affinities: { hoshimori: .8 } });
   await modal.locator('textarea[name="handle"]').fill('破棄する名前');
   await modal.getByRole('button', { name: '変更を破棄', exact: true }).click();

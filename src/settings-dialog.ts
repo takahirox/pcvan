@@ -60,6 +60,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
         <button type="submit">活動設定を保存</button></form>
       <button type="button" class="retry-activity">未完了の活動を再試行</button>
       <details><summary>住人のプロフィール・生活時間</summary>
+        <label>住人を絞り込む<input class="resident-filter" type="search" placeholder="ハンドル・職業・興味"></label>
         <label>編集する住人<select class="resident-select"></select></label>
         <form class="resident-form">${profileFields.map((key, i) => `<label>${profileLabels[i]}<textarea name="${key}" rows="2"></textarea></label>`).join('')}
           <p>配列はカンマ区切り。親しさは JSON。保存時に範囲・内容を検証します。</p>
@@ -129,8 +130,9 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     profileDirty = false;
     profile = structuredClone(residentProfiles(snapshot).find((row) => row.id === residentSelect.value));
     profileContext = residentContext(snapshot);
+    residentForm.hidden = !profile;
     for (const key of profileFields) {
-      const value = profile?.[key];
+      const value = profile?.[key] ?? (key === 'absence' ? .12 : key === 'sessionMinutes' ? 14 : undefined);
       field<HTMLTextAreaElement>(residentForm, key).value = Array.isArray(value) ? value.join(',') :
         typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
     }
@@ -157,14 +159,22 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       modelSelect.value = activity?.modelId ?? models[0].id;
       field<HTMLInputElement>(activityForm, 'maxPosts').value = String(activity?.maxPosts ?? 0);
     }
-    const residents = residentProfiles(content).map((row) => ({ id: row.id, label: row.handle }));
-    options(residentSelect, residents);
+    filterResidents();
     query('.session-times').textContent = actions.sessionTimes();
     query('.settings-help').textContent = keyboardHelp.join('\n');
     query('.settings-about').textContent = about(content).join('\n');
     if (!profileDirty) editResident();
     updateStatus();
   }
+  function filterResidents() {
+    if (!snapshot) return;
+    const term = query<HTMLInputElement>('.resident-filter').value.trim().toLocaleLowerCase('ja');
+    const residents = residentProfiles(snapshot).filter((p) => p.id === profile?.id && profileDirty ||
+      `${p.handle} ${p.occupation} ${p.interests.join(' ')} ${p.id}`.toLocaleLowerCase('ja').includes(term))
+      .map((p) => ({ id: p.id, label: `${p.handle} / ${p.occupation}` }));
+    options(residentSelect, residents);
+  }
+  query('.resident-filter').addEventListener('input', () => { filterResidents(); if (!profileDirty) editResident(); });
   residentForm.addEventListener('input', () => { profileDirty = true; });
   async function execute(action: () => Promise<unknown> | unknown) {
     if (busyEpoch === epoch || composing) return;
@@ -238,7 +248,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     for (const key of profileFields) {
       const raw = field<HTMLTextAreaElement>(residentForm, key).value;
       const value = Array.isArray(edited[key]) ? (raw.trim() ? raw.split(',').map((part) => key.endsWith('Hours') ? Number(part.trim()) : part.trim()) : []) :
-        typeof edited[key] === 'number' ? Number(raw) : key === 'affinities' ? JSON.parse(raw) : raw;
+        (typeof edited[key] === 'number' || key === 'absence' || key === 'sessionMinutes') ? Number(raw) : key === 'affinities' ? JSON.parse(raw) : raw;
       Object.assign(edited, { [key]: value });
     }
     const expected = profileContext;
@@ -285,7 +295,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     const accepted = epoch, content = await actions.read(), expected = worldContext(content);
     if (accepted !== epoch) return;
     confirm('world', content, ['投稿・メール・ローカルNetNews記事・登録OSLテキスト・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴・未送信の下書きを削除します。取り消せません。',
-      '必要なら先に JSON を保存してください。最初の10人・82件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。',
+      '必要なら先に JSON を保存してください。最初の100人・82件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。',
       'モデルの重み・端末キャッシュは保持します。AI には再同意が必要です。'], () => actions.run(() => actions.reset(expected)), '初期状態に戻す');
   });
   click('.cache-shell', () => actions.offline.cache());
