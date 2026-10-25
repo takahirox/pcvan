@@ -78,7 +78,7 @@ for (const index of [0, 1]) {
     const savedRead = await command(page, 'READ 4', `${literal}\n\nMAIN\n  結び  `);
     expect(savedRead).not.toContain('References:');
     expect(savedRead).toContain('Subject:   編集した記事  ');
-    expect(savedRead).toContain('Date: Sat, 23 Nov 1996 11:00:00 +0900');
+    expect(savedRead).toContain('Date: Sat, 24 Oct 2026 11:00:00 +0900');
     await command(page, 'REPLY 2', `件名：${group.articles[1]!.subject}`);
     await command(page, '最初の公開返信', '本文='); await command(page, '.END', '親 Message-ID:');
     await command(page, 'EDIT', 'LINE 番号'); await command(page, 'TITLE 件名を変更しても親を保持', '件名を変更');

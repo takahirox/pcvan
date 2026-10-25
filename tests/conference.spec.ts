@@ -51,7 +51,7 @@ test('conference author identity matches shared service tokens, refreshes names 
   }
   expect(tokens.size).toBe(data.members.length);
   const records = structuredClone(state), oldDetails = state.contributions.map((row) => renderContribution(row, state, data.members, calendar));
-  expect(oldDetails[2]![2]).toBe('発言者：(SYN-7MFTMGGA7CMOM) 同名 / 96年11月24日 10:02:03 (JST)');
+  expect(oldDetails[2]![2]).toBe('発言者：(SYN-7MFTMGGA7CMOM) 同名 / 1996年11月24日 10:02:03 (JST)');
   for (const renamed of [false, true]) {
     if (renamed) {
       for (const member of data.members) member.handle = member.actor === 'human' ? '  <i>人間の新名</i>  ' : '住人の新名';
@@ -82,7 +82,7 @@ test('conference safe-name and unknown-author fallbacks apply only to attributio
     member.handle = handle;
     const before = structuredClone({ state, member });
     const detail = renderContribution(row, state, [member]);
-    expect(detail[2]).toBe(`発言者：(${identityToken(member)}) 名無し / 26年10月23日 19:00:00 (JST)`);
+    expect(detail[2]).toBe(`発言者：(${identityToken(member)}) 名無し / 2026年10月23日 19:00:00 (JST)`);
     expect(detail.filter((_, i) => i !== 2)).toEqual(normal.filter((_, i) => i !== 2));
     expect({ state, member }).toEqual(before);
   }
@@ -90,7 +90,7 @@ test('conference safe-name and unknown-author fallbacks apply only to attributio
   // forum-only DEMO fixture exception that conference attribution must not use.
   for (const authorId of ['missing', 'fictional-ai:missing', '<b>key</b>', 'DEMO0001', '01234567-89ab-cdef-0123-456789abcdef']) {
     const missing = { ...row, authorId }, before = structuredClone({ state, missing });
-    expect(renderContribution(missing, state, [member])[2]).toBe('発言者：(不明) 名無し / 26年10月23日 19:00:00 (JST)');
+    expect(renderContribution(missing, state, [member])[2]).toBe('発言者：(不明) 名無し / 2026年10月23日 19:00:00 (JST)');
     expect(renderContribution(missing, state, [member]).filter((_, i) => i !== 2)).toEqual(normal.filter((_, i) => i !== 2));
     expect({ state, missing }).toEqual(before);
   }

@@ -2,7 +2,7 @@ import { decodeMailFile } from './mail-file';
 import type { MailFile } from './mail-file';
 import oslExamples from '../../data/pcvan/daisizen-collections.json' with { type: 'json' };
 import { netNewsGroups, localNetNewsMessageId } from '../netnews';
-import { CALENDAR_SETTING, isHistorical, calendarSetting, scheduleInstant, scheduleTime, SCHEDULE_HORIZON } from '../calendar';
+import { CALENDAR_SETTING, isHistorical, SCHEDULE_HORIZON } from '../calendar';
 import { OLT_SETTING, validateOlt, validateOltMembers } from '../olt-state';
 import { personas, personaMemberId, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentSettings } from '../ai/personas';
@@ -722,11 +722,7 @@ export function validateScheduledMail(value: unknown): asserts value is Schedule
 export function validateScheduledRelations(content: Pick<Backup, 'settings' | 'members' | 'mail'>): void {
   const queue = scheduledMail(content); validateScheduledMail(queue);
   for (const letter of queue.letters) {
-    const calendar = calendarSetting(content);
-    if (!calendar) invalid('Schedules require the durable service calendar.');
-    try {
-      if (scheduleInstant(scheduleTime(letter.dueAt, calendar), calendar, letter.submittedAt) !== letter.dueAt) invalid('Schedule must use minute-resolution service time.');
-    } catch { invalid('Schedule must use minute-resolution service time.'); }
+    if (Date.parse(letter.dueAt) % 60_000 !== 0) invalid('Schedule must use minute-resolution JST time.');
     if (!content.members.some((m) => m.id === letter.senderId && m.actor === 'human') ||
         resolveMailResident(content.members, letter.recipientId).id !== letter.recipientId) invalid('Invalid scheduled correspondents.');
     const mail = content.mail?.find((m) => m.id === `scheduled:${letter.id}`);

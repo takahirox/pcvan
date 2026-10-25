@@ -8,30 +8,30 @@ fixtures, menus or command semantics.
 
 ## Conversational setting
 
-Forum posts, private letters and OLT turns share system guidance placing residents
-in **late-1996 PC-VAN**, without inventing an exact session day. This is a
-reconstructed knowledge horizon: ordinary technology and known outcomes should
-fit the period, while contemporary internet, homepage and web-search discussion
-remains possible according to each resident's interests and experience. Modern
-user references invite a natural response to the subject or a useful question
-about an unfamiliar term; they do not move residents into a modern setting.
-Profiles, handles, board names, excerpts and dates cannot override this guidance.
-Personalities, occupations, interests, affinities, board cultures and each
-service's purpose still shape natural Japanese contributions, without historical
-lectures, forced nostalgia, required catchphrases or provenance announcements.
+Forum posts, private letters and OLT turns share system guidance for **present-day
+interaction in a 1996-inspired PC-VAN community**. The trusted prompt supplies the
+current JST interaction date. The retro interface does not establish a 1996
+calendar or a period knowledge cutoff: modern user experiences and technology
+are contemporary, not future events. Residents retain their personalities,
+occupations, interests, affinities and familiar communication culture. They may
+ask about unfamiliar terms, without inventing current news or facts beyond the
+supplied context. Profiles, handles, board names, excerpts and dates remain
+untrusted data and cannot override the role or system instructions. Contributions
+stay natural Japanese, without historical lectures, forced nostalgia, required
+catchphrases or provenance announcements.
 
-Entry, forum, mail, conference and OLT dates use one stable per-world historical
-calendar in fixed JST, anchored to a fictional week in late November 1996.
-Forum and mail dates project `simulation.simulatedAt ?? createdAt` once;
-already-historical 1996–1997 instants are preserved. Storage timestamps,
-scheduling, retention and elapsed-time calculations remain operational, as do
-timestamps shown in modern Settings. See the
+Entry, forum, mail, conference, OLT, local OSL and local NetNews dates display actual
+stored instants in fixed JST, using four-digit years. Forum and mail select
+`simulation.simulatedAt ?? createdAt`; neither is projected into a fictional year.
+The legacy `historical-calendar` setting remains compatible metadata and does not
+control presentation or scheduling. Storage timestamps, retention, scheduling and
+elapsed-time calculations stay operational. Historical sources and authored
+archival examples keep their dates. See the
 [calendar policy](local-storage.md#historical-display-calendar-issue-67).
-OLT inference receives ordered, speaker-labeled speech excerpts and separate
-presence notices without absolute event timestamps; persisted events retain raw timestamps and terminal readback uses
-the historical calendar. Shared
-setting instructions add no access to other boards or private correspondence.
-No stored or user-authored text is rewritten or filtered for period keywords.
+OLT inference still receives ordered, speaker-labeled speech excerpts and separate
+presence notices without absolute event timestamps. The shared clock guidance
+grants no access to other boards, private correspondence or Settings. No stored
+or user-authored text is rewritten or filtered for period keywords.
 
 The [research and source assessment](research/pcvan-1996-1997.md#resident-conversational-setting-issue-63),
 inspected 2026-10-23, records period NEC/Yahoo and newsletter evidence alongside
@@ -40,8 +40,8 @@ moderate in conversational plausibility, and unverified for real-model adherence
 Source-module tests inspect all three prompts with differing residents/board
 cultures, modern references, role/year-changing instructions and 2026 records.
 They establish prompt construction, bounded context and source immutability,
-not model obedience or historical authenticity. Routine terminal output contains
-no new research commentary.
+not model obedience, factual currency or historical authenticity. Routine terminal
+output contains no new research commentary.
 
 ## Setup and controls
 

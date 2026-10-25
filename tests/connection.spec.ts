@@ -46,7 +46,7 @@ test('missing previous logout is explicit, never inferred from an earlier login'
   const controller = new ConnectionController();
   controller.setSession({ lastLoginAt: '2026-10-23T00:00:00.000Z', lastLogoutAt: null, commandHistory: [] });
   controller.advanceConnection(); controller.advanceConnection();
-  expect(controller.advanceConnection()).toEqual(['前回使用終了: 記録なし (JST)', '今回使用開始: 26年10月23日 09:00:00 (JST)']);
+  expect(controller.advanceConnection()).toEqual(['前回使用終了: 記録なし (JST)', '今回使用開始: 2026年10月23日 09:00:00 (JST)']);
 });
 
 test('fresh entry reaches MAIN naturally with one separate handle invitation and no credential request', async ({ page }) => {

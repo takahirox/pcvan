@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { calendarSetting, scheduleInstant, scheduleTime, SCHEDULE_HORIZON } from '../src/calendar';
+import { scheduleInstant, scheduleTime, SCHEDULE_HORIZON } from '../src/calendar';
 import { scheduledMail } from '../src/storage/schema';
 import type { LocalRepository } from '../src/storage/repository';
 import { backup, command, restore, snapshot, start, enterForum, post } from './terminal-helpers';
@@ -9,19 +9,18 @@ import { mockPendingWorker, mockWorker } from './ai-helpers';
 declare global { interface Window { scheduledRepo: LocalRepository } }
 const epoch = '2026-10-23T01:02:03.000Z';
 const due = '2026-10-23T01:04:00.000Z';
-const calendar = { version: 1 as const, sourceAnchor: epoch };
 
-test('inverse JST projection validates calendar dates, exact limits and midnight/year rollover', () => {
-  expect(scheduleInstant('1996-11-22 10:04', calendar, epoch)).toBe(due);
-  expect(scheduleInstant('1996-11-23 00:00', calendar, epoch)).toBe('2026-10-23T15:00:00.000Z');
-  const later = '2026-12-01T14:59:00.000Z';
-  expect(scheduleInstant('1997-01-01 00:00', calendar, later)).toBe('2026-12-01T15:00:00.000Z');
-  for (const input of ['1996-02-30 10:00', '1996-11-22 24:00', '1996-13-01 00:00', '1996-11-22T10:04',
-    '1996-11-22 10:02', '1996-12-23 10:03', '1996-11-22 10:04:00']) expect(() => scheduleInstant(input, calendar, epoch)).toThrow();
+test('real JST input validates calendar dates, exact limits and midnight/year rollover', () => {
+  expect(scheduleInstant('2026-10-23 10:04', epoch)).toBe(due);
+  expect(scheduleInstant('2026-10-24 00:00', epoch)).toBe('2026-10-23T15:00:00.000Z');
+  const later = '2026-12-31T14:59:00.000Z';
+  expect(scheduleInstant('2027-01-01 00:00', later)).toBe('2026-12-31T15:00:00.000Z');
+  for (const input of ['2026-02-30 10:00', '2026-10-23 24:00', '2026-13-01 00:00', '2026-10-23T10:04',
+    '2026-10-23 10:02', '2026-11-23 10:03', '2026-10-23 10:04:00']) expect(() => scheduleInstant(input, epoch)).toThrow();
   const minute = '2026-10-23T01:02:00.000Z';
   const limit = new Date(Date.parse(minute) + SCHEDULE_HORIZON).toISOString();
-  expect(scheduleInstant(scheduleTime(limit, calendar), calendar, minute)).toBe(limit);
-  expect(() => scheduleInstant(scheduleTime(new Date(Date.parse(limit) + 60_000).toISOString(), calendar), calendar, minute)).toThrow();
+  expect(scheduleInstant(scheduleTime(limit), minute)).toBe(limit);
+  expect(() => scheduleInstant(scheduleTime(new Date(Date.parse(limit) + 60_000).toISOString()), minute)).toThrow();
 });
 
 test.describe('scheduled repository', () => {
@@ -172,7 +171,11 @@ test.describe('scheduled repository', () => {
     const result = await page.evaluate(async ({ due, epoch }) => {
       const repo = window.scheduledRepo, senderId = (await repo.list('members')).find((m) => m.actor === 'human')!.id;
       const draft = { id: 'P-restore', senderId, recipientId: 'fictional-ai:hoshimori', recipientLabel: '星守', subject: '復元', body: '本文', dueAt: due };
-      await repo.scheduleHumanMail(draft); const json = await repo.exportJson();
+      await repo.scheduleHumanMail(draft);
+      // A backup approved under the old fictional calendar keeps the absolute due instant.
+      const legacy = await repo.exportBackup();
+      legacy.settings.find((s) => s.id === 'historical-calendar')!.value = { version: 1, sourceAnchor: '2024-11-20T01:00:00.000Z' };
+      const json = JSON.stringify(legacy);
       const rp = '/src/storage/repository.ts'; const old = await (await import(rp)).openRepository('scheduled-world') as LocalRepository;
       await repo.replaceFromJson(json, { confirmReplace: true });
       const codes: string[] = [];
@@ -185,6 +188,7 @@ test.describe('scheduled repository', () => {
       const completed = await repo.exportJson(); await repo.replaceFromJson(completed, { confirmReplace: true });
       return { codes, restored, late, again: await repo.reconcileScheduledMail('2026-12-01T00:00:00.000Z') };
     }, { due, epoch });
+    expect(result.restored.settings.find((s) => s.id === 'historical-calendar')!.value).toEqual({ version: 1, sourceAnchor: '2024-11-20T01:00:00.000Z' });
     expect(result.codes).toEqual(['stale', 'stale', 'stale']);
     expect(scheduledMail(result.restored).letters[0]!.dueAt).toBe(due); expect(result.late).toHaveLength(1); expect(result.again).toEqual([]);
   });
@@ -246,18 +250,20 @@ for (const [index, route] of [['1'], ['X'], ['13', '2', 'MAIL']].entries()) {
       await page.clock.install({ time: new Date(epoch) }); await page.clock.setFixedTime(new Date(epoch)); await mockWorker(page, 'ok'); await start(page, '予約する人');
       for (const step of route) await command(page, step, 'コマンド=');
       expect(await command(page, 'HELP', 'コマンド=')).toContain('WRITE-AT');
-      const begin = await command(page, 'WRITE-AT hoshimori', '配達日時='); expect(begin).toContain('1996-11-22 10:02');
-      await command(page, '1996-02-30 10:04', '実在する日時');
-      await command(page, '1996-11-22 10:02', '30日以内');
-      await command(page, '1996-11-22 10:04', '件名='); await command(page, '  日本語の予約  ', '本文');
+      const begin = await command(page, 'WRITE-AT hoshimori', '配達日時='); expect(begin).toContain('2026-10-23 10:02');
+      await command(page, '2026-02-30 10:04', '実在する日時');
+      await command(page, '2026-10-23 10:02', '30日以内');
+      await command(page, '2026-11-23 10:04', '30日以内');
+      expect(scheduledMail(await snapshot(page)).letters).toEqual([]);
+      await command(page, '2026-10-23 10:04', '件名='); await command(page, '  日本語の予約  ', '本文');
       await command(page, '  最初  ', '本文='); await command(page, '', '本文='); await command(page, '.TEXT MAIN', '本文=');
-      expect(await command(page, '.END', '予約として保存しますか')).toContain('配達予定：1996-11-22 10:04');
+      expect(await command(page, '.END', '予約として保存しますか')).toContain('配達予定：2026-10-23 10:04');
       await command(page, 'EDIT', 'LINE 番号'); await command(page, 'LINE 1   編集  ', '本文を変更'); await command(page, 'REVIEW', '予約として保存しますか');
       await command(page, '', 'Y / N / EDIT'); expect(scheduledMail(await snapshot(page)).letters).toEqual([]);
       await command(page, 'Y', '予約 P-'); await command(page, 'PENDING', '配達待ち：1件');
       const saved = await snapshot(page), letter = scheduledMail(saved).letters[0]!;
       expect(saved.mail).toEqual([]); expect(letter).toMatchObject({ dueAt: due, subject: '  日本語の予約  ', body: '  編集  \n\nMAIN' });
-      expect(saved.session!.commandHistory).not.toContain('WRITE-AT hoshimori'); expect(saved.session!.commandHistory).not.toContain('1996-11-22 10:04');
+      expect(saved.session!.commandHistory).not.toContain('WRITE-AT hoshimori'); expect(saved.session!.commandHistory).not.toContain('2026-10-23 10:04');
       expect(saved.session!.commandHistory).not.toContain('  日本語の予約  ');
       expect(await command(page, `READ-PENDING ${letter.id}`, '★内容')).toContain('  編集  \n\nMAIN');
       const exported = await backup(page); await page.reload(); await page.locator('#command').press('Escape');
@@ -267,7 +273,7 @@ for (const [index, route] of [['1'], ['X'], ['13', '2', 'MAIL']].entries()) {
       await command(page, 'PENDING', '配達待ち：0件');
       await restore(page, exported); await command(page, 'MAIN', 'MAIN'); for (const step of route) await command(page, step, 'コマンド=');
       await page.clock.setFixedTime(new Date(due)); await command(page, 'SENT', 'メール一覧：1件');
-      expect(await command(page, 'READ 1', '★内容')).toContain('配達予定：96年11月22日 10:04:00');
+      expect(await command(page, 'READ 1', '★内容')).toContain('配達予定：2026年10月23日 10:04:00');
       await command(page, 'PENDING', '配達待ち：0件'); await command(page, 'BACK', index === 0 ? '電子メール' : index === 1 ? '旧電子メール' : '大自然');
       if (index < 2) await command(page, 'BACK', 'MAIN');
       const final = await snapshot(page); expect(final.mail).toHaveLength(1); expect(final.mail![0]!.recipientConfirmation).toBeUndefined();
@@ -283,10 +289,10 @@ test('expiry retains draft and requires new time/review; active release preserve
     await command(page, `WRITE-AT ${address}`, '日時指定は既存のローカル住人'); await command(page, '.CANCEL', 'メールを中止');
   }
   await command(page, 'WRITE-AT', '宛先='); await command(page, 'hoshimori', '配達日時=');
-  await command(page, '1996-11-22 10:04', '件名='); await command(page, '期限', '本文'); await command(page, '保つ本文', '本文='); await command(page, '.END', '予約として保存しますか');
+  await command(page, '2026-10-23 10:04', '件名='); await command(page, '期限', '本文'); await command(page, '保つ本文', '本文='); await command(page, '.END', '予約として保存しますか');
   await page.clock.setFixedTime(new Date(due)); await command(page, 'Y', '新しい日時を選び');
   expect(scheduledMail(await snapshot(page)).letters).toEqual([]);
-  expect(await command(page, '1996-11-22 10:05', '予約として保存しますか')).toContain('保つ本文'); await command(page, 'Y', '予約 P-');
+  expect(await command(page, '2026-10-23 10:05', '予約として保存しますか')).toContain('保つ本文'); await command(page, 'Y', '予約 P-');
   await command(page, 'WRITE kusabue', '件名='); await page.locator('#command').fill('変換している題');
   await page.locator('#command').dispatchEvent('compositionstart'); await page.locator('#command').press('Enter');
   const output = await page.locator('.output').textContent();
@@ -315,7 +321,7 @@ test('scheduled composer retries a failed save but consumes a committed draft wh
     const composer = new TerminalComposer({ keyword: 'MAIL', name: '住人' }, 'human', undefined, {
       print: (...lines) => { if (failOutput) throw new Error('output'); outputs.push(...lines); },
       save: async () => { if (++saves === 1) throw new Error('quota'); failOutput = true; return { pendingReference: 'P-retry', status: 'pending' }; },
-    }, 'mail', '', undefined, { prompt: () => ['配達日時='], parse: () => due, valid: () => true, label: () => '1996-11-22 10:04' });
+    }, 'mail', '', undefined, { prompt: () => ['配達日時='], parse: () => due, valid: () => true, label: () => '2026-10-23 10:04' });
     for (const line of ['time', '題', '本文', '.END', 'Y']) await composer.submit(line);
     const retryable = composer.active;
     try { await composer.submit('Y'); } catch { /* The save committed before output failed. */ }
@@ -331,7 +337,7 @@ test('inline registration, pinned recipient after rename, rapid queued review an
   await command(page, 'X', '旧電子メール'); await command(page, 'WRITE-AT hoshimori', '登録しますか');
   await command(page, 'Y', 'ハンドル名='); await command(page, '新しい差出人', '配達日時=');
   const initial = await snapshot(page), resident = initial.members.find((m) => m.id === 'fictional-ai:hoshimori')!;
-  await command(page, '1996-11-22 10:04', '件名=');
+  await command(page, '2026-10-23 10:04', '件名=');
   await page.evaluate(async (resident) => {
     const db = await new Promise<IDBDatabase>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => resolve(r.result); });
     await new Promise<void>((resolve) => { const tx = db.transaction('members', 'readwrite');
@@ -366,7 +372,7 @@ for (const operation of ['reset', 'restore'] as const) {
       await page.clock.install({ time: new Date(epoch) }); await page.clock.setFixedTime(new Date(epoch)); await start(page, '古い予約');
       const other = await context.newPage(); await other.clock.install({ time: new Date(epoch) }); await other.clock.setFixedTime(new Date(epoch));
       await other.goto('/'); await other.locator('#command').press('Escape'); await command(other, 'MAIN', 'MAIN'); await command(other, '1', '電子メール');
-      await command(other, 'WRITE-AT hoshimori', '配達日時='); await command(other, '1996-11-22 10:04', '件名=');
+      await command(other, 'WRITE-AT hoshimori', '配達日時='); await command(other, '2026-10-23 10:04', '件名=');
       await command(other, '古い予約の題', '本文'); await command(other, '保存しない本文', '本文='); await command(other, '.END', '予約として保存しますか');
       if (stage === 'cancellation') {
         await command(other, 'Y', '予約 P-'); const letter = scheduledMail(await snapshot(page)).letters[0]!;
@@ -394,7 +400,7 @@ test('a focus resume releases overdue mail beyond the AI window without download
   const external: string[] = []; page.on('request', (r) => { if (!r.url().startsWith('http://127.0.0.1:14373/')) external.push(r.url()); });
   await page.clock.install({ time: new Date(epoch) }); await page.clock.setFixedTime(new Date(epoch)); await mockWorker(page, 'ok'); await start(page, '再開する人');
   await command(page, '1', '電子メール'); await command(page, 'WRITE-AT hoshimori', '配達日時=');
-  await command(page, '1996-11-22 10:04', '件名='); await command(page, '遅い起床', '本文'); await command(page, '待っていた便り', '本文=');
+  await command(page, '2026-10-23 10:04', '件名='); await command(page, '遅い起床', '本文'); await command(page, '待っていた便り', '本文=');
   await command(page, '.END', '予約として保存しますか'); await command(page, 'Y', '予約 P-');
   await page.clock.setFixedTime(new Date('2026-12-01T00:00:00.000Z')); await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect.poll(async () => (await snapshot(page)).mail!.length).toBe(1);
@@ -409,7 +415,7 @@ test('active delivery continues while a resident generation is waiting indefinit
   await mockPendingWorker(page, 'generate'); await start(page, '生成を待つ人'); await lifestyles(page);
   await enterForum(page); await post(page, '人間の星', '人間の星について観察しました。');
   await command(page, 'MAIN', 'MAIN'); await command(page, '1', '電子メール');
-  await command(page, 'WRITE-AT hoshimori', '配達日時='); await command(page, '1996-11-22 12:04', '件名=');
+  await command(page, 'WRITE-AT hoshimori', '配達日時='); await command(page, '2026-10-23 12:04', '件名=');
   await command(page, '独立した配達', '本文'); await command(page, '生成を待たずに届ける本文', '本文=');
   await command(page, '.END', '予約として保存しますか'); await command(page, 'Y', '予約 P-'); await consent(page);
   await page.clock.setFixedTime(new Date('2026-10-23T02:03:03.000Z')); await page.clock.fastForward(61 * 60_000);

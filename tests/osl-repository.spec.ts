@@ -62,7 +62,7 @@ test('OSL atomically allocates category numbers, rejects collisions, deduplicate
   expect(result.prompts[1]).toEqual(result.prompts[0]);
   expect(result.catalog[1]!.body).toBe('  日本語　ｶﾅ <b>文字</b>  \n\nMAIN\n.END\n');
   expect(result.catalog[1]!.author).toMatch(/^記録係 \(SYN-[A-Z0-9]+\)$/);
-  expect(result.catalog[1]!.date).toBe('96年11月23日 11:00:00');
+  expect(result.catalog[1]!.date).toBe('2026年10月24日 11:00:00');
 });
 
 test('OSL validates direct settings and atomic restores, preserves legacy/empty state, rolls back quota failures and fences stale worlds', async ({ page }) => {

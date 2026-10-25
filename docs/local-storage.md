@@ -114,7 +114,7 @@ in four threads to DAISIZEN 2/4/6 in the same bootstrap transaction. The complet
 baseline is **82 posts, 26 threads, 15 boards**. The 100 resident IDs and all 72
 established posts remain unchanged. New IDs use `seed:forums-v1:` and provenance
 `local-seed:forum-starters-v1`; timestamps follow the same fixed JST day convention
-and historical-calendar display anchor. Board names retain their historical evidence
+and actual stored dates in fixed JST. Board names retain their historical evidence
 limits; all conversations are original fiction. See the
 [route inventory](sig-navigation.md#public-forum-content-inventory-issue-131).
 
@@ -232,7 +232,7 @@ but are outside this evidence-backed directory.
 
 The post renderer preserves the exact title/body strings, including full-width
 spaces, blank lines, trailing spaces, and literal HTML. Dates use the shared
-historical JST presentation calendar described below. `displaySecondNumber` is
+actual JST presentation described below. `displaySecondNumber` is
 displayed only when present;
 its meaning is unknown, and it is not a total, reply parent, or pagination limit.
 The renderer accepts an optional explicit line-count display value, but the app
@@ -600,8 +600,8 @@ the optional field remain valid, including old reply pairs, with no inferred
 backfill. New evidence and exact timestamps survive export/import/reload. Older
 app versions reject the unknown field without replacing data. Reset removes all
 mail/evidence; reset/restore preserve cross-tab and in-flight generation fences.
-The calendar displays `at` using the existing fixed mapping and considers it in
-legacy timestamp fallback; projected strings are never stored.
+The terminal displays the actual `at` instant in fixed JST. Legacy metadata
+initialization still considers it; formatted strings are never stored.
 
 ## Repeatable checks
 
@@ -730,52 +730,35 @@ conference operations do not reschedule residents or change forum/mail counters.
 
 ## Historical display calendar (Issue #67)
 
-`historical-calendar` is a reserved, strictly validated setting with exactly
-`{ version: 1, sourceAnchor: "<canonical UTC ISO timestamp>" }`. It is part of the
-existing version-1 JSON backup, without a database upgrade or dependency.
-`sourceAnchor` must be outside the JST years 1996–1997. Its historical anchor is
-derived, never separately editable: the same weekday and JST time of day in
-1996-11-18 through 1996-11-24. Presentation projects each operational instant as
-`H + (instant - A)`, then formats in fixed JST, independent of browser timezone.
-Gregorian day, month, leap and year boundaries advance normally; there is no
-annual wrap or per-render year substitution. Seed history can precede that week.
+Issue #137 replaces the fictional display projection with actual operational
+instants in fixed **JST (UTC+09:00)**. All local service formatters show four-digit
+years, independent of browser timezone. Forum/mail select
+`simulation.simulatedAt ?? createdAt`; commit time and catch-up event time remain
+distinct. No timestamp, authored text, message, identity, counter, reply, read
+watermark, consent, schedule or presence record is rewritten. Historical source
+dates and authored archival examples (including OSL date-only metadata and bundled
+NetNews headers) keep their dates. Existing worlds need no reset or reseed.
 
-Direct writes cannot change an existing anchor or delete its setting.
-Initialization reads and adds the setting inside the existing all-store write
-transaction, so competing tabs agree. Fresh activation/reset uses the creation
-instant. Existing operational `community-world.createdAt` takes priority and is
-never overwritten by calendar initialization. For a legacy document without a
-usable operational world marker, the deterministic fallback is the earliest
-operational timestamp among post/mail creation and simulation times, mail read
-times, conference contributions, local NetNews creation, session login/logout,
-AI activity watermark, batch endpoints and runs (including pending runs), next-due values, and OLT
-window/observation/due/lease/line times. Arbitrary settings, text, titles and
-fixture date strings are not scanned. The same dated backup therefore derives
-the same mapping at different restoration times. Import initializes atomically
-before new session/activity writes can contaminate that evidence; failures roll
-back the entire import, including the mapping.
+`historical-calendar` remains a reserved, strictly validated compatibility setting
+with exactly `{ version: 1, sourceAnchor: "<canonical UTC ISO timestamp>" }`.
+It remains in version-1 JSON backups; no database upgrade is needed. It no longer
+controls display or scheduled-mail parsing, validation or release. Existing saved
+anchors survive export/import unchanged. Generic writes still cannot replace or
+delete them. The existing atomic initialization remains for compatibility: fresh
+worlds use creation time; legacy worlds prefer operational world provenance,
+then their earliest timestamp evidence. Historical-only data retains the legacy
+deterministic +28-UTC-year surrogate metadata; entirely undated data uses activation
+time. That fallback never changes a displayed year or a stored activity instant.
+Import failures still roll back the entire replacement, including metadata.
 
-A canonical instant whose **JST** year is 1996 or 1997 is conservatively treated
-as already historical and formatted directly. This is an import assumption,
-not authentication. Such a `community-world` marker is provenance, never the
-source anchor for contemporary activity. If *all* dated evidence is historical,
-use its earliest instant plus 28 UTC years as a deterministic operational
-surrogate (1996/1997 → 2024/2025, including leap day). The new contemporary events
-then follow the same elapsed-time formula; their dates may already be beyond
-1997. Historical records stay unchanged. Only an entirely undated document uses
-its first activation/import instant. Once saved, the mapping takes priority over
-all fallback evidence, including newly arriving catch-up records.
-
-Forum/mail choose `simulation.simulatedAt ?? createdAt` before projecting once;
-`simulatedAt` is an operational catch-up event time, not an already shifted date.
-Rendering never writes records. Creation/commit time, simulation provenance,
-mail `readAt`, IDs, counters, replies, ordering, read watermarks, session history,
-AI consent/due times and OLT expiry/retention retain their operational semantics.
-Reset discards the old calendar and creates a new mapping atomically. Backup
-restoration retains an existing mapping exactly. Authored dates, user text and
-OSL date-only metadata are never translated. Modern Settings retains actual UTC
-session times and raw provenance. The epoch, JST policy and non-forum layouts
-are disclosed reconstructions; see the [research record](research/pcvan-1996-1997.md#shared-historical-calendar-issue-67).
+`WRITE-AT` parses actual `YYYY-MM-DD HH:mm` JST input directly to UTC, checks the
+real future/30-day horizon and stores the absolute due instant once. Backup
+validation checks whole-minute precision and the original elapsed-time horizon
+without consulting legacy anchors. Previously approved schedules remain at their
+stored instants, including across reload and JSON restore. Modern Settings keeps
+raw UTC provenance. The 1996-inspired interface and source research remain
+separate from the interaction clock; see the
+[research record](research/pcvan-1996-1997.md#shared-historical-calendar-issue-67).
 
 ## NetNews persistence
 
@@ -834,8 +817,8 @@ Direct writes and JSON replacement validate all categories, counters, unique
 IDs/numbers/names, timestamps, text limits and human references before committing.
 The v1 backup envelope and database version stay unchanged. Missing state in a
 legacy backup and explicit empty state both yield an empty authored catalog;
-reading never initializes it. Reset removes it. Display projects operational dates
-through the existing historical calendar without rewriting them. Original OSL
+reading never initializes it. Reset removes it. Display formats actual operational dates
+in fixed JST without projecting or rewriting them. Original OSL
 text stays outside other participation collections and resident-generation context.
 See [usage and exact text representation](../README.md#menu-destinations-and-collections)
 and [research boundaries](research/pcvan-1996-1997.md#browser-local-osl-registration-issue-121).
@@ -854,7 +837,7 @@ acknowledgements. Referenced actors and released mail cannot be individually
 removed while the schedule record exists. No schedules are seeded.
 
 `scheduleHumanMail()` validates the complete request, actors, minute-resolution
-calendar mapping and future/30-day horizon; exact retries return the existing
+real JST input and future/30-day horizon; exact retries return the existing
 record even after cancellation or release. `cancelScheduledMail()` and
 `reconcileScheduledMail()` serialize in the existing all-store transaction. Due
 ordering is due instant, submission instant, then stable reference. Release inserts

@@ -194,9 +194,9 @@ test('presentation reuses forum tokens and safe names for every line kind withou
     const name = member ? '同じ名前' : '名無し';
     if (member) labels.add(token);
     expect(printed[1]).toContain(`(${token}) ${name}`);
-    expect(printed).toContain(`26年10月21日 22:04:00 (${token}) <${name}> ${literal}`);
-    expect(printed).toContain(`26年10月21日 22:04:00 (${token}) * ${name} 入室`);
-    expect(printed).toContain(`26年10月21日 22:04:00 (${token}) * ${name} 退室`);
+    expect(printed).toContain(`2026年10月21日 22:04:00 (${token}) <${name}> ${literal}`);
+    expect(printed).toContain(`2026年10月21日 22:04:00 (${token}) * ${name} 入室`);
+    expect(printed).toContain(`2026年10月21日 22:04:00 (${token}) * ${name} 退室`);
   }
   expect(labels.size).toBe(data.members.length);
   expect(printed[1]).toContain('参加者：8人');

@@ -7,24 +7,17 @@ export interface HistoricalCalendar { version: 1; sourceAnchor: string }
 const day = 86_400_000;
 const jst = 9 * 3_600_000;
 
-/** Canonical target-era instants are conservative legacy imports, never shifted twice. */
+/** Legacy metadata classification only; never used for date presentation. */
 export function isHistorical(instant: string): boolean {
   const year = new Date(Date.parse(instant) + jst).getUTCFullYear();
   return year === 1996 || year === 1997;
-}
-
-/** H is the matching weekday and JST time in the fictional week Nov 18–24. */
-export function historicalAnchor(sourceAnchor: string): number {
-  const local = new Date(Date.parse(sourceAnchor) + jst);
-  return Date.UTC(1996, 10, 18 + (local.getUTCDay() + 6) % 7) - jst +
-    ((local.getTime() % day) + day) % day;
 }
 
 export function calendarSetting(content: { settings?: Backup['settings'] }): HistoricalCalendar | undefined {
   return content.settings?.find((s) => s.id === CALENDAR_SETTING)?.value as unknown as HistoricalCalendar | undefined;
 }
 
-/** Legacy fallback examines timestamp fields only, never authored text or fixture metadata.
+/** Compatibility metadata fallback examines timestamp fields only, never authored text or fixture metadata.
  * Prefer operational world provenance; otherwise use the earliest operational record
  * (including pending catch-up runs). Historical-only data uses its earliest instant
  * plus 28 UTC years as a deterministic surrogate source clock, never the era marker
@@ -59,29 +52,26 @@ export function initialCalendar(content: Backup, now: string): HistoricalCalenda
   return { version: 1, sourceAnchor: surrogate.toISOString() };
 }
 
-/** Presentation only. No browser timezone, mutation, per-render epoch or year wrapping. */
-export function serviceDate(instant: string, calendar?: HistoricalCalendar, style: 'date' | 'forum' | 'netnews' = 'date'): string {
-  const source = Date.parse(instant);
-  const projected = calendar && !isHistorical(instant)
-    ? historicalAnchor(calendar.sourceAnchor) + source - Date.parse(calendar.sourceAnchor) : source;
-  const date = new Date(projected + jst).toISOString();
-  if (style === 'netnews') return `${new Date(projected + jst).toUTCString().replace(' GMT', '')} +0900`;
-  if (style === 'forum') return `${date.slice(2, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}  ${date.slice(11, 16)}`;
-  return `${date.slice(2, 4)}年${date.slice(5, 7)}月${date.slice(8, 10)}日 ${date.slice(11, 19)}`;
+/** Actual stored instant in fixed JST. Legacy metadata is accepted but never projects dates. */
+export function serviceDate(instant: string, _calendar?: HistoricalCalendar, style: 'date' | 'forum' | 'netnews' = 'date'): string {
+  const local = new Date(Date.parse(instant) + jst);
+  const date = local.toISOString();
+  if (style === 'netnews') return `${local.toUTCString().replace(' GMT', '')} +0900`;
+  if (style === 'forum') return `${date.slice(0, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}  ${date.slice(11, 16)}`;
+  return `${date.slice(0, 4)}年${date.slice(5, 7)}月${date.slice(8, 10)}日 ${date.slice(11, 19)}`;
 }
 
 export const SCHEDULE_HORIZON = 30 * day;
-/** Input and inverse projection use UTC arithmetic only; the UI calendar is JST. */
-export function scheduleTime(instant: string, calendar: HistoricalCalendar): string {
-  const projected = historicalAnchor(calendar.sourceAnchor) + Date.parse(instant) - Date.parse(calendar.sourceAnchor);
-  return new Date(projected + jst).toISOString().slice(0, 16).replace('T', ' ');
+/** Real JST input/output uses UTC arithmetic, independent of legacy calendar metadata. */
+export function scheduleTime(instant: string): string {
+  return new Date(Date.parse(instant) + jst).toISOString().slice(0, 16).replace('T', ' ');
 }
-export function scheduleInstant(input: string, calendar: HistoricalCalendar, now: string): string {
+export function scheduleInstant(input: string, now: string): string {
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(input)) throw new Error('YYYY-MM-DD HH:mm (JST)');
   const local = Date.parse(`${input.replace(' ', 'T')}:00.000Z`);
   if (!Number.isFinite(local) || new Date(local).toISOString().slice(0, 16).replace('T', ' ') !== input)
     throw new Error('実在する日時を入力してください。');
-  const due = local - jst - historicalAnchor(calendar.sourceAnchor) + Date.parse(calendar.sourceAnchor);
+  const due = local - jst;
   if (due <= Date.parse(now) || due > Date.parse(now) + SCHEDULE_HORIZON) throw new Error('現在より後、30日以内の日時を入力してください。');
   return new Date(due).toISOString();
 }

@@ -5,7 +5,7 @@ import { random } from './activity';
 import { appendOlt, attendance, iso, oltAuthorization, oltEnabled, roomDefinitions, validOltText } from '../olt-state';
 import type { OltRoom, OltState, OltTurn } from '../olt-state';
 import { localConversation } from '../storage/community';
-import { historicalSetting } from './setting';
+import { residentSetting } from './setting';
 
 /** Called inside the repository's write transaction. Attempts survive reload/tabs. */
 export function planOltTurn(state: OltState, room: OltRoom, content: Backup, at: number, token: string): OltTurn | undefined {
@@ -57,7 +57,7 @@ export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn): G
   const addressee = target && target.authorId !== turn.authorId && present.includes(target.authorId) ? identify(target.authorId) : null;
   return {
     system: 'Write one short original fictional Japanese OLT chat utterance as the supplied fictional resident. '
-      + historicalSetting
+      + residentSetting()
       + (room.id === 'wakaba' ? 'This is a beginner room: welcome basic questions in plain language, avoid assuming experience, and respect quiet reading. Never demand speech or promise a reply. ' : '')
       + 'Return only the requested JSON. This is local fiction, never a real remote person or historical transcript. '
       + 'Use one or two conversational sentences, not a forum post. You may greet, answer, or speak to another PRESENT resident. '

@@ -1,20 +1,23 @@
 import { expect, test } from '@playwright/test';
-import { initialCalendar, serviceDate, historicalAnchor, calendarSetting } from '../src/calendar';
+import { initialCalendar, serviceDate, calendarSetting } from '../src/calendar';
 import { ConnectionController } from '../src/connection';
 import { renderPost } from '../src/forums';
 import { identityToken } from '../src/member-presentation';
 import { renderMail, renderMailList } from '../src/mail';
 import { renderContribution, starterConference, conferenceState } from '../src/conference';
 import { validateRecord } from '../src/storage/schema';
+import { mockWorker } from './ai-helpers';
+import { consent } from './autonomy-helpers';
+import { residents, advance, speech } from './olt-helpers';
 import { activityFixture, backupFixture } from './backup-fixture';
 import { backup, command, enterForum, post, restore, snapshot, start } from './terminal-helpers';
 
 const anchor = '2026-10-23T01:02:03.000Z';
 const calendar = { version: 1 as const, sourceAnchor: anchor };
 const setting = { id: 'historical-calendar', value: calendar };
-const stamp = '96年11月22日 10:02:03';
+const stamp = '2026年10月23日 10:02:03';
 
-test('one fixed calendar formats entry, forum, mail and conference without changing effective times or literal text', () => {
+test('real JST formats entry, forum, mail and conference without changing effective times or literal text', () => {
   const data = backupFixture(); data.settings.push(setting);
   const literal = '2026-10-23 / 1996-11-22 / 97年01月01日';
   const post = { ...data.posts[0]!, createdAt: anchor, title: literal, body: literal };
@@ -25,38 +28,37 @@ test('one fixed calendar formats entry, forum, mail and conference without chang
   controller.setSession({ lastLoginAt: anchor, lastLogoutAt: null, commandHistory: [] });
   controller.advanceConnection(); controller.advanceConnection();
   expect(controller.advanceConnection()).toEqual(['前回使用終了: 記録なし (JST)', `今回使用開始: ${stamp} (JST)`]);
-  expect(renderPost(post, '広場', undefined, data.members, calendar)[1]).toContain('96/11/22  10:02');
+  expect(renderPost(post, '広場', undefined, data.members, calendar)[1]).toContain('2026/10/23  10:02');
   expect(renderMailList([mail], data.members, 'human', 'SENT', calendar).join('\n')).toContain(stamp);
   expect(renderMail(mail, data.members, [mail], calendar)).toContain(`日時：${stamp} (JST)`);
   expect(renderContribution(row, state, data.members, calendar).join('\n')).toContain(stamp);
   for (const rendered of [renderPost(post, '広場', undefined, data.members, calendar), renderMail(mail, data.members, [mail], calendar), renderContribution(row, state, data.members, calendar)]) expect(rendered).toContain(literal);
   for (const record of [post, mail]) {
     const caughtUp = { ...record, simulation: { runId: record.id, simulatedAt: '2026-10-21T14:30:00.000Z', fictional: true as const } };
-    if ('title' in caughtUp) expect(renderPost(caughtUp, '広場', undefined, data.members, calendar)[1]).toContain('96/11/20  23:30');
+    if ('title' in caughtUp) expect(renderPost(caughtUp, '広場', undefined, data.members, calendar)[1]).toContain('2026/10/21  23:30');
     else {
-      expect(renderMail(caughtUp, data.members, [mail], calendar)).toContain('日時：96年11月20日 23:30:00 (JST)');
-      expect(renderMailList([caughtUp], data.members, 'human', 'SENT', calendar).join('\n')).toContain('96年11月20日 23:30:00');
+      expect(renderMail(caughtUp, data.members, [mail], calendar)).toContain('日時：2026年10月21日 23:30:00 (JST)');
+      expect(renderMailList([caughtUp], data.members, 'human', 'SENT', calendar).join('\n')).toContain('2026年10月21日 23:30:00');
     }
   }
   expect([post, mail, row]).toEqual(before);
 });
 
 test('JST midnight, month/year rollover, leap input and historical imports have independent expected values', () => {
-  expect(historicalAnchor(anchor)).toBe(Date.parse('1996-11-22T01:02:03.000Z'));
   for (const [input, expected] of [
-    ['2026-10-23T14:59:59.000Z', '96年11月22日 23:59:59'],
-    ['2026-10-23T15:00:00.000Z', '96年11月23日 00:00:00'],
-    ['2026-10-31T15:00:00.000Z', '96年12月01日 00:00:00'],
-    ['2026-12-01T15:00:00.000Z', '97年01月01日 00:00:00'],
-    ['1996-02-28T15:00:00.000Z', '96年02月29日 00:00:00'],
-    ['1997-12-31T14:59:59.000Z', '97年12月31日 23:59:59'],
+    ['2026-10-23T14:59:59.000Z', '2026年10月23日 23:59:59'],
+    ['2026-10-23T15:00:00.000Z', '2026年10月24日 00:00:00'],
+    ['2026-10-31T15:00:00.000Z', '2026年11月01日 00:00:00'],
+    ['2026-12-31T15:00:00.000Z', '2027年01月01日 00:00:00'],
+    ['1996-02-28T15:00:00.000Z', '1996年02月29日 00:00:00'],
+    ['1997-12-31T14:59:59.000Z', '1997年12月31日 23:59:59'],
   ]) {
     expect(serviceDate(input!, calendar)).toBe(expected);
     expect(serviceDate(input!, calendar)).toBe(expected); // rendering never compounds
   }
-  expect(serviceDate('2028-02-29T15:00:00.000Z', { version: 1, sourceAnchor: '2028-02-28T00:00:00.000Z' })).toBe('96年11月20日 00:00:00');
-  // Historical detection uses JST, including the UTC edge of the first era day.
-  expect(serviceDate('1995-12-31T15:00:00.000Z', calendar)).toBe('96年01月01日 00:00:00');
+  expect(serviceDate('2028-02-29T15:00:00.000Z', { version: 1, sourceAnchor: '2028-02-28T00:00:00.000Z' })).toBe('2028年03月01日 00:00:00');
+  // Historical instants use the same JST arithmetic, including the UTC year edge.
+  expect(serviceDate('1995-12-31T15:00:00.000Z', calendar)).toBe('1996年01月01日 00:00:00');
 });
 
 test('legacy fallback uses only timestamp fields; historical-only provenance uses a deterministic non-era source', () => {
@@ -75,27 +77,33 @@ test('legacy fallback uses only timestamp fields; historical-only provenance use
   const historical = initialCalendar(data, anchor);
   expect(historical.sourceAnchor).toBe('2024-11-20T01:00:00.000Z');
   expect(initialCalendar(data, '2030-01-01T00:00:00.000Z')).toEqual(historical);
-  expect(serviceDate('1996-11-20T01:00:00.000Z', historical)).toBe('96年11月20日 10:00:00');
-  expect(serviceDate(anchor, historical)).toBe('98年10月23日 10:02:03');
+  expect(serviceDate('1996-11-20T01:00:00.000Z', historical)).toBe('1996年11月20日 10:00:00');
+  expect(serviceDate(anchor, historical)).toBe('2026年10月23日 10:02:03');
   expect(initialCalendar({ ...data, settings: [], posts: [] }, anchor)).toEqual(calendar);
   for (const value of [{ version: 2, sourceAnchor: anchor }, { version: 1, sourceAnchor: '1996-11-20T00:00:00.000Z' }, { version: 1, sourceAnchor: '2026-10-23' }, { ...calendar, extra: true }, { version: 1 }]) expect(() => validateRecord('settings', { id: 'historical-calendar', value })).toThrow();
 });
 
-for (const timezoneId of ['Asia/Tokyo', 'America/Los_Angeles']) {
+for (const [timezoneId, anchor, stamp, forumStamp, replyStamp] of [
+  ['Asia/Tokyo', '2026-10-23T01:02:03.000Z', '2026年10月23日 10:02:03', '2026/10/23  10:02', '2026年10月23日 10:02:23'],
+  ['America/Los_Angeles', '2027-12-31T14:59:50.000Z', '2027年12月31日 23:59:50', '2027/12/31  23:59', '2028年01月01日 00:00:10'],
+] as const) {
   test(`production connected journey, live/replayed OLT, reload, backup and tabs (${timezoneId})`, async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 320, height: 640 }, timezoneId, reducedMotion: 'reduce' });
     const page = await context.newPage();
+    const calendar = { version: 1, sourceAnchor: anchor };
+    await page.clock.install({ time: new Date(anchor) });
     await page.clock.setFixedTime(new Date(anchor));
+    await mockWorker(page, 'ok');
     await page.goto('/');
     await expect(page.locator('.output')).toContainText(`今回使用開始: ${stamp} (JST)`);
     await expect(page.locator('.output')).toContainText('前回使用終了: 記録なし (JST)');
     await command(page, 'Y', 'ハンドル名='); await command(page, '暦の旅人', '登録しました');
     await enterForum(page);
-    const literal = '2026-10-23T01:02:03.000Z は本文のまま';
+    const literal = `${anchor} は本文のまま`;
     await post(page, '日付を残す', literal); await command(page, 'LIST', '日付を残す');
     let data = await backup(page);
     const own = data.posts.find((p) => p.title === '日付を残す')!;
-    expect(await command(page, `READ ${own.number}`, literal)).toContain('96/11/22  10:02');
+    expect(await command(page, `READ ${own.number}`, literal)).toContain(forumStamp);
     await command(page, 'MAIN', 'MAIN'); await command(page, '1', '電子メール');
     await command(page, 'WRITE hoshimori', '件名='); await command(page, '暦の手紙', '本文');
     await command(page, literal, '本文='); await command(page, '.END', '送信しますか'); await command(page, 'Y', '送信しました');
@@ -104,30 +112,46 @@ for (const timezoneId of ['Asia/Tokyo', 'America/Los_Angeles']) {
     await command(page, 'MAIN', 'MAIN'); await command(page, '13', 'コミュニケーション'); await command(page, '2', 'DAISIZEN');
     await command(page, 'CONFERENCE', '電子会議室'); await post(page, '会議の暦', literal);
     expect(await command(page, 'READ 4', literal)).toContain(stamp);
-    await command(page, 'BACK', 'DAISIZEN'); await command(page, 'OLT', '部屋一覧'); await command(page, 'JOIN 1', '日時 JST');
+    await command(page, 'BACK', 'DAISIZEN'); await command(page, 'OLT', '部屋一覧'); await residents(page, false, 'MITI:9', new Date(anchor));
+    await consent(page);
+    const joined = await command(page, 'JOIN 2', '日時 JST');
     const oltLabel = `(${identityToken(data.members.find((m) => m.id === own.authorId))}) <暦の旅人>`;
+    expect(joined).toContain(`${stamp} (${identityToken(data.members.find((m) => m.id === own.authorId))}) * 暦の旅人 入室`);
     const live = await command(page, literal, `${stamp} ${oltLabel} ${literal}`);
     // A queued /LIST waits for the live write and replays the identical dated line.
     const replay = await command(page, '/LIST', `<暦の旅人> ${literal}`);
     expect(replay).toContain(`${stamp} ${oltLabel} ${literal}`);
     expect(live).toContain(`${stamp} ${oltLabel} ${literal}`);
-    await command(page, '/MAIN', 'MAIN'); data = await backup(page);
+    // Cross JST midnight/year rollover while the model receives only bounded room context.
+    await page.clock.setFixedTime(new Date(Date.parse(anchor) + 20_000));
+    await advance(page, 6);
+    await expect.poll(async () => (await speech(page)).length).toBeGreaterThan(0);
+    const reply = (await speech(page))[0]!;
+    expect(reply.createdAt).toBe(new Date(Date.parse(anchor) + 20_000).toISOString());
+    expect(await command(page, '/LIST', reply.text)).toContain(`${replyStamp} (`);
+    await command(page, '/LEAVE', '部屋を退出');
+    const rejoined = await command(page, 'JOIN 2', '日時 JST');
+    expect(rejoined).toContain(`${replyStamp} (${identityToken(data.members.find((m) => m.id === own.authorId))}) * 暦の旅人 退室`);
+    await command(page, '/MAIN', 'MAIN');
+    await command(page, 'SETTINGS', '設定 / SETTINGS'); await command(page, '3', 'コマンド=');
+    await command(page, 'AUTO 0', '休止');
+    await command(page, 'MAIN', 'MAIN'); data = await backup(page);
     expect(data.posts.find((p) => p.id === own.id)!.createdAt).toBe(anchor);
     expect(data.mail![0]!.createdAt).toBe(anchor);
     expect(conferenceState(data).contributions[3]!.createdAt).toBe(anchor);
     expect(calendarSetting(data)).toEqual(calendar);
     const checkSaved = async (tab: typeof page) => {
       await command(tab, 'MAIN', 'MAIN'); await enterForum(tab);
-      expect(await command(tab, `READ ${own.number}`, literal)).toContain('96/11/22  10:02');
+      expect(await command(tab, `READ ${own.number}`, literal)).toContain(forumStamp);
       await command(tab, 'MAIN', 'MAIN'); await command(tab, '1', '電子メール'); await command(tab, 'SENT', '暦の手紙');
       expect(await command(tab, 'READ 1', literal)).toContain(stamp);
       await command(tab, 'MAIN', 'MAIN'); await command(tab, '13', 'コミュニケーション'); await command(tab, '2', 'DAISIZEN');
       await command(tab, 'CONFERENCE', '電子会議室'); expect(await command(tab, 'READ 4', literal)).toContain(stamp);
       await command(tab, 'BACK', 'DAISIZEN'); await command(tab, 'OLT', '部屋一覧');
-      expect(await command(tab, 'JOIN 1', '日時 JST')).toContain(`${stamp} ${oltLabel} ${literal}`);
+      expect(await command(tab, 'JOIN 2', '日時 JST')).toContain(`${stamp} ${oltLabel} ${literal}`);
       await command(tab, '/MAIN', 'MAIN');
     };
-    await page.clock.setFixedTime(new Date('2026-10-24T01:02:03.000Z'));
+    await page.clock.setFixedTime(new Date(Date.parse(anchor) + 86_400_000));
     await page.reload(); await expect(page.locator('.output')).toContainText('番号またはコマンド=');
     await expect(page.locator('.output')).toContainText('前回使用終了: 記録なし (JST)');
     await checkSaved(page);
@@ -135,7 +159,7 @@ for (const timezoneId of ['Asia/Tokyo', 'America/Los_Angeles']) {
     const restored = await snapshot(page);
     expect(restored.posts).toEqual(data.posts); expect(restored.mail).toEqual(data.mail);
     expect(conferenceState(restored)).toEqual(conferenceState(data));
-    const other = await context.newPage(); await other.clock.setFixedTime(new Date('2026-10-25T01:02:03.000Z'));
+    const other = await context.newPage(); await other.clock.setFixedTime(new Date(Date.parse(anchor) + 2 * 86_400_000));
     await other.goto('/'); await expect(other.locator('.output')).toContainText('番号またはコマンド=');
     await checkSaved(other); expect(calendarSetting(await snapshot(other))).toEqual(calendar);
     await other.close(); await context.close();
@@ -203,12 +227,12 @@ test('atomic initialization, pending catch-up legacy imports, historical imports
   expect(calendarSetting(result.first)).toEqual({ version: 1, sourceAnchor: '2026-10-18T00:00:00.000Z' });
   expect(calendarSetting(result.second)).toEqual(calendarSetting(result.first));
   expect(result.first.posts).toEqual(backupFixture().posts); expect(result.first.session).toEqual(backupFixture().session);
-  expect(result.rolledBack).toBe(true); expect(result.immutable).toBe(2); expect(result.catchUp).toBe('96年11月24日 23:30:00');
-  expect(result.committedDisplay).toBe('96年11月24日 23:30:00');
+  expect(result.rolledBack).toBe(true); expect(result.immutable).toBe(2); expect(result.catchUp).toBe('2026年10月18日 23:30:00');
+  expect(result.committedDisplay).toBe('2026年10月18日 23:30:00');
   expect(result.first.settings.find((s) => s.id === 'ai-activity')!.value).toEqual(result.second.settings.find((s) => s.id === 'ai-activity')!.value);
   expect(result.committed?.simulation?.simulatedAt).toBe('2026-10-18T14:30:00.000Z');
   expect(result.committed?.createdAt).not.toBe(result.committed?.simulation?.simulatedAt);
-  expect(result.eraDisplay).toBe('96年11月20日 10:00:00');
+  expect(result.eraDisplay).toBe('1996年11月20日 10:00:00');
   expect(calendarSetting(result.historicalAgain)).toEqual(calendarSetting(result.historical));
   expect(result.historical.settings.find((s) => s.id === 'community-world')!.value).toMatchObject({ createdAt: '1996-11-20T01:00:00.000Z' });
   expect(calendarSetting(result.fresh)).toEqual(calendar);
@@ -227,7 +251,7 @@ test('production legacy and era-only imports keep existing dates stable across r
     legacy.posts.forEach((p) => { p.createdAt = instant; });
     const conference = legacy.settings.find((s) => s.id === 'daisizen-conference')!.value as unknown as ReturnType<typeof starterConference>;
     conference.contributions.forEach((r) => { r.createdAt = instant; });
-    const oldHeader = era ? '96/11/20  10:00' : '96/11/22  10:02';
+    const oldHeader = era ? '1996/11/20  10:00' : '2026/10/23  10:02';
     let firstCalendar;
     for (const wallClock of [anchor, '2030-01-01T00:00:00.000Z']) {
       await page.clock.setFixedTime(new Date(wallClock));
@@ -242,7 +266,7 @@ test('production legacy and era-only imports keep existing dates stable across r
     if (era) {
       await page.clock.setFixedTime(new Date(anchor));
       await post(page, '復元後の新しい日付', '本文の日付 2026-10-23');
-      expect(await command(page, 'READ 17', '本文の日付 2026-10-23')).toContain('98/10/23  10:02');
+      expect(await command(page, 'READ 17', '本文の日付 2026-10-23')).toContain('2026/10/23  10:02');
       expect(calendarSetting(await snapshot(page))).toEqual({ version: 1, sourceAnchor: '2024-11-20T01:00:00.000Z' });
     }
   }
