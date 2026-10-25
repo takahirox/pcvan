@@ -1,7 +1,7 @@
 {
   "version": 1,
   "origin": "local-seed:forum-starters-v1",
-  "provenance": "Original fictional Japanese conversations for Issue #131, not archival messages or model output. DAISIZEN names remain provisional; board cultures and all conversation are reconstructed. Pristine/reset installation or explicit empty-default-board recovery only.",
+  "provenance": "Original fictional Japanese conversations for Issue #131, not archival messages or model output. DAISIZEN names remain provisional; board cultures and all conversation are reconstructed. Pristine initialization and confirmed factory reset only.",
   "boards": [
     {
       "keyword": "DAISIZEN",

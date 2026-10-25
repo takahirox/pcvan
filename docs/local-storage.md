@@ -10,7 +10,7 @@ fifteen populated boards and 82 original static Japanese forum posts in twenty-s
 plus three electronic-conference contributions. Model consent remains
 separate. The world anchor and fiction provenance live in `community-world`;
 seeds use `local-seed:fictional` (original thirty) or `local-seed:authored-sigs-v1`
-(additional thirty-six) or `local-seed:wakaba-v1` (three beginner contributions) or `local-seed:bulletin-v1` (three public notices) or `local-seed:forum-starters-v1` (ten posts in the remaining DAISIZEN boards), while later inference uses `local-ai:webllm:`.
+(additional thirty-six) or `local-seed:wakaba-v1` (three beginner contributions) or `local-seed:bulletin-v1` (three public notices) or `local-seed:forum-starters-v1` (ten posts in DAISIZEN 2/4/6), while later inference uses `local-ai:webllm:`.
 See [first-visit and population semantics](local-ai.md#setup-and-controls).
 
 Storage belongs to the browser profile and origin (scheme, hostname, and port).
@@ -107,58 +107,32 @@ under its existing eligibility/confirmation rules and now supplies the expanded
 baseline (up to 66 posts when customized additional boards are skipped); reset
 explicitly recreates the full baseline for any world.
 
-## Empty default board recovery (Issue #131)
+## Complete pristine and reset baseline (Issue #131)
 
-Fresh initialization and confirmed factory reset now add ten original Japanese
-posts in four threads to DAISIZEN 2/4/6, after the original 72 posts, within the
-same bootstrap transaction. The baseline is **82 posts, 26 threads, 15 boards**.
-The ten resident IDs and every original post remain unchanged. New IDs use
-`seed:forums-v1:` and provenance `local-seed:forum-starters-v1`; times use the same
-fixed JST day convention and calendar anchor. All names retain their existing
-historical evidence limits; all conversations are fiction. See the
-[complete route inventory](sig-navigation.md#public-forum-content-inventory-issue-131).
+Fresh initialization and confirmed factory reset add ten original Japanese posts
+in four threads to DAISIZEN 2/4/6 in the same bootstrap transaction. The complete
+baseline is **82 posts, 26 threads, 15 boards**. The ten resident IDs and all 72
+established posts remain unchanged. New IDs use `seed:forums-v1:` and provenance
+`local-seed:forum-starters-v1`; timestamps follow the same fixed JST day convention
+and historical-calendar display anchor. Board names retain their historical evidence
+limits; all conversations are original fiction. See the
+[route inventory](sig-navigation.md#public-forum-content-inventory-issue-131).
 
-No new automatic migration runs in existing worlds. Settings → ローカルデータ・保守
-→ **空の標準掲示板に初期会話を追加…** offers a pure preview of each eligible
-SIG/board, post count and starting number. Confirmation explicitly includes
-restored and deliberately cleared default boards. Cancel/close does nothing;
-backup export is available before proceeding. Imported-empty worlds remain empty
-on reload, restore or consent unless the user chooses this action or reset.
-
-Recovery resolves only the 15 navigable default destinations. It requires a unique
-case-insensitive SIG keyword, a unique board number, and (for an existing board)
-the reserved `resident-forum:KEYWORD:NUMBER` ID and exact default name. A missing
-SIG/board is created only if its reserved IDs are free. Custom IDs, renamed boards,
-duplicate keywords/numbers, populated boards, conflicting seed IDs anywhere in the
-world, missing authors or authors whose actor is not AI exclude that destination.
-Unknown old/custom mappings remain untouched; the UI explains when none qualify.
-A customized SIG title and edited resident handles/profiles remain authoritative.
-No member is inserted or updated by recovery.
-
-Only entire empty-board fixtures are added. Numbers begin at the existing
-`nextPostNumber` (including a cleared board's retained counter); existing numbers
-and read markers are never rewritten. Replies reference earlier same-board seeds.
-The stored historical calendar's source anchor fixes recovered content to the
-world's original era, rather than moving it forward with the recovery date.
-The calendar, world/import provenance, activity/consent, all settings and other
-service stores remain unchanged; the existing JSON format and validation apply.
-
-The public repository method requires explicit confirmation and the preview's
-`worldContext`. In one all-store read/write transaction it checks that context,
-recomputes eligibility, adds missing directories/posts, advances only affected
-counters and validates the complete backup. Cross-tab transactions serialize;
-a stale approval fails and must be reviewed again. A quota, ID constraint or
-validation failure rolls back the entire operation. Repeating against the current
-snapshot returns zero once all eligible boards are filled. No new marker or schema
-version is necessary. The older legacy-only `POPULATE` action remains unchanged
-and distinct; it still supplies at most 66 posts.
+This feature adds no existing-world migration, eligibility scanner, repair action
+or recovery UI. Older, partially populated, imported, customized and deliberately
+emptied worlds retain their saved boards and posts. The pre-existing legacy
+expansion/population rules above remain unchanged and do not add these ten posts,
+Wakaba or bulletin content. To deliberately restart with the new baseline, export
+a JSON backup before using the existing **初期状態に戻す** action. Its destructive
+warning and confirmation remain required. Importing that backup restores its prior
+contents, including empty boards, rather than adding the new fixtures.
 
 ## General bulletin initialization and lazy participation
 
 `LOCAL-BULLETIN:1` is an application mapping in the existing SIG/forum stores,
 not a historical SIG or host command. Communication selector 6 opens the single
 **一般掲示板 / 募集とお知らせ** through the normal refreshed forum path.
-Pristine bootstrap or confirmed empty-default-board recovery creates its container, board and three
+Only pristine bootstrap creates its container, board and three
 `seed:bulletin-v1:` contributions from [bulletin.json](../data/pcvan/bulletin.json),
 with `local-seed:bulletin-v1` provenance, valid existing fictional authors and
 same-board reply references. All rows share the bootstrap transaction and existing
@@ -166,7 +140,7 @@ fixed JST calendar anchor. Other fixtures are unchanged. The pristine total is
 82 posts, 26 threads, 15 boards and the same ten residents.
 
 Reopen/reconnect, consent, legacy population, v1 expansion, deletion and JSON
-restoration never add examples or missing records. Confirmed reset or [empty-default-board recovery](#empty-default-board-recovery-issue-131) may recreate
+restoration never add examples or missing records. Confirmed reset may recreate
 them. Existing/imported boards can stay empty. Browsing, handle cancellation,
 draft cancellation, invalid input and failed saving create no board records.
 Successful explicit WRITE uses `createForumPost` to create only the required
@@ -185,7 +159,7 @@ as other boards; its name resolves explicitly without joining the SIG directory.
 The welcome refreshes content before selecting its board. BACK keeps the actual
 board → welcome → MAIN/index stack, and MAIN clears it.
 
-`readActivity`'s pristine `bootstrap` branch or confirmed empty-default-board recovery inserts the authored directory,
+Only `readActivity`'s pristine `bootstrap` branch inserts the authored directory,
 board and three `seed:wakaba-v1:` posts from [wakaba.json](../data/pcvan/wakaba.json),
 with `local-seed:wakaba-v1` provenance. Members already exist; dates use the same
 creation anchor and JST day convention. The all-store transaction validates foreign
@@ -197,7 +171,7 @@ cannot infer eligibility from missing posts/boards. Reset explicitly recreates t
 pristine 82-post baseline; legacy opt-in still supplies at most 66 posts.
 
 Existing/imported/deleted/missing Wakaba boards stay empty and navigable. `WRITE`
-uses `createForumPost`: successful human submission or confirmed recovery can create an absent
+uses `createForumPost`: only successful human submission can create an absent
 local directory/board together with its first post. Draft opening, cancellation,
 invalid input, foreign-board reply parents and failed writes allocate nothing.
 Duplicate keywords or board numbers reject selection/submission rather than picking
@@ -380,7 +354,6 @@ repo.close();
 | `exportBackup()` / `exportJson()` | Returns a document / formatted JSON string, from one consistent readonly transaction. |
 | `replaceFromJson(text, {confirmReplace})` | Requires literal `true`; validates before writing, then clears and inserts every store in one atomic transaction. |
 | `resetWorld({confirmReset}, now?)` | Requires literal `true`; atomically clears all world stores, runs the first-visit bootstrap and rotates the private generation token. Invalidates older repository connections. |
-| `recoverStarterConversations({confirmAdd, expectedContext})` | Requires explicit `true` and the reviewed `worldContext`; atomically adds only eligible empty-default-board fixtures. Returns the added post count; stale context fails. See [recovery rules](#empty-default-board-recovery-issue-131). |
 | `close()` | Releases the connection. Old connections also close on `versionchange`; reload before further use. |
 
 Stores are `members`, `sigs`, `forums`, `posts`, `mail`, `readStates`, `settings`, and a

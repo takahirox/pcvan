@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "provenance": "Original Japanese public-board fiction for this application, not archival messages or identities. Selector 6, placement, name, mapping, layout, anonymous reading, replies and controls are category D reconstruction. Pristine initialization/reset or explicitly confirmed empty-default-board recovery inserts these rows.",
+  "provenance": "Original Japanese public-board fiction for this application, not archival messages or identities. Selector 6, placement, name, mapping, layout, anonymous reading, replies and controls are category D reconstruction. Only pristine initialization inserts these rows.",
   "keyword": "LOCAL-BULLETIN",
   "boardNo": 1,
   "name": "募集とお知らせ",

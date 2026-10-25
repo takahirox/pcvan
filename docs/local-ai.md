@@ -88,7 +88,7 @@ board 1 (自然の森／ＦＲＥＥ) retain their thirty posts/eight threads; e
 additional boards carry thirty-six posts/ten threads. Wakaba adds three beginner
 posts/two threads and the general bulletin board adds three notices/two threads;
 DAISIZEN 2/4/6 add ten posts/four threads. These are installed during pristine
-bootstrap/reset or explicit empty-default recovery, never an automatic refill of
+bootstrap/reset only. This feature adds no migration or recovery action for
 existing worlds. No human member, WebGPU, model import/download, inference
 or network request is needed. [The bundled UTF-8 fixture](../data/pcvan/fictional-community.json)
 is original fiction for the app: no archived bodies or real historical identities.
@@ -103,7 +103,7 @@ The general bulletin board uses `seed:bulletin-v1:` IDs and
 `local-seed:bulletin-v1` provenance for three original notices. Its short public
 notice culture uses the existing board hook. No schedules, preferred boards,
 forced replies or model requirement are added. See
-[initialization and recovery](local-storage.md#general-bulletin-initialization-and-lazy-participation).
+[pristine-only initialization](local-storage.md#general-bulletin-initialization-and-lazy-participation).
 
 Wakaba uses `seed:wakaba-v1:` IDs and `local-seed:wakaba-v1` provenance.
 Its public beginner culture follows the normal prompt path; preferences, consent

@@ -7,9 +7,9 @@ MAIN labels stay intact; `16` now opens the separate Wakaba beginner welcome.
 
 | Route from MAIN | Destination | First-visit conversations |
 | --- | --- | --- |
-| `13` → `6` | 一般掲示板 / 募集とお知らせ | Three original public notices, pristine/reset; confirmed empty-default recovery available |
+| `13` → `6` | 一般掲示板 / 募集とお知らせ | Three original public notices, pristine/reset only |
 | `16` → `2` → `JOIN 1` | わかばマーク / はじめての談話室 | Separate fictional beginner OLT room; quiet reading or speech |
-| `16` → `1` | わかばマーク / はじめての広場 | Three original beginner contributions, pristine/reset; confirmed empty-default recovery available |
+| `16` → `1` | わかばマーク / はじめての広場 | Three original beginner contributions, pristine/reset only |
 | `J MITI` → `3` → `9` or `13` → `1` → `3` → `9` | MITI 資料室 | Original sixteen posts, unchanged |
 | `13` → `2` → `FORUMS` → `1` | DAISIZEN 自然の森／ＦＲＥＥ | Original fourteen posts, unchanged |
 | `13` → `2` → `FORUMS` → `2` | 風の谷住民会議 | Three posts: organizing long observation logs |
@@ -25,7 +25,8 @@ MAIN labels stay intact; `16` now opens the separate Wakaba beginner welcome.
 | `13` → `5` → `1` | グローバル・ビレッジ / ビレッジ・ボード | Six posts: monthly gathering, shift workers and visitors |
 
 DAISIZEN boards `2`, `4`, `6` now have original starter threads on pristine/reset worlds.
-Existing worlds retain their saved contents until confirmed Settings recovery.
+Existing worlds retain their saved contents; the existing confirmed factory reset
+can explicitly start a new world after backup export.
 `LIST` lists numbered messages; `READ number` reads and advances the selected
 human’s read marker. `UNREAD` lists existing numbers above that human/forum's
 marker and `NEXT` reads the lowest one, skipping gaps. Each command refreshes the
@@ -38,7 +39,7 @@ HANDLE; anonymous LIST/READ remain available. These are
 `.END`, review/edit and `Y` confirmation sequence. `HELP` repeats the current
 screen, `BACK` returns to its parent, and `MAIN` returns to MAIN. Inside an
 active composition, `.CANCEL` explicitly discards the draft before navigation.
-An absent board is created on a successful human send or confirmed Settings recovery; ambiguous mappings
+An absent board is created only on a successful human send; ambiguous mappings
 report an error. Invalid reads/selectors leave the current screen intact.
 
 DAISIZEN also has static, read-only collections: `LIBRARY` → `2` or `5` →
@@ -82,7 +83,8 @@ See [local AI](local-ai.md) and [safe migration](local-storage.md#community-expa
 The welcome accepts HELP/LIST and exposes no composition target. BACK from the
 board restores the welcome, then the actual MAIN/index caller. MAIN returns
 directly to MAIN. Existing LIST/READ/UNREAD/NEXT and WRITE/REPLY review/save/cancel
-controls apply; missing boards offer WRITE, which creates the directory/board on successful save or confirmed Settings recovery. Anonymous readers can browse; HANDLE enables personal unread
+controls apply; missing boards offer WRITE, which creates the directory/board only
+on successful save. Anonymous readers can browse; HANDLE enables personal unread
 tracking and participation. Ambiguous mappings never choose arbitrary posts.
 
 The original three contributions by 水玉 and タブストップ include a question and
@@ -149,17 +151,11 @@ logs in the SIG council, three about leaf veins/scale in botanical sketches and
 four about a short mountain walk, turning back and carrying a map. Activity stays
 uneven (3–16 posts per board); no generic repeated welcome or inflated counter.
 
-Existing-profile counts depend on saved history, not current fixtures. An intact
-old original-only world has 16 MITI and 14 DAISIZEN-1 posts; its eligible old
-expansion adds 36 across eight boards once. A previously expanded world has 66,
-with Wakaba/bulletin absent if it predates them. A previous pristine 72-post world
-has the twelve previously populated boards above and zero in DAISIZEN 2/4/6. Deleted,
-partially customized or imported worlds can have zero anywhere; missing boards
-are displayed empty without display-only demos. Reload/consent does not fill them.
-These cases are reproduced in deterministic repository/browser tests; no claim is
-made about an operator's unrelated personal browser data. Settings recovery
-previews the actual saved-world eligibility/counts and fills only explicitly
-confirmed empty default destinations; see [recovery rules](local-storage.md#empty-default-board-recovery-issue-131).
+Existing profiles are outside the new baseline's scope and keep their saved
+contents, including empty/missing boards. No new migration, recovery scanner or
+opt-in population action is added. Users wishing to restart with all 82 posts can
+export a backup and explicitly confirm the existing Settings → ローカルデータ・保守
+→ 初期状態に戻す action. Restoring an empty backup leaves its forums empty.
 Wakaba's existing three authored posts are visible to anonymous fresh/reset users
 through MAIN `16` → `1`, without WebGPU, a model, registration or Settings.
 
@@ -174,4 +170,4 @@ local forum board. Keep accurate empty states and contextual instructions there;
 do not fabricate mail, presence, articles or search hits to hide zeros. Deliberate
 empty/imported/custom forums remain valid saved worlds.
 
-See the [validation record](validation.md#complete-public-forum-starters-and-safe-recovery-issue-131) for the production and repository checks.
+See the [validation record](validation.md#complete-public-forum-starters-issue-131) for the production and repository checks.

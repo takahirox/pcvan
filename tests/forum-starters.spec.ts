@@ -64,136 +64,53 @@ test('every production forum route has authored threads anonymously on fresh sta
   expect(external).toEqual([]); expect(errors).toEqual([]);
 });
 
-test('empty-default recovery is atomic, fenced, idempotent across tabs and preserves all other records', async ({ page }) => {
+test('older partial and customized local worlds retain exact content across reload and backup restore', async ({ page }) => {
   await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async () => {
     const path = '/src/storage/repository.ts';
-    const { openRepository, worldContext, validateBackup } = await import(path) as typeof import('../src/storage/repository');
-    const communityPath = '/src/storage/community.ts';
-    const { starterAdditions, localConversation } = await import(communityPath) as typeof import('../src/storage/community');
+    const { openRepository, validateBackup } = await import(path) as typeof import('../src/storage/repository');
     const anchor = '2026-10-21T00:00:00.000Z';
-    const repo = await openRepository('recovery'), other = await openRepository('recovery');
-    await repo.openActivity(anchor);
+    const repo = await openRepository('old-partial'); await repo.openActivity(anchor);
     const alice = await repo.createHumanMember('一人目'), bob = await repo.createHumanMember('二人目');
     await repo.markRead(alice.id, 'seed:v1:repair-1'); await repo.markRead(bob.id, 'seed:v1:repair-2');
     const baseline = await repo.exportBackup();
-    // Older partially populated world: absent Wakaba/quiet boards, cleared bulletin
-    // with advanced numbering, custom-named board and an unrelated empty custom board.
     for (const p of baseline.posts.filter((p) => ['local-seed:forum-starters-v1', 'local-seed:wakaba-v1', 'local-seed:bulletin-v1'].includes(p.origin)).sort((a, b) => b.number - a.number)) await repo.delete('posts', p.id);
     for (const key of ['DAISIZEN:2', 'DAISIZEN:4', 'DAISIZEN:6', 'LOCAL-WAKABA:1']) await repo.delete('forums', `resident-forum:${key}`);
-    const bulletinBoard = baseline.forums.find((f) => f.id === 'resident-forum:LOCAL-BULLETIN:1')!;
-    await repo.put('forums', { ...bulletinBoard, nextPostNumber: 50 });
     await repo.put('forums', { id: 'custom-empty', sigId: 'resident-sig:MITI', boardNo: 99, name: '私の空き部屋', nextPostNumber: 8 });
     await repo.put('sigs', { id: 'resident-sig:DAISIZEN', keyword: 'DAISIZEN', title: '自分の自然ＳＩＧ' });
-    await repo.put('forums', { id: 'resident-forum:DAISIZEN:4', sigId: 'resident-sig:DAISIZEN', boardNo: 4, name: '改名した部屋', nextPostNumber: 1 });
     await repo.put('settings', { id: 'private-setting', value: { keep: '設定と日時' } });
     await repo.createPost({ forumId: 'resident-forum:MITI:9', authorId: alice.id, title: '人の投稿', body: '残す', origin: 'local-human' });
     const ai = baseline.members.find((m) => m.actor === 'ai')!;
     await repo.createAiPost(ai, { forumId: 'resident-forum:MITI:9', authorId: ai.id, title: '生成の投稿', body: '残す', origin: 'local-ai:webllm:test' });
-    const before = await repo.exportBackup();
-    await repo.openActivity(anchor); const reopened = await repo.exportBackup();
-    const expectedContext = worldContext(reopened);
-    const plan = starterAdditions(reopened, anchor);
-    let refused = false;
-    try { await repo.recoverStarterConversations({ confirmAdd: false, expectedContext }); } catch { refused = true; }
-    const native = IDBObjectStore.prototype.add; let writes = 0, failed = false;
-    IDBObjectStore.prototype.add = function (value, key) {
-      if (this.transaction.db.name === 'recovery' && this.name === 'posts' && ++writes === 5) throw new DOMException('recovery quota', 'QuotaExceededError');
-      return key === undefined ? native.call(this, value) : native.call(this, value, key);
-    };
-    try { await repo.recoverStarterConversations({ confirmAdd: true, expectedContext }); } catch { failed = true; }
-    finally { IDBObjectStore.prototype.add = native; }
-    const rollback = await repo.exportBackup();
-    const racing = await Promise.allSettled([repo, other].map((r) => r.recoverStarterConversations({ confirmAdd: true, expectedContext })));
-    const after = await repo.exportBackup(); validateBackup(after);
-    const repeat = await other.recoverStarterConversations({ confirmAdd: true, expectedContext: worldContext(after) });
-    const afterRepeat = await repo.exportBackup();
-    await repo.markRead(alice.id, 'seed:wakaba-v1:question');
-    const readAfter = (await repo.exportBackup()).readStates;
-    // JSON roundtrip keeps the imported guard and original world provenance.
-    const imported = await openRepository('recovery-import'); await imported.replaceFromJson(JSON.stringify(before), { confirmReplace: true });
-    await imported.openActivity(anchor); const importedBefore = await imported.exportBackup();
-    const addedImported = await imported.recoverStarterConversations({ confirmAdd: true, expectedContext: worldContext(importedBefore) });
-    const importedAfter = await imported.exportBackup(); validateBackup(importedAfter);
-    const conversation = after.posts.filter((p) => p.origin === 'local-seed:forum-starters-v1').every(localConversation);
-    repo.close(); other.close(); imported.close();
-    return { before, reopened, plan, refused, failed, rollback, racing: racing.map((r) => r.status), after, repeat, afterRepeat, readAfter, importedBefore, importedAfter, addedImported, conversation };
+    const before = await repo.exportBackup(); repo.close();
+    const reopened = await openRepository('old-partial'); await reopened.openActivity(anchor);
+    const after = await reopened.exportBackup(); validateBackup(after);
+    const imported = await openRepository('old-partial-import');
+    await imported.replaceFromJson(JSON.stringify(before), { confirmReplace: true }); await imported.openActivity(anchor);
+    const restored = await imported.exportBackup(); validateBackup(restored);
+    reopened.close(); imported.close(); return { before, after, restored };
   });
-  expect(result.refused).toBe(true); expect(result.failed).toBe(true); expect(result.rollback).toEqual(result.reopened);
-  expect(result.reopened.posts).toEqual(result.before.posts); expect(result.reopened.forums).toEqual(result.before.forums);
-  expect(result.plan.map((p) => p.forum.id).sort()).toEqual(['resident-forum:DAISIZEN:2', 'resident-forum:DAISIZEN:6', 'resident-forum:LOCAL-BULLETIN:1', 'resident-forum:LOCAL-WAKABA:1']);
-  expect(result.racing.sort()).toEqual(['fulfilled', 'rejected']);
-  expect(result.after.posts).toHaveLength(81); // 68 retained + 13 recovered; custom drawing board stays empty
-  for (const p of result.before.posts) expect(result.after.posts.find((row) => row.id === p.id)).toEqual(p);
-  for (const key of ['members', 'sigs', 'readStates', 'mail', 'settings', 'session'] as const) expect(result.after[key]).toEqual(result.reopened[key]);
-  for (const f of result.before.forums.filter((f) => f.id !== 'resident-forum:LOCAL-BULLETIN:1')) expect(result.after.forums.find((row) => row.id === f.id)).toEqual(f);
-  expect(result.after.posts.filter((p) => p.origin === bulletin.origin).map((p) => p.number).sort()).toEqual([50, 51, 52]);
-  expect(result.readAfter.filter((r) => r.forumId === 'resident-forum:LOCAL-WAKABA:1')).toEqual([expect.objectContaining({ lastReadNumber: 1, memberId: result.before.members.find((m) => m.handle === '一人目')!.id })]);
-  expect(result.repeat).toBe(0); expect(result.afterRepeat).toEqual(result.after); expect(result.conversation).toBe(true);
-  expect(result.importedBefore.posts).toEqual(result.before.posts); expect(result.addedImported).toBe(13);
-  expect(result.importedAfter.settings).toEqual(result.importedBefore.settings);
-  expect(result.importedAfter.posts).toEqual(result.after.posts);
+  expect(result.before.posts).toHaveLength(68);
+  expect(result.after).toEqual(result.before); expect(result.restored).toEqual(result.before);
 });
 
-test('Settings previews empty imported defaults, cancel preserves them and confirmation makes Wakaba readable', async ({ page }) => {
+test('restoring intentionally empty forums keeps Wakaba empty and exposes only the existing reset flow', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-21T00:00:00.000Z'));
   await start(page, '継続する人');
   const baseline = await snapshot(page), empty = structuredClone(baseline);
   empty.posts = []; empty.readStates = [];
   await restore(page, empty); await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
-  expect((await snapshot(page)).posts).toEqual([]);
+  const saved = await snapshot(page);
+  expect(saved.posts).toEqual([]); expect(saved.forums).toEqual(empty.forums);
+  expect(saved.members).toEqual(empty.members); expect(saved.settings).toEqual(empty.settings);
   await command(page, '16'); await command(page, '1', '投稿はありません');
   await page.getByRole('button', { name: '設定 / Options', exact: true }).click();
-  const modal = page.getByRole('dialog');
-  await modal.locator('.storage-panel > summary').click();
-  await modal.locator('.recover-starters').click();
-  await expect(modal.locator('.confirmation-copy')).toContainText('はじめての広場：3件（#4〜）');
-  await expect(modal.locator('.confirmation-copy')).toContainText('自分で空にした');
-  await modal.locator('.cancel-action').click(); expect((await snapshot(page)).posts).toEqual([]);
-  await modal.locator('.recover-starters').click(); await modal.locator('.confirm-action').click();
-  await expect(modal.locator('.settings-message')).toContainText('82件');
-  await modal.getByRole('button', { name: '閉じる', exact: true }).click();
-  await command(page, 'LIST', '返信の前にひとつ質問'); await command(page, 'READ 4', '★内容');
-  const recovered = await snapshot(page);
-  expect(recovered.posts).toHaveLength(82); expect(recovered.members).toEqual(empty.members);
-  expect(recovered.settings.find((s) => s.id === 'community-world')).toEqual(empty.settings.find((s) => s.id === 'community-world'));
-  await noOtherUi(page);
-});
-
-test('recovery skips ambiguous/custom mappings, seed collisions and missing authors without inventing identities', async ({ page }) => {
-  await page.goto('http://127.0.0.1:14374');
-  const result = await page.evaluate(async () => {
-    const path = '/src/storage/repository.ts';
-    const { openRepository, worldContext } = await import(path) as typeof import('../src/storage/repository');
-    const repo = await openRepository('recovery-safety'); await repo.openActivity('2026-10-21T00:00:00.000Z');
-    const source = await repo.exportBackup();
-    const outcomes = [];
-    for (const kind of ['duplicate-sig', 'duplicate-board', 'custom-id', 'collision', 'missing-author', 'wrong-actor']) {
-      const content = structuredClone(source); content.posts = []; content.readStates = [];
-      const board = content.forums.find((f) => f.id === 'resident-forum:DAISIZEN:2')!;
-      if (kind === 'duplicate-sig') content.sigs.push({ id: 'duplicate', keyword: 'daisizen', title: '別のＳＩＧ' });
-      if (kind === 'duplicate-board') content.forums.push({ ...board, id: 'duplicate' });
-      if (kind === 'custom-id') board.id = 'custom-board';
-      if (kind === 'collision') {
-        const p = source.posts.find((p) => p.id === 'seed:forums-v1:council-notes')!;
-        content.posts.push({ ...p, forumId: 'resident-forum:MITI:9' });
-      }
-      if (kind === 'missing-author') content.members = content.members.filter((m) => m.id !== 'fictional-ai:soroban');
-      if (kind === 'wrong-actor') content.members.find((m) => m.id === 'fictional-ai:soroban')!.actor = 'human';
-      await repo.replaceFromJson(JSON.stringify(content), { confirmReplace: true });
-      await repo.openActivity('2026-10-21T00:00:00.000Z');
-      const before = await repo.exportBackup();
-      await repo.recoverStarterConversations({ confirmAdd: true, expectedContext: worldContext(before) });
-      const after = await repo.exportBackup();
-      outcomes.push({ kind, posts: after.posts.filter((p) => p.forumId === board.id), board: after.forums.find((f) => f.id === board.id),
-        beforeBoard: board, membersUnchanged: JSON.stringify(before.members) === JSON.stringify(after.members),
-        settingsUnchanged: JSON.stringify(before.settings) === JSON.stringify(after.settings),
-        preserved: before.posts.every((p) => JSON.stringify(after.posts.find((r) => r.id === p.id)) === JSON.stringify(p)) });
-    }
-    repo.close(); return outcomes;
-  });
-  expect(result).toHaveLength(6);
-  for (const row of result) {
-    expect(row.posts, row.kind).toEqual([]); expect(row.board, row.kind).toEqual(row.beforeBoard);
-    expect(row.membersUnchanged).toBe(true); expect(row.settingsUnchanged).toBe(true); expect(row.preserved).toBe(true);
-  }
+  const modal = page.getByRole('dialog'); await modal.locator('.storage-panel > summary').click();
+  await expect(modal.getByRole('button', { name: '空の標準掲示板に初期会話を追加…', exact: true })).toHaveCount(0);
+  await modal.getByRole('button', { name: '初期状態に戻す', exact: true }).click();
+  await expect(modal.locator('.confirmation-copy')).toContainText('82件');
+  await expect(modal.locator('.confirmation-copy')).toContainText('取り消せません');
+  await expect(modal.getByRole('button', { name: '先に JSON を保存', exact: true })).toBeVisible();
+  await modal.locator('.cancel-action').click(); await modal.getByRole('button', { name: '閉じる', exact: true }).click();
+  expect((await snapshot(page)).posts).toEqual([]); await noOtherUi(page);
 });

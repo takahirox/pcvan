@@ -96,7 +96,7 @@ test('reset transaction failure rolls back clears, fixture writes and generation
     const add = IDBObjectStore.prototype.add;
     let inserted = 0;
     IDBObjectStore.prototype.add = function (value, key) {
-      if (this.name === 'posts' && ++inserted === 8) throw new DOMException('Reset quota failure', 'QuotaExceededError');
+      if (this.name === 'posts' && ++inserted === 78) throw new DOMException('Reset quota failure', 'QuotaExceededError');
       return key === undefined ? add.call(this, value) : add.call(this, value, key);
     };
     let code = '';
@@ -108,7 +108,7 @@ test('reset transaction failure rolls back clears, fixture writes and generation
     repo.close(); other.close();
     return { before, after, code, inserted, stillCurrent };
   }, anchor);
-  expect(result.code).toBe('quota'); expect(result.inserted).toBe(8);
+  expect(result.code).toBe('quota'); expect(result.inserted).toBe(78);
   expect(result.after).toEqual(result.before);
   expect(result.stillCurrent?.value).toBe(true);
 });

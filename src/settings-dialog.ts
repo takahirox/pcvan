@@ -1,6 +1,5 @@
 import type { AiActivity, Backup, TerminalPreferences } from './storage/schema';
 import { validateBackup } from './storage/schema';
-import { initialCalendar, calendarSetting } from './calendar';
 import { worldContext, residentContext } from './storage/repository';
 import type { CommandActions } from './commands';
 import { profileFields, profileLabels } from './commands';
@@ -11,7 +10,7 @@ import { models, residentProfiles } from './ai/personas';
 import type { ResidentProfile } from './ai/personas';
 import { ACTIVITY_SETTING, setupContext } from './ai/activity';
 import { modelDisclosure } from './ai/setup';
-import { canPopulateCommunity, starterAdditions } from './storage/community';
+import { canPopulateCommunity } from './storage/community';
 import { chooseBackup, downloadText } from './storage/controls';
 import type { createSettingsActions } from './settings-actions';
 import type { createOfflineControls } from './offline/controls';
@@ -75,8 +74,6 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       <p>JSON は投稿・メール（INET#外部宛先・手紙を含む）・ローカルNetNews記事・登録OSLテキスト・会員・既読・設定・履歴・出自を含みます。モデルの重みと端末キャッシュ、未送信の下書き、ECOMの郵便内容・模擬受付票は含みません。外部に保存してください。</p>
       <div class="settings-buttons"><button type="button" class="export-json">JSON を保存</button>
         <button type="button" class="import-json">JSON から復元</button><button type="button" class="populate-world" hidden>初期会話を追加</button><button type="button" class="reset-world">初期状態に戻す</button></div>
-      <p>空の標準掲示板だけに初期会話を補えます。追加先と件数を確認してから実行します。復元した世界も対象です。</p>
-      <button type="button" class="recover-starters">空の標準掲示板に初期会話を追加…</button>
       <h3>オフライン・保存領域</h3><p>端末とモデルの重みは別の保存です。端末の保存ではモデルを取得しません。</p>
       <div class="settings-buttons"><button type="button" class="cache-shell">端末をオフライン用に保存</button>
         <button type="button" class="storage-status">保存状態・容量を確認</button><button type="button" class="persist-storage">永続保存を要求</button></div>
@@ -283,21 +280,6 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
       await actions.run(async () => { await (await actions.repository()).populateEmptyCommunity({ confirmPopulate: true }); });
       refresh(await actions.read());
     }, '初期会話を追加する');
-  });
-  click('.recover-starters', async () => {
-    const accepted = epoch, content = await actions.read();
-    if (accepted !== epoch || !dialog.open) return;
-    const additions = starterAdditions(content, (calendarSetting(content) ?? initialCalendar(content, new Date().toISOString())).sourceAnchor);
-    if (!additions.length) { message('追加できる空の標準掲示板はありません。独自・改名・対応が不明な掲示板や住人が不足した掲示板には追加しません。'); return; }
-    const expected = worldContext(content);
-    confirm('world', content, ['次の空の標準掲示板に創作の初期会話だけを追加します。モデルは取得しません。',
-      ...additions.map(({ sig, forum, posts }) => `${sig.title} / ${forum.name}：${posts.length}件（#${posts[0]!.number}〜）`),
-      '復元した世界や、自分で空にした標準掲示板も上記の対象なら追加します。既存の投稿・既読・設定・出自は保持します。',
-      '独自・改名した掲示板には追加しません。必要なら先に JSON を保存してください。'], async () => {
-      let count = 0;
-      await actions.run(async () => { count = await (await actions.repository()).recoverStarterConversations({ confirmAdd: true, expectedContext: expected }); });
-      refresh(await actions.read()); message(`${count}件の初期会話を追加しました。端末の各掲示板で読めます。`);
-    }, '表示した掲示板に追加する');
   });
   click('.reset-world', async () => {
     const accepted = epoch, content = await actions.read(), expected = worldContext(content);

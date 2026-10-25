@@ -1,44 +1,41 @@
-# Complete public forum starters and safe recovery (Issue #131)
+# Complete public forum starters (Issue #131)
 
-Validated on 2026-10-25 with Node.js 24.12.0 on macOS.
+Validated on 2026-10-25 against the current Issue's new-world/reset-only scope.
 
-- Read the live Issue and repository guidance; rechecked the selected upstream
-  against application baseline `9413594` (intervening commits are GitWeave checkpoints).
-- `npm ci`: passed, zero reported vulnerabilities; no dependency or lockfile changes.
-- Final `npm test`: **523 passed in 4.0 minutes**, no failures, retries or skips.
-  Both configured servers built/served the production assets and repository modules.
-- Final standalone `npm run build`: passed TypeScript checking and Vite production build.
-- The first full run had 520 passes and three failures from old baseline assumptions:
-  two journeys still counted 74/75 posts, and lazy composition assumed fresh
-  DAISIZEN 2 was absent. Updated the explicit totals to 84/85 and made the lazy
-  case restore an intentionally missing board. The final full run above passes.
-- Reviewed the complete staged diff, added local Markdown links/heading anchors,
-  balanced fences and staged whitespace, including the new fixture and tests.
-  Existing Vite large-chunk and Node color-environment warnings remain informational.
+- `npm ci`: passed, zero reported vulnerabilities; dependencies unchanged.
+- Final `npm test`: **522 passed in 4.1 minutes**, no failures, retries or skips.
+  Both configured servers built/served production assets and repository modules.
+- Standalone `npm run build`: passed TypeScript checking and Vite production build.
+  Existing large-chunk and color-environment warnings remain informational.
+- `git diff --check`: passed; local Markdown targets and new linked headings checked.
+- The first full run had 521 passes and one failure in the new empty-restore
+  browser test: a live clock advanced the scheduler timestamps between snapshots.
+  Fixed its clock so the preservation assertion is deterministic.
 
-The explicit 15-route production oracle checks anonymous fresh startup and confirmed
-reset, every LIST/READ path (including MAIN 16 → 1), exact per-board/total/thread
-counts, all 72 established posts plus ten new originals, stable identities,
-ordered same-board replies and historical display dates. No page errors, external
-requests, model setup or human registration were required. The route inventory
-separates public posting boards from quiet collections, mailboxes, OLT, search,
-NetNews and retained conference content.
+The explicit 15-route production oracle covers anonymous fresh startup and
+confirmed factory reset, every LIST/READ path (including MAIN 16 → 1), exact
+per-board/total/thread counts, all 72 established posts plus ten new originals,
+stable identities, ordered same-board replies and historical display dates.
+It checks for page errors, external requests and unexpected forum controls.
+No model setup, WebGPU or human registration is needed to read the content.
+The route inventory separates public posting boards from quiet collections,
+mailboxes, OLT, search, NetNews and retained conference content.
 
-Recovery checks reconstruct a partial older world with human/AI posts, separate
-human read markers, custom SIG names/boards, retained counters and settings.
-They cover explicit refusal, whole-transaction quota rollback, competing-tab
-approval fencing, idempotency, imported worlds/provenance, backup validation and
-per-human reading after recovery. Further cases exclude duplicate keywords/boards,
-custom board IDs/names, conflicting seed IDs, missing authors and actor conflicts.
-The production Settings flow previews imported empty default destinations and
-starting numbers, cancels without writing, then adds only on confirmation and
-makes Wakaba readable through the terminal. Existing lifecycle/backup/restore,
-consent/scheduler, mail, OLT, conference and other service checks all pass.
+Repository/browser regressions cover partial older worlds with human/AI posts,
+separate human read markers, customized SIGs/empty boards and private settings;
+reopening and backup restore preserve their content exactly. Restoring intentionally
+empty forums leaves Wakaba empty. The existing reset confirmation retains its
+backup/export option and destructive warning. No recovery scanner, migration or
+additional population UI is introduced by this feature.
 
-Recovery deliberately skips unknown/custom mappings and absent/conflicting authors;
-it does not invent replacement identities. Existing/imported/cleared worlds receive
-no new automatic refill. No real-model download, hardware inference or optional
-historical-user signoff was performed. No post-merge verification is required.
+Bootstrap and reset quota failures now occur at the 78th post, within the new
+fixture writes, to verify rollback of the complete world. Concurrent bootstrap
+connections must produce exactly 82 unique posts. Existing lifecycle, backup,
+read-state, consent/scheduler and service regressions remain part of the full suite.
+
+No real model download, hardware inference, optional subjective signoff or
+post-deployment check was performed; these are not required for this change.
+No post-merge verification is required.
 
 # Issue #69: environmental gateway and EIC NET readings
 

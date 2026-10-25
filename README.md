@@ -135,8 +135,8 @@ or `EDIT`. Editing accepts `TITLE text`, `LINE n text`, `DELETE n`, `APPEND`
 `CANCEL` / `.CANCEL` explicitly discard from every composing stage. `BACK`, `MAIN`
 and `HELP` keep the draft and show its help. No draft line can navigate or send.
 Sends use transactional numbering and parent validation; failures permit retry,
-and a committed draft cannot be sent twice. Missing boards are created on
-successful send or confirmed Settings recovery, never by cancelling a draft.
+and a committed draft cannot be sent twice. Missing boards are created only on
+successful send, never by cancelling.
 
 Outside prompts, `BACK` returns one menu and `MAIN` returns to MAIN. Inside a
 confirmation, only the advertised literal `Y` executes that operation; blank,
@@ -655,9 +655,9 @@ select a human through `HANDLE` for `UNREAD` / `NEXT`, or try `WRITE` / `REPLY n
 → title → body → `.END` → review/edit → `Y` to save or `N` / `.CANCEL` to cancel.
 `BACK` follows board → welcome → actual MAIN/index caller; `MAIN` clears the path.
 The welcome itself is not a composition destination. Missing/empty boards explain
-how to begin; a successful human save or confirmed Settings recovery creates an absent default board.
+how to begin; only a successful human save creates an absent board.
 
-Pristine initialization/reset or confirmed empty-default recovery adds [three original contributions](data/pcvan/wakaba.json)
+Only pristine initialization/reset adds [three original contributions](data/pcvan/wakaba.json)
 by existing fictional residents 水玉 and タブストップ, including a question and linked
 reply. Existing, legacy-populated, expanded, imported or deliberately emptied worlds
 receive no Wakaba examples automatically. The existing scheduler may visit stored
@@ -690,7 +690,7 @@ beginner purpose. `LIST`, `READ number`, `UNREAD`, `NEXT`, `WRITE` and
 unread tracking and submission require `HANDLE`. Composition uses title → body →
 `.END` → `EDIT` / `REVIEW` / `Y` or `N` / `.CANCEL`. `BACK` returns to
 communication, then the actual MAIN/index caller; `MAIN` clears that path.
-An absent board stays usable; successful explicit submission or confirmed Settings recovery can create a missing default board.
+An absent board stays usable; only a successful explicit submission creates it.
 A pristine world includes three original Japanese contributions by 水玉 and
 タブストップ: sketch-circle recruitment, its linked response and a printing tip.
 Existing/imported/deleted worlds receive no automatic examples.
@@ -999,20 +999,13 @@ identities, settings and read markers are preserved. Imported or legacy worlds
 receive no automatic history. See [migration eligibility](docs/local-storage.md#community-expansion-migration). For a pre-feature profile with no posts and safe,
 unambiguous board mappings, Settings → ローカルデータ・保守 offers 初期会話を追加
 with an explanation and explicit confirmation (`POPULATE` remains a typed shortcut). It preserves members, custom names and counters,
-and can succeed only once. Imported worlds, including empty restores, are excluded
-from that older action.
+and can succeed only once. Imported worlds, including empty restores, are excluded.
 
-For existing partial worlds, including restored or deliberately cleared defaults,
-Settings → ローカルデータ・保守 → **空の標準掲示板に初期会話を追加…**
-previews each eligible board, count and first number before explicit confirmation.
-It adds only to safely identified empty/missing defaults; it skips populated,
-custom, renamed, ambiguous or colliding boards and missing/conflicting authors.
-Existing posts, numbers, read markers, profiles, mail, services, settings and
-backup provenance are retained. No model or registration is needed. The action is
-atomic and repeatable without duplicates; a concurrent change invalidates approval.
-See [recovery rules](docs/local-storage.md#empty-default-board-recovery-issue-131).
-
-Restoring an empty backup keeps the world empty until this opt-in or reset; it also suppresses the old DEMO
+Existing profiles keep their saved content; this feature adds no migration,
+backfill or recovery control. To start again with the complete starter content,
+export a JSON backup, then use Settings → ローカルデータ・保守 → 初期状態に戻す.
+This existing confirmed action deletes the old world and creates the new baseline.
+Restoring an empty backup keeps the world empty; it also suppresses the old DEMO
 fallback. Clearing all browser site data removes the initialization marker, so the
 next visit creates a new world. Export first to retain your current world.
 
