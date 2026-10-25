@@ -5,7 +5,7 @@ import type { LocalRepository } from './storage/repository';
 import { activeHuman } from './forums';
 import { identityToken, penName } from './member-presentation';
 import { OLT_SETTING, attendance, oltState, roomDefinitions, contextRooms } from './olt-state';
-import type { OltContext, OltLine, OltRoom, RoomId } from './olt-state';
+import type { OltContext, OltLine, OltRoom, OltState, RoomId } from './olt-state';
 import { buildOltPrompt } from './ai/olt';
 import type { createAiControls } from './ai/controls';
 
@@ -36,11 +36,17 @@ export class TerminalOlt {
   private submission = 0;
   private working = false;
   private task: AbortController | undefined;
+  private turnId: string | undefined;
+  private liveSince = Date.now();
   private readonly clientId = crypto.randomUUID();
   constructor(private readonly actions: OltActions) {}
   get active() { return !!this.roomId; }
   invalidate() { this.suspend(); this.roomId = undefined; this.seen = 0; }
-  suspend() { this.visit++; this.task?.abort(); this.task = undefined; }
+  suspend() { this.visit++; this.task?.abort(); this.task = undefined; this.turnId = undefined; this.liveSince = Date.now(); }
+  resume() { this.liveSince = Date.now(); }
+  observePresence(state: OltState) {
+    if (this.turnId && state.rooms.find((r) => r.id === this.roomId)?.pending?.id !== this.turnId) this.task?.abort();
+  }
   private who(room: OltRoom, data: Backup) {
     const ids = attendance(room);
     return `参加者：${ids.length}人 / ${ids.map((id) => {
@@ -55,9 +61,10 @@ export class TerminalOlt {
       : `* ${name} ${line.kind === 'enter' ? '入室' : '退室'}`}`;
   }
   private show(room: OltRoom, data: Backup, full: boolean) {
-    const lines = (full ? room.lines.slice(-40) : room.lines.filter((l) => l.number > this.seen));
+    const lines = (full ? room.lines.slice(-40) : room.lines.filter((l) => l.number > this.seen && (l.kind === 'say' || Date.parse(l.createdAt) >= this.liveSince)));
     this.seen = room.nextNumber - 1;
     if (full) this.actions.print(`OLT / ${roomDefinitions.find((d) => d.id === room.id)!.name}`, this.who(room, data));
+    if (full && lines.length) this.actions.print('最近の記録（表示日時は発生時刻）');
     if (lines.length) this.actions.print(...lines.map((l) => this.line(l, data)));
     if (full) this.actions.print(roomHelp, 'そのまま入力: 発言（400文字まで）/ //文字: 先頭の / を発言 / /HANDLE: ハンドル設定', '日時 JST / 発言=');
   }
@@ -150,6 +157,7 @@ export class TerminalOlt {
       await this.actions.ai.runRoom(async (engine, signal) => {
         const turn = await repo.claimRoomTurn(id);
         if (!turn) return;
+        this.turnId = turn.id;
         try {
           const snapshot = await this.actions.read(); signal.throwIfAborted();
           if (!current()) { task.abort(); return; }
@@ -158,7 +166,7 @@ export class TerminalOlt {
           signal.throwIfAborted();
           if (!current()) { task.abort(); return; }
           await repo.finishRoomTurn(id, turn.id, raw, signal);
-        } finally { await repo.finishRoomTurn(id, turn.id).catch(() => {}); }
+        } finally { if (this.turnId === turn.id) this.turnId = undefined; await repo.finishRoomTurn(id, turn.id).catch(() => {}); }
       }, task.signal);
       if (this.task === task) this.task = undefined;
     } finally { this.working = false; }

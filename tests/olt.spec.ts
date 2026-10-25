@@ -59,7 +59,8 @@ test('delayed human-to-resident and resident-to-resident chat preserve input, sh
     const member = data.members.find((m) => m.id === line.authorId)!;
     const token = renderPost({ ...data.posts[0]!, authorId: member.id }, '照合', undefined, data.members)[1]!.match(/\((SYN-[0-9A-V]{13})\)/)![1];
     expect(replay).toContain(`(${token}) <${member.handle}> ${line.text}`);
-    expect(replay).toContain(`(${token}) * ${member.handle} 入室`);
+    // These residents were already present; entry does not replay their arrivals.
+    expect(replay).not.toContain(`(${token}) * ${member.handle} 入室`);
     expect(who).toContain(`(${token}) ${member.handle}`);
   }
   await noOtherUi(page);
@@ -123,13 +124,16 @@ test('JSON backup, import and reset preserve transcript and shared authors, then
   await command(page, '保存する発言', '<保存する客>'); await command(page, '/LEAVE', '退出');
   const saved = await backup(page), olt = saved.settings.find((s) => s.id === 'olt-rooms')!;
   await command(page, 'JOIN 1', '発言='); await command(page, '変更後', '<保存する客>'); await command(page, '/LEAVE', '退出');
-  await restore(page, saved); expect((await snapshot(page)).settings.find((s) => s.id === 'olt-rooms')).toEqual(olt);
+  await restore(page, saved);
+  const restored = (await state(page))!;
+  const expected = olt.value as unknown as import('../src/olt-state').OltState;
+  expect(restored.rooms.map(({ observedAt: _at, ...room }) => room)).toEqual(expected.rooms.map(({ observedAt: _at, ...room }) => room));
   await command(page, 'JOIN 2', '保存する発言'); await command(page, '/LEAVE', '退出');
   await command(page, 'RESET', '初期状態に戻しますか');
   // Approval reloads the page; its old transcript echo can disappear before polling.
   await page.locator('#command').fill('Y'); await page.locator('#command').press('Enter');
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
-  expect(await state(page)).toBeUndefined(); expect((await snapshot(page)).posts).toHaveLength(82);
+  expect((await state(page))!.rooms.every((r) => !r.lines.length && !r.visitors.length)).toBe(true); expect((await snapshot(page)).posts).toHaveLength(82);
 });
 
 test('pending OLT generation times out, releases its worker, and keeps navigation usable', async ({ page }) => {
@@ -289,17 +293,18 @@ test('production OLT speech → WHO → rename → LIST keeps forum identity thr
   await noOtherUi(page);
 });
 
-test('anonymous OLT reading preserves zero attendance and never invents an identity', async ({ page }) => {
+test('anonymous OLT reading preserves fictional attendance and never invents a human identity', async ({ page }) => {
   await page.clock.install({ time: epoch }); await start(page); const before = await snapshot(page);
   await room(page);
-  const who = await command(page, '/WHO', '参加者：0人 / 誰もいません');
-  expect(who).not.toMatch(/SYN-|名無し|不明/);
+  const who = await command(page, '/WHO', '参加者：');
+  expect(who).not.toMatch(/名無し|不明/);
   await command(page, '読むだけ', '発言にはハンドルが必要');
   const replay = await command(page, '/LIST', '日時 JST');
-  expect(replay).not.toMatch(/SYN-|名無し|不明/);
+  expect(replay).not.toMatch(/名無し|不明/);
   const after = await snapshot(page);
   expect(after.members).toEqual(before.members);
-  expect((await state(page))!.rooms.flatMap((r) => r.lines)).toEqual([]);
+  expect((await state(page))!.rooms.flatMap((r) => r.visitors)).toEqual([]);
+  expect((await state(page))!.rooms.flatMap((r) => r.lines).some((l) => after.members.find((m) => m.id === l.authorId)?.actor === 'human')).toBe(false);
   await command(page, '/LEAVE', '部屋を退出しました。');
 });
 
@@ -309,4 +314,122 @@ test('About discloses OLT identity sources, confidence, continuity and reconstru
     '原本と省略された別紙は未回収', 'トークン位置', '現名の再表示', '公開日は未確認',
     'https://www.law.co.jp/cases/pcvan.htm', 'https://someya.sakura.ne.jp/poem/tansi/tansimain.html',
     'https://www.vector.co.jp/soft/win95/net/se024554.html']) expect(text).toContain(detail);
+});
+
+test('connection, visible world ticks and resume reconcile all rooms before directory entry without model consent', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+  await mockWorker(page, 'ok'); await start(page, '時間の客');
+  const initial = await state(page);
+  expect(initial!.rooms.every((r) => r.observedAt === epoch.toISOString())).toBe(true);
+  expect(initial!.rooms.flatMap((r) => r.lines)).toEqual([]);
+  await residents(page);
+  await advance(page, 5); // still on MAIN, never visited OLT
+  expect((await state(page))!.rooms.flatMap((r) => r.residents)).toHaveLength(2);
+  for (const context of ['daisizen', 'wakaba'] as const) {
+    await directory(page, context);
+    const before = (await state(page))!;
+    const roomId = context === 'wakaba' ? 'wakaba' : 'night';
+    const target = before.rooms.find((r) => r.id === roomId)!;
+    await expect(page.locator('.output')).toContainText(`${context === 'wakaba' ? '1 はじめての談話室' : '2 星と道具の部屋'} / 参加者：${target.residents.length}人`);
+    const joined = await command(page, `JOIN ${context === 'wakaba' ? 1 : 2}`, '発言=');
+    expect((await state(page))!.rooms.map((r) => r.residents)).toEqual(before.rooms.map((r) => r.residents));
+    for (const p of target.residents) {
+      const name = (await snapshot(page)).members.find((m) => m.id === p.memberId)!.handle;
+      expect(joined).not.toContain(`* ${name} 入室`);
+    }
+    await command(page, '/WHO', '参加者'); await command(page, '/LIST', '日時 JST');
+    expect((await state(page))!.rooms.map((r) => r.residents)).toEqual(before.rooms.map((r) => r.residents));
+    await command(page, '/MAIN', 'MAIN');
+  }
+  const notices = (await state(page))!.rooms.flatMap((r) => r.lines).filter((l) => l.authorId.startsWith('fictional-ai:'));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const hiddenAt = (await state(page))!.rooms[0]!.observedAt;
+  await page.clock.setSystemTime(new Date(epoch.getTime() + 24 * 3_600_000));
+  await advance(page, 6);
+  expect((await state(page))!.rooms[0]!.observedAt).toBe(hiddenAt);
+  const input = page.locator('#command'); await input.fill('変換中'); await input.dispatchEvent('compositionstart');
+  const transcript = await page.locator('.output').textContent();
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect.poll(async () => (await state(page))!.rooms[0]!.observedAt).not.toBe(hiddenAt);
+  expect((await state(page))!.rooms.flatMap((r) => r.lines).filter((l) => l.authorId.startsWith('fictional-ai:'))).toEqual(notices);
+  expect(await page.locator('.output').textContent()).toBe(transcript);
+  await expect(input).toHaveValue('変換中'); await expect(input).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { journeyWorker: { loads: number } }).journeyWorker.loads)).toBe(0);
+});
+
+for (const mode of ['conversation', 'self-greeting', 'echo'] as const) test(`first visit Japanese chat validates ${mode} output before history or transcript`, async ({ page }) => {
+  await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+  await mockWorker(page, mode); await start(page, '初めの客');
+  await residents(page); await consent(page); await room(page);
+  const human = 'こんにちは、初めてのOLTでドキドキしています';
+  await command(page, human, '<初めの客>');
+  // A real second visitor's entrance is appended after the human utterance.
+  // It must not become the reply target. Append a valid, atomic status fixture.
+  await page.evaluate(async () => {
+    const dataRequest = indexedDB.open('pcvan-local');
+    const db = await new Promise<IDBDatabase>((resolve) => { dataRequest.onsuccess = () => resolve(dataRequest.result); });
+    const tx = db.transaction(['settings', 'members'], 'readwrite');
+    const request = tx.objectStore('settings').get('olt-rooms');
+    request.onsuccess = () => {
+      const row = request.result, room = row.value.rooms.find((r: { id: string }) => r.id === 'night');
+      tx.objectStore('members').put({ id: 'late-visitor', handle: '後からの客', actor: 'human' });
+      room.visitors.push({ clientId: 'late', memberId: 'late-visitor', until: new Date(Date.now() + 45_000).toISOString() });
+      const number = room.nextNumber++;
+      room.lines.push({ id: `olt:night:${number}`, number, authorId: 'late-visitor', kind: 'enter', text: '', origin: 'local-presence', createdAt: new Date().toISOString() });
+      tx.objectStore('settings').put(row);
+    };
+    await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); }); db.close();
+  });
+  await advance(page, 7);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)).toBeGreaterThan(0);
+  const prompts = await page.evaluate(() => (window as unknown as { journeyWorker: { prompts: { replyTo: { text: string }; addressee: { id: string; handle: string }; speaker: { id: string } }[] } }).journeyWorker.prompts);
+  expect(prompts[0]!.replyTo.text).toBe(human);
+  expect(prompts[0]!.addressee.handle).toBe('初めの客');
+  expect(prompts[0]!.speaker.id).not.toBe(prompts[0]!.addressee.id);
+  if (mode === 'conversation') {
+    await expect.poll(async () => (await speech(page)).length).toBe(1);
+    expect((await speech(page))[0]!.text).toContain('初めの客さん');
+    expect((await speech(page))[0]!.text).toContain('双眼鏡');
+    await advance(page, 7);
+    await expect.poll(async () => (await speech(page)).length).toBeGreaterThanOrEqual(2);
+    const lines = await speech(page); expect(lines[1]!.authorId).not.toBe(lines[0]!.authorId);
+  } else {
+    expect(await speech(page)).toEqual([]);
+    await command(page, '/LIST', '日時 JST');
+    expect(await page.locator('.output').textContent()).not.toContain('ドキドキワクワク');
+    expect((await state(page))!.attempts).toBe(1);
+    expect((await state(page))!.rooms.find((r) => r.id === 'night')!.pending).toBeNull();
+  }
+});
+
+test('the world presence timer cancels an in-flight model turn when its speaker departs', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+  await mockPendingWorker(page, 'generate'); await start(page, '見送る客');
+  await residents(page); await consent(page); await room(page);
+  await command(page, '今夜の星はどうですか', '<見送る客>'); await advance(page, 5);
+  await expect.poll(async () => (await state(page))!.rooms[1]!.pending?.authorId).toBeTruthy();
+  await page.evaluate(async () => {
+    const request = indexedDB.open('pcvan-local');
+    const db = await new Promise<IDBDatabase>((resolve) => { request.onsuccess = () => resolve(request.result); });
+    const tx = db.transaction('settings', 'readwrite'), get = tx.objectStore('settings').get('olt-rooms');
+    get.onsuccess = () => {
+      const row = get.result, room = row.value.rooms[1];
+      room.residents.find((p: { memberId: string }) => p.memberId === room.pending.authorId).until = new Date(Date.now() + 1000).toISOString();
+      tx.objectStore('settings').put(row);
+    };
+    await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); }); db.close();
+  });
+  await advance(page, 5);
+  await expect.poll(async () => (await state(page))!.rooms[1]!.pending).toBeNull();
+  expect(await speech(page)).toEqual([]);
+  await command(page, '/LEAVE', '退出');
+  await page.getByRole('button', { name: '設定 / Options', exact: true }).click();
+  await page.locator('.ai-panel > summary').click();
+  await expect(page.locator('.ai-status')).not.toContainText('時間切れ');
 });

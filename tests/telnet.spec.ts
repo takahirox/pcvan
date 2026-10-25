@@ -5,7 +5,7 @@ import { ConnectionController } from '../src/connection';
 import { remoteLetters, telnetAccount, telnetHost } from '../src/telnet';
 import { about } from '../src/settings';
 import type { AiActivity } from '../src/storage/schema';
-import { backupFixture } from './backup-fixture';
+import { backupFixture, quietOltFixture } from './backup-fixture';
 import { backup, command, importFile, noOtherUi, restore, snapshot, start } from './terminal-helpers';
 
 const open = `OPEN ${telnetHost}`;
@@ -126,6 +126,7 @@ for (const world of ['anonymous empty', 'registered empty', 'registered populate
     const fixture = await snapshot(page);
     const activity = fixture.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity;
     activity.maxPosts = 0; activity.consent = false;
+    quietOltFixture(fixture);
     if (world.endsWith('empty')) {
       fixture.members = fixture.members.filter((member) => member.actor === 'human');
       fixture.sigs = []; fixture.forums = []; fixture.posts = []; fixture.mail = []; fixture.readStates = [];

@@ -27,8 +27,8 @@ already-historical 1996–1997 instants are preserved. Storage timestamps,
 scheduling, retention and elapsed-time calculations remain operational, as do
 timestamps shown in modern Settings. See the
 [calendar policy](local-storage.md#historical-display-calendar-issue-67).
-OLT inference receives ordered author/kind/text excerpts without absolute event
-timestamps; persisted events retain raw timestamps and terminal readback uses
+OLT inference receives ordered, speaker-labeled speech excerpts and separate
+presence notices without absolute event timestamps; persisted events retain raw timestamps and terminal readback uses
 the historical calendar. Shared
 setting instructions add no access to other boards or private correspondence.
 No stored or user-authored text is rewritten or filtered for period keywords.
@@ -436,10 +436,25 @@ The saved stable resident IDs, profile editor, selected human and handles
 are shared with forums/mail. Presence is fictional local scheduling, never a
 remote connection: independently phased finite visits use personal hours, daily
 absence, participation/frequency, preferred-board interest and occasional exploration.
-Typical sessions range from short visits to a few long-stay regulars (see below). Out-of-hours residents leave;
+Typical sessions range from short visits to a few long-stay regulars (see below).
+Hours and daily absences govern each visit start; a visit finishes at its individual
+end time, including across an hour or day boundary;
 not all residents appear, and some windows/rooms are empty. Identical observations,
 reentry and reload do not reroll arrival chances. Local presence events are
 `local-presence`, not model output or prewritten dialogue. No OLT history is seeded.
+
+Connection/login, visible-session resume and a coalesced 15-second visible-tab
+cadence reconcile all three rooms, even outside OLT. Directory reads also reconcile
+before rendering, so immediate JOIN/WHO/LIST reuse the same attendance. This cheap,
+deterministic fictional metadata does not require model consent, load weights or
+produce speech. No browser code runs after the browser is closed. On reopen, only
+plausible current attendance is restored.
+
+Initial observations and gaps longer than 90 seconds reconcile silently: existing
+residents appear in WHO as already present, without invented arrival/departure
+notices. Continuously observed transitions use actual visit/lease boundaries and
+are sorted before assigning line numbers. Explicit readback labels retained events
+as records with occurrence dates; visibility resume does not stream missed notices.
 
 An active visible room renews its human lease every three seconds. After human
 speech, the earliest response is eight seconds later, then subsequent resident
@@ -450,12 +465,11 @@ three consecutive resident utterances end that exchange until new room activity.
 A resident never replies as an absent character or impersonates the human.
 There is no guarantee of an answer. Only currently visible tabs infer; hidden,
 closed and long-unobserved intervals do not generate retrospective conversation.
-On return, expired presence can be recorded conservatively, then a fresh quiet
-interval begins. The next observation reconciles attendance rather than replaying
-missed intervals.
+On return after a long gap, a fresh quiet interval begins. Reconciliation
+updates attendance without replaying missed intervals.
 
 OLT uses the already authorized model, shared loader/worker, Web Locks and stop/
-retry controls. Opening/joining alone grants no consent. `AUTO 0` pauses OLT too.
+retry controls. Opening/joining alone grants no consent. `AUTO 0` pauses OLT speech too.
 Unsupported WebGPU, missing Web Locks, offline model-load errors, malformed output
 and worker failures leave human speech, navigation and readback usable without
 invented replies. A separate persisted **24 attempts per hour across all rooms**
@@ -468,8 +482,13 @@ has a 30-second deadline. Failure/timeout suspends automatic retry until Setting
 retry/load. Commit checks consent, profiles, current presence, turn token, lease
 and world epoch again. Tokens expire after 35 seconds; stale output is discarded.
 
-The prompt contains the last 12 room events (text excerpts up to 120 characters), present identities, the speaker's
-profile/affinities and at most three public posts (180 characters each). **No mail
+The prompt separates the selected speaker and intended addressee by stable ID,
+current handle and actor, and identifies the reserved reply target independently
+of later status notices. Unanswered speech remains eligible when no resident is
+available yet. It contains twelve typed speech turns (160-character excerpts),
+four separate presence notices, up to sixteen present identities, a bounded
+speaker profile/interests and at most three public posts from this room's linked
+board (180 characters each). **No mail
 records or private-mail excerpts are passed**, even for the speaking resident.
 Wakaba adds beginner culture through this same prompt: plain language, basic
 questions welcome, no assumed experience, quiet reading respected and no promised
@@ -477,18 +496,25 @@ reply. Other OLT rooms’ transcripts are excluded. This context is a category D
 choice, not an archived conversation. Prompt assertions verify construction, not
 real-model cultural quality. All supplied conversation is untrusted data. Output
 must be exact JSON for the selected speaker/room, one plain line of 1–400 UTF-16 units, without terminal
-controls, invisible formatting, HTML or a repeated recent utterance. Rejected
-output never becomes chat. Settings exposes technical status and per-line origin.
+controls, invisible formatting, HTML or a repeated recent utterance. Before
+storage, conservative Japanese checks reject self-addressed greetings, extensive
+copying, first-visit excitement echoes and nearby rephrase loops. Short
+acknowledgements and attributed quotations with a new contribution are allowed.
+These lexical checks cannot guarantee natural language quality or detect every
+paraphrase. Rejected output never becomes chat; there is no automatic corrective
+inference or canned fallback, and the reserved attempt remains spent. Settings
+exposes technical status and per-line origin.
 Background readback waits while the input has text, Japanese composition is active
 or Options is open; it never edits input, changes focus or submits a partial line.
 
-See [OLT persistence](local-storage.md#olt-persistence) and
+See [OLT persistence](local-storage.md#olt-persistence),
+[Issue #135 validation](validation.md#issue-135-olt-presence-and-conversation) and
 [historical uncertainty](research/pcvan-1996-1997.md#olt-interaction-research-issue-53).
 
 ## Presence and response validation for Issue #133
 
-OLT observes current routines immediately on entry, using per-person phased visit
-cycles, finite individual durations and daily absence draws. Defaults for legacy
+OLT reconciles current attendance on connection and while visible, using
+per-person phased visit cycles, finite individual durations and daily absence draws. Defaults for legacy
 profiles remain short stays; added long-stay regulars can stay up to roughly 160
 minutes but still leave, sleep and have absent days. Attendance is limited to 16
 residents per room and 32 overall, independently of roster size; at most 128 new
@@ -502,7 +528,8 @@ polling), while reply probability, silence, current attendance and the inference
 lease remain authoritative. All rooms share 24 model attempts/hour; spontaneous
 turns may spend at most 16, leaving eight available for human speech. No authorized
 model means no generated speech. Prompts remain one selected profile, at most 16
-participant names, twelve short room events and three public-memory excerpts.
+participant names, twelve speech turns, four status notices and three room-linked
+public-memory excerpts.
 
 `community-scale.spec.ts` samples seven days × 24 JST hours × eight seeds across
 all three rooms. Design gates are >70% populated room visits overall, >45% in each

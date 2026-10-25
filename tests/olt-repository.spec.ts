@@ -132,7 +132,7 @@ for (const roomId of ['night', 'wakaba'] as const) {
     }, { now, roomId, roomIndex });
     expect(result.claims.filter(Boolean)).toHaveLength(1);
     expect(result.prompt.user).not.toMatch(/TOP_SECRET|PRIVATE_CORRESPONDENCE|private-1/);
-    expect(JSON.parse(result.prompt.user).recent).toHaveLength(2);
+    expect(JSON.parse(result.prompt.user).recentSpeech).toHaveLength(1);
     expect(result.committed.rooms[roomIndex]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
     expect(result.capped).toBeUndefined(); expect(result.withdrawn).toBeTruthy();
     expect(result.pending).toBeTruthy(); expect(result.changed.consent).toBe(false);
@@ -197,9 +197,62 @@ for (const roomId of ['night', 'wakaba'] as const) {
       return { prompt, failures, before, after, final: room.lines.at(-1)! };
     }, { now, roomId, roomIndex });
     const prompt = JSON.parse(result.prompt.user);
-    expect(prompt.recent).toHaveLength(12); expect(prompt.recent.every((l: { text: string }) => l.text.length <= 120)).toBe(true);
+    expect(prompt.recentSpeech).toHaveLength(12); expect(prompt.recentSpeech.every((l: { text: string }) => l.text.length <= 160)).toBe(true);
     expect(prompt.publicMemory.length).toBeLessThanOrEqual(3);
     expect(result.failures).toEqual(Array(10).fill(true)); expect(result.after).toBe(result.before);
     expect(result.final).toMatchObject({ authorId: 'fictional-ai:hoshimori', kind: 'say', origin: 'local-ai:webllm:test-model' });
   });
 }
+test('world reconciliation is atomic across tabs, keeps honest event order and rolls back rejected Japanese output', async ({ page }) => {
+  const result = await page.evaluate(async (now) => {
+    const repo = window.oltRepo, rp = '/src/storage/repository.ts', op = '/src/olt-state.ts';
+    const { oltState, iso } = await import(op) as typeof import('../src/olt-state');
+    const other = await (await import(rp)).openRepository('olt-world') as LocalRepository;
+    const at = Date.parse(now);
+    const first = await Promise.all([repo.reconcileOlt(now), other.reconcileOlt(now)]);
+    const content = await repo.exportBackup(), row = content.settings.find((s) => s.id === 'ai-residents')!;
+    const profiles = (row.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
+    profiles.forEach((p) => { p.participation = 0; p.reply = 1; p.inactivity = 0; });
+    await repo.put('settings', row);
+    const state = oltState(content), room = state.rooms[1]!;
+    state.rooms.forEach((r) => { r.residents = []; });
+    room.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: iso(at + 30_000) },
+      { memberId: 'fictional-ai:kusabue', joinedAt: now, until: iso(at + 7000) }];
+    await repo.put('settings', { id: 'olt-rooms', value: state as never });
+    await repo.authorizeModel((await repo.openActivity()).modelId);
+    const human = content.members.find((m) => m.actor === 'human')!;
+    await repo.observeRoom('human', 'night', human.id, now);
+    await repo.speakRoom('night', 'human', 'こんにちは、初めてのOLTでドキドキしています', now);
+    const turn = await repo.claimRoomTurn('night', iso(at + 10_000));
+    const before = await repo.exportBackup();
+    let rejected = false;
+    try { await repo.finishRoomTurn('night', turn!.id, JSON.stringify({ kind: 'olt', roomId: 'night', personaId: 'hoshimori',
+      text: 'こんにちは星守さん、初めてのOLTでドキドキワクワクしています。' }), undefined, iso(at + 11_000)); } catch { rejected = true; }
+    const unchanged = JSON.stringify(before) === JSON.stringify(await repo.exportBackup());
+    await repo.finishRoomTurn('night', turn!.id);
+    const departures = await Promise.all([repo.reconcileOlt(iso(at + 31_000)), other.reconcileOlt(iso(at + 31_000))]);
+    const saved = await repo.exportBackup();
+    const native = IDBObjectStore.prototype.put;
+    let quota = '';
+    try {
+      IDBObjectStore.prototype.put = function (value, key) {
+        if (this.name === 'settings' && value.id === 'olt-rooms') throw new DOMException('quota', 'QuotaExceededError');
+        return key === undefined ? native.call(this, value) : native.call(this, value, key);
+      };
+      try { await repo.reconcileOlt(iso(at + 40_000)); } catch (e) { quota = (e as { code: string }).code; }
+    } finally { IDBObjectStore.prototype.put = native; }
+    const preserved = JSON.stringify(saved) === JSON.stringify(await repo.exportBackup());
+    other.close();
+    return { first, rejected, unchanged, departures, saved, quota, preserved };
+  }, now);
+  expect(result.first[0]).toEqual(result.first[1]);
+  expect(result.first[0]!.rooms.flatMap((r) => r.lines)).toEqual([]);
+  expect(result.rejected).toBe(true); expect(result.unchanged).toBe(true);
+  expect(result.departures[0]).toEqual(result.departures[1]);
+  const room = result.departures[0]!.rooms[1]!;
+  expect(room.lines.filter((l) => l.kind === 'leave').map((l) => l.createdAt)).toEqual(['2026-10-21T13:04:07.000Z', '2026-10-21T13:04:30.000Z']);
+  expect(room.lines.some((l) => l.origin.startsWith('local-ai:'))).toBe(false);
+  expect(new Set(room.lines.map((l) => l.id)).size).toBe(room.lines.length);
+  expect(result.departures[0]!.attempts).toBe(1);
+  expect(result.quota).toBe('quota'); expect(result.preserved).toBe(true);
+});

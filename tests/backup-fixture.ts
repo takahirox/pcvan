@@ -52,3 +52,11 @@ export function unreadFixture(): Backup {
     createdAt: '2026-10-20T01:02:03.000Z', origin: 'local-human' }];
   return data;
 }
+
+/** Service-isolation fixtures disable attendance explicitly, independently of AI consent. */
+export function quietOltFixture(data: Backup): void {
+  (data.settings.find((s) => s.id === 'ai-residents')!.value as unknown as import('../src/ai/personas').ResidentSettings)
+    .profiles.forEach((p) => { p.frequency = 0; });
+  (data.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState)
+    .rooms.forEach((r) => { r.residents = []; r.pending = null; });
+}

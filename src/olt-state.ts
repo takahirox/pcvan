@@ -18,7 +18,7 @@ export interface OltLine {
 export interface OltPresence { memberId: string; joinedAt: string; until: string }
 export interface OltVisitor { clientId: string; memberId: string; until: string }
 export interface OltTurn {
-  id: string; authorId: string; modelId: string; context: string; until: string;
+  id: string; authorId: string; modelId: string; context: string; until: string; targetNumber?: number;
 }
 export interface OltRoom {
   id: RoomId; nextNumber: number; lines: OltLine[];
@@ -86,63 +86,80 @@ export const MAX_ROOM_PRESENT = 16;
 
 /** One observation, no elapsed-time loop and no closed-tab dialogue. */
 export function observeOlt(state: OltState, content: Backup, at: number): void {
-  const ai = oltEnabled(content);
+  const ai = content.settings.find((s) => s.id === 'ai-activity')?.value as unknown as AiActivity | undefined;
+  const seed = ai?.seed ?? 'pcvan';
   const profiles = residentProfiles(content);
   const byMember = new Map(profiles.map((p) => [personaMemberId(p.id), p]));
   const members = new Set(content.members.filter((m) => m.actor === 'ai').map((m) => m.id));
+  // Check every room before mutating, including legacy records with different watermarks.
+  if (state.rooms.some((room) => at < Date.parse(room.observedAt))) return;
   const present = new Set<string>();
+  const events = new Map<OltRoom, { memberId: string; kind: 'enter' | 'leave'; at: number }[]>();
   for (const room of state.rooms) {
-    const previous = new Set(room.visitors.map((v) => v.memberId));
-    room.visitors = room.visitors.filter((v) => Date.parse(v.until) > at);
-    for (const id of previous) if (!room.visitors.some((v) => v.memberId === id)) {
-      const expired = Math.max(Date.parse(room.observedAt), Math.min(at, Date.parse(room.observedAt) + VISITOR_LEASE));
-      appendOlt(room, id, 'leave', '', 'local-presence', expired);
+    const previousAt = Date.parse(room.observedAt);
+    const live = at > previousAt && at - previousAt <= 90_000;
+    const changes: { memberId: string; kind: 'enter' | 'leave'; at: number }[] = [];
+    events.set(room, changes);
+    const previous = room.visitors;
+    room.visitors = previous.filter((v) => Date.parse(v.until) > at);
+    for (const id of new Set(previous.map((v) => v.memberId))) {
+      if (room.visitors.some((v) => v.memberId === id)) continue;
+      const expired = Math.max(...previous.filter((v) => v.memberId === id).map((v) => Date.parse(v.until)));
+      if (live && expired > previousAt) changes.push({ memberId: id, kind: 'leave', at: expired });
     }
     room.residents = room.residents.filter((p) => {
       const profile = byMember.get(p.memberId);
-      if (ai && members.has(p.memberId) && profile?.frequency && Date.parse(p.until) > at && routineFactor(profile, at) === 1) {
+      // Hours govern visit STARTS. An hour boundary never evicts a crowd.
+      if (members.has(p.memberId) && profile?.frequency && Date.parse(p.until) > at) {
         present.add(p.memberId); return true;
       }
-      appendOlt(room, p.memberId, 'leave', '', 'local-presence', Math.min(at, Date.parse(p.until)));
+      const ended = Math.min(at, Date.parse(p.until));
+      if (live && ended > previousAt) changes.push({ memberId: p.memberId, kind: 'leave', at: ended });
       return false;
     });
     if (room.pending && !room.residents.some((p) => p.memberId === room.pending!.authorId)) room.pending = null;
-    if (at - Date.parse(room.observedAt) > 90_000) {
+    if (at - previousAt > 90_000) {
       room.pending = null; room.handledNumber = room.nextNumber - 1;
       room.nextTurnAt = iso(at + 15_000); room.chain = 0;
     }
-    room.observedAt = iso(Math.max(at, Date.parse(room.observedAt)));
   }
-  if (!ai) return;
-  // At most 128 identities considered for new arrivals per observation. Existing
-  // attendance is always retained. A larger future roster rotates daily.
+  // Deterministic fictional status is independent of download/speech consent.
+  // At most 128 candidates; no elapsed-time loop or retrospective conversation.
   const offset = profiles.length > 128 ? Math.floor(at / 86_400_000) * 127 % profiles.length : 0;
   for (let index = 0; index < Math.min(128, profiles.length) && present.size < MAX_PRESENT; index++) {
     const p = profiles[(offset + index) % profiles.length]!;
     const memberId = personaMemberId(p.id);
-    if (!members.has(memberId) || present.has(memberId) || !p.frequency || routineFactor(p, at) !== 1) continue;
-    // Individual visit cycles, not a synchronized twenty-minute exodus. Long-stay
-    // regulars still have a daily absence chance and finite sessions.
+    if (!members.has(memberId) || present.has(memberId) || !p.frequency) continue;
     const minutes = p.sessionMinutes ?? 14;
     const cycle = (minutes + 5) * 60_000;
-    const phase = random(`${ai.seed}:olt:${p.id}:phase`) * cycle;
+    const phase = random(`${seed}:olt:${p.id}:phase`) * cycle;
     const slot = Math.floor((at - phase) / cycle);
-    const draw = (key: string) => random(`${ai.seed}:olt:${p.id}:${slot}:${key}`);
-    if (draw('visit') >= Math.min(.95, p.participation * p.frequency) ||
-      random(`${ai.seed}:olt:${p.id}:away:${Math.floor((at + p.utcOffsetMinutes * 60_000) / 86_400_000)}`) < (p.absence ?? .12)) continue;
+    const draw = (key: string) => random(`${seed}:olt:${p.id}:${slot}:${key}`);
+    const start = slot * cycle + phase;
+    const end = start + minutes * (.7 + draw('duration') * .3) * 60_000;
+    // Check the resident's routine/absence at the actual individual visit start,
+    // not the observation hour. Sessions can finish naturally across midnight.
+    if (at >= end || routineFactor(p, start) !== 1 ||
+      draw('visit') >= Math.min(.95, p.participation * p.frequency) ||
+      random(`${seed}:olt:${p.id}:away:${Math.floor((start + p.utcOffsetMinutes * 60_000) / 86_400_000)}`) < (p.absence ?? .12)) continue;
     const preferred = roomDefinitions.filter((r) => p.preferredBoards.includes(r.board));
     const pool = preferred.length && draw('explore') > .15 ? preferred : roomDefinitions;
     const selected = pool[Math.floor(draw('room') * pool.length)]!;
     const room = state.rooms.find((r) => r.id === selected.id)!;
     if (room.residents.length >= MAX_ROOM_PRESENT) continue;
-    const start = slot * cycle + phase;
-    const end = start + minutes * (.7 + draw('duration') * .3) * 60_000;
-    if (at >= end) continue;
-    // Reentry never rolls again or repeats a visit that ended in this cycle.
     if (room.lines.some((l) => l.authorId === memberId && l.kind === 'enter' && Date.parse(l.createdAt) >= start)) continue;
     room.residents.push({ memberId, joinedAt: iso(start), until: iso(end) });
     present.add(memberId);
-    appendOlt(room, memberId, 'enter', '', 'local-presence', at);
+    const previousAt = Date.parse(room.observedAt);
+    if (at - previousAt <= 90_000 && start > previousAt) events.get(room)!.push({ memberId, kind: 'enter', at: start });
+  }
+  for (const room of state.rooms) {
+    // Assign line numbers in occurrence order, never roster/sweep order. Initial
+    // and long-gap reconciliation changes attendance without inventing notices.
+    for (const e of events.get(room)!.sort((a, b) => a.at - b.at || a.memberId.localeCompare(b.memberId))) {
+      appendOlt(room, e.memberId, e.kind, '', 'local-presence', e.at);
+    }
+    room.observedAt = iso(at);
   }
 }
 
@@ -197,7 +214,8 @@ export function validateOlt(value: unknown): asserts value is OltState {
       }
     }
     if (r.pending !== null) {
-      const p = obj(r.pending, ['id', 'authorId', 'modelId', 'context', 'until']);
+      const p = obj(r.pending, ['id', 'authorId', 'modelId', 'context', 'until'], ['targetNumber']);
+      if (p.targetNumber !== undefined) { int(p.targetNumber, 1); if ((p.targetNumber as number) >= (r.nextNumber as number)) fail(); }
       text(p.id); text(p.authorId); text(p.modelId); time(p.until);
       if (typeof p.context !== 'string' || p.context.length > 100_000) fail();
     }

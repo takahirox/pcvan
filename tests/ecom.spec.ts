@@ -8,7 +8,7 @@ import { emptyOlt, appendOlt, OLT_SETTING } from '../src/olt-state';
 import { emptyNetNews, localNetNewsMessageId } from '../src/netnews';
 import { about } from '../src/settings';
 import type { AiActivity, Backup } from '../src/storage/schema';
-import { backupFixture } from './backup-fixture';
+import { backupFixture, quietOltFixture } from './backup-fixture';
 import { backup, command, noOtherUi, restore, snapshot, start } from './terminal-helpers';
 
 const recipient = '  空想 花子Ａｶﾅ <name> & Fiction  ';
@@ -130,6 +130,7 @@ for (const handle of [undefined, '架空の手紙を書く人']) test(`productio
   await start(page, handle); const fixture = await snapshot(page);
   const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
   activity.maxPosts = 0; activity.consent = false;
+  quietOltFixture(fixture);
   if (!handle) {
     fixture.members = []; fixture.sigs = []; fixture.forums = []; fixture.posts = []; fixture.mail = []; fixture.readStates = [];
     fixture.settings = fixture.settings.filter((s) => !['daisizen-conference', 'active-human-member'].includes(s.id));
@@ -140,11 +141,12 @@ for (const handle of [undefined, '架空の手紙を書く人']) test(`productio
       origin: 'local-ai:webllm:test', readAt: '2026-10-23T02:00:00.000Z',
       simulation: { runId: 'ecom-protected-mail', simulatedAt: '2026-10-23T01:00:00.000Z', fictional: true } }];
     fixture.readStates = [{ memberId: human, forumId: fixture.posts[0]!.forumId, lastReadNumber: 1 }];
-    const at = '2026-10-23T01:00:00.000Z', olt = emptyOlt(at), news = emptyNetNews();
+    const at = '2026-10-23T01:00:00.000Z', olt = emptyOlt(await page.evaluate(() => new Date().toISOString())), news = emptyNetNews();
     appendOlt(olt.rooms[0]!, human, 'say', '保持する会話', 'local-human', Date.parse(at));
     news.contributions.push({ id: 'ecom-protected-news', group: 'fj.questions.fj', number: 4, authorId: human,
       title: '保持する記事', body: '保持する本文', createdAt: at, origin: 'local-human',
       messageId: localNetNewsMessageId('fj.questions.fj', 4), references: [] }); news.nextNumbers['fj.questions.fj'] = 5;
+    fixture.settings = fixture.settings.filter((s) => s.id !== OLT_SETTING);
     fixture.settings.push({ id: OLT_SETTING, value: olt as never }, { id: 'netnews-local', value: news as never });
   }
   await restore(page, fixture); const before = await snapshot(page);
@@ -220,7 +222,9 @@ test('production ECOM draft and receipt lifetime across identical restore, cross
   test.setTimeout(120_000);
   await start(page, '復元を試す人');
   const fixture = await snapshot(page); const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
-  activity.maxPosts = 0; activity.consent = false; await restore(page, fixture);
+  activity.maxPosts = 0; activity.consent = false;
+  quietOltFixture(fixture);
+  await restore(page, fixture);
   await enter(page); await application(page); await command(page, 'Y', '模擬受付が完了');
   await application(page); await page.locator('#command').fill('Y');
   await modalRestore(page, await snapshot(page));

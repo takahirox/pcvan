@@ -770,9 +770,15 @@ to their configured hours and interests. After existing model consent, replies
 can arrive after a short delay, without generation/approval commands. Quiet and
 empty rooms are normal. No consent or usable WebGPU means no generated speech;
 human chat, navigation and persisted readback still work. No remote users connect.
-Presence and bounded transcripts survive reload and JSON backup, while closed
-or hidden tabs never generate a backlog of chat. Setup, provenance and maintenance
-remain in Options. All three rooms share the existing 24-attempt hourly OLT cap
+Presence reconciles on connection, visible resume and a bounded 15-second cadence,
+including outside OLT, independently of model consent. Directory counts and JOIN
+share that state; pre-existing residents are listed without replayed arrivals.
+Visits end individually rather than at shared hourly cutoffs. Presence and bounded
+transcripts survive reload and JSON backup; gaps reconcile current attendance
+without a backlog of chat or historical arrival/departure notices. Prompts separate
+speaker, addressee and speech from status; self-greetings and obvious echoes are
+rejected before storage. Language quality remains limited by the small local model.
+Setup, provenance and maintenance remain in Options. All three rooms share the existing 24-attempt hourly OLT cap
 and inference lock. Valid version-1 two-room saves are checked before an empty
 Wakaba room is added; existing lines, counters, timestamps, reservations and
 budget remain intact, subject to normal presence/turn expiry and cancellation.
@@ -942,7 +948,7 @@ seconds, typically 1–3 minutes with a visible tab and a warm authorized model.
 A separate persisted allowance allows six attempts per six hours, with at most two
 pending replies. Organic discussions and mail retain their slower cadence and
 four-save default. Silence, unavailable specialists, busy inference and exhausted
-allowances remain possible. OLT observes overlapping individual visits promptly
+allowances remain possible. OLT reconciles overlapping individual visits while visible
 and can plan a present resident's reply after eight seconds; spontaneous speech
 uses at most sixteen of the shared twenty-four attempts/hour. All identities share
 one opt-in worker and cross-tab lease. [Design and bounds](docs/local-ai.md#presence-and-response-validation-for-issue-133).

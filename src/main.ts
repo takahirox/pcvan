@@ -50,6 +50,10 @@ async function loadHistory(load: () => Promise<Session | null>) {
     const saved = await load(); session.history.replace([...(saved?.commandHistory ?? []), ...lines]); showSessionTimes(saved);
   } finally { commandsDuringHistoryLoad = null; }
 }
+async function reconcilePresence() {
+  if (document.visibilityState !== 'visible' || controller.screen === 'disconnected') return;
+  commands.olt.observePresence(await (await repository).reconcileOlt());
+}
 async function readContent(background = false): Promise<Backup> {
   const repo = await repository;
   try { await repo.reconcileScheduledMail(); }
@@ -122,7 +126,9 @@ const terminal = mountTerminal(root, {
       const before = controller.screen;
       if (!await commands.submit(line)) {
         let navigationLine = line;
-        if (line.trim() && controller.needsContent && !['MAIN', 'BACK'].includes(line.trim().toUpperCase())) {
+        const enteringOlt = (controller.screen === 'daisizen' && line.trim().toUpperCase() === 'OLT') || (controller.screen === 'wakaba' && line.trim() === '2');
+        if (enteringOlt) await reconcilePresence();
+        if (line.trim() && (controller.needsContent || enteringOlt) && !['MAIN', 'BACK'].includes(line.trim().toUpperCase())) {
           const content = await refreshContent();
           const target = controller.forum;
           const read = /^READ ([1-9]\d*)$/i.exec(line.trim().replace(/\s+/g, ' '));
@@ -150,6 +156,8 @@ const terminal = mountTerminal(root, {
       if (before === 'disconnected' && after !== 'disconnected') {
         showSessionTimes(await repo.startSession());
         const activity = await repo.openActivity();
+        await reconcilePresence();
+        await refreshContent();
         if (document.visibilityState === 'visible') void ai.openActivity(activity).catch(reportError);
       }
       if (before !== 'disconnected' && after === 'disconnected') {
@@ -241,6 +249,7 @@ terminal.append(...session.transcript);
 const startup = enqueue(async () => {
   const repo = await repository;
   const activity = await repo.openActivity();
+  await reconcilePresence();
   await loadHistory(() => repo.startSession());
   await refreshContent();
   try {
@@ -275,9 +284,18 @@ function tickResidents() {
   })().catch(reportError);
 }
 setInterval(tickResidents, 60_000);
+// Presence advances outside OLT and without loading a model. Coalesce slow IDB
+// work so suspended tabs cannot accumulate an unbounded queue of timer writes.
+let presenceRunning = false;
+function tickPresence() {
+  if (presenceRunning || resetting || document.visibilityState !== 'visible' || controller.screen === 'disconnected') return;
+  presenceRunning = true;
+  void enqueue(async () => { await reconcilePresence(); await refreshContent(true); }).catch(reportError).finally(() => { presenceRunning = false; });
+}
+setInterval(tickPresence, 15_000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { commands.olt.suspend(); ai.cancelBackground(); touchActivity(); }
-  else { tickResidents(); tickRoom(); }
+  else { commands.olt.resume(); tickPresence(); tickResidents(); tickRoom(); }
 });
 function tickRoom() {
   if (!resetting && document.visibilityState === 'visible' && !settingsDialog?.open)
@@ -286,7 +304,7 @@ function tickRoom() {
 setInterval(tickRoom, 3_000);
 window.addEventListener('pagehide', () => { commands.olt.suspend(); ai.invalidate(); touchActivity(); });
 window.addEventListener('pageshow', (event) => {
-  if (event.persisted) { ai.resume(); tickResidents(); }
+  if (event.persisted) { commands.olt.resume(); ai.resume(); tickPresence(); tickResidents(); }
 });
 if (typeof BroadcastChannel !== 'undefined') {
   try {
@@ -301,4 +319,4 @@ if (typeof BroadcastChannel !== 'undefined') {
     });
   } catch { /* Focus refresh covers missed notifications. */ }
 }
-window.addEventListener('focus', () => { void enqueue(() => refreshContent(true)).catch(reportError); });
+window.addEventListener('focus', tickPresence);

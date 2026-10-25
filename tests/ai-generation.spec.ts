@@ -46,7 +46,9 @@ for (const [personaId, keyword] of [['hankote', 'LOCAL-DOSV'], ['soroban', 'LOCA
       const mail = buildMailPrompt(fixture, personaId, { humanId: 'human', replyToMailId: 'letter-6' });
       const olt = buildOltPrompt(fixture, room, turn);
       return { forum, mail, olt, profile, culture: boardCulture(keyword, 1), topic, instruction, residentId,
-        expectedRecent: room.lines.slice(-12).map((l) => ({ authorId: l.authorId, kind: l.kind, text: l.text.slice(0, 120) })),
+        expectedRecent: room.lines.filter((l) => l.kind === 'say').slice(-12).map((l) => ({ number: l.number, kind: l.kind,
+          speaker: { id: l.authorId, handle: fixture.members.find((m) => m.id === l.authorId)!.handle, actor: fixture.members.find((m) => m.id === l.authorId)!.actor },
+          text: l.text.slice(0, 160) })),
         unchanged: before === JSON.stringify({ fixture, room, turn }), dates: room.lines.map((l) => l.createdAt) };
     }, { fixture: backupFixture(), personaId, keyword });
 
@@ -67,8 +69,12 @@ for (const [personaId, keyword] of [['hankote', 'LOCAL-DOSV'], ['soroban', 'LOCA
       expect(context).not.toHaveProperty('session');
       const persona = typeof context.persona === 'string' ? context : context.persona;
       expect(persona).toMatchObject({ occupation: result.profile.occupation, routine: result.profile.routine,
-        interests: result.profile.interests, affinities: result.profile.affinities });
-      expect(JSON.stringify(context.persona)).toContain(result.profile.handle);
+        interests: result.profile.interests });
+      if (context.kind === 'olt') expect(context.speaker).toMatchObject({ id: result.residentId, handle: result.profile.handle });
+      else {
+        expect(persona.affinities).toEqual(result.profile.affinities);
+        expect(JSON.stringify(context.persona)).toContain(result.profile.handle);
+      }
       expect(JSON.stringify(context.persona)).toContain(result.profile.profile);
     }
     const forum = JSON.parse(result.forum.user), mail = JSON.parse(result.mail.user), olt = JSON.parse(result.olt.user);
@@ -93,11 +99,10 @@ for (const [personaId, keyword] of [['hankote', 'LOCAL-DOSV'], ['soroban', 'LOCA
       recipientId: { enum: ['human'] }, replyToMailId: { enum: ['reply-target'] }, body: { maxLength: 1200 } });
     expect(result.olt.system).toContain('one or two conversational sentences');
     expect(result.olt.system).toContain('PRESENT resident');
-    expect(olt.recent).toEqual(result.expectedRecent);
-    expect(olt.recent).toHaveLength(12);
+    expect(olt.recentSpeech).toEqual(result.expectedRecent);
+    expect(olt.recentSpeech).toHaveLength(12);
     expect(olt.present.map((m: { id: string }) => m.id)).toEqual(['human', result.residentId]);
-    expect(olt.publicMemory).toHaveLength(3);
-    expect(olt.publicMemory.every((p: { body: string }) => p.body.length === 180)).toBe(true);
+    expect(olt.publicMemory).toEqual([]); // unrelated LOCAL board is outside this room's context
     expect(olt).not.toHaveProperty('mail');
     expect(JSON.parse(result.olt.schema).properties).toMatchObject({
       kind: { enum: ['olt'] }, roomId: { enum: ['lounge'] }, text: { maxLength: 400 } });

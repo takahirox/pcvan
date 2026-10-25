@@ -3547,3 +3547,49 @@ warning. `git diff --cached --check` passed, and all 153 local file links checke
 in the affected README/AI/storage/SIG/E2E/validation documentation resolved.
 Earlier development runs exposed outdated count/timing/consent and fixed-seed
 fixtures; these were corrected and are included in the passing full run.
+
+## Issue #135 OLT presence and conversation
+
+Validated locally on 2026-10-25 with the existing Playwright Chromium, browser
+fake clock, IndexedDB and mocked WebLLM worker tooling:
+
+- `npm test -- --workers=4 --reporter=line`: **545 passed** (7.9 minutes).
+- Focused OLT conversation/browser/repository, Wakaba OLT browser/repository,
+  community scheduling and mail repository suites: **90 passed** (42.4 seconds).
+- `npm run build`: TypeScript and production assets passed; Vite retains its
+  existing large-chunk advisory for the optional WebLLM bundles.
+- `git diff --check` and the staged whitespace check passed.
+
+Connection and visible-session ticks reconcile all rooms without visiting OLT or
+loading a model. Both directories reuse contemporaneous attendance on JOIN;
+already-present residents do not acquire invented arrival lines. Tests cover
+visible resume, a day-long jump, backwards time, chronological live events,
+same-time observations, two-tab reconciliation/turn arbitration, quota rollback,
+legacy JSON restoration, reset fences, Japanese composition and speaker departure
+cancellation. Service isolation fixtures now explicitly pause resident profiles:
+model consent alone no longer suppresses deterministic attendance.
+
+The weekly eight-seed sample still covers all 100 residents: 3,485 of 4,032 room
+observations were populated, 547 were empty, the minimum hourly aggregate was
+75%, and the largest simultaneous population was 17. A separate three-seed,
+48-hour minute-by-minute simulation checks individual starts/ends, varied visit
+lengths, absent days, exact event/lease timestamps and the absence of shared
+boundary spikes. These samples are regression checks, not an attendance promise.
+
+Adversarial Japanese samples reject self-address, first-visit excitement echoes,
+punctuation-varied greetings and nearby rephrase loops before storage. Positive
+samples allow short acknowledgements, appropriate salutations, useful quotations
+and distinct contributions. The browser journey keeps a human's unanswered line
+as the target despite a later arrival, then exchanges turns between two residents.
+Prompts separate stable speaker/addressee identities, speech and system notices;
+private mail and unrelated room/board context remain excluded.
+
+Earlier validation exposed outdated attendance fixtures and a paused connection
+presentation assumption; those were corrected. One native-mail repository run
+lost its browser execution context and subsequently passed both focused and full
+reruns. The final runs above have no remaining failures.
+
+Optional real Qwen/WebGPU chat sessions were **not performed**. The deterministic
+and mocked tests establish context, persistence, rejection and timing behavior;
+they do not establish subjective real-model fluency or greeting diversity. No
+model download, backend or post-merge verification is required for this change.

@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { PcvanController } from '../src/navigation';
 import { emptyNetNews, netNewsGroup, localNetNewsMessageId, netNewsGroups } from '../src/netnews';
 import { about } from '../src/settings';
-import { backupFixture } from './backup-fixture';
+import { backupFixture, quietOltFixture } from './backup-fixture';
 import type { AiActivity } from '../src/storage/schema';
 import { command, start, snapshot, restore, backup, noOtherUi } from './terminal-helpers';
 
@@ -188,6 +188,7 @@ for (const world of ['registered populated', 'registered empty', 'anonymous empt
     const fixture = await snapshot(page);
     const activity = fixture.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity;
     activity.maxPosts = 0; activity.consent = false;
+    quietOltFixture(fixture);
     if (world.endsWith('empty')) {
       fixture.members = fixture.members.filter((member) => member.actor === 'human');
       fixture.sigs = []; fixture.forums = []; fixture.posts = []; fixture.mail = []; fixture.readStates = [];
