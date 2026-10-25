@@ -12,7 +12,7 @@ test('typed model consent rejects blank, malformed and refusal, without manual p
   await command(page, 'N', '操作を中止');
   await command(page, 'LOAD', '同意してモデル'); await command(page, 'Y');
   await expect(page.locator('.output')).toContainText('モデル準備完了');
-  expect((await snapshot(page)).posts).toHaveLength(72);
+  expect((await snapshot(page)).posts).toHaveLength(82);
 });
 
 test('resident profile editor persists all field types with validation and stable identity', async ({ page }) => {

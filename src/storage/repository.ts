@@ -6,7 +6,7 @@ import { bulletin } from '../bulletin';
 import { netNewsState, netNewsGroups, localNetNewsMessageId } from '../netnews';
 import { NETNEWS_SETTING, validateNetNews, validateNetNewsMembers } from './schema';
 import type { LocalNetNewsArticle } from './schema';
-import { CALENDAR_SETTING, initialCalendar } from '../calendar';
+import { CALENDAR_SETTING, initialCalendar, calendarSetting } from '../calendar';
 import { conferenceState, starterConference } from '../conference';
 import { CONFERENCE_SETTING, validateConference, validateConferenceMembers } from './schema';
 import type { Contribution } from './schema';
@@ -27,7 +27,7 @@ import { wakaba } from '../wakaba';
 import { expandedBoards, additionalSigs } from '../communities';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { WORLD_SETTING, INTERNET_SAMPLE_ORIGIN } from './schema';
-import { canPopulateCommunity, communityBoards, communityPosts, wakabaPosts, bulletinPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
+import { canPopulateCommunity, communityBoards, communityPosts, wakabaPosts, bulletinPosts, expandedPosts, canExpandCommunity, starterAdditions, SEED_FIXTURE } from './community';
 import { validateMailGeneration } from '../ai/mail';
 import { postInput, validateGeneration } from '../ai/generation';
 
@@ -748,6 +748,7 @@ export class LocalRepository {
       await request(settings.add({ id: CONFERENCE_SETTING, value: state }));
     }
     await this.expandCommunity(tx, now);
+    if (migrated.bootstrap) await this.addStarterConversations(tx, now);
     migrated.bootstrap = false;
     removePausedRuns(migrated, profiles);
     return migrated;
@@ -818,6 +819,33 @@ export class LocalRepository {
     const world = content.settings.find((s) => s.id === WORLD_SETTING)!;
     await request(tx.objectStore('settings').put({ ...world, value: { ...(world.value as object), expansion: 1 } }));
     validateBackup(await this.snapshot(tx));
+  }
+
+  private async addStarterConversations(tx: IDBTransaction, anchor: string): Promise<number> {
+    const content = await this.snapshot(tx);
+    const additions = starterAdditions(content, anchor);
+    for (const { sig, forum, posts } of additions) {
+      if (!content.sigs.some((s) => s.id === sig.id)) {
+        await request(tx.objectStore('sigs').add(sig)); content.sigs.push(sig);
+      }
+      for (const post of posts) await request(tx.objectStore('posts').add(post));
+      await request(tx.objectStore('forums').put({ ...forum, nextPostNumber: forum.nextPostNumber + posts.length }));
+    }
+    validateBackup(await this.snapshot(tx));
+    return additions.reduce((sum, addition) => sum + addition.posts.length, 0);
+  }
+
+  /** Opt-in only, including restored/cleared worlds. Preview approval is fenced in
+   * the same serialized transaction as eligibility, numbering and all inserts. */
+  recoverStarterConversations(options: { confirmAdd: boolean; expectedContext: string }): Promise<number> {
+    if (options?.confirmAdd !== true) return Promise.reject(new RepositoryError('confirmation-required',
+      'Adding starter conversations requires explicit confirmation.'));
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      const content = await this.snapshot(tx);
+      if (worldContext(content) !== options.expectedContext) invalid('世界や設定が変わりました。現在の設定から確認し直してください。');
+      const anchor = (calendarSetting(content) ?? initialCalendar(content, new Date().toISOString())).sourceAnchor;
+      return this.addStarterConversations(tx, anchor);
+    });
   }
 
   /** Settings confirmation is required. Re-check eligibility inside the write transaction. */

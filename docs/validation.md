@@ -1,3 +1,45 @@
+# Complete public forum starters and safe recovery (Issue #131)
+
+Validated on 2026-10-25 with Node.js 24.12.0 on macOS.
+
+- Read the live Issue and repository guidance; rechecked the selected upstream
+  against application baseline `9413594` (intervening commits are GitWeave checkpoints).
+- `npm ci`: passed, zero reported vulnerabilities; no dependency or lockfile changes.
+- Final `npm test`: **523 passed in 4.0 minutes**, no failures, retries or skips.
+  Both configured servers built/served the production assets and repository modules.
+- Final standalone `npm run build`: passed TypeScript checking and Vite production build.
+- The first full run had 520 passes and three failures from old baseline assumptions:
+  two journeys still counted 74/75 posts, and lazy composition assumed fresh
+  DAISIZEN 2 was absent. Updated the explicit totals to 84/85 and made the lazy
+  case restore an intentionally missing board. The final full run above passes.
+- Reviewed the complete staged diff, added local Markdown links/heading anchors,
+  balanced fences and staged whitespace, including the new fixture and tests.
+  Existing Vite large-chunk and Node color-environment warnings remain informational.
+
+The explicit 15-route production oracle checks anonymous fresh startup and confirmed
+reset, every LIST/READ path (including MAIN 16 → 1), exact per-board/total/thread
+counts, all 72 established posts plus ten new originals, stable identities,
+ordered same-board replies and historical display dates. No page errors, external
+requests, model setup or human registration were required. The route inventory
+separates public posting boards from quiet collections, mailboxes, OLT, search,
+NetNews and retained conference content.
+
+Recovery checks reconstruct a partial older world with human/AI posts, separate
+human read markers, custom SIG names/boards, retained counters and settings.
+They cover explicit refusal, whole-transaction quota rollback, competing-tab
+approval fencing, idempotency, imported worlds/provenance, backup validation and
+per-human reading after recovery. Further cases exclude duplicate keywords/boards,
+custom board IDs/names, conflicting seed IDs, missing authors and actor conflicts.
+The production Settings flow previews imported empty default destinations and
+starting numbers, cancels without writing, then adds only on confirmation and
+makes Wakaba readable through the terminal. Existing lifecycle/backup/restore,
+consent/scheduler, mail, OLT, conference and other service checks all pass.
+
+Recovery deliberately skips unknown/custom mappings and absent/conflicting authors;
+it does not invent replacement identities. Existing/imported/cleared worlds receive
+no new automatic refill. No real-model download, hardware inference or optional
+historical-user signoff was performed. No post-merge verification is required.
+
 # Issue #69: environmental gateway and EIC NET readings
 
 Validated on 2026-10-23 with Node.js 24.12.0 on macOS.

@@ -44,7 +44,7 @@ test('general bulletin pristine initialization is atomic/concurrent; reopen, con
     return { failed, empty, rollback, pristine, repeat, deleted, afterConsent, populated, restored, restoredEmpty, reset };
   }, anchor);
   expect(result.failed).toBe(true); expect(result.rollback).toEqual(result.empty);
-  expect(result.pristine.posts).toHaveLength(72); expect(result.pristine.forums).toHaveLength(12);
+  expect(result.pristine.posts).toHaveLength(82); expect(result.pristine.forums).toHaveLength(15);
   expect(result.repeat).toEqual(result.pristine);
   const starters = result.pristine.posts.filter((p) => p.origin === bulletin.origin).sort((a, b) => a.number - b.number);
   expect(starters.map((p) => p.number)).toEqual([1, 2, 3]); expect(starters[1]!.replyToPostId).toBe(starters[0]!.id);
@@ -62,7 +62,7 @@ test('general bulletin pristine initialization is atomic/concurrent; reopen, con
   expect(result.deleted.sigs.some((s) => s.keyword === bulletin.keyword)).toBe(false);
   expect(result.deleted.posts.some((p) => p.origin === bulletin.origin)).toBe(false);
   expect(result.populated).toBe(false); expect(result.restoredEmpty.posts).toEqual([]); expect(result.restoredEmpty.forums).toEqual([]);
-  expect(result.reset.posts.filter((p) => p.origin === bulletin.origin)).toHaveLength(3); expect(result.reset.posts).toHaveLength(72);
+  expect(result.reset.posts.filter((p) => p.origin === bulletin.origin)).toHaveLength(3); expect(result.reset.posts).toHaveLength(82);
 });
 
 test('existing/legacy population and v1 expansion never insert general bulletin examples', async ({ page }) => {

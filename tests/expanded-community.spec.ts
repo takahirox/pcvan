@@ -12,8 +12,8 @@ const anchor = '2026-10-21T00:00:00.000Z';
 test('expanded baseline preserves original fiction and shares ten authors across distinct conversations', async ({ page }) => {
   await start(page);
   const data = await snapshot(page);
-  expect(data.posts).toHaveLength(72); expect(data.forums).toHaveLength(12); expect(data.members).toHaveLength(10);
-  expect(data.posts.filter((p) => !p.replyToPostId)).toHaveLength(22);
+  expect(data.posts).toHaveLength(82); expect(data.forums).toHaveLength(15); expect(data.members).toHaveLength(10);
+  expect(data.posts.filter((p) => !p.replyToPostId)).toHaveLength(26);
   for (const p of original.posts) {
     expect(data.posts.find((old) => old.id === `seed:v1:${p.id}`)).toMatchObject({
       title: p.title, body: p.body, authorId: `fictional-ai:${p.author}`, origin: 'local-seed:fictional',
@@ -64,7 +64,7 @@ test('v1 expansion is atomic, concurrent, conservative with custom boards and ne
     const repo = await openRepository('expanded-migration'); await repo.openActivity(anchor);
     // Reconstruct the exact pre-expansion world through supported mutations.
     const fresh = await repo.exportBackup();
-    for (const p of fresh.posts.filter((p) => ['local-seed:authored-sigs-v1', 'local-seed:wakaba-v1', 'local-seed:bulletin-v1'].includes(p.origin)).sort((a, b) => b.number - a.number)) await repo.delete('posts', p.id);
+    for (const p of fresh.posts.filter((p) => ['local-seed:forum-starters-v1', 'local-seed:authored-sigs-v1', 'local-seed:wakaba-v1', 'local-seed:bulletin-v1'].includes(p.origin)).sort((a, b) => b.number - a.number)) await repo.delete('posts', p.id);
     for (const f of fresh.forums.filter((f) => !['resident-forum:MITI:9', 'resident-forum:DAISIZEN:1'].includes(f.id))) await repo.delete('forums', f.id);
     for (const s of fresh.sigs.filter((s) => s.keyword.startsWith('LOCAL-'))) await repo.delete('sigs', s.id);
     const world = fresh.settings.find((s) => s.id === 'community-world')!;
@@ -98,7 +98,7 @@ test('v1 expansion is atomic, concurrent, conservative with custom boards and ne
     const opted = await openRepository('expanded-optout'); await opted.openActivity(anchor);
     const baseline = await opted.exportBackup();
     await opted.put('settings', { id: 'community-world', value: v1 });
-    for (const p of baseline.posts.filter((p) => ['local-seed:authored-sigs-v1', 'local-seed:wakaba-v1', 'local-seed:bulletin-v1'].includes(p.origin)).sort((a, b) => b.number - a.number)) await opted.delete('posts', p.id);
+    for (const p of baseline.posts.filter((p) => ['local-seed:forum-starters-v1', 'local-seed:authored-sigs-v1', 'local-seed:wakaba-v1', 'local-seed:bulletin-v1'].includes(p.origin)).sort((a, b) => b.number - a.number)) await opted.delete('posts', p.id);
     await opted.delete('posts', 'seed:v1:repair-2');
     const optedBefore = await opted.exportBackup(); await opted.openActivity(anchor); const optedAfter = await opted.exportBackup();
     repo.close(); other.close(); restore.close(); opted.close();

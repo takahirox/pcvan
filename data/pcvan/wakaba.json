@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "provenance": "Original Japanese beginner-board fiction for this application. Board name, selector, mapping, controls and conversation are category D reconstruction, not historical identifiers or archived messages. Only pristine initialization inserts these rows.",
+  "provenance": "Original Japanese beginner-board fiction for this application. Board name, selector, mapping, controls and conversation are category D reconstruction, not historical identifiers or archived messages. Pristine initialization/reset or explicitly confirmed empty-default-board recovery inserts these rows.",
   "keyword": "LOCAL-WAKABA",
   "boardNo": 1,
   "name": "はじめての広場",
