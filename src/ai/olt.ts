@@ -14,7 +14,10 @@ export function planOltTurn(state: OltState, room: OltRoom, content: Backup, at:
       (room.pending && Date.parse(room.pending.until) > at)) return;
   if (at - Date.parse(state.windowAt) >= 3_600_000) { state.windowAt = iso(at); state.attempts = 0; state.organicAttempts = 0; }
   if (state.attempts >= 24) return;
-  const utterance = [...room.lines].reverse().find((l) => l.kind === 'say');
+  // An older in-flight reply may finish after a new human line. Its appended
+  // speech must not advance the watermark past that unanswered human turn.
+  const utterance = room.lines.find((l) => l.kind === 'say' && l.origin === 'local-human' && l.number > room.handledNumber)
+    ?? [...room.lines].reverse().find((l) => l.kind === 'say');
   const last = utterance && utterance.number > room.handledNumber ? utterance
     : [...room.lines].reverse().find((l) => l.kind === 'enter' && l.number > room.handledNumber &&
       attendance(room, at).includes(l.authorId));

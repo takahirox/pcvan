@@ -256,3 +256,111 @@ test('world reconciliation is atomic across tabs, keeps honest event order and r
   expect(result.departures[0]!.attempts).toBe(1);
   expect(result.quota).toBe('quota'); expect(result.preserved).toBe(true);
 });
+
+test('generation completion reconciles arrivals and departures before speech and cancels a departed speaker', async ({ page }) => {
+  const result = await page.evaluate(async (now) => {
+    const repo = window.oltRepo, op = '/src/olt-state.ts', ap = '/src/ai/activity.ts';
+    const { emptyOlt, oltState, iso } = await import(op) as typeof import('../src/olt-state');
+    const { random } = await import(ap) as typeof import('../src/ai/activity');
+    await repo.authorizeModel((await repo.openActivity()).modelId);
+    const content = await repo.exportBackup(), roster = content.settings.find((s) => s.id === 'ai-residents')!;
+    const profiles = (roster.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
+    profiles.forEach((p) => { p.participation = 0; p.reply = 1; p.inactivity = 0; });
+    const entrant = profiles.find((p) => p.id === 'kusabue')!;
+    Object.assign(profiles.find((p) => p.id === 'hoshimori')!, { interests: ['月', '道具'], affinities: {} });
+    Object.assign(profiles.find((p) => p.id === 'hankote')!, { interests: ['電子工作'], affinities: {} });
+    Object.assign(entrant, { participation: 1, frequency: 1, absence: 0, sessionMinutes: 60,
+      weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i),
+      preferredBoards: ['MITI:9'] });
+    // Place a real deterministic visit start inside the inference interval.
+    const activity = content.settings.find((s) => s.id === 'ai-activity')!;
+    let start = 0;
+    for (let i = 0; i < 100; i++) {
+      const seed = `inference-presence-${i}`, cycle = 65 * 60_000;
+      const phase = random(`${seed}:olt:kusabue:phase`) * cycle;
+      const slot = Math.ceil((Date.parse(now) + 10_000 - phase) / cycle);
+      if (random(`${seed}:olt:kusabue:${slot}:visit`) >= .95 || random(`${seed}:olt:kusabue:${slot}:explore`) <= .15) continue;
+      (activity.value as unknown as import('../src/storage/schema').AiActivity).seed = seed;
+      start = slot * cycle + phase;
+      break;
+    }
+    if (!start) throw new Error('No deterministic arrival fixture found.');
+    // ISO presence timestamps store the visit's whole milliseconds.
+    start = Math.floor(start);
+    const at = start - 10_000, human = content.members.find((m) => m.actor === 'human')!;
+    await repo.put('settings', roster); await repo.put('settings', activity);
+    const state = emptyOlt(iso(at)), room = state.rooms[1]!;
+    room.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: iso(at), until: iso(at + 60_000) },
+      { memberId: 'fictional-ai:hankote', joinedAt: iso(at), until: iso(start - 500) }];
+    await repo.put('settings', { id: 'olt-rooms', value: state as never });
+    await repo.observeRoom('human', 'night', human.id, iso(at));
+    await repo.speakRoom('night', 'human', '月を見る道具を教えてください。', iso(at));
+    const turn = await repo.claimRoomTurn('night', iso(start - 1000));
+    const raw = JSON.stringify({ kind: 'olt', roomId: 'night', personaId: 'hoshimori', text: '双眼鏡なら月の縁も見やすいですよ。' });
+    await repo.finishRoomTurn('night', turn!.id, raw, undefined, iso(start + 1000));
+    const completed = oltState(await repo.exportBackup());
+    const reconciled = await repo.reconcileOlt(iso(start + 2000));
+    await repo.speakRoom('night', 'human', '窓辺からでも見えますか。', iso(start + 3000));
+    const next = await repo.claimRoomTurn('night', iso(start + 12_000));
+    const pending = oltState(await repo.exportBackup());
+    pending.rooms[1]!.residents.find((p) => p.memberId === next!.authorId)!.until = iso(start + 13_000);
+    await repo.put('settings', { id: 'olt-rooms', value: pending as never });
+    await repo.finishRoomTurn('night', next!.id, JSON.stringify({ kind: 'olt', roomId: 'night',
+      personaId: next!.authorId.replace('fictional-ai:', ''), text: '窓を開けるとよさそうですね。' }), undefined, iso(start + 14_000));
+    return { start, completed, reconciled, cancelled: oltState(await repo.exportBackup()), departed: next!.authorId };
+  }, now);
+  const lines = result.completed.rooms[1]!.lines.slice(-3);
+  expect(lines.map((l) => [l.kind, l.authorId, l.createdAt])).toEqual([
+    ['leave', 'fictional-ai:hankote', new Date(result.start - 500).toISOString()],
+    ['enter', 'fictional-ai:kusabue', new Date(Math.floor(result.start)).toISOString()],
+    ['say', 'fictional-ai:hoshimori', new Date(result.start + 1000).toISOString()],
+  ]);
+  expect(result.reconciled.rooms[1]!.lines).toEqual(result.completed.rooms[1]!.lines);
+  expect(result.cancelled.rooms[1]!.pending).toBeNull();
+  expect(result.cancelled.rooms[1]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
+  expect(result.cancelled.rooms[1]!.lines.at(-1)).toMatchObject({ kind: 'leave', authorId: result.departed,
+    createdAt: new Date(result.start + 13_000).toISOString() });
+});
+
+test('a delayed older reply cannot displace human speech sent during inference across tabs', async ({ page }) => {
+  const result = await page.evaluate(async (now) => {
+    const repo = window.oltRepo, rp = '/src/storage/repository.ts', op = '/src/olt-state.ts', ap = '/src/ai/olt.ts';
+    const { emptyOlt, oltState, appendOlt, iso } = await import(op) as typeof import('../src/olt-state');
+    const { buildOltPrompt } = await import(ap) as typeof import('../src/ai/olt');
+    const other = await (await import(rp)).openRepository('olt-world') as LocalRepository;
+    await repo.authorizeModel((await repo.openActivity()).modelId);
+    const content = await repo.exportBackup(), roster = content.settings.find((s) => s.id === 'ai-residents')!;
+    const profiles = (roster.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
+    profiles.forEach((p) => { p.participation = 0; p.reply = 1; p.inactivity = 0; });
+    await repo.put('settings', roster);
+    const at = Date.parse(now), human = content.members.find((m) => m.actor === 'human')!;
+    const state = emptyOlt(now), room = state.rooms[1]!;
+    room.residents = profiles.slice(0, 2).map((p) => ({ memberId: `fictional-ai:${p.id}`, joinedAt: now, until: iso(at + 60_000) }));
+    room.visitors = [{ clientId: 'human', memberId: human.id, until: iso(at + 60_000) }];
+    appendOlt(room, 'fictional-ai:kusabue', 'say', '今夜は月がよく見えますね。', 'local-ai:webllm:test', at);
+    await repo.put('settings', { id: 'olt-rooms', value: state as never });
+    const older = await repo.claimRoomTurn('night', iso(at + 15_000));
+    const greeting = 'こんにちは、初めてのOLTでドキドキしています';
+    await other.speakRoom('night', 'human', greeting, iso(at + 16_000));
+    await repo.finishRoomTurn('night', older!.id, JSON.stringify({ kind: 'olt', roomId: 'night',
+      personaId: older!.authorId.replace('fictional-ai:', ''), text: '双眼鏡で月の縁を眺めていました。' }), undefined, iso(at + 17_000));
+    const claims = await Promise.all([repo.claimRoomTurn('night', iso(at + 32_000)), other.claimRoomTurn('night', iso(at + 32_000))]);
+    const turn = claims.find(Boolean)!;
+    const snapshot = await repo.exportBackup(), saved = oltState(snapshot);
+    const prompt = JSON.parse(buildOltPrompt(snapshot, saved.rooms[1]!, turn).user);
+    await other.finishRoomTurn('night', turn.id, JSON.stringify({ kind: 'olt', roomId: 'night',
+      personaId: turn.authorId.replace('fictional-ai:', ''), text: 'ゆっくりどうぞ。月の模様を話題にすると話しやすいですよ。' }), undefined, iso(at + 33_000));
+    other.close();
+    return { older, claims, prompt, human, greeting, saved, finished: oltState(await repo.exportBackup()) };
+  }, now);
+  expect(result.older!.targetNumber).toBe(1);
+  expect(result.claims.filter(Boolean)).toHaveLength(1);
+  expect(result.claims.find(Boolean)!.targetNumber).toBe(2);
+  expect(result.prompt.replyTo).toMatchObject({ number: 2, kind: 'say', text: result.greeting });
+  expect(result.prompt.addressee).toMatchObject({ id: result.human.id, handle: result.human.handle, actor: 'human' });
+  expect(result.prompt.speaker.id).not.toBe(result.human.id);
+  expect(result.saved.rooms[1]!.handledNumber).toBe(2);
+  expect(result.finished.rooms[1]!.lines.map((l) => l.kind)).toEqual(['say', 'say', 'say', 'say']);
+  expect(result.finished.attempts).toBe(2);
+  expect(result.finished.organicAttempts).toBe(1);
+});

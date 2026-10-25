@@ -1082,10 +1082,13 @@ export class LocalRepository {
 
   finishRoomTurn(roomId: RoomId, token: string, raw?: string, signal?: AbortSignal, now = new Date().toISOString()): Promise<void> {
     return this.changeOlt((state, content) => {
+      const at = Date.parse(now);
+      // Record intervening presence boundaries before speech at completion time.
+      // Reconciliation can also withdraw the pending turn if its speaker left.
+      observeOlt(state, content, at);
       const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
       if (!turn || turn.id !== token) return;
       room.pending = null;
-      const at = Date.parse(now);
       if (raw === undefined || at < Date.parse(room.observedAt) || !oltEnabled(content) || turn.context !== oltAuthorization(content) || Date.parse(turn.until) <= at ||
         !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at) ||
         !room.visitors.some((v) => Date.parse(v.until) > at)) return;
