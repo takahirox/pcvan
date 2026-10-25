@@ -616,8 +616,9 @@ for results and checks not executed.
 
 OLT adds a validated reserved setting `olt-rooms`, version 1, using the existing
 settings store. IndexedDB remains version 2; JSON remains `pcvan-local` version 1.
-Pre-OLT backups omit this setting and lazily get empty rooms on their first OLT
-operation. No store-number migration can collide with SIG/mail work. Existing
+Pre-OLT backups omit this setting; the next visible connection/reconciliation
+creates rooms with current fictional attendance and no seeded presence notices.
+No store-number migration can collide with SIG/mail work. Existing
 members, posts, mail and counters are preserved. Reset removes OLT and recreates
 the 100 residents/82 forum posts and three conference contributions;
 OLT has no seeded transcript.
@@ -662,15 +663,30 @@ rooms). Visitors store `{clientId, memberId, until}` (at most sixteen per room),
 renewed with a 45-second lease by an open room. Attendance deduplicates member
 IDs across tabs. Leaving one tab preserves the human while another lease remains;
 reload renews that identity without a duplicate entrance. Expired leases are
-reconciled on observation. Closing/hiding never claims continued live presence.
+reconciled on observation at their actual expiry. Resident presence is deterministic
+metadata independent of model consent. Connection, visible resume, a coalesced
+15-second visible-session timer and directory reads reconcile all rooms atomically;
+room polling additionally renews human leases. Routine hours determine individual
+visit starts rather than evicting everyone at an hour boundary. Initial and
+long-gap (>90 seconds) observations update attendance silently; live changes are
+sorted by actual boundary timestamps before line numbering. A backwards clock
+keeps the observation watermark and cannot replay visits. Closing/hiding never
+claims continued live presence.
 A read-only unregistered visitor has no fictional member record.
 
-`observeRoom`, `speakRoom`, `claimRoomTurn` and `finishRoomTurn` each read/update
+`reconcileOlt`, `observeRoom`, `speakRoom`, `claimRoomTurn` and `finishRoomTurn` each read/update
 the complete bounded setting in one repository transaction. Inference happens
-outside transactions. A pending `{id, authorId, modelId, context, until}` token
-reserves a turn for 35 seconds; commit revalidates authorization/profile context,
+outside transactions. Confirmation contexts ignore only the OLT observation
+watermark so routine bookkeeping does not invalidate an import/reset confirmation;
+actual attendance, transcripts, budgets and other world edits remain fenced.
+A pending `{id, authorId, modelId, context, until, targetNumber?}` token
+reserves a turn for 35 seconds; optional `targetNumber` preserves the exact speech/arrival
+being answered (legacy tokens remain valid). Commit revalidates
+authorization/profile context,
 presence, expiry and token before atomically appending and clearing it. Repeated
-or stale commits cannot duplicate a line. Handled events, attempt counters and
+or stale commits cannot duplicate a line. Semantic rejection rolls back the write;
+normal lease cleanup clears the pending token without refunding its attempt.
+Handled events, attempt counters and
 next-turn times survive cancellation, reload, backup and restore. Old pending
 leases expire; import never automatically infers a saved pending turn.
 

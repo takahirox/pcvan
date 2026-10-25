@@ -24,6 +24,10 @@ export async function advance(page: Page, ticks: number) {
 }
 export async function residents(page: Page, quiet = false, board = 'MITI:9') {
   const data = await snapshot(page), aiRow = data.settings.find((r) => r.id === 'ai-activity')!, residentRow = data.settings.find((r) => r.id === 'ai-residents')!;
+  const oltRow = data.settings.find((r) => r.id === 'olt-rooms')!;
+  // Replace the fixture timeline as well as its seed/profiles. A connection has
+  // already reconciled attendance, which must not leak into this seeded setup.
+  (oltRow.value as unknown as OltState).rooms.forEach((r) => { r.residents = []; r.pending = null; });
   const ai = aiRow.value as unknown as AiActivity, profiles = (residentRow.value as unknown as ResidentSettings).profiles;
   const day = Math.floor((epoch.getTime() + 540 * 60_000) / 86_400_000);
   const selected = profiles.slice(0, 2);
@@ -35,7 +39,7 @@ export async function residents(page: Page, quiet = false, board = 'MITI:9') {
       const slot = Math.floor((epoch.getTime() - phase) / cycle);
       const draw = (key: string) => random(`${seed}:olt:${p.id}:${slot}:${key}`);
       const end = slot * cycle + phase + 60 * (.7 + draw('duration') * .3) * 60_000;
-      return draw('visit') < .95 && random(`${seed}:olt:${p.id}:away:${day}`) >= .12 &&
+      return slot * cycle + phase >= epoch.getTime() - 4 * 60_000 && draw('visit') < .95 && random(`${seed}:olt:${p.id}:away:${day}`) >= .12 &&
         draw('explore') > .15 && end > epoch.getTime() + 8 * 60_000;
     })) break;
   }
@@ -45,5 +49,5 @@ export async function residents(page: Page, quiet = false, board = 'MITI:9') {
   await page.evaluate(async (rows) => {
     const r = indexedDB.open('pcvan-local'); const db = await new Promise<IDBDatabase>((resolve) => { r.onsuccess = () => resolve(r.result); });
     await new Promise<void>((resolve) => { const tx = db.transaction('settings', 'readwrite'); for (const row of rows) tx.objectStore('settings').put(row); tx.oncomplete = () => resolve(); }); db.close();
-  }, [aiRow, residentRow]);
+  }, [aiRow, residentRow, oltRow]);
 }

@@ -201,3 +201,53 @@ test('spontaneous OLT turns leave reserved capacity for human speech and consent
   expect(planOltTurn(state, room, data, at + 21_000, 'human')!.authorId).toBe('fictional-ai:hoshimori');
   expect(state.attempts).toBe(17); expect(state.organicAttempts).toBe(16);
 });
+
+test('individual visit boundaries, absence and live event times stay staggered over multiple seeded days', () => {
+  const start = Date.parse('2026-10-18T15:00:00Z');
+  for (const seed of ['timeline-a', 'timeline-b', 'timeline-c']) {
+    const data = world(100, seed), state = emptyOlt(iso(start));
+    // Metadata presence needs no model consent or speech allowance.
+    (data.settings.find((s) => s.id === 'ai-activity')!.value as unknown as import('../src/storage/schema').AiActivity).consent = false;
+    const visits = new Map<string, { id: string; start: number; end: number }>();
+    const events = new Map<string, { at: number; kind: string; id: string }>();
+    const days = new Map<string, Set<number>>();
+    let validLeases = true;
+    for (let elapsed = 0; elapsed <= 48 * HOUR; elapsed += 60_000) {
+      const at = start + elapsed;
+      observeOlt(state, data, at);
+      for (const room of state.rooms) {
+        for (const p of room.residents) {
+          const visit = { id: p.memberId, start: Date.parse(p.joinedAt), end: Date.parse(p.until) };
+          visits.set(`${p.memberId}:${p.joinedAt}`, visit);
+          validLeases &&= visit.start <= at && visit.end > at;
+          const seen = days.get(p.memberId) ?? new Set<number>(); seen.add(Math.floor((at - start) / HOUR / 24)); days.set(p.memberId, seen);
+        }
+        for (const l of room.lines) events.set(l.id, { at: Date.parse(l.createdAt), kind: l.kind, id: l.authorId });
+      }
+    }
+    expect(validLeases).toBe(true);
+    expect(visits.size).toBeGreaterThan(200);
+    expect(new Set([...visits.values()].map((v) => v.end - v.start)).size).toBeGreaterThan(150);
+    expect([...visits.values()].every((v) => v.start % 60_000 !== 0 && v.end % 60_000 !== 0)).toBe(true);
+    expect([...visits.values()].some((v) => v.end - v.start > HOUR)).toBe(true);
+    expect([...visits.values()].some((v) => v.end - v.start < 10 * 60_000)).toBe(true);
+    expect([...days.values()].some((d) => d.size === 1)).toBe(true);
+    const byBoundary = new Map<number, number>();
+    const boundaries = new Set([...visits.values()].flatMap((v) => [`${v.id}:enter:${v.start}`, `${v.id}:leave:${v.end}`]));
+    let honestEvents = true;
+    for (const e of events.values()) {
+      byBoundary.set(e.at, (byBoundary.get(e.at) ?? 0) + 1);
+      // Every printed event uses the actual lease boundary, never the sweep time.
+      honestEvents &&= boundaries.has(`${e.id}:${e.kind}:${e.at}`);
+    }
+    expect(honestEvents).toBe(true);
+    expect(Math.max(...byBoundary.values())).toBe(1);
+    const before = JSON.stringify(state); observeOlt(state, data, start + 48 * HOUR);
+    expect(JSON.stringify(state)).toBe(before);
+    const lines = state.rooms.map((r) => r.lines);
+    observeOlt(state, data, start + 96 * HOUR);
+    expect(state.rooms.map((r) => r.lines)).toEqual(lines); // no historical crowd on wake
+    const resumed = JSON.stringify(state); observeOlt(state, data, start + HOUR);
+    expect(JSON.stringify(state)).toBe(resumed); // clock reversal never replays
+  }
+});

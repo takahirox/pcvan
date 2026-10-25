@@ -8,7 +8,7 @@ import { about } from '../src/settings';
 import type { AiActivity, Backup } from '../src/storage/schema';
 import { emptyOlt, appendOlt, OLT_SETTING } from '../src/olt-state';
 import { emptyNetNews, localNetNewsMessageId } from '../src/netnews';
-import { backupFixture } from './backup-fixture';
+import { backupFixture, quietOltFixture } from './backup-fixture';
 import { backup, command, importFile, noOtherUi, restore, snapshot, start } from './terminal-helpers';
 
 const invalid = ['0', '-1', '01', '+1', '1.5', '1e0', 'NaN', 'Infinity', '4', '99',
@@ -146,6 +146,8 @@ for (const handle of [undefined, '星空を読む人']) {
     await start(page, handle); const fixture = await snapshot(page);
     const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
     activity.maxPosts = 0; activity.consent = false;
+    quietOltFixture(fixture);
+
     if (!handle) {
       fixture.members = []; fixture.sigs = []; fixture.forums = []; fixture.posts = []; fixture.mail = []; fixture.readStates = [];
       fixture.settings = fixture.settings.filter((s) => !['daisizen-conference', 'active-human-member'].includes(s.id));
@@ -154,12 +156,13 @@ for (const handle of [undefined, '星空を読む人']) {
       fixture.mail = [{ id: 'gopher-protected-mail', number: 1, senderId: human, recipientId: 'fictional-ai:hoshimori',
         subject: '保持する便り', body: '  <記録> & 日本語\n', createdAt: '2026-10-23T01:00:00.000Z', origin: 'local-human' }];
       fixture.readStates = [{ memberId: human, forumId: fixture.posts[0]!.forumId, lastReadNumber: 1 }];
-      const at = '2026-10-23T01:00:00.000Z', olt = emptyOlt(at), news = emptyNetNews();
+      const at = '2026-10-23T01:00:00.000Z', olt = emptyOlt(await page.evaluate(() => new Date().toISOString())), news = emptyNetNews();
       appendOlt(olt.rooms[0]!, human, 'say', '保持する会話', 'local-human', Date.parse(at));
       news.contributions.push({ id: 'gopher-protected-news', group: 'fj.questions.fj', number: 4, authorId: human,
         title: '保持する記事', body: '  <本文> & 記録\n', createdAt: at, origin: 'local-human',
         messageId: localNetNewsMessageId('fj.questions.fj', 4), references: [] });
       news.nextNumbers['fj.questions.fj'] = 5;
+      fixture.settings = fixture.settings.filter((s) => s.id !== OLT_SETTING);
       fixture.settings.push({ id: OLT_SETTING, value: olt as never }, { id: 'netnews-local', value: news as never });
     }
     await restore(page, fixture); const before = await snapshot(page);

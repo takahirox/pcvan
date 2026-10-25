@@ -39,14 +39,15 @@ for (const index of [false, true]) for (const registered of [false, true]) {
     const before = await snapshot(page);
     if (index) await command(page, '2', '索引');
     await command(page, '16', '通信が初めて'); const dir = await command(page, '2', '部屋一覧');
-    expect(dir).toContain('1 はじめての談話室 / 参加者：0人'); expect(dir).not.toMatch(/自然の談話室|星と道具/);
+    const count = (await state(page))!.rooms.find((r) => r.id === 'wakaba')!.residents.length;
+    expect(dir).toContain(`1 はじめての談話室 / 参加者：${count}人`); expect(dir).not.toMatch(/自然の談話室|星と道具/);
     for (const input of ['2', 'JOIN 2', 'WHO 2', 'JOIN 3', 'WHO 3', 'JOIN wakaba', 'JOIN 01']) {
       const out = await command(page, input, 'JOIN 1'); expect(out).not.toMatch(/自然の談話室|星と道具/);
     }
-    const who = await command(page, 'WHO', '誰もいません'); expect(who).not.toMatch(/自然の談話室|星と道具/);
-    await command(page, 'WHO 1', '参加者：0人'); await command(page, 'HELP', '部屋一覧'); await command(page, 'LIST', '部屋一覧');
+    const who = await command(page, 'WHO', '参加者：'); expect(who).not.toMatch(/自然の談話室|星と道具/);
+    await command(page, 'WHO 1', `参加者：${count}人`); await command(page, 'HELP', '部屋一覧'); await command(page, 'LIST', '部屋一覧');
     await command(page, 'JOIN 1', '発言='); await advance(page, 4);
-    await command(page, '/WHO', registered ? '初めの客' : '参加者：0人');
+    await command(page, '/WHO', registered ? '初めの客' : '参加者：');
     const invalidMove = await command(page, '/JOIN 2', 'その部屋はありません'); expect(invalidMove).toContain('/JOIN 1');
     await command(page, '/WHO 2', 'その部屋はありません');
     if (registered) {
@@ -64,7 +65,7 @@ for (const index of [false, true]) for (const registered of [false, true]) {
     await command(page, 'BACK', '通信が初めて'); await command(page, 'BACK', index ? '索引' : '＝＝＝ＰＣ－ＶＡＮ');
     expect(protectedRecords(await snapshot(page))).toEqual(protectedRecords(before));
     expect(await speech(page)).toEqual([]);
-    const olt = (await state(page))!; expect(olt.rooms.filter((r) => r.id !== 'wakaba').every((r) => r.lines.length === 0 && r.visitors.length === 0)).toBe(true);
+    const olt = (await state(page))!; expect(olt.rooms.filter((r) => r.id !== 'wakaba').every((r) => r.lines.every((l) => l.origin === 'local-presence') && r.visitors.length === 0)).toBe(true);
     await room(page, 1, 'wakaba'); await command(page, '/LEAVE', '部屋一覧'); await command(page, 'BACK', '通信が初めて');
     const saved = await backup(page); await restore(page, saved); await room(page, 1, 'wakaba');
     await command(page, '/MAIN', '＝＝＝ＰＣ－ＶＡＮ'); await noOtherUi(page);
@@ -73,15 +74,16 @@ for (const index of [false, true]) for (const registered of [false, true]) {
 }
 
 test('Wakaba two-tab attendance and shared turn arbitration use the shared residents and model', async ({ page, context }) => {
-  await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '同じ初心者');
+  await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+  await mockWorker(page, 'ok'); await start(page, '同じ初心者');
   await residents(page, false, 'LOCAL-WAKABA:1'); await consent(page); await room(page, 1, 'wakaba');
-  const other = await context.newPage(); await other.clock.install({ time: epoch }); await mockWorker(other, 'ok'); await other.goto('/');
-  await expect(other.locator('.output')).toContainText('MAIN'); await room(other, 1, 'wakaba');
+  const other = await context.newPage(); await mockWorker(other, 'ok'); await other.goto('/');
+  await room(other, 1, 'wakaba'); // MAIN completes the paused connection presentation.
   const joined = (await state(page))!.rooms.find((r) => r.id === 'wakaba')!;
   expect(joined.visitors).toHaveLength(2); expect(joined.residents).toHaveLength(2);
   expect(joined.lines.filter((l) => l.kind === 'enter' && l.authorId === joined.visitors[0]!.memberId)).toHaveLength(1);
   await command(page, '初めての質問です', '<同じ初心者>');
-  await Promise.all([advance(page, 7), advance(other, 7)]);
+  await advance(page, 7);
   await expect.poll(async () => (await speech(page)).length).toBeGreaterThan(0);
   const turns = await speech(page); expect(turns.every((l) => l.id.startsWith('olt:wakaba:'))).toBe(true);
   const generations = await Promise.all([page, other].map((p) => p.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)));

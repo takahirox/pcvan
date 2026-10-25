@@ -4,7 +4,7 @@ import type { Download, Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PcvanController } from '../src/navigation';
 import type { AiActivity, Backup } from '../src/storage/schema';
-import { backupFixture } from './backup-fixture';
+import { backupFixture, quietOltFixture } from './backup-fixture';
 import { command, start, snapshot, restore, backup, noOtherUi } from './terminal-helpers';
 
 const fixtures = JSON.parse(await readFile(new URL('../data/pcvan/daisizen-collections.json', import.meta.url), 'utf8')).OSL;
@@ -142,6 +142,7 @@ for (const handle of [undefined, '取得する人']) {
     await start(page, handle); const fixture = await snapshot(page);
     const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
     activity.maxPosts = 0; activity.consent = false;
+    quietOltFixture(fixture);
     if (!handle) {
       fixture.members = []; fixture.sigs = []; fixture.forums = []; fixture.posts = []; fixture.mail = []; fixture.readStates = [];
       fixture.settings = fixture.settings.filter((s) => !['daisizen-conference', 'active-human-member'].includes(s.id));
@@ -278,6 +279,7 @@ for (const category of [1, 2]) {
     await start(page); const fixture = await snapshot(page);
     const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
     activity.maxPosts = 0; activity.consent = false;
+    quietOltFixture(fixture);
     await restore(page, fixture);
     const protect = (data: Backup) => ({ ...protectedRecords(data), settings: data.settings.filter((s) => s.id !== 'osl-local') });
     const before = await snapshot(page);
@@ -356,7 +358,9 @@ test('production fresh cross-tab OSL selection and world replacement invalidate 
   test.setTimeout(120_000);
   await start(page, '観察係'); const fixture = await snapshot(page);
   const activity = fixture.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
-  activity.maxPosts = 0; activity.consent = false; await restore(page, fixture);
+  activity.maxPosts = 0; activity.consent = false;
+  quietOltFixture(fixture);
+  await restore(page, fixture);
   await enter(page, 3); await command(page, 'REGISTER', 'この画面では使えない');
   expect((await snapshot(page)).settings.some((s) => s.id === 'osl-local')).toBe(false);
   await command(page, 'BACK', '1 ＳＩＧの道具箱'); await command(page, '1', 'ファイル一覧：1件');

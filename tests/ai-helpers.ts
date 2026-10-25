@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure') {
+export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation') {
   await page.addInitScript((mode) => {
     Object.defineProperty(navigator, 'gpu', { value: {} });
     // Keep outputs distinct when a new page resumes the same persona/forum run.
@@ -22,7 +22,14 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           stats.prompts.push(data);
           const raw = mode === 'invalid' ? '{}' : data.kind === 'olt' ? JSON.stringify({
             kind: 'olt', personaId: data.personaId, roomId: data.roomId,
-            text: `星の観察、いいですね。${data.personaId}/${visit}/${stats.generations}`,
+            text: mode === 'self-greeting' ? `こんにちは${data.speaker.handle}さん、初めてのOLTでドキドキワクワクしています。`
+              : mode === 'echo' ? 'こんにちは、初めてのOLTでドキドキワクワクしています。'
+              : mode === 'conversation' ? [
+                `${data.addressee?.handle}さん、ゆっくりどうぞ。私は今夜、双眼鏡で月の縁を眺めていました。`,
+                `${data.addressee?.handle}さん、月なら小さな望遠鏡でも影が面白いですね。どの倍率でしたか。`,
+                '低倍率から試すと見つけやすいですよ。手すりに肘を置くと像が落ち着きました。',
+              ][(stats.generations - 1) % 3]
+              : `星の観察、いいですね。${data.personaId}/${visit}/${stats.generations}`,
           }) : data.kind === 'mail' ? JSON.stringify({
             personaId: data.personaId, recipientId: data.recipientId,
             ...(data.replyToMailId ? { replyToMailId: data.replyToMailId } : {}),

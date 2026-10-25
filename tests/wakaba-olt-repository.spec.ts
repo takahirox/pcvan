@@ -78,7 +78,10 @@ test('legacy normalization preserves every old field, is pure/idempotent and per
   expect(withoutOlt(r.upgraded)).toEqual(withoutOlt(r.before)); expect(withoutOlt(r.missingAfter)).toEqual(withoutOlt(r.missingBefore));
   const upgraded = r.upgraded.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState;
   expect(upgraded.attempts).toBe(17); expect(upgraded.windowAt).toBe(legacy.windowAt);
-  expect(upgraded.rooms.slice(0, 2)).toEqual((r.before.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState).rooms);
+  // Presence reconciles without consent; normalization still preserves history,
+  // sequence numbers, budgets and leases rather than replaying arrivals.
+  const metadata = (rooms: typeof upgraded.rooms) => rooms.map(({ residents: _residents, ...room }) => room);
+  expect(metadata(upgraded.rooms.slice(0, 2))).toEqual(metadata((r.before.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState).rooms));
   const fresh = r.missingAfter.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState;
   expect(fresh.rooms.map((r) => r.id)).toEqual(['lounge', 'night', 'wakaba']); expect(fresh.rooms.every((r) => !r.lines.length && !r.visitors.length)).toBe(true);
 });
@@ -185,7 +188,7 @@ test('all three rooms share the persistent cap, while Wakaba prompt/output and t
   expect(r.prompt.system).toContain('beginner room'); expect(r.prompt.system).toContain('quiet reading'); expect(r.prompt.system).toContain('1996');
   expect(r.prompt.user).not.toMatch(/PRIVATE_SUBJECT|PRIVATE_MAIL_SENTINEL|OTHER_OLT_TRANSCRIPT_SENTINEL/);
   const prompt = JSON.parse(r.prompt.user); expect(prompt.roomId).toBe('wakaba'); expect(prompt.room).toBe('はじめての談話室');
-  expect(prompt.recent.length).toBeLessThanOrEqual(12); expect(prompt.publicMemory.length).toBeLessThanOrEqual(3);
+  expect(prompt.recentSpeech.length).toBeLessThanOrEqual(12); expect(prompt.publicMemory.length).toBeLessThanOrEqual(3);
   expect(r.failures).toEqual(Array(5).fill(true)); expect(r.unchanged.every(Boolean)).toBe(true); expect(r.absentRejected).toBe(true);
   expect(r.state.rooms.flatMap((r) => r.lines).filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
   const present = r.state.rooms.flatMap((r) => r.residents.map((p) => p.memberId)); expect(new Set(present).size).toBe(present.length);

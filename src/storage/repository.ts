@@ -38,7 +38,9 @@ export const ACTIVE_MEMBER_SETTING = 'active-human-member';
 export interface ForumDestination { keyword: string; boardNo: number; name: string }
 // Command activity watermarks and session history advance without editing the world.
 export const worldContext = (data: Backup): string => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.mail ?? [], data.readStates,
-  data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } } : row)]);
+  data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } }
+    : row.id === OLT_SETTING ? { ...row, value: { ...(row.value as unknown as OltState),
+      rooms: (row.value as unknown as OltState).rooms.map((room) => ({ ...room, observedAt: null })) } } : row)]);
 /** Fence open profile editors across world replacement and concurrent edits. */
 export function residentContext(content: Pick<Backup, 'settings'>): string {
   return JSON.stringify([content.settings.find((row) => row.id === WORLD_SETTING)?.value, residentProfiles(content)]);
@@ -1025,6 +1027,14 @@ export class LocalRepository {
     }, signal);
   }
 
+  /** Cheap world presence: no visitor mutation, model access or consent required. */
+  reconcileOlt(now = new Date().toISOString()): Promise<OltState> {
+    return this.changeOlt((state, content) => {
+      observeOlt(state, content, Date.parse(now));
+      return state;
+    }, now);
+  }
+
   observeRoom(clientId: string, roomId?: RoomId, memberId?: string, now = new Date().toISOString()): Promise<OltState> {
     return this.changeOlt((state, content) => {
       const at = Date.parse(now);
@@ -1072,14 +1082,17 @@ export class LocalRepository {
 
   finishRoomTurn(roomId: RoomId, token: string, raw?: string, signal?: AbortSignal, now = new Date().toISOString()): Promise<void> {
     return this.changeOlt((state, content) => {
+      const at = Date.parse(now);
+      // Record intervening presence boundaries before speech at completion time.
+      // Reconciliation can also withdraw the pending turn if its speaker left.
+      observeOlt(state, content, at);
       const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
       if (!turn || turn.id !== token) return;
       room.pending = null;
-      const at = Date.parse(now);
-      if (raw === undefined || !oltEnabled(content) || turn.context !== oltAuthorization(content) || Date.parse(turn.until) <= at ||
+      if (raw === undefined || at < Date.parse(room.observedAt) || !oltEnabled(content) || turn.context !== oltAuthorization(content) || Date.parse(turn.until) <= at ||
         !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at) ||
         !room.visitors.some((v) => Date.parse(v.until) > at)) return;
-      commitOltText(room, turn, raw, at);
+      commitOltText(room, turn, raw, at, content);
     }, now, signal);
   }
 
