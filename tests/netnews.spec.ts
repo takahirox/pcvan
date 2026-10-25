@@ -330,7 +330,7 @@ test('local NetNews attribution shares safe stable identities and calendar proje
     const row = state.contributions[i]!, member = data.members.find((m) => m.id === row.authorId)!;
     expect(group.articles.slice(0, 3)).toEqual(netNewsGroups[i]!.articles);
     expect(group.articles[3]!.from).toBe(`人間 <${identityToken(member).toLowerCase()}@members.example.invalid>`);
-    expect(group.articles[3]!.date).toBe('Sat, 23 Nov 1996 11:00:00 +0900');
+    expect(group.articles[3]!.date).toBe('Sat, 24 Oct 2026 11:00:00 +0900');
     const address = group.articles[3]!.from.slice(3);
     member.handle = '<i>新名</i>'; data.members.reverse();
     expect(netNewsGroup(data, i).articles[3]!.from).toBe(`<i>新名</i> ${address}`);
@@ -343,6 +343,6 @@ test('local NetNews attribution shares safe stable identities and calendar proje
   // import/initialization; rendering does not advance it or rewrite UTC records.
   const onlyNews = { ...data, posts: [], mail: [], session: null, settings: data.settings.filter((s) => s.id === 'netnews-local') };
   expect(initialCalendar(onlyNews, '2030-01-01T00:00:00.000Z')).toEqual({ version: 1, sourceAnchor: now });
-  expect(serviceDate('2026-10-24T02:00:01.000Z', calendarSetting(data), 'netnews')).toBe('Sat, 23 Nov 1996 11:00:01 +0900');
+  expect(serviceDate('2026-10-24T02:00:01.000Z', calendarSetting(data), 'netnews')).toBe('Sat, 24 Oct 2026 11:00:01 +0900');
   expect(serviceDate('1997-01-01T00:00:00.000Z', calendarSetting(data), 'netnews')).toBe('Wed, 01 Jan 1997 09:00:00 +0900');
 });

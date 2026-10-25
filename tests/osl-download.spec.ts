@@ -325,7 +325,7 @@ for (const category of [1, 2]) {
     await command(page, 'Y', 'この画面では使えない');
     await command(page, 'LIST', 'ファイル一覧：2件');
     const read = await command(page, 'READ 2', expectedBody);
-    expect(read).toContain('著者：記録する人 (SYN-'); expect(read).toContain('96年11月23日 11:00:00');
+    expect(read).toContain('著者：記録する人 (SYN-'); expect(read).toContain('2026年10月24日 11:00:00');
     expect(read).toContain(`サイズ：${Buffer.byteLength(expectedBody, 'utf8')} bytes（UTF-8）`);
     expect(await output.locator('b').count()).toBe(0);
     const saved = await backup(page), entry = oslState(saved).entries[0]!;

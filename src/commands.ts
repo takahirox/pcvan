@@ -221,7 +221,6 @@ export class TerminalCommands {
       this.mailAddress = false;
       const id = createRecordId(), revision = this.revision;
       const label = mailCorrespondent(data.members.find((m) => m.id === recipient.recipientId));
-      const calendar = calendarSetting(data)!;
       this.composer = new TerminalComposer({ keyword: 'MAIL', name: recipient.internetAddress !== undefined ? `INET#${recipient.internetAddress}` : mailCorrespondent(data.members.find((m) => m.id === recipient.recipientId)), localMail: recipient.internetAddress !== undefined }, authorId, intent.parent, {
         print: this.actions.print,
         save: async (_target, draft) => {
@@ -242,11 +241,11 @@ export class TerminalCommands {
       }, 'mail', intent.parent ? `Re: ${intent.parent.subject.replace(/^(Re: )+/i, '')}`.slice(0, 200) : '', undefined, intent.scheduled ? {
         prompt: () => { const now = new Date().toISOString(); return [
           `日時指定（再構成） 宛先：${label}`,
-          `現在：${scheduleTime(now, calendar)} (JST)。現在より後〜${scheduleTime(new Date(Date.parse(now) + SCHEDULE_HORIZON).toISOString(), calendar)} (JST)、最大30日。`,
+          `現在：${scheduleTime(now)} (JST)。現在より後〜${scheduleTime(new Date(Date.parse(now) + SCHEDULE_HORIZON).toISOString())} (JST)、最大30日。`,
           'YYYY-MM-DD HH:mm (JST) / .CANCEL: 中止。配達日時=']; },
-        parse: (line) => scheduleInstant(line, calendar, new Date().toISOString()),
+        parse: (line) => scheduleInstant(line, new Date().toISOString()),
         valid: (due) => Date.parse(due) > Date.now() && Date.parse(due) <= Date.now() + SCHEDULE_HORIZON,
-        label: (due) => scheduleTime(due, calendar),
+        label: (due) => scheduleTime(due),
       } : undefined);
     } else this.composer = new TerminalComposer(intent.target, authorId, intent.parent, this.actions);
   }
@@ -520,13 +519,13 @@ export class TerminalCommands {
       if (command === 'PENDING' || /^(READ-PENDING|CANCEL-PENDING)(?: |$)/.test(command)) {
         const letters = scheduledMail(data).letters.filter((l) => l.senderId === human && l.status === 'pending');
         if (command === 'PENDING') {
-          print(`配達待ち：${letters.length}件`, ...letters.map((l) => `${l.id} / ${l.recipientLabel} / ${scheduleTime(l.dueAt, calendarSetting(data)!)} (JST) / ${l.subject}`),
+          print(`配達待ち：${letters.length}件`, ...letters.map((l) => `${l.id} / ${l.recipientLabel} / ${scheduleTime(l.dueAt)} (JST) / ${l.subject}`),
             'READ-PENDING 参照 / CANCEL-PENDING 参照（配達前にYで取消し） / BACK: 戻る / MAIN: MAIN'); return true;
         }
         const reference = line.trim().split(/\s+/)[1];
         const letter = letters.find((l) => l.id.toUpperCase() === reference?.toUpperCase());
         if (!letter) { print('その参照の配達待ちはありません。PENDING で確認してください。'); return true; }
-        print(`予約 ${letter.id}`, `宛先：${letter.recipientLabel}`, `配達予定：${scheduleTime(letter.dueAt, calendarSetting(data)!)} (JST)`, `件名：${letter.subject}`, '★内容', letter.body);
+        print(`予約 ${letter.id}`, `宛先：${letter.recipientLabel}`, `配達予定：${scheduleTime(letter.dueAt)} (JST)`, `件名：${letter.subject}`, '★内容', letter.body);
         if (command.startsWith('CANCEL-PENDING')) {
           this.pendingCancellation = { senderId: human!, reference: letter.id }; print('この予約を取り消しますか？ (Y/N)=');
         } else print('PENDING / CANCEL-PENDING 参照 / コマンド=');

@@ -67,7 +67,7 @@ test('Wakaba numbered/gapped unread reads, anonymous guidance and missing/empty/
   expect(c.submit('UNREAD').join('\n')).toContain('#4 返事 RE#1 [未読]');
   expect(c.submit('NEXT').join('\n')).toContain('#4/12　はじめての広場');
   expect(c.submit('READ 4').join('\n')).toContain('返信先：#1');
-  expect(c.submit('READ 9').join('\n')).toContain('96/11/21  10:00');
+  expect(c.submit('READ 9').join('\n')).toContain('1996/11/21  10:00');
   expect(c.submit('READ 2').join('\n')).toContain('その番号の投稿はありません');
   expect(data).toEqual(before);
   c.setMemberId(undefined);

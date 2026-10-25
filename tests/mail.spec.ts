@@ -333,7 +333,7 @@ for (const route of [
     const read = await command(page, 'READ 1', '★内容');
     expect(read).toContain(`差出人：${address}`); expect(read).toContain(`宛先：(${identityToken(human)}) 秋の読者`);
     expect(read).toContain(sample.body); expect(read).toContain('実際のネットワーク受信ではありません');
-    expect(read).toMatch(/日時：96年/);
+    expect(read).toMatch(/日時：2026年/);
     await command(page, 'LIST', '[既読]');
     // Cancellation at each applicable stage never adds a letter.
     for (const stage of ['body', 'review', 'edit']) {
@@ -463,7 +463,7 @@ for (const route of [
         const read = await command(page, `READ ${i + 1}`, '★内容');
         expect(read).toContain(`宛先：${labels[i]}`); expect(read).not.toContain(labels[1 - i]!);
         expect(read).toContain('件名：  秋の招待　ｶﾅ  '); expect(read).toContain('  日本語の一行目　ｶﾅ <b>文字</b>  \n\n  変更した本文  ');
-        expect(read).toContain('既読確認：確認なし'); expect(read).toMatch(/日時：96年/);
+        expect(read).toContain('既読確認：確認なし'); expect(read).toMatch(/日時：2026年/);
       }
       await command(page, 'BACK', route.title); await command(page, 'BACK', route.parent);
     };

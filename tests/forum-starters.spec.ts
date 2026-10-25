@@ -29,6 +29,7 @@ test('every production forum route has authored threads anonymously on fresh sta
   const external: string[] = [], errors: string[] = [];
   page.on('request', (r) => { if (!r.url().startsWith('http://127.0.0.1:14373/')) external.push(r.url()); });
   page.on('pageerror', (e) => errors.push(e.message));
+  await page.clock.setFixedTime(new Date('2026-10-25T01:02:03.000Z'));
   await start(page);
   for (const reset of [false, true]) {
     if (reset) { await command(page, 'RESET', '82件'); await Promise.all([page.waitForEvent('load'), command(page, 'Y')]); await expect(page.locator('.output')).toContainText('MAIN'); }
@@ -42,7 +43,7 @@ test('every production forum route has authored threads anonymously on fresh sta
       const listing = await command(page, 'LIST', title);
       expect(listing).not.toMatch(/投稿はありません|local-seed|創作|https?:/);
       const reading = await command(page, 'READ 1', '★内容');
-      expect(reading).toContain(title); expect(reading).toMatch(/96\/11\//);
+      expect(reading).toContain(title); expect(reading).toMatch(/2026\/10\/\d{2}  \d{2}:\d{2}/);
       const posts = data.posts.filter((p) => p.forumId === `resident-forum:${board}`).sort((a, b) => a.number - b.number);
       expect(posts).toHaveLength(count); expect(posts.map((p) => p.number)).toEqual(Array.from({ length: count }, (_, i) => i + 1));
       expect(posts.some((p) => p.replyToPostId)).toBe(true);

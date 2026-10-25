@@ -7,7 +7,7 @@ import type { Mail, Member } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
 import { serviceDate } from '../src/calendar';
 
-test('sent status means unknown until confirmation and projects the durable commitment instant without changing content', () => {
+test('sent status means unknown until confirmation and formats the durable commitment instant without changing content', () => {
   const members: Member[] = [{ id: 'human', handle: '手紙の主', actor: 'human' },
     { id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' }];
   const calendar = { version: 1 as const, sourceAnchor: '2026-10-21T00:00:00.000Z' };
@@ -23,7 +23,7 @@ test('sent status means unknown until confirmation and projects the durable comm
     expect(detail).toContain(row.recipientConfirmation
       ? `既読確認：${serviceDate(row.recipientConfirmation.at, calendar)} (JST)` : '既読確認：確認なし');
     expect(detail).toContain(`件名：${parent.subject}`); expect(detail).toContain(parent.body);
-    expect([...detail, list].join('\n')).not.toMatch(/未読|local-resident|replyMailId|2026/);
+    expect([...detail, list].join('\n')).not.toMatch(/未読|local-resident|replyMailId|2026-10-/);
     expect(row).toEqual(before);
   }
   const incoming: Mail = { ...parent, id: 'reply', number: 2, senderId: members[1]!.id, recipientId: 'human', replyToMailId: 'parent' };
@@ -52,7 +52,7 @@ test('mail parties share forum tokens, refresh safe names and preserve literal c
       const row = { ...letter, ...(box === 'INBOX' ? { senderId: id } : { senderId: 'human', recipientId: id }) };
       const before = structuredClone({ data, row });
       const list = renderMailList([row], data.members, 'human', box);
-      expect(list[1]).toContain(`#3 ${literal} / ${label} / 26年10月20日 10:02:03`);
+      expect(list[1]).toContain(`#3 ${literal} / ${label} / 2026年10月20日 10:02:03`);
       if (box === 'INBOX') expect(list[1]).toContain('[未読]');
       const detail = renderMail(row, data.members, [row]);
       expect(detail[box === 'INBOX' ? 1 : 2]).toBe(`${box === 'INBOX' ? '差出人' : '宛先'}：${label}`);
@@ -178,7 +178,7 @@ test('incoming external sender has its own address, sample label, recipient and 
   const before = structuredClone(letter);
   const list = renderMailList([letter], members, 'human', 'INBOX', calendar).join('\n');
   expect(list).toContain('observer@letters.example.invalid'); expect(list).toContain('宛先：(SYN-'); expect(list).toContain('秋の読者');
-  expect(list).toContain('[未読]'); expect(list).toContain('創作サンプル'); expect(list).toContain('96年');
+  expect(list).toContain('[未読]'); expect(list).toContain('創作サンプル'); expect(list).toContain('2026年10月21日 09:00:00');
   const detail = renderMail(letter, members, [letter], calendar);
   expect(detail[1]).toBe('差出人：observer@letters.example.invalid'); expect(detail[2]).toContain('秋の読者');
   expect(detail).toContain(`件名：${letter.subject}`); expect(detail).toContain(letter.body);

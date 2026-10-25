@@ -57,12 +57,13 @@ from character reveal speed, including Instant/reduced-motion display. Escape or
 a submitted command skips the rest. The optional local handle invitation runs
 only at this handoff under its existing first-use rules.
 
-Entry, forums, mail, conference, OLT and local NetNews articles share a durable
-historical display calendar in fixed JST. A fresh world starts in the fictional week of November
-18–24, 1996 and advances with elapsed operational time, including into 1997.
-Stored timestamps and scheduling remain operational UTC; modern Settings shows
-actual session times. Only `Q` records a logout; reload without `Q` never invents
-one. See the [calendar/import policy](docs/local-storage.md#historical-display-calendar-issue-67). The
+Entry, forums, mail, conference, OLT and local NetNews articles display their
+actual stored operational timestamps in fixed **JST (UTC+09:00)**, with four-digit
+years. The interface is inspired by 1996 PC-VAN; interactions happen in the
+present day. Authored archival examples and historical source dates retain their
+original dates. No reset or rewriting of posts, messages or pending deliveries is
+needed for existing worlds. Only `Q` records a logout; reload without `Q` never
+invents one. See the [calendar/import policy](docs/local-storage.md#historical-display-calendar-issue-67). The
 [entry research](docs/research/pcvan-1996-1997.md#staged-session-entry-issue-61)
 records the 1995-04-02 excerpt published 2010-09-22 (contents: high confidence;
 independent authenticity/adjacent-year applicability: moderate), the undated
@@ -311,8 +312,8 @@ Factory reset removes local articles and retains all six bundled examples;
 import/reset invalidates open drafts. See [storage details](docs/local-storage.md#netnews-persistence).
 Local From uses the current safe pen name plus the shared stable identity token,
 lowercased, at `members.example.invalid`; no real email address is requested or
-raw member key displayed. Local operational UTC timestamps are projected through
-the durable historical calendar for an English RFC-style `Date` with seconds and
+raw member key displayed. Local operational UTC timestamps are formatted in
+fixed JST for an English RFC-style `Date` with seconds and
 `+0900`. The address, format, commands, editor and local persistence are category D
 reconstruction, not recovered PC-VAN session syntax.
 
@@ -606,8 +607,8 @@ Successful registration is immediately browser-local: `LIST` / `READ number` /
 registration or JSON restore. Bundled numbers remain intact; new numbers append
 within the category. Case-insensitive filename collisions (including fixtures)
 fail without overwriting, and failed writes retain editable input for explicit
-retry. Dates retain operational timestamps in storage and use the existing
-historical calendar for presentation; author labels use the current safe handle
+retry. Dates retain operational timestamps in storage and display those actual
+instants in fixed JST; author labels use the current safe handle
 and synthetic identity. Saved entries are separate from forums, mail, conference,
 OLT, NetNews and resident-generation context. JSON includes `osl-local`; older
 backups without it and explicitly empty state mean no authored files. Reset
@@ -797,7 +798,7 @@ they create no external members, remote read evidence or resident AI context. Se
 [bounded ASCII address subset](docs/mail.md#browser-local-internet-destinations-issue-93).
 Compose subject/body, `.END`, then `EDIT` / `Y` / `N` through the single terminal
 input. Sent and received letters have stable numbers, subjects,
-historical JST display dates (stored as operational UTC), reply chains and
+actual JST display dates with four-digit years (stored as operational UTC), reply chains and
 per-recipient read markers. Cancelled drafts do not send. [Mail commands and privacy](docs/mail.md) explain the full workflow.
 
 `WRITE-MULTI` selects one existing local resident per line; `.END` after at least

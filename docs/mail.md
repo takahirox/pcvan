@@ -250,7 +250,7 @@ The first confirmation stores its operational commitment timestamp, reconstructi
 provenance and confirming reply ID atomically with the reply, number allocation
 and completed run. A backwards clock is clamped to at least the parent's creation
 time (and the new reply's creation time). It never uses catch-up `simulatedAt`.
-The existing calendar projects this instant for display; no 1996 string is saved.
+The terminal displays this actual instant in fixed JST with a four-digit year.
 Retries, concurrent commits, duplicate-parent suppression, reload and restore
 do not refresh it. Older reply pairs remain unconfirmed without backfilling.
 Invalid/failed/cancelled work, consent withdrawal, pause, stale worlds, quota
@@ -337,12 +337,15 @@ Replies, multiple recipients, attachments and Internet destinations are excluded
 Registration, address resolution and pinned safe recipient labels reuse ordinary
 composition. Renaming a resident cannot redirect a draft or approved schedule.
 
-`WRITE-AT hoshimori` prompts for `YYYY-MM-DD HH:mm` in the shared simulated JST
+`WRITE-AT hoshimori` prompts for `YYYY-MM-DD HH:mm` in the actual JST
 calendar, with the current time and upper limit. The time must be strictly future
 and at most **30 elapsed days** away. Impossible dates and out-of-range values are
-rejected. Conversion uses the durable calendar anchor and UTC arithmetic, independent
+rejected. Conversion subtracts the fixed UTC+09:00 offset using UTC arithmetic, independent
 of browser timezone, midnight, year rollover and daylight-saving changes. The
-operational due instant is stored once; reload/restore do not rebase it.
+operational due instant is stored once; reload/restore do not rebase it. Previously
+approved deliveries keep their absolute instants even when a legacy calendar
+setting is present. For example, `2026-12-31 23:59` JST is
+`2026-12-31T14:59:00.000Z`; `2027-01-01 00:00` is the next UTC minute.
 
 Enter the subject and literal multiline body, `.END`, optionally `EDIT` and
 `REVIEW`, then `Y`. Every review identifies the recipient and intended time.

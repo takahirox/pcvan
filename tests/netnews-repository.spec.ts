@@ -63,7 +63,7 @@ test('NetNews atomic allocation, concurrent/idempotent drafts, group identities,
   expect(result.after.settings.filter((s) => s.id !== 'netnews-local')).toEqual(result.before.settings);
   expect(result.contextAfter).toEqual(result.contextBefore);
   expect(result.display.articles[3]!.from).toMatch(/^記録係 <syn-[a-z0-9]+@members.example.invalid>$/);
-  expect(result.display.articles[3]!.date).toBe('Sat, 23 Nov 1996 11:00:00 +0900');
+  expect(result.display.articles[3]!.date).toBe('Sat, 24 Oct 2026 11:00:00 +0900');
 });
 
 test('NetNews direct writes and restores validate entire state; quota rollback, roundtrip, legacy absence, reset and stale connections', async ({ page }) => {

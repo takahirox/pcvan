@@ -62,7 +62,7 @@ test('MITI route reaches numbered original demos; gaps and invalid reads preserv
   expect(listing).not.toMatch(/創作|再構成|https?:/);
   const read = controller.submit(' read   1 ').join('\n');
   expect(read).toContain('#1/9001　資料室');
-  expect(read).toContain('★タイトル (DEMO0001)  96/07/06  21:34');
+  expect(read).toContain('★タイトル (DEMO0001)  1996/07/06  21:34');
   expect(read).toContain('★内容\n  架空の星');
   expect(read).toContain('架空の星を見つけたら、どんな名前を付けますか。');
   for (const invalid of ['READ 2', 'READ 999', 'READ 0', 'READ -1', 'READ 1.5', 'READ 9007199254740992', 'READ 1 extra', 'Q', 'J MITI']) {
@@ -81,7 +81,7 @@ test('MITI route reaches numbered original demos; gaps and invalid reads preserv
 test('headers preserve title/body spacing and optional fields without interpreting secondary numbers', () => {
   const post = { ...demos.posts[0]!, displaySecondNumber: 0, title: '  創作　ｶﾅ  ', body: '\n  <b>文字</b>　。\n\n末尾  \n' };
   expect(renderPost(post, '表示試験', 7)).toEqual([
-    '#1/0　表示試験', '★タイトル (DEMO0001)  96/07/06  21:34  ( 7)',
+    '#1/0　表示試験', '★タイトル (DEMO0001)  1996/07/06  21:34  ( 7)',
     `${post.title}　名無し`, '★内容', post.body,
   ]);
   const { displaySecondNumber: _second, ...withoutSecond } = post;
@@ -109,11 +109,11 @@ test('human, seeded and generated headers separate stable tokens from current pe
   const members = [...fixture.members, { id: seeded.authorId, handle: '常連', actor: 'ai' as const }];
   const before = structuredClone({ posts: [human, seeded, generated], members });
   expect(renderPost(human, '広場', undefined, members).slice(1, 3)).toEqual([
-    '★タイトル (SYN-7MFTMGGA7CMOM)  26/10/20  10:02', `${human.title}　人間`,
+    '★タイトル (SYN-7MFTMGGA7CMOM)  2026/10/20  10:02', `${human.title}　人間`,
   ]);
   const original = renderPost(generated, '広場', undefined, members);
   expect(original.slice(1, 3)).toEqual([
-    '★タイトル (SYN-5C6R92FE6GO9F)  96/07/06  21:34', `${generated.title}　常連`,
+    '★タイトル (SYN-5C6R92FE6GO9F)  1996/07/06  21:34', `${generated.title}　常連`,
   ]);
   expect(renderPost(seeded, '広場', undefined, members)[1]).toContain('(SYN-5C6R92FE6GO9F)');
   expect(original.join('\n')).not.toMatch(/fictional-ai:|架空の投稿時刻|local-ai:|runId|AI住人|シミュレーション/);
@@ -252,7 +252,7 @@ test('unread controls cover MITI, every DAISIZEN board and additional SIG boards
     expect(listing.indexOf('#4 ')).toBeLessThan(listing.indexOf('#9 '));
     const next = controller.submit(' next ').join('\n');
     expect(next).toContain('#4/12'); expect(next).toContain('返事　今の筆名');
-    expect(next).toContain('96/11/20  10:03'); expect(next).toContain('返信先：#1');
+    expect(next).toContain('1996/11/20  10:03'); expect(next).toContain('返信先：#1');
     for (const invalid of ['NEXT 1', 'NEXT NEXT', 'UNREAD 1', 'UN READ', 'NEXT extra', 'READ 4 extra', '']) {
       expect(controller.submit(invalid).join('\n')).toContain('この画面では使えない');
       expect(controller.screen).toBe(screen);
