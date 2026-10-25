@@ -6,11 +6,11 @@ upgrading version 1 preserves every existing store and record. The repository ha
 no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. Before starting the first
 session, `openActivity()` initializes a pristine world with ten fictional residents,
-twelve populated boards and 72 original static Japanese forum posts in twenty-two threads,
+fifteen populated boards and 82 original static Japanese forum posts in twenty-six threads,
 plus three electronic-conference contributions. Model consent remains
 separate. The world anchor and fiction provenance live in `community-world`;
 seeds use `local-seed:fictional` (original thirty) or `local-seed:authored-sigs-v1`
-(additional thirty-six) or `local-seed:wakaba-v1` (three beginner contributions) or `local-seed:bulletin-v1` (three public notices), while later inference uses `local-ai:webllm:`.
+(additional thirty-six) or `local-seed:wakaba-v1` (three beginner contributions) or `local-seed:bulletin-v1` (three public notices) or `local-seed:forum-starters-v1` (ten posts in DAISIZEN 2/4/6), while later inference uses `local-ai:webllm:`.
 See [first-visit and population semantics](local-ai.md#setup-and-controls).
 
 Storage belongs to the browser profile and origin (scheme, hostname, and port).
@@ -49,7 +49,7 @@ shortcut to the same reset method.
 
 Reset clears and recreates the normal first-visit world in one IndexedDB
 transaction, using the same bootstrap as `openActivity()`: ten default residents,
-twelve populated forums, 72 original forum posts/twenty-two threads, three electronic-conference
+fifteen populated forums, 82 original forum posts/twenty-six threads, three electronic-conference
 contributions and `community-world`
 provenance. The default auto-activity cap is four, with no model consent or setup
 deferral. No model, WebGPU or network is needed. Failure rolls back both clears
@@ -107,6 +107,26 @@ under its existing eligibility/confirmation rules and now supplies the expanded
 baseline (up to 66 posts when customized additional boards are skipped); reset
 explicitly recreates the full baseline for any world.
 
+## Complete pristine and reset baseline (Issue #131)
+
+Fresh initialization and confirmed factory reset add ten original Japanese posts
+in four threads to DAISIZEN 2/4/6 in the same bootstrap transaction. The complete
+baseline is **82 posts, 26 threads, 15 boards**. The ten resident IDs and all 72
+established posts remain unchanged. New IDs use `seed:forums-v1:` and provenance
+`local-seed:forum-starters-v1`; timestamps follow the same fixed JST day convention
+and historical-calendar display anchor. Board names retain their historical evidence
+limits; all conversations are original fiction. See the
+[route inventory](sig-navigation.md#public-forum-content-inventory-issue-131).
+
+This feature adds no existing-world migration, eligibility scanner, repair action
+or recovery UI. Older, partially populated, imported, customized and deliberately
+emptied worlds retain their saved boards and posts. The pre-existing legacy
+expansion/population rules above remain unchanged and do not add these ten posts,
+Wakaba or bulletin content. To deliberately restart with the new baseline, export
+a JSON backup before using the existing **初期状態に戻す** action. Its destructive
+warning and confirmation remain required. Importing that backup restores its prior
+contents, including empty boards, rather than adding the new fixtures.
+
 ## General bulletin initialization and lazy participation
 
 `LOCAL-BULLETIN:1` is an application mapping in the existing SIG/forum stores,
@@ -117,7 +137,7 @@ Only pristine bootstrap creates its container, board and three
 with `local-seed:bulletin-v1` provenance, valid existing fictional authors and
 same-board reply references. All rows share the bootstrap transaction and existing
 fixed JST calendar anchor. Other fixtures are unchanged. The pristine total is
-72 posts, 22 threads, 12 boards and the same ten residents.
+82 posts, 26 threads, 15 boards and the same ten residents.
 
 Reopen/reconnect, consent, legacy population, v1 expansion, deletion and JSON
 restoration never add examples or missing records. Confirmed reset may recreate
@@ -148,7 +168,7 @@ world; competing tabs serialize and seed once. There is no new world marker,
 database version or backup-format migration. The legacy population and v1 expansion
 helpers never insert Wakaba records. Reopen, reconnect, consent and JSON restore
 cannot infer eligibility from missing posts/boards. Reset explicitly recreates the
-pristine 72-post baseline; legacy opt-in still supplies at most 66 posts.
+pristine 82-post baseline; legacy opt-in still supplies at most 66 posts.
 
 Existing/imported/deleted/missing Wakaba boards stay empty and navigable. `WRITE`
 uses `createForumPost`: only successful human submission can create an absent
@@ -597,7 +617,7 @@ settings store. IndexedDB remains version 2; JSON remains `pcvan-local` version 
 Pre-OLT backups omit this setting and lazily get empty rooms on their first OLT
 operation. No store-number migration can collide with SIG/mail work. Existing
 members, posts, mail and counters are preserved. Reset removes OLT and recreates
-the established ten residents/72 forum posts and three conference contributions;
+the established ten residents/82 forum posts and three conference contributions;
 OLT has no seeded transcript.
 
 The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly

@@ -1,3 +1,42 @@
+# Complete public forum starters (Issue #131)
+
+Validated on 2026-10-25 against the current Issue's new-world/reset-only scope.
+
+- `npm ci`: passed, zero reported vulnerabilities; dependencies unchanged.
+- Final `npm test`: **522 passed in 4.1 minutes**, no failures, retries or skips.
+  Both configured servers built/served production assets and repository modules.
+- Standalone `npm run build`: passed TypeScript checking and Vite production build.
+  Existing large-chunk and color-environment warnings remain informational.
+- `git diff --check`: passed; local Markdown targets and new linked headings checked.
+- The first full run had 521 passes and one failure in the new empty-restore
+  browser test: a live clock advanced the scheduler timestamps between snapshots.
+  Fixed its clock so the preservation assertion is deterministic.
+
+The explicit 15-route production oracle covers anonymous fresh startup and
+confirmed factory reset, every LIST/READ path (including MAIN 16 → 1), exact
+per-board/total/thread counts, all 72 established posts plus ten new originals,
+stable identities, ordered same-board replies and historical display dates.
+It checks for page errors, external requests and unexpected forum controls.
+No model setup, WebGPU or human registration is needed to read the content.
+The route inventory separates public posting boards from quiet collections,
+mailboxes, OLT, search, NetNews and retained conference content.
+
+Repository/browser regressions cover partial older worlds with human/AI posts,
+separate human read markers, customized SIGs/empty boards and private settings;
+reopening and backup restore preserve their content exactly. Restoring intentionally
+empty forums leaves Wakaba empty. The existing reset confirmation retains its
+backup/export option and destructive warning. No recovery scanner, migration or
+additional population UI is introduced by this feature.
+
+Bootstrap and reset quota failures now occur at the 78th post, within the new
+fixture writes, to verify rollback of the complete world. Concurrent bootstrap
+connections must produce exactly 82 unique posts. Existing lifecycle, backup,
+read-state, consent/scheduler and service regressions remain part of the full suite.
+
+No real model download, hardware inference, optional subjective signoff or
+post-deployment check was performed; these are not required for this change.
+No post-merge verification is required.
+
 # Issue #69: environmental gateway and EIC NET readings
 
 Validated on 2026-10-23 with Node.js 24.12.0 on macOS.

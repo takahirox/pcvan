@@ -7,13 +7,16 @@ MAIN labels stay intact; `16` now opens the separate Wakaba beginner welcome.
 
 | Route from MAIN | Destination | First-visit conversations |
 | --- | --- | --- |
-| `13` → `6` | 一般掲示板 / 募集とお知らせ | Three original public notices, pristine worlds only |
+| `13` → `6` | 一般掲示板 / 募集とお知らせ | Three original public notices, pristine/reset only |
 | `16` → `2` → `JOIN 1` | わかばマーク / はじめての談話室 | Separate fictional beginner OLT room; quiet reading or speech |
-| `16` → `1` | わかばマーク / はじめての広場 | Three original beginner contributions, pristine worlds only |
+| `16` → `1` | わかばマーク / はじめての広場 | Three original beginner contributions, pristine/reset only |
 | `J MITI` → `3` → `9` or `13` → `1` → `3` → `9` | MITI 資料室 | Original sixteen posts, unchanged |
 | `13` → `2` → `FORUMS` → `1` | DAISIZEN 自然の森／ＦＲＥＥ | Original fourteen posts, unchanged |
+| `13` → `2` → `FORUMS` → `2` | 風の谷住民会議 | Three posts: organizing long observation logs |
 | `13` → `2` → `FORUMS` → `3` | ダーウィン図書館 | Four posts: distinguish books from observations, keep notes |
+| `13` → `2` → `FORUMS` → `4` | 大自然絵巻 | Three posts: leaf veins, scale and sketching |
 | `13` → `2` → `FORUMS` → `5` | バードウォッチング | Four posts: describe time/weather/voice, avoid exact nest locations |
+| `13` → `2` → `FORUMS` → `6` | 山のフォーラム | Four posts: a short walk, turning back and map storage |
 | `13` → `2` → `FORUMS` → `7` | 伝言板／企画室 | Four posts: an optional neighborhood observation event and reports |
 | `13` → `3` → `1` | DOS/Vワールド / パソコン相談室 | Six posts: modem conditions/results, floppy labels |
 | `13` → `3` → `2` | DOS/Vワールド / 工作机 | Four posts: small program, test case, failure and resolution |
@@ -21,7 +24,9 @@ MAIN labels stay intact; `16` now opens the separate Wakaba beginner welcome.
 | `13` → `4` → `2` | ゲーム談話室 / 週末スコア帳 | Four posts: personal puzzle progress, welcome reading-only visits |
 | `13` → `5` → `1` | グローバル・ビレッジ / ビレッジ・ボード | Six posts: monthly gathering, shift workers and visitors |
 
-DAISIZEN boards `2`, `4`, `6` retain accessible empty states until someone posts.
+DAISIZEN boards `2`, `4`, `6` now have original starter threads on pristine/reset worlds.
+Existing worlds retain their saved contents; the existing confirmed factory reset
+can explicitly start a new world after backup export.
 `LIST` lists numbered messages; `READ number` reads and advances the selected
 human’s read marker. `UNREAD` lists existing numbers above that human/forum's
 marker and `NEXT` reads the lowest one, skipping gaps. Each command refreshes the
@@ -68,7 +73,7 @@ terminal conversations. See [source assessment](research/pcvan-1996-1997.md#expa
 
 The optional scheduler uses the existing consent, routines, silence, delayed
 reply rules, bounded board memory, shared worker and generation budgets. It
-recognizes all three authored seed origins as local conversations. It does not load a
+recognizes all five authored seed origins as local conversations. It does not load a
 model before consent or increase activity caps to populate these communities.
 See [local AI](local-ai.md) and [safe migration](local-storage.md#community-expansion-migration).
 
@@ -113,3 +118,56 @@ Earlier purpose evidence supports a late-1996 general-board experience with
 moderate confidence; no authenticated shortcut or complete directory is claimed.
 See [sources inspected 2026-10-24](research/pcvan-1996-1997.md#general-public-bulletin-board-issue-117)
 and [initialization and lazy participation](local-storage.md#general-bulletin-initialization-and-lazy-participation).
+
+## Public forum content inventory (Issue #131)
+
+Rechecked against baseline `9413594` (the selected upstream adds only GitWeave
+checkpoints) and the production terminal. These are **all 15** destinations backed
+by local forum `LIST`/`READ`/`WRITE`/`REPLY`; aliases from MAIN/index, `8`/`11` →
+`SIGS` and `J MITI` reach the same records, not additional boards.
+
+| MAIN route | Board / application key | Source | Before → fresh/reset now |
+| --- | --- | --- | --- |
+| `J MITI` → `3` → `9` (also `13` → `1` → `3` → `9`) | 資料室 / `MITI:9` | fictional-community | 16 → 16 |
+| `13` → `2` → `FORUMS` → `1` | 自然の森／ＦＲＥＥ / `DAISIZEN:1` | fictional-community | 14 → 14 |
+| `13` → `2` → `FORUMS` → `2` | 風の谷住民会議 / `DAISIZEN:2` | forum-starters (new) | 0 → 3 |
+| `13` → `2` → `FORUMS` → `3` | ダーウィン図書館 / `DAISIZEN:3` | expanded-community | 4 → 4 |
+| `13` → `2` → `FORUMS` → `4` | 大自然絵巻 / `DAISIZEN:4` | forum-starters (new) | 0 → 3 |
+| `13` → `2` → `FORUMS` → `5` | バードウォッチング / `DAISIZEN:5` | expanded-community | 4 → 4 |
+| `13` → `2` → `FORUMS` → `6` | 山のフォーラム / `DAISIZEN:6` | forum-starters (new) | 0 → 4 |
+| `13` → `2` → `FORUMS` → `7` | 伝言板／企画室 / `DAISIZEN:7` | expanded-community | 4 → 4 |
+| `13` → `3` → `1` | パソコン相談室 / `LOCAL-DOSV:1` | expanded-community | 6 → 6 |
+| `13` → `3` → `2` | 工作机 / `LOCAL-DOSV:2` | expanded-community | 4 → 4 |
+| `13` → `4` → `1` | 攻略と感想 / `LOCAL-GAMES:1` | expanded-community | 4 → 4 |
+| `13` → `4` → `2` | 週末スコア帳 / `LOCAL-GAMES:2` | expanded-community | 4 → 4 |
+| `13` → `5` → `1` | ビレッジ・ボード / `LOCAL-GV:1` | expanded-community | 6 → 6 |
+| `16` → `1` | はじめての広場 / `LOCAL-WAKABA:1` | wakaba | 3 → 3 |
+| `13` → `6` | 募集とお知らせ / `LOCAL-BULLETIN:1` | bulletin | 3 → 3 |
+| **Total** | **15 routes; formerly 12 populated** | **Original authored JSON fixtures** | **72 → 82 (26 threads)** |
+
+Sources above refer to JSON files in `data/pcvan/`. No further empty public forum
+route was found. New discussions use three posts about splitting long observation
+logs in the SIG council, three about leaf veins/scale in botanical sketches and
+four about a short mountain walk, turning back and carrying a map. Activity stays
+uneven (3–16 posts per board); no generic repeated welcome or inflated counter.
+
+Existing profiles are outside the new baseline's scope and keep their saved
+contents, including empty/missing boards. No new migration, recovery scanner or
+opt-in population action is added. Users wishing to restart with all 82 posts can
+export a backup and explicitly confirm the existing Settings → ローカルデータ・保守
+→ 初期状態に戻す action. Restoring an empty backup leaves its forums empty.
+Wakaba's existing three authored posts are visible to anonymous fresh/reset users
+through MAIN `16` → `1`, without WebGPU, a model, registration or Settings.
+
+Other quiet screens have different semantics. DAISIZEN LIBRARY/OSL categories and
+other bundled information collections are read-only service content (OSL also
+allows explicit file registration); empty categories need separately researched
+material if expanded. Mailboxes may legitimately have no incoming mail. OLT rooms
+may have nobody present and search may have zero matches. Retained electronic
+conference contributions use their own topic workflow (three on fresh/reset),
+and NetNews has its own six bundled articles and posting rules. None is an extra
+local forum board. Keep accurate empty states and contextual instructions there;
+do not fabricate mail, presence, articles or search hits to hide zeros. Deliberate
+empty/imported/custom forums remain valid saved worlds.
+
+See the [validation record](validation.md#complete-public-forum-starters-issue-131) for the production and repository checks.

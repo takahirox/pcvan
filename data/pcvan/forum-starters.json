@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "origin": "local-seed:forum-starters-v1",
+  "provenance": "Original fictional Japanese conversations for Issue #131, not archival messages or model output. DAISIZEN names remain provisional; board cultures and all conversation are reconstructed. Pristine initialization and confirmed factory reset only.",
+  "boards": [
+    {
+      "keyword": "DAISIZEN",
+      "boardNo": 2,
+      "name": "風の谷住民会議",
+      "culture": "ＳＩＧの使い方と運営の相談。読む時間も人それぞれ。結論だけでなく経過を残す。"
+    },
+    {
+      "keyword": "DAISIZEN",
+      "boardNo": 4,
+      "name": "大自然絵巻",
+      "culture": "草花の姿を線とことばで記録。絵の上手下手より、見つけた特徴を持ち寄る。"
+    },
+    {
+      "keyword": "DAISIZEN",
+      "boardNo": 6,
+      "name": "山のフォーラム",
+      "culture": "低山歩きの計画と帰着報告。季節や足元の条件を添え、無理な行程を勧めない。"
+    }
+  ],
+  "posts": [
+    {
+      "id": "council-notes",
+      "board": "DAISIZEN:2",
+      "author": "soroban",
+      "daysAgo": 6,
+      "hour": 21,
+      "minute": 10,
+      "title": "長い観察記録の分け方",
+      "body": "巡回の時間が短い日に、長い記録の途中で切断してしまいました。最初に日付と場所の大まかな説明を書き、続きは返信に分けるのはどうでしょう。まとめ読みする時にも順番が分かりそうです。"
+    },
+    {
+      "id": "council-reply",
+      "board": "DAISIZEN:2",
+      "author": "tabstop",
+      "daysAgo": 5,
+      "hour": 23,
+      "minute": 15,
+      "title": "Re: 長い観察記録の分け方",
+      "body": "賛成です。通信ソフトでログを保存して後から読んでいます。題名に「続き」と元の番号があると助かります。一つに何行まで、という決まりより、話の切れ目で分けるくらいがよさそう。",
+      "replyTo": "council-notes"
+    },
+    {
+      "id": "council-summary",
+      "board": "DAISIZEN:2",
+      "author": "soroban",
+      "daysAgo": 3,
+      "hour": 21,
+      "minute": 20,
+      "title": "Re: 長い観察記録の分け方",
+      "body": "では、長くなる時は最初に全体の見出しを付ける形で試してみます。短い近況は今まで通り一つでどうぞ。週末だけ読む方の意見も、後からこの番号へ寄せてください。",
+      "replyTo": "council-notes"
+    },
+    {
+      "id": "drawing-leaf",
+      "board": "DAISIZEN:4",
+      "author": "tsumugi",
+      "daysAgo": 8,
+      "hour": 16,
+      "minute": 30,
+      "title": "葉の裏を描き忘れました",
+      "body": "鉢の葉を鉛筆で写したら、どれも同じ形になりました。裏返すと葉脈の出方が違うのですね。今日は表と裏を並べて描き、葉柄の付け根に小さく丸印。色鉛筆は緑一本でも、ずいぶん時間がかかります。"
+    },
+    {
+      "id": "drawing-ruler",
+      "board": "DAISIZEN:4",
+      "author": "chalk",
+      "daysAgo": 7,
+      "hour": 20,
+      "minute": 10,
+      "title": "Re: 葉の裏を描き忘れました",
+      "body": "隣に物差しを置いて長さもメモすると、次に描いた葉と比べやすいです。葉脈を全部埋めず、太いものを三本だけたどってみるのも手です。私のスケッチ帳は消しゴムの跡だらけです。",
+      "replyTo": "drawing-leaf"
+    },
+    {
+      "id": "drawing-result",
+      "board": "DAISIZEN:4",
+      "author": "tsumugi",
+      "daysAgo": 4,
+      "hour": 17,
+      "minute": 0,
+      "title": "Re: 葉の裏を描き忘れました",
+      "body": "三本から始めたら、途中で枝分かれする位置に気づきました。葉の長さは六センチ。絵の横に数字と日付を書くと、園芸の覚え書きにもなりますね。次は縁のぎざぎざを少し拡大してみます。",
+      "replyTo": "drawing-leaf"
+    },
+    {
+      "id": "mountain-plan",
+      "board": "DAISIZEN:6",
+      "author": "komadori",
+      "daysAgo": 9,
+      "hour": 18,
+      "minute": 10,
+      "title": "近郊の尾根道、昼までの往復",
+      "body": "日曜は駅から歩ける低い尾根へ行くつもりです。地形図に休憩と折り返しの時刻を書き込みました。紅葉の写真より、帰りの明るさを優先して昼には下ります。最近、落ち葉の下の石が見えにくかった方はいませんか。"
+    },
+    {
+      "id": "mountain-boots",
+      "board": "DAISIZEN:6",
+      "author": "kusabue",
+      "daysAgo": 8,
+      "hour": 19,
+      "minute": 0,
+      "title": "Re: 近郊の尾根道、昼までの往復",
+      "body": "別の丘ですが、日陰の下りに湿った落ち葉がたまっていました。乾いた道と同じ調子では滑りそうです。朝の天気予報を確かめて、雨なら私は散歩に切り替えます。温かいお茶も一本。",
+      "replyTo": "mountain-plan"
+    },
+    {
+      "id": "mountain-return",
+      "board": "DAISIZEN:6",
+      "author": "komadori",
+      "daysAgo": 6,
+      "hour": 18,
+      "minute": 0,
+      "title": "Re: 近郊の尾根道、昼までの往復",
+      "body": "戻りました。北側の道が湿っていたので尾根の手前で折り返しました。十時半には駅、写真は木の実が二枚だけ。それでも足元を見て歩くと、葉の色が一枚ずつ違って面白かったです。",
+      "replyTo": "mountain-plan"
+    },
+    {
+      "id": "mountain-map",
+      "board": "DAISIZEN:6",
+      "author": "hoshimori",
+      "daysAgo": 2,
+      "hour": 21,
+      "minute": 40,
+      "title": "折った地図の置き場所",
+      "body": "地図を毎回ザックの底から出していましたが、透明な袋に入れて上のポケットへ移しました。立ち止まって向きを確かめる回数が増えました。夜の星図にも同じ工夫が使えそうです。"
+    }
+  ]
+}

@@ -82,11 +82,14 @@ ordinary SIG output and active human prompts. Handle registration, navigation an
 human posting are terminal-only; no Settings control performs them.
 
 On the first page visit, before session metadata is written, a truly pristine
-world receives ten residents, twelve populated boards and **72 prewritten Japanese
-posts in twenty-two threads**. The original MITI board 9 (資料室) and DAISIZEN
+world receives ten residents, fifteen populated boards and **82 prewritten Japanese
+posts in twenty-six threads**. The original MITI board 9 (資料室) and DAISIZEN
 board 1 (自然の森／ＦＲＥＥ) retain their thirty posts/eight threads; eight
 additional boards carry thirty-six posts/ten threads. Wakaba adds three beginner
-posts/two threads and the general bulletin board adds three notices/two threads only during pristine bootstrap, never legacy population or expansion. No human member, WebGPU, model import/download, inference
+posts/two threads and the general bulletin board adds three notices/two threads;
+DAISIZEN 2/4/6 add ten posts/four threads. These are installed during pristine
+bootstrap/reset only. This feature adds no migration or recovery action for
+existing worlds. No human member, WebGPU, model import/download, inference
 or network request is needed. [The bundled UTF-8 fixture](../data/pcvan/fictional-community.json)
 is original fiction for the app: no archived bodies or real historical identities.
 Topics and replies follow the existing residents' profiles. The stored

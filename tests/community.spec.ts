@@ -13,7 +13,7 @@ test('atomic seed failure rolls back every record; concurrent connections seed o
     const native = IDBObjectStore.prototype.add;
     let writes = 0; let failed = false;
     IDBObjectStore.prototype.add = function (value, key) {
-      if (this.name === 'posts' && this.transaction.db.name === 'seed-atomic' && ++writes === 8) throw new DOMException('Simulated quota', 'QuotaExceededError');
+      if (this.name === 'posts' && this.transaction.db.name === 'seed-atomic' && ++writes === 78) throw new DOMException('Simulated quota', 'QuotaExceededError');
       return key === undefined ? native.call(this, value) : native.call(this, value, key);
     };
     try { await repo.openActivity(anchor); } catch { failed = true; }
@@ -42,9 +42,9 @@ test('atomic seed failure rolls back every record; concurrent connections seed o
     repo.close(); reopened.close();
     return { failed, writes, rolledBack, first, roundtrip, cleared, repeat, invalidMarkers };
   }, anchor);
-  expect(result.failed).toBe(true); expect(result.rolledBack).toBe(true); expect(result.writes).toBe(8);
+  expect(result.failed).toBe(true); expect(result.rolledBack).toBe(true); expect(result.writes).toBe(78);
   expect(result.invalidMarkers).toEqual([true, true, true, true, true]);
-  expect(result.first.posts).toHaveLength(72); expect(new Set(result.first.posts.map((p) => p.id)).size).toBe(72);
+  expect(result.first.posts).toHaveLength(82); expect(new Set(result.first.posts.map((p) => p.id)).size).toBe(82);
   expect(result.roundtrip.posts).toEqual(result.first.posts);
   expect(result.roundtrip.settings.find((s) => s.id === 'community-world')).toEqual(result.first.settings.find((s) => s.id === 'community-world'));
   expect(result.cleared.posts).toEqual([]); expect(result.cleared.forums).toEqual(result.first.forums); expect(result.repeat).toBe(false);

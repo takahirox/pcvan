@@ -11,7 +11,7 @@ test('offline shell is opt-in, caches static assets only, and supports offline r
   await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
   await context.setOffline(true); await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
   await enterForum(page); await command(page, 'READ 1', '★内容'); await post(page, 'オフライン投稿', '通信なしでも保存');
-  expect((await backup(page)).posts).toHaveLength(73);
+  expect((await backup(page)).posts).toHaveLength(83);
   await settings(page, 5); await command(page, 'STATUS', 'オフライン');
   expect(external).toEqual([]);
 });

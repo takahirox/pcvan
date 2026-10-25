@@ -24,10 +24,10 @@ import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleA
 import { aiOrigin, models, personas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
 import { wakaba } from '../wakaba';
-import { expandedBoards, additionalSigs } from '../communities';
+import { expandedBoards, quietBoards, additionalSigs } from '../communities';
 import evidence from '../../data/pcvan/sig-evidence.json' with { type: 'json' };
 import { WORLD_SETTING, INTERNET_SAMPLE_ORIGIN } from './schema';
-import { canPopulateCommunity, communityBoards, communityPosts, wakabaPosts, bulletinPosts, expandedPosts, canExpandCommunity, SEED_FIXTURE } from './community';
+import { canPopulateCommunity, communityBoards, communityPosts, wakabaPosts, bulletinPosts, expandedPosts, canExpandCommunity, quietPosts, SEED_FIXTURE } from './community';
 import { validateMailGeneration } from '../ai/mail';
 import { postInput, validateGeneration } from '../ai/generation';
 
@@ -748,6 +748,17 @@ export class LocalRepository {
       await request(settings.add({ id: CONFERENCE_SETTING, value: state }));
     }
     await this.expandCommunity(tx, now);
+    if (migrated.bootstrap) {
+      for (const board of quietBoards) {
+        const forum: Forum = { id: `resident-forum:${board.keyword}:${board.boardNo}`,
+          sigId: `resident-sig:${board.keyword}`, boardNo: board.boardNo,
+          name: board.name, nextPostNumber: 1 };
+        const posts = quietPosts(now, `${board.keyword}:${board.boardNo}`, forum.id);
+        for (const post of posts) await request(tx.objectStore('posts').add(post));
+        await request(tx.objectStore('forums').add({ ...forum, nextPostNumber: posts.length + 1 }));
+      }
+      validateBackup(await this.snapshot(tx));
+    }
     migrated.bootstrap = false;
     removePausedRuns(migrated, profiles);
     return migrated;

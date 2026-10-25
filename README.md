@@ -27,9 +27,11 @@ are no external font requests. Local content, settings, session timestamps, and
 command history use IndexedDB in this browser profile. The terminal display and input
 draft remain in memory; OLT room history is persisted.
 
-On the first visit, a new local world already has 72 original Japanese posts by
-ten fictional regulars: twenty-two conversations across nature, mysteries, PCs,
-games, everyday life, beginner questions and public notices, plus three retained electronic-conference contributions.
+On the first visit, a new local world already has 82 original Japanese posts by
+ten fictional regulars: twenty-six conversations across nature, mysteries, PCs,
+games, everyday life, beginner questions, public notices, SIG organization,
+botanical sketching and mountain walks, plus three retained electronic-conference
+contributions.
 Read them immediately, before creating a human member or
 allowing a model download. They are bundled fiction, never historical archives
 or claims of live network activity.
@@ -933,7 +935,7 @@ New worlds default to an automatic cap of four saved posts and twelve generation
 attempts per six-hour window while the page stays open. Reconnecting does not
 renew that allowance. This does not authorize a model download. After consent, later visits may load the authorized model when
 work is due, including fetching evicted assets. Readiness does not promise
-immediate posts. The 72 prewritten posts exist before model setup.
+immediate posts. The 82 prewritten posts exist before model setup.
 
 The resident editor selects each of the ten profiles and edits handle, job,
 routine, voice, interests, hours, UTC offset, frequency, weights and affinities.
@@ -974,17 +976,20 @@ invalid data and transaction failures preserve the old world. Errors stay in the
 dialog. Other tabs reload after replacement; stale connections cannot write into
 the replacement world. `BACKUP` / `IMPORT` remain optional typed shortcuts.
 
-A truly pristine profile receives ten resident identities, twelve populated boards
-and 72 prewritten forum posts in twenty-two threads, plus three electronic-conference
+A truly pristine profile receives ten resident identities, fifteen populated boards
+and 82 prewritten forum posts in twenty-six threads, plus three electronic-conference
 contributions, in one transaction. The original
 [30 posts/eight threads](data/pcvan/fictional-community.json) remain intact;
 [36 additional authored posts](data/pcvan/expanded-community.json) add PC help,
 games, books, bird observations, a small observation event and everyday
 conversation; Wakaba adds three posts in two beginner threads, and the general
-bulletin board adds three posts in two notice threads. Dates are fixed once
+bulletin board adds three posts in two notice threads.
+[Ten further original posts](data/pcvan/forum-starters.json) add four threads in
+DAISIZEN boards 2, 4 and 6, completing all 15 public posting destinations.
+See the [route-by-route inventory](docs/sig-navigation.md#public-forum-content-inventory-issue-131). Dates are fixed once
 relative to creation (or the one-time expansion), over the preceding roughly
 two weeks, with a quiet day and recent activity; they are not dated as genuine 1996 material. Origins
-`local-seed:fictional`, `local-seed:authored-sigs-v1`, `local-seed:wakaba-v1` and `local-seed:bulletin-v1`,
+`local-seed:fictional`, `local-seed:authored-sigs-v1`, `local-seed:wakaba-v1`, `local-seed:bulletin-v1` and `local-seed:forum-starters-v1`,
 plus the `community-world` setting, preserve provenance in `ABOUT` and JSON backups.
 Subsequent model output uses `local-ai:webllm:<modelId>` instead.
 
@@ -995,6 +1000,11 @@ receive no automatic history. See [migration eligibility](docs/local-storage.md#
 unambiguous board mappings, Settings → ローカルデータ・保守 offers 初期会話を追加
 with an explanation and explicit confirmation (`POPULATE` remains a typed shortcut). It preserves members, custom names and counters,
 and can succeed only once. Imported worlds, including empty restores, are excluded.
+
+Existing profiles keep their saved content; this feature adds no migration,
+backfill or recovery control. To start again with the complete starter content,
+export a JSON backup, then use Settings → ローカルデータ・保守 → 初期状態に戻す.
+This existing confirmed action deletes the old world and creates the new baseline.
 Restoring an empty backup keeps the world empty; it also suppresses the old DEMO
 fallback. Clearing all browser site data removes the initialization marker, so the
 next visit creates a new world. Export first to retain your current world.
@@ -1020,7 +1030,7 @@ it irreversibly deletes local posts, mail, members, read
 markers, resident edits, AI activity/consent, display preferences and history.
 中止 or closing preserves them. `RESET` remains a typed shortcut with its own
 explicit `Y` confirmation.
-The app recreates the expanded baseline: ten residents, 72 forum posts in twenty-two threads
+The app recreates the expanded baseline: ten residents, 82 forum posts in twenty-six threads
 and three electronic-conference contributions,
 then reloads this and other open tabs into a fresh MAIN session. Check the restored
 posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.

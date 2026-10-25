@@ -285,7 +285,7 @@ export function mountSettings(root: HTMLElement, actions: SettingsActions) {
     const accepted = epoch, content = await actions.read(), expected = worldContext(content);
     if (accepted !== epoch) return;
     confirm('world', content, ['投稿・メール・ローカルNetNews記事・登録OSLテキスト・会員・既読・住人編集・活動設定・モデル同意・表示設定・履歴・未送信の下書きを削除します。取り消せません。',
-      '必要なら先に JSON を保存してください。最初の10人・72件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。',
+      '必要なら先に JSON を保存してください。最初の10人・82件の投稿と電子会議室の3件を準備し、他のタブも再読み込みします。NetNewsの同梱6件は残ります。',
       'モデルの重み・端末キャッシュは保持します。AI には再同意が必要です。'], () => actions.run(() => actions.reset(expected)), '初期状態に戻す');
   });
   click('.cache-shell', () => actions.offline.cache());
