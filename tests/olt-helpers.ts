@@ -25,15 +25,22 @@ export async function advance(page: Page, ticks: number) {
 export async function residents(page: Page, quiet = false, board = 'MITI:9') {
   const data = await snapshot(page), aiRow = data.settings.find((r) => r.id === 'ai-activity')!, residentRow = data.settings.find((r) => r.id === 'ai-residents')!;
   const ai = aiRow.value as unknown as AiActivity, profiles = (residentRow.value as unknown as ResidentSettings).profiles;
-  const slot = Math.floor(epoch.getTime() / 1_200_000), day = Math.floor(epoch.getTime() / 86_400_000);
+  const day = Math.floor((epoch.getTime() + 540 * 60_000) / 86_400_000);
   const selected = profiles.slice(0, 2);
   let seed = '';
   for (let i = 0; i < 10000; i++) {
     seed = `olt-test-${i}`;
-    if (selected.every((p) => random(`${seed}:olt:${p.id}:${slot}:visit`) < .9 && random(`${seed}:olt:${p.id}:away:${day}`) >= .12 && random(`${seed}:olt:${p.id}:${slot}:explore`) > .15)) break;
+    if (selected.every((p) => {
+      const cycle = 65 * 60_000, phase = random(`${seed}:olt:${p.id}:phase`) * cycle;
+      const slot = Math.floor((epoch.getTime() - phase) / cycle);
+      const draw = (key: string) => random(`${seed}:olt:${p.id}:${slot}:${key}`);
+      const end = slot * cycle + phase + 60 * (.7 + draw('duration') * .3) * 60_000;
+      return draw('visit') < .95 && random(`${seed}:olt:${p.id}:away:${day}`) >= .12 &&
+        draw('explore') > .15 && end > epoch.getTime() + 8 * 60_000;
+    })) break;
   }
   Object.assign(ai, { seed, batch: null, nextDue: Object.fromEntries(profiles.map((p) => [p.id, new Date(epoch.getTime() + 3_600_000).toISOString()])) });
-  for (const [i, p] of profiles.entries()) Object.assign(p, { frequency: i < 2 ? 1 : 0, participation: 1,
+  for (const [i, p] of profiles.entries()) Object.assign(p, { frequency: i < 2 ? 1 : 0, participation: 1, sessionMinutes: 60,
     preferredBoards: [board], weekdayHours: [22], weekendHours: [22], reply: 1, inactivity: quiet ? 1 : 0 });
   await page.evaluate(async (rows) => {
     const r = indexedDB.open('pcvan-local'); const db = await new Promise<IDBDatabase>((resolve) => { r.onsuccess = () => resolve(r.result); });

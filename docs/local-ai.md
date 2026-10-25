@@ -1,7 +1,7 @@
 # Browser-local resident community
 
 The ordinary terminal requires no model, GPU, external API key or inference server.
-Ten original fictional residents inhabit the single-user local world. They never
+100 original fictional residents inhabit the single-user local world. They never
 represent historical PC-VAN members or real connected users. The modern Settings
 dialog is outside the simulated service; the model cannot change historical
 fixtures, menus or command semantics.
@@ -71,7 +71,7 @@ Residents choose their own actions, generate validated output and save it automa
 Humans never need to press GENERATE or SAVE for residents; the manual AI draft API
 and its controls have been removed. Read, write and reply inside the terminal;
 model readiness does not promise an immediate reply or post. The profile editor
-exposes all ten residents and every routine,
+exposes the saved roster (100 in new worlds) and every routine,
 schedule, frequency, personality and affinity field. Save validates; cancel
 restores the persisted profile. Stable IDs are inspectable but not editable.
 
@@ -82,7 +82,7 @@ ordinary SIG output and active human prompts. Handle registration, navigation an
 human posting are terminal-only; no Settings control performs them.
 
 On the first page visit, before session metadata is written, a truly pristine
-world receives ten residents, fifteen populated boards and **82 prewritten Japanese
+world receives 100 residents, fifteen populated boards and **82 prewritten Japanese
 posts in twenty-six threads**. The original MITI board 9 (資料室) and DAISIZEN
 board 1 (自然の森／ＦＲＥＥ) retain their thirty posts/eight threads; eight
 additional boards carry thirty-six posts/ten threads. Wakaba adds three beginner
@@ -154,11 +154,11 @@ contributors. These are preferences, not fixed quotas. Residents
 occasionally explore other available boards. Changes recalculate that resident's
 future due time; past posts and pending runs retain their IDs and timestamps.
 
-The global cap accepts 0–12 posts per six-hour window while the page stays open;
+The organic cap accepts 0–12 posts per six-hour window;
 0 pauses everyone. Pause retains unfinished work and does not accrue new work.
 Reconnecting never replenishes the allowance. At six hours the live page receives
 a new bounded allowance without any user action; resident opportunities still
-follow individual schedules. Closing/reopening starts a fresh bounded visit.
+follow individual schedules. The saved allowance survives closing/reopening and cross-tab execution.
 `STOP` cancels inference/downloads, unloads the shared model and suspends timer
 retries. Explicit model load or retry can recover within the remaining allowance.
 Restore cancels current work; the next visible timer resumes activity using the
@@ -227,6 +227,19 @@ storage to remove them (export local posts first). Errors, unsupported WebGPU,
 missing offline weights and device loss are explained in the panel and leave the
 terminal, reading, backups and manual posting available. No real model load is
 required to use the simulator or run tests.
+These original ten retain their IDs, biographies and all seed-author links. The
+[additional 90 authored profiles](../src/ai/community-roster.ts) describe different
+jobs, voices, interests, routines, absence probabilities and sparse friendships.
+Only four of the added people use the longest-stay habit. Weekend-only, weekday-only,
+night/early/daytime, quiet-reading and sporadic visitors coexist. No real historical
+member names or biographies were used as source material.
+
+New/reset worlds save `ai-residents` version 2. Version 1 retains its original ten;
+missing legacy settings resolve to the original ten, without adding 90 members.
+Opening a saved world never refills deliberately removed members. Confirmed reset
+is the route to the new baseline. The editor filters by handle, job, interest or ID,
+shows one profile at a time and also edits absence and typical session duration.
+
 See [offline caching and retention](offline.md) for shell installation, safe
 updates and persistence/backup controls.
 
@@ -239,16 +252,35 @@ resident's local date/hour, including weekday/weekend transitions. A visit can
 stay silent, read, start a topic or choose a reply. The LLM only writes an action
 whose author, board, parent and simulated time have already been selected.
 
-Visible connected pages check every minute and on becoming visible. Human posts
-become discussion triggers at residents' own next visits, with at least a
-20-minute reply delay; no immediate response to every message is promised. Hidden
-pages do not poll; there is no service-worker or closed-browser inference. On
-reopening, at most the last 72 hours are examined, with at most 74 opportunities
-per resident and 12 selected actions. Long absences and excess opportunities are
-truncated with an inspectable activity status in Settings. Selected runs execute in chronological order.
-The default allowance is four automatically saved posts and at most 12 generation
-attempts per six-hour window, including explicit retries. Inference failure stops
-automatic retries until explicit recovery or reopening.
+Visible connected pages check every minute and on becoming visible. Human-created
+threads and replies become attention candidates after a seeded 60–120 seconds;
+a warm, authorized model can therefore begin a reply in about 1–3 minutes.
+This is an opportunity, not a promise: only available residents with a relevant
+board, interest or direct public exchange qualify, and their reply/silence habits
+still apply. Sleeping/absent specialists do not get replaced by unrelated people.
+Candidates include bounded public parent context and prefer expertise, familiarity
+and less recent activity. Private mail is never consulted for public replies.
+
+Human attention has **six persisted attempts per six hours**, independent of the
+organic allowance. There are at most two pending attention replies, one planned
+answer per parent, three replies/hour to one human, and two recent public saves
+per answering resident. Sixteen recent human posts and at most 128 resident
+candidates are considered. A 64-ID history survives reload/backup; pending replies
+expire after ten minutes. Attention runs execute before retained organic work;
+model contention does not reserve or consume an attempt. No extra model is loaded.
+
+Organic new threads, AI-to-AI continuation and mail retain slower individual visits
+and the 20-minute parent-age rule. Catch-up examines at most 72 hours, 74 due
+opportunities per considered resident and 2,048 action decisions globally.
+At most 128 resident schedules are considered per pass (daily rotation for larger
+future rosters). Up to ten organic runs leave two of the twelve batch slots for
+human attention. Public posts are indexed once per pass, with 128 recent posts per
+board for candidate selection and bounded public/mail preselection for letters.
+The default organic allowance remains four saves and at most twelve attempts per
+six-hour window; both now persist through reload. Mail still has at most two saves
+per six hours inside that allowance. Inference failure stops automatic retries
+until explicit recovery or reopening. Hidden/closed pages never infer or process
+a chat backlog. Roster metadata work never imports WebLLM or creates a worker.
 
 Candidates use at most eight recent same-forum local human, seed or generated AI
 posts, exclude the resident's own posts, future posts and recently answered targets, and prefer shared
@@ -272,7 +304,7 @@ loss leave terminal navigation, human posting and backups usable.
 
 ## Private mail
 
-The [terminal mail service](mail.md) uses the same ten profiles/member IDs,
+The [terminal mail service](mail.md) uses the same saved profiles/member IDs,
 consent, local WebLLM worker/model, scheduled visits, cross-tab leases, durable
 batch/statuses and shared six-hour save/attempt budgets. No separate identities,
 model approval flow, manual generate control or AI draft confirmation is added.
@@ -330,7 +362,8 @@ Rendered model/profile text uses `textContent`.
 The backup envelope remains version 1; IndexedDB version 2 adds a dedicated mail
 store and accepts pre-mail backups without rewriting public content. Additive reserved
 settings are strictly validated before writes or atomic restore: `ai-residents`
-version 1 stores exactly ten editable profiles; `ai-activity` version 2 stores
+version 2 stores the saved roster (100 in new/reset worlds); legacy resident
+version 1 retains its original ten editable profiles. `ai-activity` version 2 stores
 consent, seed, per-resident next-due times, truncation/bootstrap state, the existing
 cap/model/watermark, optional boolean setup deferral and one bounded batch.
 Version-1 activity settings migrate on use, preserving model, explicit zero/nonzero cap and every pending run. The older
@@ -360,7 +393,7 @@ No actual background activity or historically verified timeline is claimed.
 ## Checks and limitations
 
 `npm test` builds production assets and runs mocked-model Chromium checks. The
-resident/activity suites inject clocks and fixed seeds to cover all ten profiles,
+resident/activity suites inject clocks and fixed seeds to cover legacy profiles and the 100-resident baseline,
 routines/time offsets, quiet periods, delayed human/AI replies, open-tab timers,
 consent, first-visit seeded boards, caps, pause/resume, profile persistence, legacy backup
 migration, invalid restore rollback, concurrent commits, cross-tab model leases,
@@ -399,11 +432,11 @@ immediately send human speech. `/WHO`, `/LIST`,
 `/HANDLE` or `/SETTINGS` leaves for the corresponding typed menu. Read-only
 visitors can register later. No AI preview, send button or model popup is involved.
 
-The existing ten stable resident IDs, profile editor, selected human and handles
+The saved stable resident IDs, profile editor, selected human and handles
 are shared with forums/mail. Presence is fictional local scheduling, never a
-remote connection: fixed seeded twenty-minute windows use personal hours, daily
+remote connection: independently phased finite visits use personal hours, daily
 absence, participation/frequency, preferred-board interest and occasional exploration.
-Visits last about 7–18 minutes within their window. Out-of-hours residents leave;
+Typical sessions range from short visits to a few long-stay regulars (see below). Out-of-hours residents leave;
 not all residents appear, and some windows/rooms are empty. Identical observations,
 reentry and reload do not reroll arrival chances. Local presence events are
 `local-presence`, not model output or prewritten dialogue. No OLT history is seeded.
@@ -451,3 +484,31 @@ or Options is open; it never edits input, changes focus or submits a partial lin
 
 See [OLT persistence](local-storage.md#olt-persistence) and
 [historical uncertainty](research/pcvan-1996-1997.md#olt-interaction-research-issue-53).
+
+## Presence and response validation for Issue #133
+
+OLT observes current routines immediately on entry, using per-person phased visit
+cycles, finite individual durations and daily absence draws. Defaults for legacy
+profiles remain short stays; added long-stay regulars can stay up to roughly 160
+minutes but still leave, sleep and have absent days. Attendance is limited to 16
+residents per room and 32 overall, independently of roster size; at most 128 new
+arrival candidates are examined per observation. Same-time observations/reentry
+reuse the same visit. Three room transcripts retain 200 events each. Pending OLT
+authorization stores a compact configuration fingerprint, not 100 biographies.
+
+Unanswered speech takes priority over intervening arrival notices. A suitable
+present resident can receive a turn after eight seconds (three-second browser
+polling), while reply probability, silence, current attendance and the inference
+lease remain authoritative. All rooms share 24 model attempts/hour; spontaneous
+turns may spend at most 16, leaving eight available for human speech. No authorized
+model means no generated speech. Prompts remain one selected profile, at most 16
+participant names, twelve short room events and three public-memory excerpts.
+
+`community-scale.spec.ts` samples seven days × 24 JST hours × eight seeds across
+all three rooms. Design gates are >70% populated room visits overall, >45% in each
+hour aggregate, real empty rooms, >85 distinct residents and >12 night-only
+participants relative to noon. These are deterministic design regression gates,
+not guarantees for an individual visit. See [measured results](validation.md#issue-133-community-scale).
+The browser suites cover warm mock replies in 1–3 minutes, IME/drafts, OLT at four
+representative hours, silence, leases, cancellation, persisted caps and atomic
+reload/restore/reset. Real-model speed and persona quality remain optional checks.

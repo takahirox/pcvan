@@ -72,7 +72,7 @@ test('repository reset reuses the exact first-visit fixture, clears all local st
     }
     expect(fresh.posts).toHaveLength(82);
     expect(fresh.posts.filter((p) => !p.replyToPostId)).toHaveLength(26);
-    expect(fresh.members).toHaveLength(10);
+    expect(fresh.members).toHaveLength(100);
     expect(fresh.forums).toHaveLength(15);
     expect(fresh.settings.map((s) => s.id)).toEqual(result.expected.settings.map((s) => s.id));
     for (const id of ['ai-residents', 'community-world']) {
@@ -164,7 +164,7 @@ test('typed reset refusal/invalid/blank preserves data; confirmed reset reloads 
   await expect(page.locator('.output')).toContainText('初期状態に戻しました');
   await expect(other.locator('.output')).toContainText('MAIN');
   const reset = await snapshot(page);
-  expect(reset.posts).toHaveLength(82); expect(reset.members).toHaveLength(10); expect(reset.readStates).toEqual([]);
+  expect(reset.posts).toHaveLength(82); expect(reset.members).toHaveLength(100); expect(reset.readStates).toEqual([]);
   expect(reset.settings.find((s) => s.id === 'ai-activity')!.value).toMatchObject({ consent: false, maxPosts: 4 });
   expect(await page.evaluate(async () => !!await (await caches.open('unrelated-test')).match('/keep'))).toBe(true);
   await command(page, 'SKIP'); await restore(page, saved); expect((await snapshot(page)).posts).toEqual(saved.posts);

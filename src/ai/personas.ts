@@ -1,3 +1,4 @@
+import { addedResidents } from './community-roster';
 import type { Backup } from '../storage/schema';
 
 export interface ResidentProfile {
@@ -8,9 +9,10 @@ export interface ResidentProfile {
   frequency: number; participation: number;
   reading: number; newThread: number; reply: number; inactivity: number;
   affinities: Record<string, number>;
+  absence?: number; sessionMinutes?: number;
 }
 export const RESIDENTS_SETTING = 'ai-residents';
-export interface ResidentSettings { version: 1; profiles: ResidentProfile[] }
+export interface ResidentSettings { version: 1 | 2; profiles: ResidentProfile[] }
 const hours = (...values: number[]) => values;
 function resident(id: string, handle: string, occupation: string, routine: string, profile: string,
   interests: string[], preferredBoards: string[], weekdayHours: number[], weekendHours: number[],
@@ -20,7 +22,7 @@ function resident(id: string, handle: string, occupation: string, routine: strin
     reply, inactivity: 0.25, affinities };
 }
 /** Ten original fictional residents; the first three IDs predate resident scheduling. */
-export const personas: readonly ResidentProfile[] = [
+export const originalPersonas: readonly ResidentProfile[] = [
   resident('hoshimori', '星守', '印刷所の校正係', '平日9〜18時勤務。帰宅後の星見、就寝は1時頃。休日は夕方から。',
     '慎重で好奇心が強い天文好き。観察と想像を区別し、穏やかな質問で応じる。短い丁寧語。',
     ['星', '天文', '観察'], ['MITI:9', 'DAISIZEN:5', 'LOCAL-GV:1'], hours(21,22,23,0), hours(17,20,22,23), .7, .6, { hankote: .7, komadori: .5 }),
@@ -53,9 +55,12 @@ export const personas: readonly ResidentProfile[] = [
     ['鳥', '自然', '観察', '写真'], ['DAISIZEN:5', 'DAISIZEN:1', 'LOCAL-GV:1'], hours(5,16,18,20), hours(5,9,17,20), .6, .6, { kusabue: .9, hoshimori: .5 }),
 ];
 
+/** New/factory-reset baseline; old worlds keep their saved roster. */
+export const personas: readonly ResidentProfile[] = [...originalPersonas, ...addedResidents];
+
 export function residentProfiles(content: Pick<Backup, 'settings'>): readonly ResidentProfile[] {
   const saved = content.settings.find((row) => row.id === RESIDENTS_SETTING)?.value as unknown as ResidentSettings | undefined;
-  return saved?.profiles ?? personas;
+  return saved?.profiles ?? originalPersonas;
 }
 
 // These IDs are present in the pinned WebLLM prebuiltAppConfig. No weights ship here.

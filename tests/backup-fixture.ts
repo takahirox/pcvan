@@ -1,5 +1,6 @@
 import type { Backup } from '../src/storage/schema';
 import { ACTIVE_MEMBER_SETTING } from '../src/storage/repository';
+import { originalPersonas, personaMemberId } from '../src/ai/personas';
 
 // Synthetic data, including allocation gaps and fields with no historical interpretation.
 export function backupFixture(): Backup {
@@ -20,6 +21,13 @@ export function backupFixture(): Backup {
     session: { lastLoginAt: '2026-10-20T01:00:00.000Z', lastLogoutAt: '2026-10-20T02:00:00.000Z', commandHistory: ['help', 'echo  日本語'] },
     settings: [{ id: 'preferences', value: { nested: ['日本語', true, 42, null], width: 80 } }],
   };
+}
+
+/** Scheduling fixtures explicitly include the residents eligible to participate. */
+export function activityFixture(): Backup {
+  const data = backupFixture();
+  data.members.push(...originalPersonas.map((p) => ({ id: personaMemberId(p.id), handle: p.handle, actor: 'ai' as const })));
+  return data;
 }
 
 /** Gapped unread journey, deliberately unrelated timestamps and storage order. */

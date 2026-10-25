@@ -84,6 +84,8 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   const fixture = await backup(page);
   fixture.settings.find((row) => row.id === 'ai-activity')!.value = emptyActivity(startTime.toISOString(), 'recovery-42') as unknown as JsonValue;
   const residents = fixture.settings.find((row) => row.id === 'ai-residents')!.value as unknown as ResidentSettings;
+  // Pin the legacy repeated-author scenario independently of the new-world roster.
+  residents.version = 1; residents.profiles = residents.profiles.slice(0, 10);
   for (const profile of residents.profiles) profile.preferredBoards = ['MITI:9'];
   await restore(page, fixture);
   await settings(page, 3); await command(page, 'AUTO 2', '有効');

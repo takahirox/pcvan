@@ -37,6 +37,95 @@ async function send(page: Page, steps = ['1']) {
 }
 const incoming = async (page: Page) => (await snapshot(page)).mail!.filter((m) => m.simulation);
 
+test('indexed correspondence matches complete pair eligibility across catch-up times and nonchronological numbers', async ({ page }) => {
+  await page.goto('http://127.0.0.1:14374');
+  const results = await page.evaluate(async () => {
+    const rp = '/src/storage/repository.ts', mp = '/src/ai/mail.ts', pp = '/src/ai/personas.ts', ap = '/src/ai/activity.ts', sp = '/src/storage/schema.ts';
+    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
+    const { pairMail, chooseMail, mailPlanningIndex } = await import(mp) as typeof import('../src/ai/mail');
+    const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
+    const { random, HOUR } = await import(ap) as typeof import('../src/ai/activity');
+    const { mailAvailableAt } = await import(sp) as typeof import('../src/storage/schema');
+    const repo = await openRepository('mail-index-times'); await repo.openActivity();
+    const human = await repo.createHumanMember('文通相手'), content = await repo.exportBackup(); repo.close();
+    const resident = 'fictional-ai:hoshimori', start = Date.parse('2026-10-01T00:00:00Z');
+    const profile = { ...residentProfiles(content)[0]!, reply: 1, newThread: 0 };
+    content.mail = Array.from({ length: 120 }, (_, i) => ({ id: `letter-${120 - i}`, number: i + 1,
+      senderId: human.id, recipientId: resident, subject: '観察', body: '観察のお話', origin: 'local-human',
+      createdAt: new Date(start + ((i * 17) % 120) * HOUR).toISOString() }));
+    content.mail.push(...content.mail.filter((_, i) => i % 3 !== 0).map((m, i) => ({ ...m, id: `reply-${i}`, number: 121 + i,
+      senderId: resident, recipientId: human.id, replyToMailId: m.id,
+      createdAt: new Date(Date.parse(m.createdAt) + 25 * HOUR).toISOString() })));
+    const index = mailPlanningIndex(content);
+    // Reverse queries also test that a later visit never changes earlier eligibility.
+    return Array.from({ length: 202 }, (_, i) => i <= 100 ? i * 2 : (201 - i) * 2).map((hours) => {
+      const at = start + hours * HOUR;
+      const mail = pairMail(content, resident, human.id).filter((m) => Date.parse(mailAvailableAt(m)) <= at);
+      const inbound = mail.filter((m) => m.senderId === human.id && Date.parse(mailAvailableAt(m)) <= at - 20 * 60_000 &&
+        !mail.some((reply) => reply.replyToMailId === m.id)).at(-1);
+      const blocked = mail.some((m) => m.senderId === resident && Date.parse(mailAvailableAt(m)) > at - 24 * HOUR);
+      const expected = !blocked && inbound && random(`index:hoshimori:${at}:mail`) < .5 ? { humanId: human.id, replyToMailId: inbound.id } : null;
+      return { actual: chooseMail(content, profile, at, 'index', [], index), expected };
+    });
+  });
+  expect(results.some((r) => r.expected)).toBe(true);
+  for (const row of results) expect(row.actual).toEqual(row.expected);
+});
+
+test('planning indexes large mailboxes by correspondence and retains answered parents and daily limits', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await page.goto('http://127.0.0.1:14374');
+  const result = await page.evaluate(async () => {
+    const rp = '/src/storage/repository.ts', ap = '/src/ai/activity.ts', mp = '/src/ai/mail.ts', pp = '/src/ai/personas.ts';
+    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
+    const { emptyActivity, scheduleActivity, random, HOUR } = await import(ap) as typeof import('../src/ai/activity');
+    const { chooseMail } = await import(mp) as typeof import('../src/ai/mail');
+    const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
+    const repo = await openRepository('large-planning-mailbox'); await repo.openActivity();
+    const human = await repo.createHumanMember('文通相手'), now = Date.now(), due = now - 1;
+    const content = await repo.exportBackup();
+    const profiles = residentProfiles(content).map((p) => ({ ...p, frequency: p.id === 'hoshimori' ? 1 : 0,
+      absence: 0, participation: 1, reply: 1, newThread: 0, reading: 0, inactivity: 0,
+      weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i) }));
+    content.settings.find((s) => s.id === 'ai-residents')!.value = { version: 2, profiles } as never;
+    const state = { ...emptyActivity(new Date(now - HOUR).toISOString()), consent: true, maxPosts: 4,
+      nextDue: Object.fromEntries(profiles.map((p) => [p.id, new Date(p.id === 'hoshimori' ? due : now + HOUR).toISOString()])) };
+    for (let i = 0; ; i++) {
+      state.seed = `large-mail-${i}`;
+      if (random(`${state.seed}:hoshimori:${due}:mail`) < .5) break;
+    }
+    const letter = { id: 'a-recent-human', number: 257, senderId: human.id, recipientId: 'fictional-ai:hoshimori',
+      subject: '星の便り', body: '観察の続きです。', createdAt: new Date(now - HOUR).toISOString(), origin: 'local-human' };
+    // IDB exports these older, unrelated letters after the relevant a/0 IDs.
+    const unrelated = Array.from({ length: 256 }, (_, i) => ({ ...letter, id: `z-old-${i}`, number: i + 1,
+      recipientId: 'fictional-ai:kusabue', createdAt: new Date(now - 72 * HOUR).toISOString() }));
+    const reply = { ...letter, id: '0-resident-reply', number: 258, senderId: letter.recipientId, recipientId: human.id,
+      replyToMailId: letter.id, origin: `local-ai:webllm:${state.modelId}`, createdAt: new Date(now - 25 * HOUR).toISOString(),
+      simulation: { runId: '0-resident-reply', simulatedAt: new Date(now - 25 * HOUR).toISOString(), fictional: true } };
+    const cases = [
+      [...unrelated, letter],
+      [...unrelated, { ...letter, createdAt: new Date(now - 48 * HOUR).toISOString() }, reply],
+      [...unrelated, { ...letter, createdAt: new Date(now - 48 * HOUR).toISOString() },
+        { ...reply, createdAt: new Date(now - HOUR).toISOString(), simulation: {
+          ...reply.simulation, simulatedAt: new Date(now - HOUR).toISOString() } },
+        { ...letter, id: 'a-unanswered', number: 259 }],
+    ];
+    const results = [];
+    for (const mail of cases) {
+      await repo.replaceFromJson(JSON.stringify({ ...content, mail }), { confirmReplace: true });
+      const saved = await repo.exportBackup();
+      results.push({ count: saved.mail!.length, first: saved.mail![0]!.id,
+        direct: chooseMail(saved, profiles[0]!, due, state.seed!, []),
+        planned: scheduleActivity(saved, state, new Date(now).toISOString()).batch?.runs.filter((r) => r.mail).map((r) => r.mail) ?? [] });
+    }
+    repo.close(); return results;
+  });
+  expect(result.map((r) => r.count)).toEqual([257, 258, 259]);
+  expect(result[0]!.first).toBe('a-recent-human'); expect(result[1]!.first).toBe('0-resident-reply');
+  expect(result[0]!.direct).toMatchObject({ replyToMailId: 'a-recent-human' });
+  expect(result[0]!.planned).toEqual([result[0]!.direct]);
+  for (const row of result.slice(1)) { expect(row.direct).toBeNull(); expect(row.planned).toEqual([]); }
+});
+
 for (const route of [{ name: 'MAIN 1', steps: ['1'] }, { name: 'MAIN X', steps: ['X'] }, { name: 'SIG MAIL', steps: ['13', '2', 'MAIL'] }]) {
   test(`${route.name}: consented reply confirms only its parent, preserves draft/IME and public capacity, and survives reload/restore`, async ({ page, context }) => {
     await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '星を見る人');
@@ -198,7 +287,7 @@ test('separate timer batches reserve forum saves until the six-hour mail allowan
     const profiles = residentProfiles(await repo.exportBackup()).map((profile) => ({ ...profile,
       participation: 1, reading: 0, inactivity: 0, newThread: 1, reply: 1,
       weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i) }));
-    await repo.put('settings', { id: 'ai-residents', value: { version: 1, profiles } as never });
+    await repo.put('settings', { id: 'ai-residents', value: { version: 2, profiles } as never });
     for (const profile of profiles.slice(0, 4)) {
       await repo.createHumanMail({ id: `letter:${profile.id}`, senderId: human.id, recipient: profile.id,
         subject: '近況', body: 'またお話を聞かせてください。' });

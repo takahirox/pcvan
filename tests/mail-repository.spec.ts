@@ -218,6 +218,7 @@ test('only a new explicit reply confirms its parent atomically; concurrent retri
   expect(saved.after.settings.filter((s) => s.id !== 'ai-activity')).toEqual(saved.before.settings.filter((s) => s.id !== 'ai-activity'));
   const expectedActivity = structuredClone(saved.before.settings.find((s) => s.id === 'ai-activity')!.value) as unknown as AiActivity;
   expectedActivity.batch!.runs[0]!.status = 'committed';
+  expectedActivity.allowance = { windowAt: '2026-10-21T02:03:04.000Z', attempts: 0, committed: 1, responses: 0 };
   expect(saved.after.settings.find((s) => s.id === 'ai-activity')!.value).toEqual(expectedActivity);
 
   await page.clock.setFixedTime(new Date('2026-10-22T08:00:00.000Z'));

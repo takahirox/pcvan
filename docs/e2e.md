@@ -31,9 +31,9 @@ native file pickers/downloads, confirmations, keyboard focus and mocked models.
 | Wakaba MAIN/index welcome/return, beginner read/write/reply, unread gaps, cross-tab freshness, protected records, pristine-only seed/lazy send rollback and restore/reset | `wakaba.spec.ts`, `wakaba-repository.spec.ts` |
 | Progressive UTF-8 output, graphemes, bounded queues, themes, speed, motion, logs | `progressive-output.spec.ts`, `connection.spec.ts` |
 | Keyboard history/focus/scroll, literal text and narrow layout | `terminal.spec.ts`, `immersive.spec.ts` |
-| Modern Settings: display, models, consent/cancel/progress/failure, all ten profiles, JSON import/export/reset, stale callbacks, focus/IME/mobile and offline storage | `settings-dialog.spec.ts` |
+| Modern Settings: display, models, consent/cancel/progress/failure, filtered profiles, JSON import/export/reset, stale callbacks, focus/IME/mobile and offline storage | `settings-dialog.spec.ts` |
 | Real offline shell and storage request statuses | `offline.spec.ts` |
-| Repository integrity, deterministic ten-resident scheduling and concurrent commits | `repository.spec.ts`, `activity.spec.ts`, `residents.spec.ts`, `community.spec.ts` |
+| Repository integrity, deterministic legacy/100-resident scheduling and concurrent commits | `repository.spec.ts`, `activity.spec.ts`, `residents.spec.ts`, `community.spec.ts` |
 
 All convenience prompts and commands are documented as reconstructed interactions.
 MAIN labels, SIG evidence, initial fiction and repository/backup schemas retain
@@ -43,3 +43,9 @@ ordinary post reading uses nontechnical handles and plain parent references.
 Native physical IME, mobile keyboards, screen-reader speech and real GPU quality
 remain optional observations. Browser event tests cannot substitute for them.
 No post-merge verification is required for this interaction migration.
+
+Issue #133 adds `community-scale.spec.ts` (100-profile invariants, simulated-week
+presence, representative OLT slots, human attention and durable allowances) and
+`community-performance.spec.ts` (same-browser 10/100 metadata, planning, OLT,
+navigation and real IndexedDB timings). Existing mock-worker, IME, cross-tab,
+privacy, restore and reset journeys continue to exercise the shared runtime.

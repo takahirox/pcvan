@@ -34,7 +34,7 @@ test('every production forum route has authored threads anonymously on fresh sta
     if (reset) { await command(page, 'RESET', '82件'); await Promise.all([page.waitForEvent('load'), command(page, 'Y')]); await expect(page.locator('.output')).toContainText('MAIN'); }
     const data = await snapshot(page);
     expect(data.posts).toHaveLength(82); expect(data.forums).toHaveLength(15);
-    expect(data.members).toHaveLength(10); expect(data.members.every((m) => m.actor === 'ai')).toBe(true);
+    expect(data.members).toHaveLength(100); expect(data.members.every((m) => m.actor === 'ai')).toBe(true);
     expect(data.posts.filter((p) => !p.replyToPostId)).toHaveLength(26);
     for (const [route, board, title, count] of routes) {
       await command(page, 'MAIN', 'MAIN');

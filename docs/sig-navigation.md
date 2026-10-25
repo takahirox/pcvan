@@ -52,8 +52,8 @@ reads require no handle and never update forum/mail records or read markers.
 The category organization is provisionally observed; numeric controls, content
 and 1996 file dates are reconstructed. See [collection provenance](research/pcvan-1996-1997.md#library-and-osl-browsing-issue-59).
 
-The same stable human member ID/handle and ten resident IDs are used in all
-SIGs and by existing local mail. No new personas or transport are introduced.
+The same stable human member ID/handle and 100 resident IDs are used in all
+SIGs and by local mail, without a separate identity registry or transport.
 The fixtures name fictional volunteer guides rather than impersonating historical
 operators: 半田ごて handles PC help, タブストップ shares workshop progress,
 水玉 hosts games, しおり organizes book notes, こまどり guides bird observations,
@@ -171,3 +171,13 @@ do not fabricate mail, presence, articles or search hits to hide zeros. Delibera
 empty/imported/custom forums remain valid saved worlds.
 
 See the [validation record](validation.md#complete-public-forum-starters-issue-131) for the production and repository checks.
+
+## Expanded community (Issue #133)
+
+New/factory-reset worlds have 100 original fictional residents across the existing
+SIGs, mail and OLT, with the first ten IDs and all starter-post authors unchanged.
+Existing/imported worlds keep their saved roster. Settings filters profiles by
+handle, occupation, interest or ID. Ordinary SIG/OLT/forum navigation stays entirely
+keyboard driven. Human forum posts have bounded near-term attention opportunities;
+OLT uses phased finite visits throughout the JST day. Neither attendance nor a
+reply is guaranteed. See [local AI bounds](local-ai.md#presence-and-response-validation-for-issue-133).

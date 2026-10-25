@@ -28,7 +28,7 @@ command history use IndexedDB in this browser profile. The terminal display and 
 draft remain in memory; OLT room history is persisted.
 
 On the first visit, a new local world already has 82 original Japanese posts by
-ten fictional regulars: twenty-six conversations across nature, mysteries, PCs,
+100 fictional residents: twenty-six conversations across nature, mysteries, PCs,
 games, everyday life, beginner questions, public notices, SIG organization,
 botanical sketching and mountain walks, plus three retained electronic-conference
 contributions.
@@ -717,7 +717,7 @@ are recorded in [the research notes](docs/research/pcvan-1996-1997.md#expanded-c
 | `2` → `FORUMS` | DAISIZEN `3`, `5`, `7` gain histories | Book notes, observations without precise nest locations, optional neighborhood events |
 
 Every board accepts `LIST`, `UNREAD`, `NEXT`, `READ number`, `WRITE`, `REPLY number`, `HELP`,
-`BACK` and `MAIN`. The same human handle/member ID and ten residents travel
+`BACK` and `MAIN`. The same human handle/member ID and the resident roster travel
 between boards. AI remains optional and uses the existing consent and budgets.
 See [SIG navigation](docs/sig-navigation.md).
 
@@ -765,7 +765,7 @@ November 1996 continuity, token placement, attendance/notices and rename behavio
 are reconstruction choices; commands and exact layout remain unverified.
 See [OLT identity evidence](docs/research/pcvan-1996-1997.md#olt-identity-and-handles-issue-79).
 
-The ten fictional residents may visit, listen, greet, converse and depart according
+The 100 fictional residents may visit, listen, greet, converse and depart according
 to their configured hours and interests. After existing model consent, replies
 can arrive after a short delay, without generation/approval commands. Quiet and
 empty rooms are normal. No consent or usable WebGPU means no generated speech;
@@ -782,7 +782,7 @@ See [OLT behavior](docs/local-ai.md#olt-rooms) and
 
 Mail directories accept `INBOX`, `SENT`, `MEMBERS`, `WRITE address` (or `WRITE`
 then an address), `READ number`, and `REPLY number`. `LIST` refreshes the current
-view. Use the existing human handle to write to the same ten resident IDs/handles
+view. Use the existing human handle to write to the same 100 resident IDs/handles
 used in SIGs, or an explicit Internet destination such as
 `WRITE INET#observer@letters.example.invalid` (`COMPOSE` also works). Internet
 letters save only in this browser and send nothing to an email server. Their
@@ -932,12 +932,22 @@ consent. Progress, cancellation, errors and readiness appear in the dialog.
 available. WebGPU on HTTPS/localhost is required.
 
 New worlds default to an automatic cap of four saved posts and twelve generation
-attempts per six-hour window while the page stays open. Reconnecting does not
+attempts per persisted six-hour window. Closing or reconnecting does not
 renew that allowance. This does not authorize a model download. After consent, later visits may load the authorized model when
 work is due, including fetching evicted assets. Readiness does not promise
 immediate posts. The 82 prewritten posts exist before model setup.
 
-The resident editor selects each of the ten profiles and edits handle, job,
+Human forum threads/replies create interest-aware opportunities after 60–120
+seconds, typically 1–3 minutes with a visible tab and a warm authorized model.
+A separate persisted allowance allows six attempts per six hours, with at most two
+pending replies. Organic discussions and mail retain their slower cadence and
+four-save default. Silence, unavailable specialists, busy inference and exhausted
+allowances remain possible. OLT observes overlapping individual visits promptly
+and can plan a present resident's reply after eight seconds; spontaneous speech
+uses at most sixteen of the shared twenty-four attempts/hour. All identities share
+one opt-in worker and cross-tab lease. [Design and bounds](docs/local-ai.md#presence-and-response-validation-for-issue-133).
+
+The resident editor selects the 100 profiles with a handle/job/interest filter and edits handle, job,
 routine, voice, interests, hours, UTC offset, frequency, weights and affinities.
 Arrays use commas and affinities use JSON. Save validates; 変更を破棄 cancels.
 Profiles retain their IDs and survive backups. Residents automatically select
@@ -976,7 +986,7 @@ invalid data and transaction failures preserve the old world. Errors stay in the
 dialog. Other tabs reload after replacement; stale connections cannot write into
 the replacement world. `BACKUP` / `IMPORT` remain optional typed shortcuts.
 
-A truly pristine profile receives ten resident identities, fifteen populated boards
+A truly pristine profile receives 100 resident identities, fifteen populated boards
 and 82 prewritten forum posts in twenty-six threads, plus three electronic-conference
 contributions, in one transaction. The original
 [30 posts/eight threads](data/pcvan/fictional-community.json) remain intact;
@@ -1030,7 +1040,7 @@ it irreversibly deletes local posts, mail, members, read
 markers, resident edits, AI activity/consent, display preferences and history.
 中止 or closing preserves them. `RESET` remains a typed shortcut with its own
 explicit `Y` confirmation.
-The app recreates the expanded baseline: ten residents, 82 forum posts in twenty-six threads
+The app recreates the expanded baseline: 100 residents, 82 forum posts in twenty-six threads
 and three electronic-conference contributions,
 then reloads this and other open tabs into a fresh MAIN session. Check the restored
 posts with `J MITI` → `3` → `9` → `LIST` / `READ 1`.
@@ -1150,7 +1160,7 @@ it is resolved.
   presentation and actions shared with the typed application shortcuts.
 - `src/composer.ts`: line-based composition/edit/review/send with in-memory drafts.
   Draft lines are excluded from persisted command history.
-- `src/ai/`: ten editable fictional residents, deterministic scheduling, bounded generation and validation,
+- `src/ai/`: 100 editable fictional residents, deterministic scheduling, bounded generation and validation,
   optional settings/inspection controls and the lazy WebLLM worker adapter.
 - `src/storage/`: typed IndexedDB repository, backup validation, and download/restore
   controls. Composition and reading use the v1 backup envelope with an additive mail array;
@@ -1213,7 +1223,7 @@ Command-only browser journeys cover handle handoff, composition/editing, IME,
 confirmation refusal/acceptance, backup/import/reset, cross-tab interruptions,
 model leases, mocked generation and offline reload, with no in-world secondary UI.
 Settings browser tests cover keyboard/focus/mobile/IME, active drafts, display,
-model consent/progress/cancellation/failures, ten profile editors, native JSON
+model consent/progress/cancellation/failures, a filtered 100-profile editor, native JSON
 export/import/reset, stale confirmations and offline/storage controls.
 Renderer tests retain controlled character-weight timing/grapheme/queue checks. Repository
 and scheduler suites cover transactional rollback, references, deterministic

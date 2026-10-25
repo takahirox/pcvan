@@ -5,7 +5,7 @@ database version **2**. Version 2 adds only the `mail` store/indexes;
 upgrading version 1 preserves every existing store and record. The repository has
 no runtime dependencies, network writes,
 authentication, synchronization, or remote copies. Before starting the first
-session, `openActivity()` initializes a pristine world with ten fictional residents,
+session, `openActivity()` initializes a pristine world with 100 fictional residents,
 fifteen populated boards and 82 original static Japanese forum posts in twenty-six threads,
 plus three electronic-conference contributions. Model consent remains
 separate. The world anchor and fiction provenance live in `community-world`;
@@ -111,7 +111,7 @@ explicitly recreates the full baseline for any world.
 
 Fresh initialization and confirmed factory reset add ten original Japanese posts
 in four threads to DAISIZEN 2/4/6 in the same bootstrap transaction. The complete
-baseline is **82 posts, 26 threads, 15 boards**. The ten resident IDs and all 72
+baseline is **82 posts, 26 threads, 15 boards**. The 100 resident IDs and all 72
 established posts remain unchanged. New IDs use `seed:forums-v1:` and provenance
 `local-seed:forum-starters-v1`; timestamps follow the same fixed JST day convention
 and historical-calendar display anchor. Board names retain their historical evidence
@@ -137,7 +137,7 @@ Only pristine bootstrap creates its container, board and three
 with `local-seed:bulletin-v1` provenance, valid existing fictional authors and
 same-board reply references. All rows share the bootstrap transaction and existing
 fixed JST calendar anchor. Other fixtures are unchanged. The pristine total is
-82 posts, 26 threads, 15 boards and the same ten residents.
+82 posts, 26 threads, 15 boards and 100 residents in new worlds.
 
 Reopen/reconnect, consent, legacy population, v1 expansion, deletion and JSON
 restoration never add examples or missing records. Confirmed reset may recreate
@@ -423,8 +423,10 @@ IDs, handles, keywords, names, SIG titles, and origins are nonblank strings; pos
 title/body and history entries may be empty strings. IDs are unique **within each
 entity collection**, not globally across types. Read states are unique by their
 member/forum pair. Settings values may be any finite JSON value, including nested
-arrays/objects. Opening the app seeds the strictly validated `ai-residents`
-version-1 setting (exactly ten profiles) and `ai-activity` version 2. Activity holds
+arrays/objects. A pristine world stores strictly validated `ai-residents` version 2
+(a bounded saved roster, 100 by default) and `ai-activity` version 2. Legacy
+resident version 1 retains exactly the original ten profiles; opening it never
+appends the new residents. Activity holds
 the visit cap, consent, seed, per-resident due times, watermark, bootstrap/truncation
 flags and at most one batch of 12 stable runs/statuses. The default cap is four;
 heavy model downloads still require explicit consent. Older version-1 activity
@@ -617,7 +619,7 @@ settings store. IndexedDB remains version 2; JSON remains `pcvan-local` version 
 Pre-OLT backups omit this setting and lazily get empty rooms on their first OLT
 operation. No store-number migration can collide with SIG/mail work. Existing
 members, posts, mail and counters are preserved. Reset removes OLT and recreates
-the established ten residents/82 forum posts and three conference contributions;
+the 100 residents/82 forum posts and three conference contributions;
 OLT has no seeded transcript.
 
 The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly
@@ -652,10 +654,10 @@ within the room even if the system clock moves backwards. `kind` is `enter`,
 `leave`, or `say`. Presence lines have empty text and `local-presence` origin;
 human speech uses `local-human`; model speech uses `local-ai:webllm:<modelId>`.
 Authors reference shared members, so selecting/renaming/restoring a handle never
-creates a second OLT identity. Presence and AI authors must use the stable ten
+creates a second OLT identity. Presence and AI authors must use the saved stable
 fictional resident IDs. No remote participant identities are created.
 
-Resident entries store `{memberId, joinedAt, until}` (at most ten total across
+Resident entries store `{memberId, joinedAt, until}` (at most sixteen per room and thirty-two total across
 rooms). Visitors store `{clientId, memberId, until}` (at most sixteen per room),
 renewed with a 45-second lease by an open room. Attendance deduplicates member
 IDs across tabs. Leaving one tab preserves the human while another lease remains;
@@ -902,3 +904,23 @@ atomically replaces records; reset and individual file-letter deletion remove th
 embedded bytes. Member deletion/actor changes cannot invalidate retained mail.
 Existing reset/restore generation fences apply across tabs even when restored
 JSON is identical. No payload enters terminal output, command history or inference.
+
+## Expanded resident state (Issue #133)
+
+Pristine bootstrap/reset writes 100 members and resident settings version 2 in the
+existing atomic transaction. Original author IDs and the 82 public posts are
+unchanged. An existing saved roster is authoritative; initialization no longer
+recreates absent members on ordinary reload. Imported worlds retain their members
+and profiles. A legacy world without resident settings receives only the original
+ten profile definitions, never the ninety-person expansion.
+
+Activity `nextDue` validates known resident IDs with a bounded map, then normalizes
+to the saved roster. Optional `allowance` records its six-hour start, organic
+attempts/saves and human-response attempts; attempts are reserved transactionally
+before inference and survive reload/tabs/JSON restore. `attention` retains at most
+64 considered parent IDs; a `userResponse` run must be a public reply, never mail.
+Pending work remains at most twelve runs. OLT accepts up to sixteen residents per
+room/thirty-two total, retains strict author/member checks and optionally records
+`organicAttempts` (at most sixteen of twenty-four attempts/hour). Legacy records
+without these optional counters remain valid. No IndexedDB or outer JSON backup
+version bump, migration wizard or automatic model authorization is required.

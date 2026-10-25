@@ -1,6 +1,6 @@
 import { WORLD_SETTING } from '../storage/schema';
 import type { AiActivity, Backup } from '../storage/schema';
-import { ACTIVITY_SETTING, MAX_SESSION_POSTS, HOUR, setupContext, migrateActivity } from './activity';
+import { ACTIVITY_SETTING, MAX_SESSION_POSTS, HOUR, canAttempt, setupContext, migrateActivity } from './activity';
 import { runActivityBatch } from './activity-runner';
 import type { ActivityActions } from './activity-runner';
 import { residentProfiles } from './personas';
@@ -84,11 +84,11 @@ export function createAiControls(actions: AiActions,
     return created;
   }
   async function simulate() {
-    if (!supported || !activity?.maxPosts || !activity.consent || !activity.batch || operation || autoBlocked) return;
+    if (document.visibilityState !== 'visible' || !supported || !activity?.maxPosts || !activity.consent || !activity.batch || operation || autoBlocked) return;
     if (activity.batch.modelId !== activity.modelId || !navigator.locks) return;
     const state = activity;
-    if (!state.batch!.runs.some((run) => run.status !== 'committed') ||
-      budget.attempts >= MAX_SESSION_POSTS || budget.committed >= state.maxPosts) return;
+    if (!state.batch!.runs.some((run) => run.status !== 'committed' && canAttempt(state, run, Date.now()) &&
+      (run.userResponse || (budget.attempts < MAX_SESSION_POSTS && budget.committed < state.maxPosts)))) return;
     const task = new AbortController(); operation = task;
     try {
       await navigator.locks.request('pcvan-ai-activity', { ifAvailable: true }, async (lock) => {
@@ -168,7 +168,8 @@ export function createAiControls(actions: AiActions,
     status() {
       return [activityStatus(), supported ? message : 'WebGPU が利用できません。端末・閲覧・手動投稿は利用できます。',
         `6時間の自動投稿上限: ${activity?.maxPosts ?? 0} / 同意: ${activity?.consent ? 'あり' : 'なし'} / 試行 ${budget.attempts}/${MAX_SESSION_POSTS} / 保存 ${budget.committed}`,
-        'メールも同じ生成上限を使い、住人の次の予定で届くことがあります。',
+        ...(activity?.allowance ? [`保存済みの6時間枠: 通常試行 ${activity.allowance.attempts}/12 / 通常保存 ${activity.allowance.committed} / 人間への返信 ${activity.allowance.responses}/6`] : []),
+        'メールも同じ生成上限を使います。人間の掲示板投稿への返信は別枠で6時間6試行まで（再読込でも維持）。',
         'OLT は別枠で全室1時間24試行まで。自動活動0で OLT も休止。可視タブのみで動作します。',
         ...(activity?.batch?.runs.map((run) => `${run.id} / ${run.status} / ${run.personaId} / simulatedAt=${run.simulatedAt}`) ?? [])];
     },
