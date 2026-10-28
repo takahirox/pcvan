@@ -344,12 +344,12 @@ test('a delayed older reply cannot displace human speech sent during inference a
     await other.speakRoom('night', 'human', greeting, iso(at + 26_000));
     await repo.finishRoomTurn('night', older!.id, JSON.stringify({ kind: 'olt', roomId: 'night',
       personaId: older!.authorId.replace('fictional-ai:', ''), text: '双眼鏡で月の縁を眺めていました。' }), undefined, iso(at + 27_000));
-    const claims = await Promise.all([repo.claimRoomTurn('night', iso(at + 28_000)), other.claimRoomTurn('night', iso(at + 28_000))]);
+    const claims = await Promise.all([repo.claimRoomTurn('night', iso(at + 35_000)), other.claimRoomTurn('night', iso(at + 35_000))]);
     const turn = claims.find(Boolean)!;
     const snapshot = await repo.exportBackup(), saved = oltState(snapshot);
     const prompt = JSON.parse(buildOltPrompt(snapshot, saved.rooms[1]!, turn).user);
     await other.finishRoomTurn('night', turn.id, JSON.stringify({ kind: 'olt', roomId: 'night',
-      personaId: turn.authorId.replace('fictional-ai:', ''), text: 'ゆっくりどうぞ。月の模様を話題にすると話しやすいですよ。' }), undefined, iso(at + 29_000));
+      personaId: turn.authorId.replace('fictional-ai:', ''), text: 'ゆっくりどうぞ。月の模様を話題にすると話しやすいですよ。' }), undefined, iso(at + 36_000));
     other.close();
     return { older, claims, prompt, human, greeting, saved, finished: oltState(await repo.exportBackup()) };
   }, now);
@@ -359,15 +359,16 @@ test('a delayed older reply cannot displace human speech sent during inference a
   expect(result.prompt.replyTo).toMatchObject({ number: 2, kind: 'say', text: result.greeting });
   expect(result.prompt.addressee).toMatchObject({ id: result.human.id, handle: result.human.handle, actor: 'human' });
   expect(result.prompt.speaker.id).not.toBe(result.human.id);
-  expect(result.saved.rooms[1]!.handledNumber).toBe(2);
+  expect(result.saved.rooms[1]!.observations!['fictional-ai:hoshimori']!.number).toBe(2);
   expect(result.finished.rooms[1]!.lines.map((l) => l.kind)).toEqual(['say', 'say', 'say', 'say']);
   expect(result.finished.attempts).toBe(2);
-  expect(result.finished.organicAttempts).toBe(1);
+  expect(result.finished.organicAttempts ?? 0).toBe(0);
 });
 
 
 test('corrective completion reservation survives reload, races once and cannot exceed the last hourly attempt', async ({ page }) => {
-  const result = await page.evaluate(async (now) => {
+  const result = await page.evaluate(async (epoch) => {
+    const now = new Date(Date.parse(epoch) + 9000).toISOString();
     const repo = window.oltRepo, op = '/src/olt-state.ts', rp = '/src/storage/repository.ts';
     const { emptyOlt, iso, oltState } = await import(op) as typeof import('../src/olt-state');
     const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
@@ -376,12 +377,12 @@ test('corrective completion reservation survives reload, races once and cannot e
     const profiles = (roster.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
     profiles.forEach((p) => { p.participation = 0; p.reply = 1; p.inactivity = 0; });
     await repo.put('settings', roster);
-    const human = data.members.find((m) => m.actor === 'human')!, at = Date.parse(now), state = emptyOlt(now);
+    const human = data.members.find((m) => m.actor === 'human')!, at = Date.parse(now), state = emptyOlt(epoch);
     state.attempts = 22;
-    state.rooms[1]!.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: iso(at + 60_000) }];
+    state.rooms[1]!.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: epoch, until: iso(at + 60_000) }];
     await repo.put('settings', { id: 'olt-rooms', value: state as never });
-    await repo.observeRoom('human', 'night', human.id, now);
-    await repo.speakRoom('night', 'human', '月を見る道具を教えてください。', now);
+    await repo.observeRoom('human', 'night', human.id, epoch);
+    await repo.speakRoom('night', 'human', '月を見る道具を教えてください。', epoch);
     const turn = (await repo.claimRoomTurn('night', now))!;
     let rejection = '';
     try { await repo.finishRoomTurn('night', turn.id, '{', undefined, now); }
@@ -396,7 +397,7 @@ test('corrective completion reservation survives reload, races once and cannot e
     const saved = oltState(await repo.exportBackup()); other.close();
     const future = structuredClone(saved); future.rooms[1]!.observedAt = iso(at + 120_000); future.rooms[1]!.handledNumber = 0;
     await repo.put('settings', { id: 'olt-rooms', value: future as never });
-    await repo.expireRoomSpeech('night', iso(at + 61_000));
+    await repo.reconcileOlt(iso(at + 61_000));
     const backwards = oltState(await repo.exportBackup()).rooms[1]!.handledNumber;
     return { rejection, retries, retry, capped, committed, saved, backwards };
   }, now);

@@ -47,7 +47,7 @@ test('directed prompts keep stable speaker/addressee identities and pending spee
   room.pending = null;
   const next = planOltTurn(state, room, data, at + 35_000, 'resident-reply')!;
   expect(next.authorId).not.toBe(turn.authorId);
-  expect(JSON.parse(buildOltPrompt(data, room, next).user).addressee.id).toBe(turn.authorId);
+  expect(JSON.parse(buildOltPrompt(data, room, next).user).addressee.id).toBe('human');
 });
 
 test('Japanese self-address, visitor echoes and nearby rephrase loops are rejected before appending; useful shared terms survive', () => {
@@ -61,6 +61,7 @@ test('Japanese self-address, visitor echoes and nearby rephrase loops are reject
     'こんにちは、初めてのOLTでドキドキワクワクしています。',
     '初めてのOLTで緊張しております。',
     '初めてのOLTでドキドキしていますね。',
+    '草笛：こんにちは。私が草笛です。',
   ];
   for (const text of invalid) {
     const before = structuredClone(room);

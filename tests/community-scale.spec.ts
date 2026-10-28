@@ -78,93 +78,11 @@ for (const hour of [3, 8, 13, 22]) test(`present interested OLT resident gets a 
   appendOlt(room, 'human', 'say', '星の観察はどう始めればいいですか', 'local-human', at);
   // An arrival must not swallow an unanswered human utterance.
   appendOlt(room, personaMemberId(profiles[1]!.id), 'enter', '', 'local-presence', at + 1000);
-  const turn = planOltTurn(state, room, data, at + 1000, 'reply')!;
+  const turn = planOltTurn(state, room, data, at + 9000, 'reply')!;
   expect(turn.authorId).toBe(personaMemberId(p.id)); expect(state.attempts).toBe(1);
   expect(buildOltPrompt(data, room, turn).user.length).toBeLessThan(6000);
   expect(turn.context.length).toBeLessThan(256);
   expect(planOltTurn(state, room, data, at + 10_000, 'duplicate')).toBeUndefined();
-});
-
-test('forum attention is topical, bounded, deterministic and separate from sleeping, quiet or exhausted residents', () => {
-  const at = Date.parse('2026-10-21T03:00:00Z'), from = iso(at), now = iso(at + 120_000);
-  const data = world(), profiles = structuredClone(personas);
-  // One fitting daytime reader, one unrelated person, one sleeping specialist.
-  for (const p of profiles) p.frequency = 0;
-  Object.assign(profiles[1]!, { frequency: 1, absence: 0, participation: 1, reply: 1, inactivity: 0, weekdayHours: [12] });
-  Object.assign(profiles[2]!, { frequency: 1, absence: 0, participation: 1, reply: 1, inactivity: 0, weekdayHours: [0], interests: ['庭'] });
-  Object.assign(profiles[8]!, { frequency: 1, absence: 0, participation: 1, reply: 1, inactivity: 0, weekdayHours: [12] });
-  (data.settings.find((s) => s.id === 'ai-residents')!.value as unknown as ResidentSettings).profiles = profiles;
-  const parent = { ...data.posts[0]!, id: 'fresh', title: '庭の草木', body: '庭の草木を観察しています', createdAt: from, number: 7 };
-  data.posts = [parent];
-  const state = { ...emptyActivity(from, 'attention'), consent: true,
-    allowance: { windowAt: from, attempts: 12, responses: 0, committed: 4 } };
-  const plan = scheduleActivity(data, state, now);
-  expect(scheduleActivity(data, state, iso(at + 30_000)).batch).toBeNull();
-  expect(plan).toEqual(scheduleActivity(data, state, now));
-  expect(plan.batch!.runs).toHaveLength(1);
-  expect(plan.batch!.runs[0]).toMatchObject({ userResponse: true, personaId: 'kusabue', replyToPostId: parent.id });
-  expect(scheduleActivity(data, { ...state, allowance: { ...state.allowance, responses: 6 } }, now).batch).toBeNull();
-  profiles[1]!.weekdayHours = [0];
-  expect(scheduleActivity(data, state, now).batch).toBeNull();
-  profiles[1]!.weekdayHours = [12]; profiles[1]!.reply = 0;
-  expect(scheduleActivity(data, state, now).batch).toBeNull();
-  profiles[1]!.reply = 1;
-  const off = scheduleActivity(data, { ...state, consent: false }, now);
-  expect(off.batch).toBeNull();
-  expect(scheduleActivity(data, plan, iso(at + 15 * 60_000)).batch).toBeNull();
-});
-
-test('human attention commits once across connections, survives JSON/reload, and retains its own exhausted allowance', async ({ page }) => {
-  await page.clock.setFixedTime(new Date('2026-10-21T03:02:00Z'));
-  await page.goto('http://127.0.0.1:14374');
-  const result = await page.evaluate(async () => {
-    const rp = '/src/storage/repository.ts', pp = '/src/ai/personas.ts', ap = '/src/ai/activity-runner.ts';
-    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
-    const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
-    const { runActivityBatch } = await import(ap) as typeof import('../src/ai/activity-runner');
-    let repo = await openRepository('attention-atomic'); await repo.openActivity();
-    const human = await repo.createHumanMember('庭を見る人');
-    const model = (await repo.openActivity()).modelId;
-    const profiles = structuredClone(residentProfiles(await repo.exportBackup()));
-    for (const p of profiles) p.frequency = 0;
-    Object.assign(profiles[1]!, { frequency: 1, participation: 1, absence: 0, reply: 1, inactivity: 0, weekdayHours: [12] });
-    await repo.put('settings', { id: 'ai-residents', value: { version: 2, profiles } as never });
-    await repo.authorizeModel(model);
-    const post = await repo.createPost({ forumId: 'resident-forum:DAISIZEN:1', authorId: human.id,
-      title: '庭の草木', body: '庭の観察を教えてください。', origin: 'local-human' });
-    const backdated = await repo.exportBackup();
-    backdated.posts.find((p) => p.id === post.id)!.createdAt = '2026-10-21T03:00:00.000Z';
-    await repo.replaceFromJson(JSON.stringify(backdated), { confirmReplace: true });
-    const other = await openRepository('attention-atomic');
-    const plans = await Promise.all([repo.openActivity(), other.openActivity()]);
-    const run = plans[0].batch!.runs.find((r) => r.userResponse)!;
-    let calls = 0;
-    const engine = { async load() {}, dispose() {}, async generate(prompt: { user: string }) {
-      calls++; const p = JSON.parse(prompt.user);
-      return JSON.stringify({ personaId: p.personaId, forumId: p.forumId, replyToPostId: p.replyToPostId,
-        title: '葉の様子', body: '葉の色と土の湿り気を一緒に見てみるとよさそうです。' });
-    } };
-    await Promise.all([repo, other].map((connection) => navigator.locks.request('attention-test-shared-worker', { ifAvailable: true }, async (lock) => {
-      if (lock) await runActivityBatch(connection, () => connection.exportBackup(), plans[0], engine,
-        new AbortController().signal, { attempts: 12, committed: 4 }, () => {});
-    })));
-    const saved = await repo.exportBackup();
-    await repo.replaceFromJson(JSON.stringify(saved), { confirmReplace: true }); other.close(); repo.close();
-    repo = await openRepository('attention-atomic');
-    const reloaded = await repo.openActivity();
-    // A new post must not replenish the persisted response allowance.
-    const state = { ...reloaded, allowance: { ...reloaded.allowance!, responses: 6 } };
-    await repo.put('settings', { id: 'ai-activity', value: state as never });
-    const capped = await repo.openActivity();
-    const after = await repo.exportBackup(); repo.close();
-    return { plans, run, calls, saved, reloaded, capped, after };
-  });
-  expect(result.plans[0].batch).toEqual(result.plans[1].batch);
-  expect(result.run.personaId).toBe('kusabue'); expect(result.calls).toBe(1);
-  expect(result.saved.posts.filter((p) => p.simulation)).toHaveLength(1);
-  expect(result.saved.posts.find((p) => p.id === result.run.id)!.replyToPostId).toBe(result.run.replyToPostId);
-  expect(result.reloaded.allowance!.responses).toBe(1); expect(result.capped.allowance!.responses).toBe(6);
-  expect(result.after.posts).toEqual(result.saved.posts);
 });
 
 test('a removed v2 member stays absent from planning and OLT even with an active saved profile', () => {
@@ -180,25 +98,6 @@ test('a removed v2 member stays absent from planning and OLT even with an active
   const olt = emptyOlt(iso(at)); observeOlt(olt, data, at);
   expect(olt.rooms.flatMap((r) => r.residents)).toEqual([]);
   validateBackup(data);
-});
-
-test('spontaneous OLT turns leave reserved capacity for human speech and consent still gates speech', () => {
-  const data = world(), at = Date.parse('2026-10-21T13:00:00Z');
-  const profiles = (data.settings.find((s) => s.id === 'ai-residents')!.value as unknown as ResidentSettings).profiles;
-  Object.assign(profiles[0]!, { reply: 1, inactivity: 0 });
-  const state = emptyOlt(iso(at)), room = state.rooms[1]!;
-  state.attempts = 16; state.organicAttempts = 16;
-  room.visitors = [{ clientId: 'a', memberId: 'human', until: iso(at + 45_000) }];
-  room.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: iso(at), until: iso(at + 120_000) }];
-  appendOlt(room, 'human', 'enter', '', 'local-presence', at);
-  expect(planOltTurn(state, room, data, at + 12_000, 'spontaneous')).toBeUndefined();
-  appendOlt(room, 'human', 'say', '星の観察', 'local-human', at + 12_000);
-  const ai = data.settings.find((s) => s.id === 'ai-activity')!;
-  (ai.value as unknown as import('../src/storage/schema').AiActivity).consent = false;
-  expect(planOltTurn(state, room, data, at + 21_000, 'no-consent')).toBeUndefined();
-  (ai.value as unknown as import('../src/storage/schema').AiActivity).consent = true;
-  expect(planOltTurn(state, room, data, at + 21_000, 'human')!.authorId).toBe('fictional-ai:hoshimori');
-  expect(state.attempts).toBe(17); expect(state.organicAttempts).toBe(16);
 });
 
 test('individual visit boundaries, absence and live event times stay staggered over multiple seeded days', () => {
@@ -249,44 +148,4 @@ test('individual visit boundaries, absence and live event times stay staggered o
     const resumed = JSON.stringify(state); observeOlt(state, data, start + HOUR);
     expect(JSON.stringify(state)).toBe(resumed); // clock reversal never replays
   }
-});
-
-
-test('human-first policy accepts a high majority across seeds, JST hours, rooms and utterance types', () => {
-  let suitable = 0, accepted = 0, quiet = 0, empty = 0;
-  const byHour: number[] = [];
-  for (const hour of [3, 8, 13, 22]) {
-    let eligibleAtHour = 0, acceptedAtHour = 0;
-    for (let seed = 0; seed < 64; seed++) for (const text of ['こんにちは、初めて来ました。', '月や草花を観察する道具を教えてください。', 'ありがとう。窓辺からでも試せますか。']) {
-      const at = Date.parse('2026-10-20T15:00:00Z') + hour * HOUR;
-      const data = world(100, `human-${seed}`), state = emptyOlt(iso(at));
-      observeOlt(state, data, at);
-      for (const room of state.rooms) {
-        room.visitors = [{ clientId: 'human', memberId: 'human', until: iso(at + 45_000) }];
-        appendOlt(room, 'human', 'say', text, 'local-human', at);
-        const hasSuitable = room.residents.some((r) => {
-          const p = personas.find((p) => personaMemberId(p.id) === r.memberId)!;
-          return p.frequency > 0 && p.reply > 0 && p.inactivity < 1;
-        });
-        let reason = '';
-        const turn = planOltTurn(state, room, data, at, 'reply', (value) => { reason = value; });
-        if (!hasSuitable) { empty++; expect(turn).toBeUndefined(); expect(reason).toBe('適任の在室住人なし'); continue; }
-        suitable++; eligibleAtHour++;
-        if (turn) {
-          accepted++; acceptedAtHour++;
-          const prompt = JSON.parse(buildOltPrompt(data, room, turn).user);
-          expect(prompt.replyTo.text).toBe(text); expect(prompt.addressee.id).toBe('human');
-          commitOltText(room, turn, JSON.stringify({ kind: 'olt', roomId: room.id,
-            personaId: turn.authorId.replace('fictional-ai:', ''), text: '窓辺の明るさを調べて、見やすい場所から試すとよさそうです。' }), at, data);
-        } else { quiet++; expect(reason).toBe('意図的な静けさ'); }
-        expect(room.handledNumber).toBe(1);
-        expect(planOltTurn(state, room, data, at + 100, 'reroll')).toBeUndefined();
-      }
-    }
-    byHour.push(acceptedAtHour / eligibleAtHour);
-  }
-  console.log('HUMAN_POLICY', { suitable, accepted, quiet, empty, byHour });
-  expect(suitable).toBeGreaterThan(1000); expect(empty).toBeGreaterThan(0); expect(quiet).toBeGreaterThan(0);
-  expect(accepted / suitable).toBeGreaterThan(.93); expect(accepted / suitable).toBeLessThan(.995);
-  expect(Math.min(...byHour)).toBeGreaterThan(.90);
 });

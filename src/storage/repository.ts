@@ -13,14 +13,14 @@ import type { Contribution } from './schema';
 import { OLT_SETTING, oltState, observeOlt, appendOlt, attendance, VISITOR_LEASE, iso, validOltText,
   validateOlt, validateOltMembers, oltAuthorization, oltEnabled } from '../olt-state';
 import type { OltRoom, OltState, OltTurn, RoomId } from '../olt-state';
-import { planOltTurn, commitOltText, OltOutputRejected } from '../ai/olt';
+import { planOltTurn, observeRoomResidents, commitOltText, OltOutputRejected } from '../ai/olt';
 import {
   SCHEDULED_MAIL_SETTING, scheduledMail, validateScheduledMail, validateScheduledRelations, mailAvailableAt,
   invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailDestination, resolveMailResident,
 } from './schema';
 import type { ScheduledLetter, AiActivity, AiRunStatus, Backup, Forum, JsonValue, Key, Mail, MailIdentity, Member, NewPost, Post, Records, Session, Store } from './schema';
 import { COMMAND_HISTORY_LIMIT } from '../history';
-import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext, canAttempt, activityAllowance, routineFactor } from '../ai/activity';
+import { ACTIVITY_SETTING, emptyActivity, initialDue, migrateActivity, scheduleActivity, setupContext, canAttempt, activityAllowance } from '../ai/activity';
 import { aiOrigin, models, personas, originalPersonas, personaMemberId, residentProfiles, RESIDENTS_SETTING } from '../ai/personas';
 import type { ResidentProfile, ResidentSettings } from '../ai/personas';
 import { wakaba } from '../wakaba';
@@ -855,7 +855,7 @@ export class LocalRepository {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       if (!models.some((model) => model.id === modelId)) invalid('Unknown model.');
       const state = await this.readActivity(tx, now);
-      return this.writeActivity(tx, { ...state, maxPosts, modelId, lastActivityAt: now,
+      return this.writeActivity(tx, { ...state, maxPosts, modelId, lastActivityAt: new Date(Math.max(Date.parse(now), Date.parse(state.lastActivityAt))).toISOString(),
         consent: state.consent && state.modelId === modelId,
         nextDue: initialDue(now, state.seed!, residentProfiles(await this.snapshot(tx))) });
     }).then((state) => { this.notifySetupChanged(); return state; });
@@ -936,13 +936,7 @@ export class LocalRepository {
             if (run.status === 'running') run.status = 'pending';
             return this.writeActivity(tx, state);
           }
-          if (run.userResponse) {
-            const parent: Post | undefined = await request(tx.objectStore('posts').get(run.replyToPostId!));
-            const author: Member | undefined = parent && await request(tx.objectStore('members').get(parent.authorId));
-            if (!parent || parent.origin !== 'local-human' || parent.forumId !== run.forumId || author?.actor !== 'human') invalid('Human attention requires a human public post.');
-          }
-          const allowance = activityAllowance(state, Date.now());
-          if (run.userResponse) allowance.responses++; else allowance.attempts++;
+          activityAllowance(state, Date.now()).attempts++;
         }
         run.status = status;
       }
@@ -970,12 +964,11 @@ export class LocalRepository {
       if (!state.consent || state.batch!.modelId !== state.modelId || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && p.frequency > 0)) invalid('Mail/model activity is no longer authorized.');
       const member: Member | undefined = await request(tx.objectStore('members').get(personaMemberId(run.personaId)));
       if (member?.actor !== 'ai') return undefined;
-      if (run.userResponse && (Date.now() - Date.parse(run.simulatedAt) > 10 * 60_000 || !residentProfiles(await this.snapshot(tx)).some((p) => p.id === run.personaId && routineFactor(p, Date.now()) === 1))) return undefined;
       if (run.mail) {
         const content = await this.snapshot(tx);
         const at = Date.parse(run.simulatedAt);
         const parent = content.mail?.find((m) => m.id === run.mail!.replyToMailId);
-        if (parent?.delivery && Date.parse(mailAvailableAt(parent)) + 20 * 60_000 > at) invalid('Scheduled parent is not available for this visit.');
+        if (parent?.delivery && Date.parse(mailAvailableAt(parent)) > at) invalid('Scheduled parent is not available for this visit.');
         const context = { ...content, mail: content.mail?.filter((m) => !m.delivery || Date.parse(mailAvailableAt(m)) <= at) };
         const generated = validateMailGeneration(raw, context, run.personaId, run.mail);
         const senderId = personaMemberId(run.personaId);
@@ -1010,7 +1003,7 @@ export class LocalRepository {
       await this.registerAi(tx, input.member, input.post);
       const post = await this.insertPost(tx, input.post, id);
       run.status = 'committed';
-      if (!run.userResponse) activityAllowance(state, Date.now()).committed++;
+      activityAllowance(state, Date.now()).committed++;
       await this.writeActivity(tx, state);
       return post;
     }, signal).then((result) => { if (result && 'senderId' in result) this.notifySetupChanged(); return result; });
@@ -1021,6 +1014,7 @@ export class LocalRepository {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       const content = await this.snapshot(tx), state = oltState(content, now);
       const result = change(state, content);
+      for (const room of state.rooms) observeRoomResidents(room, content, Date.parse(now));
       validateOlt(state); validateOltMembers(state, content.members);
       await request(tx.objectStore('settings').put({ id: OLT_SETTING, value: state }));
       return result;
@@ -1080,23 +1074,6 @@ export class LocalRepository {
     }, now);
   }
 
-  /** Busy workers never consume a reply decision; abandon stale waits without inference. */
-  expireRoomSpeech(roomId: RoomId, now = new Date().toISOString()): Promise<void> {
-    return this.changeOlt((state, content) => {
-      const at = Date.parse(now);
-      observeOlt(state, content, at);
-      const room = state.rooms.find((r) => r.id === roomId)!;
-      if (at < Date.parse(room.observedAt)) return;
-      if (room.pending && Date.parse(room.pending.until) > at) return;
-      for (const line of room.lines) {
-        if (line.kind === 'say' && line.origin === 'local-human' && line.number > room.handledNumber && at - Date.parse(line.createdAt) > 60_000) {
-          room.handledNumber = line.number;
-          room.nextTurnAt = iso(Math.max(Date.parse(room.nextTurnAt), at + 60_000));
-        }
-      }
-    }, now);
-  }
-
   /** One corrective completion, charged atomically to the same persisted caps. */
   retryRoomTurn(roomId: RoomId, token: string, signal: AbortSignal, now = new Date().toISOString()): Promise<OltTurn | undefined> {
     return this.changeOlt((state, content) => {
@@ -1107,10 +1084,7 @@ export class LocalRepository {
         turn.context !== oltAuthorization(content) || !oltEnabled(content) || state.attempts >= 24 ||
         !room.visitors.some((v) => Date.parse(v.until) > at) ||
         !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at)) return;
-      const organic = !room.lines.some((l) => l.number === turn.targetNumber && l.origin === 'local-human');
-      if (organic && (state.organicAttempts ?? 0) >= 16) return;
       state.attempts++;
-      if (organic) state.organicAttempts = (state.organicAttempts ?? 0) + 1;
       turn.retry = 1;
       return turn;
     }, now, signal);

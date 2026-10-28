@@ -26,7 +26,7 @@ export async function lifestyles(page: Page, cap = 4) {
   Object.assign(state, { seed, maxPosts: cap, nextDue: Object.fromEntries(profiles.map((p, i) =>
     [p.id, new Date(now + (i + 1) * hour).toISOString()])) });
   for (const [i, p] of profiles.entries()) Object.assign(p, {
-    frequency: i < 2 ? 1 : 0, participation: 1, preferredBoards: ['MITI:9'],
+    frequency: i < 2 ? 1 : 0, participation: 1, absence: 0, preferredBoards: ['MITI:9'],
     weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i),
     reading: 0, inactivity: 0, newThread: 0, reply: 1,
     interests: i === 0 ? ['人間の星'] : ['創作'], affinities: i === 1 ? { hoshimori: 1 } : {},

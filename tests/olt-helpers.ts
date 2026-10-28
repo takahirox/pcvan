@@ -19,6 +19,7 @@ export async function advance(page: Page, ticks: number) {
   // Let the command queue, worker microtasks and IDB settle between paced ticks.
   for (let i = 0; i < ticks; i++) {
     await page.clock.runFor(3000);
+    await new Promise((resolve) => setTimeout(resolve, 20));
     await page.evaluate(() => new Promise<void>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => { r.result.close(); resolve(); }; }));
   }
 }

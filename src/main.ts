@@ -202,7 +202,7 @@ const ai = createAiControls({
 const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
   speechSaved: () => queueMicrotask(tickRoom),
-  display: (lines: string[], visible: () => void) => { print(...lines); terminal.whenVisible(visible); },
+  display: (lines: string[], visible: () => void) => { print(...lines); terminal.reveal(); terminal.whenVisible(visible); },
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   isTelnet: () => controller.isTelnet,
   isGopher: () => controller.isGopher,
@@ -301,7 +301,7 @@ document.addEventListener('visibilitychange', () => {
 });
 function tickRoom() {
   if (!resetting && document.visibilityState === 'visible' && !settingsDialog?.open)
-    void commands.olt.tick(() => terminal.composing || terminal.hasInput || !!settingsDialog?.open).catch(reportError);
+    void commands.olt.tick().catch(reportError);
 }
 setInterval(tickRoom, 1_000);
 window.addEventListener('pagehide', () => { commands.olt.suspend(); ai.invalidate(); touchActivity(); });

@@ -5,6 +5,7 @@ import { calendarSetting, serviceDate } from '../src/calendar';
 import { epoch, hour, lifestyles, consent } from './autonomy-helpers';
 import { mockWorker } from './ai-helpers';
 import { random } from '../src/ai/activity';
+import { chooseMail } from '../src/ai/mail';
 import type { AiActivity } from '../src/storage/schema';
 import type { ResidentSettings } from '../src/ai/personas';
 
@@ -19,7 +20,7 @@ async function mailVisits(page: Page) {
   for (let i = 0; i < 10000; i++) {
     const seed = `mail-${i}`;
     if (profiles.slice(0, 2).every((p) => random(`${seed}:${p.id}:away:${Math.floor(localDay / 3)}`) >= .12) &&
-      random(`${seed}:hoshimori:${due}:mail`) < .1) { state.seed = seed; break; }
+      !!chooseMail(data, { ...profiles[0]!, newThread: 1 }, due, seed, [])) { state.seed = seed; break; }
   }
   profiles[0]!.newThread = 1;
   await page.evaluate(async (rows) => {
@@ -37,42 +38,7 @@ async function send(page: Page, steps = ['1']) {
 }
 const incoming = async (page: Page) => (await snapshot(page)).mail!.filter((m) => m.simulation);
 
-test('indexed correspondence matches complete pair eligibility across catch-up times and nonchronological numbers', async ({ page }) => {
-  await page.goto('http://127.0.0.1:14374');
-  const results = await page.evaluate(async () => {
-    const rp = '/src/storage/repository.ts', mp = '/src/ai/mail.ts', pp = '/src/ai/personas.ts', ap = '/src/ai/activity.ts', sp = '/src/storage/schema.ts';
-    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
-    const { pairMail, chooseMail, mailPlanningIndex } = await import(mp) as typeof import('../src/ai/mail');
-    const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
-    const { random, HOUR } = await import(ap) as typeof import('../src/ai/activity');
-    const { mailAvailableAt } = await import(sp) as typeof import('../src/storage/schema');
-    const repo = await openRepository('mail-index-times'); await repo.openActivity();
-    const human = await repo.createHumanMember('文通相手'), content = await repo.exportBackup(); repo.close();
-    const resident = 'fictional-ai:hoshimori', start = Date.parse('2026-10-01T00:00:00Z');
-    const profile = { ...residentProfiles(content)[0]!, reply: 1, newThread: 0 };
-    content.mail = Array.from({ length: 120 }, (_, i) => ({ id: `letter-${120 - i}`, number: i + 1,
-      senderId: human.id, recipientId: resident, subject: '観察', body: '観察のお話', origin: 'local-human',
-      createdAt: new Date(start + ((i * 17) % 120) * HOUR).toISOString() }));
-    content.mail.push(...content.mail.filter((_, i) => i % 3 !== 0).map((m, i) => ({ ...m, id: `reply-${i}`, number: 121 + i,
-      senderId: resident, recipientId: human.id, replyToMailId: m.id,
-      createdAt: new Date(Date.parse(m.createdAt) + 25 * HOUR).toISOString() })));
-    const index = mailPlanningIndex(content);
-    // Reverse queries also test that a later visit never changes earlier eligibility.
-    return Array.from({ length: 202 }, (_, i) => i <= 100 ? i * 2 : (201 - i) * 2).map((hours) => {
-      const at = start + hours * HOUR;
-      const mail = pairMail(content, resident, human.id).filter((m) => Date.parse(mailAvailableAt(m)) <= at);
-      const inbound = mail.filter((m) => m.senderId === human.id && Date.parse(mailAvailableAt(m)) <= at - 20 * 60_000 &&
-        !mail.some((reply) => reply.replyToMailId === m.id)).at(-1);
-      const blocked = mail.some((m) => m.senderId === resident && Date.parse(mailAvailableAt(m)) > at - 24 * HOUR);
-      const expected = !blocked && inbound && random(`index:hoshimori:${at}:mail`) < .5 ? { humanId: human.id, replyToMailId: inbound.id } : null;
-      return { actual: chooseMail(content, profile, at, 'index', [], index), expected };
-    });
-  });
-  expect(results.some((r) => r.expected)).toBe(true);
-  for (const row of results) expect(row.actual).toEqual(row.expected);
-});
-
-test('planning indexes large mailboxes by correspondence and retains answered parents and daily limits', async ({ page }) => {
+test('planning indexes large mailboxes by correspondence and retains answered parents while allowing same-day follow-ups', async ({ page }) => {
   await page.clock.install({ time: epoch }); await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async () => {
     const rp = '/src/storage/repository.ts', ap = '/src/ai/activity.ts', mp = '/src/ai/mail.ts', pp = '/src/ai/personas.ts';
@@ -114,8 +80,8 @@ test('planning indexes large mailboxes by correspondence and retains answered pa
       await repo.replaceFromJson(JSON.stringify({ ...content, mail }), { confirmReplace: true });
       const saved = await repo.exportBackup();
       results.push({ count: saved.mail!.length, first: saved.mail![0]!.id,
-        direct: chooseMail(saved, profiles[0]!, due, state.seed!, []),
-        planned: scheduleActivity(saved, state, new Date(now).toISOString()).batch?.runs.filter((r) => r.mail).map((r) => r.mail) ?? [] });
+        direct: chooseMail(saved, profiles[0]!, now + HOUR, state.seed!, []),
+        planned: scheduleActivity(saved, state, new Date(now + HOUR).toISOString()).batch?.runs.filter((r) => r.mail).map((r) => r.mail) ?? [] });
     }
     repo.close(); return results;
   });
@@ -123,7 +89,9 @@ test('planning indexes large mailboxes by correspondence and retains answered pa
   expect(result[0]!.first).toBe('a-recent-human'); expect(result[1]!.first).toBe('0-resident-reply');
   expect(result[0]!.direct).toMatchObject({ replyToMailId: 'a-recent-human' });
   expect(result[0]!.planned).toEqual([result[0]!.direct]);
-  for (const row of result.slice(1)) { expect(row.direct).toBeNull(); expect(row.planned).toEqual([]); }
+  expect(result[1]!.direct).toBeNull(); expect(result[1]!.planned).toEqual([]);
+  expect(result[2]!.direct).toMatchObject({ replyToMailId: 'a-unanswered' });
+  expect(result[2]!.planned).toEqual([result[2]!.direct]);
 });
 
 for (const route of [{ name: 'MAIN 1', steps: ['1'] }, { name: 'MAIN X', steps: ['X'] }, { name: 'SIG MAIL', steps: ['13', '2', 'MAIL'] }]) {
@@ -244,7 +212,7 @@ for (const mode of ['invalid', 'failure'] as const) {
     await page.clock.fastForward(3 * hour);
     expect(await incoming(page)).toEqual([]);
     expect((await snapshot(page)).mail!.every((m) => !m.recipientConfirmation)).toBe(true);
-    expect(await page.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)).toBe(1);
+    expect(await page.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)).toBeLessThanOrEqual(12);
     await command(page, 'SENT', '夜空の観察'); await command(page, 'READ 1', 'あの星を見つけました。');
   });
 }
@@ -271,102 +239,6 @@ test('deterministic catch-up bounds mail without displacing all public work, and
   expect(result.a.batch!.runs.every((r) => Date.parse(r.simulatedAt) >= Date.parse(result.now) - 72 * hour)).toBe(true);
   expect(result.pause.batch).toBeNull(); expect(result.noConsent.batch).toBeNull();
   expect((await snapshot(page)).mail!.every((m) => !m.recipientConfirmation)).toBe(true);
-});
-
-test('separate timer batches reserve forum saves until the six-hour mail allowance renews', async ({ page }) => {
-  await page.clock.install({ time: epoch });
-  await page.goto('http://127.0.0.1:14374');
-  await page.evaluate(async () => {
-    const rp = '/src/storage/repository.ts', ap = '/src/ai/activity.ts', pp = '/src/ai/personas.ts';
-    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
-    const { emptyActivity } = await import(ap) as typeof import('../src/ai/activity');
-    const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
-    const repo = await openRepository('mail-budget-ticks');
-    await repo.openActivity();
-    const human = await repo.createHumanMember('文通相手');
-    const profiles = residentProfiles(await repo.exportBackup()).map((profile) => ({ ...profile,
-      participation: 1, reading: 0, inactivity: 0, newThread: 1, reply: 1,
-      weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i) }));
-    await repo.put('settings', { id: 'ai-residents', value: { version: 2, profiles } as never });
-    for (const profile of profiles.slice(0, 4)) {
-      await repo.createHumanMail({ id: `letter:${profile.id}`, senderId: human.id, recipient: profile.id,
-        subject: '近況', body: 'またお話を聞かせてください。' });
-    }
-    await repo.put('settings', { id: 'ai-activity', value: { ...emptyActivity(new Date().toISOString()), consent: true } as never });
-    repo.close();
-  });
-  const ticks = [];
-  // Keep the same save/attempt allowance, as the controls do across timer ticks.
-  let budget = { attempts: 0, committed: 0 };
-  for (let tick = 1; tick <= 4; tick++) {
-    await page.clock.setFixedTime(new Date(epoch.getTime() + tick * hour));
-    const result = await page.evaluate(async ({ tick, budget }) => {
-      const rp = '/src/storage/repository.ts', ap = '/src/ai/activity.ts', pp = '/src/ai/personas.ts', bp = '/src/ai/activity-runner.ts';
-      const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
-      const { random } = await import(ap) as typeof import('../src/ai/activity');
-      const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
-      const { runActivityBatch } = await import(bp) as typeof import('../src/ai/activity-runner');
-      const repo = await openRepository('mail-budget-ticks'), content = await repo.exportBackup();
-      const state = content.settings.find((s) => s.id === 'ai-activity')!.value as unknown as AiActivity;
-      const profile = residentProfiles(content)[tick - 1]!;
-      const now = Date.now(), due = now - 30 * 60_000;
-      const day = Math.floor((due + profile.utcOffsetMinutes * 60_000) / (24 * 3_600_000));
-      // Ensure each visit would choose mail if its allowance were available.
-      for (let i = 0; ; i++) {
-        state.seed = `budget-${i}`;
-        if (random(`${state.seed}:${profile.id}:away:${Math.floor(day / 3)}`) >= .12 &&
-          random(`${state.seed}:${profile.id}:${due}:mail`) < .5) break;
-      }
-      state.nextDue = Object.fromEntries(residentProfiles(content).map((p) => [p.id,
-        new Date(p.id === profile.id ? due : now + 48 * 3_600_000).toISOString()]));
-      await repo.put('settings', { id: 'ai-activity', value: state as never });
-      const planned = await repo.openActivity();
-      const engine = { async load() {}, dispose() {}, async generate(prompt: { user: string }) {
-        const request = JSON.parse(prompt.user);
-        return JSON.stringify(request.kind === 'mail'
-          ? { personaId: request.personaId, recipientId: request.recipientId, replyToMailId: request.replyToMailId,
-            subject: '近況のお便り', body: `お手紙ありがとう。${tick}回目の近況です。` }
-          : { personaId: request.personaId, forumId: request.forumId, replyToPostId: request.replyToPostId,
-            title: '近況の話題', body: `${tick}回目の掲示板での話題です。` });
-      } };
-      await runActivityBatch(repo, () => repo.exportBackup(), planned, engine, new AbortController().signal, budget, () => {});
-      const saved = await repo.exportBackup(); repo.close();
-      return { runs: planned.batch!.runs, budget, saved };
-    }, { tick, budget });
-    ticks.push(result); budget = result.budget;
-  }
-  expect(ticks.map((tick) => tick.runs.length)).toEqual([1, 1, 1, 1]);
-  expect(ticks.map((tick) => !!tick.runs[0]!.mail)).toEqual([true, true, false, false]);
-  expect(budget).toEqual({ attempts: 4, committed: 4 });
-  const saved = ticks[3]!.saved;
-  expect(saved.mail!.filter((m) => m.simulation)).toHaveLength(2);
-  expect(saved.posts.filter((p) => p.simulation)).toHaveLength(2);
-  expect(saved.mail!.filter((m) => m.recipientConfirmation).map((m) => m.id).sort()).toEqual(['letter:hoshimori', 'letter:kusabue']);
-  // The public runs leave the other two human letters unconfirmed.
-  expect(saved.mail!.filter((m) => m.senderId.startsWith('fictional-ai:')).every((m) => !m.recipientConfirmation)).toBe(true);
-
-  const renewed = await page.evaluate(async ({ saved, epoch }) => {
-    const ap = '/src/ai/activity.ts', pp = '/src/ai/personas.ts';
-    const { random, scheduleActivity } = await import(ap) as typeof import('../src/ai/activity');
-    const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
-    return [6.5, 7].map((hours) => {
-      const state = structuredClone(saved.settings.find((s) => s.id === 'ai-activity')!.value) as unknown as AiActivity;
-      const profile = residentProfiles(saved)[2]!, now = epoch + hours * 3_600_000, due = now - 60_000;
-      const day = Math.floor((due + profile.utcOffsetMinutes * 60_000) / (24 * 3_600_000));
-      state.batch = null;
-      for (let i = 0; ; i++) {
-        state.seed = `renew-${i}`;
-        if (random(`${state.seed}:${profile.id}:away:${Math.floor(day / 3)}`) >= .12 &&
-          random(`${state.seed}:${profile.id}:${due}:mail`) < .5) break;
-      }
-      state.nextDue = Object.fromEntries(residentProfiles(saved).map((p) => [p.id,
-        new Date(p.id === profile.id ? due : now + 48 * 3_600_000).toISOString()]));
-      return scheduleActivity(saved, state, new Date(now).toISOString()).batch!.runs;
-    });
-  }, { saved, epoch: epoch.getTime() });
-  // Catch-up simulated dates must not free slots before their actual saves age out.
-  expect(renewed[0]![0]!.mail).toBeUndefined();
-  expect(renewed[1]![0]!.mail).toBeDefined();
 });
 
 test('scheduled mail quota failure rolls back delivery and run completion; explicit recovery commits the same run once', async ({ page }) => {

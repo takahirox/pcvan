@@ -25,6 +25,8 @@ export interface OltRoom {
   residents: OltPresence[]; visitors: OltVisitor[];
   observedAt: string; nextTurnAt: string; handledNumber: number; chain: number;
   pending: OltTurn | null;
+  observations?: Record<string, { number: number; topicAt: string }>;
+  decisions?: { authorId: string; targetNumber?: number; readyAt: string }[];
 }
 export interface OltState {
   version: 1; windowAt: string; attempts: number; organicAttempts?: number; rooms: OltRoom[];
@@ -64,10 +66,7 @@ export function appendOlt(room: OltRoom, authorId: string, kind: OltLine['kind']
   const line = { id: `olt:${room.id}:${number}`, number, authorId, kind, text, origin, createdAt };
   room.lines.push(line); room.lines = room.lines.slice(-RETAIN_LINES);
   if (kind === 'say') {
-    room.chain = origin === 'local-human' ? 0 : room.chain + 1;
-    const rhythm = random(`olt:cadence:${authorId}:${number}:${createdAt}`);
-    room.nextTurnAt = iso(Date.parse(createdAt) + (origin === 'local-human' ? 0
-      : room.chain >= 3 ? 75_000 + rhythm * 45_000 : 14_000 + rhythm * 8_000));
+    room.chain = origin === 'local-human' ? 0 : Math.min(3, room.chain + 1);
   }
   return line;
 }
@@ -119,10 +118,15 @@ export function observeOlt(state: OltState, content: Backup, at: number): void {
       if (live && ended > previousAt) changes.push({ memberId: p.memberId, kind: 'leave', at: ended });
       return false;
     });
-    if (room.pending && !room.residents.some((p) => p.memberId === room.pending!.authorId)) room.pending = null;
+    if (room.decisions) room.decisions = room.decisions.filter((d) => room.residents.some((r) => r.memberId === d.authorId) &&
+      (d.targetNumber === undefined || room.lines.some((l) => l.number === d.targetNumber)));
+    if (room.observations) room.observations = Object.fromEntries(Object.entries(room.observations).filter(([id]) => room.residents.some((r) => r.memberId === id)));
+    if (room.pending && (Date.parse(room.pending.until) <= at || !room.residents.some((p) => p.memberId === room.pending!.authorId))) room.pending = null;
     if (at - previousAt > 90_000) {
       room.pending = null; room.handledNumber = room.nextNumber - 1;
       room.nextTurnAt = iso(at + 15_000); room.chain = 0;
+      if (room.decisions) room.decisions = [];
+      if (room.residents.length || room.observations) room.observations = Object.fromEntries(room.residents.map((r) => [r.memberId, { number: room.nextNumber - 1, topicAt: iso(at + 90_000) }]));
     }
   }
   // Deterministic fictional status is independent of download/speech consent.
@@ -186,7 +190,7 @@ export function validateOlt(value: unknown): asserts value is OltState {
   const roomIds = new Set();
   const residentIds = new Set();
   for (const raw of state.rooms as unknown[]) {
-    const r = obj(raw, ['id', 'nextNumber', 'lines', 'residents', 'visitors', 'observedAt', 'nextTurnAt', 'handledNumber', 'chain', 'pending']);
+    const r = obj(raw, ['id', 'nextNumber', 'lines', 'residents', 'visitors', 'observedAt', 'nextTurnAt', 'handledNumber', 'chain', 'pending'], ['observations', 'decisions']);
     if (!roomDefinitions.some((d) => d.id === r.id) || roomIds.has(r.id)) fail(); roomIds.add(r.id);
     int(r.nextNumber, 1); int(r.handledNumber); int(r.chain);
     if ((r.handledNumber as number) >= (r.nextNumber as number) || (r.chain as number) > 3) fail();
@@ -215,6 +219,23 @@ export function validateOlt(value: unknown): asserts value is OltState {
         if (key === 'residents') residentIds.add(id);
       }
     }
+    if (r.observations !== undefined) {
+      const memory = obj(r.observations, [], Object.keys(r.observations as object));
+      if (Object.keys(memory).length > MAX_ROOM_PRESENT) fail();
+      for (const [id, raw] of Object.entries(memory)) {
+        text(id); const m = obj(raw, ['number', 'topicAt']); int(m.number); time(m.topicAt);
+        if ((m.number as number) >= (r.nextNumber as number)) fail();
+      }
+    }
+    if (r.decisions !== undefined) {
+      if (!Array.isArray(r.decisions) || r.decisions.length > 8) fail();
+      const authors = new Set();
+      for (const raw of r.decisions as unknown[]) {
+        const d = obj(raw, ['authorId', 'readyAt'], ['targetNumber']); text(d.authorId); time(d.readyAt);
+        if (authors.has(d.authorId)) fail(); authors.add(d.authorId);
+        if (d.targetNumber !== undefined) { int(d.targetNumber, 1); if ((d.targetNumber as number) >= (r.nextNumber as number)) fail(); }
+      }
+    }
     if (r.pending !== null) {
       const p = obj(r.pending, ['id', 'authorId', 'modelId', 'context', 'until'], ['targetNumber', 'retry']);
       if (p.retry !== undefined && p.retry !== 1) fail();
@@ -238,6 +259,8 @@ export function validateOltMembers(state: OltState, members: readonly Member[]) 
     for (const p of room.residents) if (!members.some((m) => m.id === p.memberId && m.actor === 'ai') ||
       !personas.some((r) => personaMemberId(r.id) === p.memberId)) throw new Error('Invalid OLT resident.');
     for (const p of room.visitors) if (!members.some((m) => m.id === p.memberId && m.actor === 'human')) throw new Error('Invalid OLT visitor.');
+    for (const id of [...Object.keys(room.observations ?? {}), ...(room.decisions ?? []).map((d) => d.authorId)])
+      if (!members.some((m) => m.id === id && m.actor === 'ai') || !personas.some((p) => personaMemberId(p.id) === id)) throw new Error('Invalid OLT observer.');
     if (room.pending && !room.residents.some((p) => p.memberId === room.pending!.authorId)) throw new Error('Invalid OLT turn.');
   }
 }

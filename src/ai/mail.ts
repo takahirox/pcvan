@@ -4,7 +4,7 @@ import { localConversation } from '../storage/community';
 import { personaMemberId, residentProfiles } from './personas';
 import type { ResidentProfile } from './personas';
 import type { GenerationPrompt } from './generation';
-import { random } from './activity';
+import { random, observeResident } from './observation';
 import { residentSetting } from './setting';
 
 const time = (m: Mail) => Date.parse(mailAvailableAt(m));
@@ -17,94 +17,46 @@ export function pairMail(content: Backup, residentId: string, humanId: string): 
     (m.senderId === humanId && m.recipientId === residentId))).sort((a, b) => a.number - b.number);
 }
 
-interface CorrespondenceState { at: number; lastOutgoing: number; replyToMailId?: string }
 interface MailPlanningIndex {
   humanId?: string;
   residents: Set<string>;
-  pairs: Map<string, CorrespondenceState[]>;
+  incoming: Map<string, Mail[]>;
+  answered: Map<string, number>;
 }
-
-/** Index correspondence metadata once, without copying letter bodies. Each visit
- * uses a binary lookup, regardless of mailbox size or storage-key ordering. */
+/** Metadata index: delivery is observable by its addressed resident, including
+ * letters from a human other than the currently active terminal identity. */
 export function mailPlanningIndex(content: Backup): MailPlanningIndex {
+  const humans = new Set(content.members.filter((m) => m.actor === 'human').map((m) => m.id));
   const active = content.settings.find((s) => s.id === 'active-human-member')?.value;
-  const human = content.members.find((m) => m.id === active && m.actor === 'human') ?? content.members.find((m) => m.actor === 'human');
-  const index: MailPlanningIndex = { humanId: human?.id,
-    residents: new Set(content.members.filter((m) => m.actor === 'ai').map((m) => m.id)), pairs: new Map() };
-  if (!human) return index;
-  const pairs = new Map<string, Mail[]>();
+  const index: MailPlanningIndex = { humanId: typeof active === 'string' && humans.has(active) ? active : [...humans][0],
+    residents: new Set(content.members.filter((m) => m.actor === 'ai').map((m) => m.id)), incoming: new Map(), answered: new Map() };
   for (const m of content.mail ?? []) {
     if (m.file !== undefined || m.internetAddress !== undefined || m.senderInternetAddress !== undefined) continue;
-    const resident = m.senderId === human.id ? m.recipientId : m.recipientId === human.id ? m.senderId : undefined;
-    if (!resident || !index.residents.has(resident)) continue;
-    const pair = pairs.get(resident) ?? []; pair.push(m); pairs.set(resident, pair);
+    if (m.replyToMailId && index.residents.has(m.senderId)) index.answered.set(m.replyToMailId, Math.min(index.answered.get(m.replyToMailId) ?? Infinity, time(m)));
+    if (!humans.has(m.senderId) || !index.residents.has(m.recipientId)) continue;
+    const list = index.incoming.get(m.recipientId) ?? []; list.push(m); index.incoming.set(m.recipientId, list);
   }
-  for (const [resident, mail] of pairs) {
-    const events = mail.flatMap((m) => [
-      { at: time(m), mail: m, eligible: false },
-      ...(m.senderId === human.id ? [{ at: time(m) + 20 * 60_000, mail: m, eligible: true }] : []),
-    ]).sort((a, b) => a.at - b.at);
-    // Max heap by mail number preserves pairMail's newest-letter selection even
-    // for imported letters whose IDs and availability dates are nonchronological.
-    const eligible: Mail[] = [], answered = new Set<string>();
-    let lastOutgoing = -Infinity;
-    const states: CorrespondenceState[] = [];
-    for (let i = 0; i < events.length;) {
-      const at = events[i]!.at;
-      do {
-        const event = events[i++]!, m = event.mail;
-        if (event.eligible) {
-          let pos = eligible.length; eligible.push(m);
-          while (pos > 0) {
-            const parent = (pos - 1) >>> 1;
-            if (eligible[parent]!.number >= m.number) break;
-            eligible[pos] = eligible[parent]!; pos = parent;
-          }
-          eligible[pos] = m;
-        } else {
-          if (m.senderId === resident) lastOutgoing = at;
-          if (m.replyToMailId) answered.add(m.replyToMailId);
-        }
-      } while (i < events.length && events[i]!.at === at);
-      while (eligible.length && answered.has(eligible[0]!.id)) {
-        const last = eligible.pop()!;
-        if (!eligible.length) break;
-        let pos = 0;
-        while (pos * 2 + 1 < eligible.length) {
-          let child = pos * 2 + 1;
-          if (child + 1 < eligible.length && eligible[child + 1]!.number > eligible[child]!.number) child++;
-          if (eligible[child]!.number <= last.number) break;
-          eligible[pos] = eligible[child]!; pos = child;
-        }
-        eligible[pos] = last;
-      }
-      states.push({ at, lastOutgoing, replyToMailId: eligible[0]?.id });
-    }
-    index.pairs.set(resident, states);
-  }
+  for (const [id, letters] of index.incoming) index.incoming.set(id, letters.sort((a, b) => b.number - a.number).slice(0, 16));
   return index;
 }
 
-/** Called only at an eligible resident visit. No polling-dependent random draws. */
-export function chooseMail(content: Backup, profile: ResidentProfile, at: number, seed: string, planned: readonly AiRun[], index = mailPlanningIndex(content)): MailTarget | null {
-  const humanId = index.humanId;
-  if (!humanId || planned.some((r) => r.mail && r.personaId === profile.id)) return null;
+/** Called at this person's reading visit, independently of public writing. */
+export function chooseMail(content: Backup, profile: ResidentProfile, at: number, seed: string, planned: readonly AiRun[], index = mailPlanningIndex(content), seen: string[] = []): MailTarget | null {
   const residentId = personaMemberId(profile.id);
-  if (!index.residents.has(residentId)) return null;
-  const states = index.pairs.get(residentId) ?? [];
-  let low = 0, high = states.length;
-  while (low < high) {
-    const mid = (low + high) >>> 1;
-    if (states[mid]!.at <= at) low = mid + 1; else high = mid;
+  if (!index.residents.has(residentId) || planned.some((r) => r.mail && r.personaId === profile.id)) return null;
+  // A small personal rhythm bounds rapid exchanges without a universal daily ban.
+  const gap = (3 + random(`${seed}:${profile.id}:mail-pace`) * 27) * 60_000;
+  const outgoing = (content.mail ?? []).filter((m) => m.senderId === residentId && time(m) <= at);
+  for (const letter of index.incoming.get(residentId) ?? []) {
+    if (!letter.senderId || time(letter) > at || (index.answered.get(letter.id) ?? Infinity) <= at || seen.includes(`mail:${letter.id}`)) continue;
+    const decision = observeResident(profile, { id: letter.id, service: 'mail', authorId: letter.senderId,
+      text: `${letter.subject} ${letter.body.slice(0, 400)}`, at: time(letter), addressed: true }, seed);
+    if (!decision.write) seen.push(`mail:${letter.id}`);
+    if (decision.write && decision.readyAt <= at && !outgoing.some((m) => m.recipientId === letter.senderId && time(m) > at - gap))
+      return { humanId: letter.senderId, replyToMailId: letter.id };
   }
-  const correspondence = states[low - 1];
-  // One letter per pair/day, including catch-up and initiation; multiple unanswered
-  // human letters can be acknowledged together in bounded pair context.
-  if (correspondence && correspondence.lastOutgoing > at - 24 * 3_600_000) return null;
-  const inbound = correspondence?.replyToMailId;
-  const draw = random(`${seed}:${profile.id}:${at}:mail`);
-  if (inbound && draw < .5 * profile.reply) return { humanId, replyToMailId: inbound };
-  if (correspondence) return null;
+  const humanId = index.humanId;
+  if (!humanId || outgoing.some((m) => m.recipientId === humanId) || index.incoming.has(residentId)) return null;
   // Initiate only after a direct public exchange with this human. A stranger's
   // unrelated public post is not enough to manufacture an acquaintance.
   const postsById = new Map(content.posts.map((p) => [p.id, p]));
@@ -119,7 +71,7 @@ export function chooseMail(content: Backup, profile: ResidentProfile, at: number
   })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const familiarity = 1 + Math.min(2, exchanges.length) * .25;
-  return exchanges[0] && draw < .15 * profile.newThread * familiarity
+  return exchanges[0] && random(`${seed}:${profile.id}:${exchanges[0].id}:initiate-mail`) < .15 * profile.newThread * (1 - profile.inactivity) * familiarity
     ? { humanId, publicPostId: exchanges[0].id } : null;
 }
 

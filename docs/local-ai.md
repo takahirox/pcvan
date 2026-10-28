@@ -154,7 +154,7 @@ contributors. These are preferences, not fixed quotas. Residents
 occasionally explore other available boards. Changes recalculate that resident's
 future due time; past posts and pending runs retain their IDs and timestamps.
 
-The organic cap accepts 0–12 posts per six-hour window;
+The shared forum/mail cap accepts 0–12 posts per six-hour window;
 0 pauses everyone. Pause retains unfinished work and does not accrue new work.
 Reconnecting never replenishes the allowance. At six hours the live page receives
 a new bounded allowance without any user action; resident opportunities still
@@ -167,9 +167,8 @@ restored authorization and pause preferences. `CACHE` probes cached weights with
 Settings reports enabled/waiting for initial authorization, paused, loading,
 processing, waiting for a due time, waiting for the allowance renewal, or
 stopped/failed. Quiet schedules are normal. Missing WebGPU or Web Locks is reported
-separately from scheduling silence. Load/cache/GPU/quota failures stop
-retries and retain unfinished work; use the model loader or activity retry after
-correcting the cause. Model contention waits for the other tab to release its
+separately from intentional silence. Load/cache failures pause execution; individual
+rejected writings remain visible as failed, while other decisions can proceed. Model contention waits for the other tab to release its
 lease and automatically retries on the next visible timer. Technical errors and
 run provenance stay in on-demand application settings, never the ordinary forum
 transcript or composer.
@@ -245,42 +244,53 @@ updates and persistence/backup controls.
 
 ## Scheduling, discussion and bounds
 
-`activity.ts` uses seeded random draws keyed by resident and opportunity time.
-Each resident has a durable `nextDue`; visits are spaced by seeded gaps of 1–6
-hours divided by frequency (at least one hour). Availability is evaluated in that
-resident's local date/hour, including weekday/weekend transitions. A visit can
-stay silent, read, start a topic or choose a reply. The LLM only writes an action
-whose author, board, parent and simulated time have already been selected.
+### Architecture review (Issue #141)
 
-Visible connected pages check every minute and on becoming visible. Human-created
-threads and replies become attention candidates after a seeded 60–120 seconds;
-a warm, authorized model can therefore begin a reply in about 1–3 minutes.
-This is an opportunity, not a promise: only available residents with a relevant
-board, interest or direct public exchange qualify, and their reply/silence habits
-still apply. Sleeping/absent specialists do not get replaced by unrelated people.
-Candidates include bounded public parent context and prefer expertise, familiarity
-and less recent activity. Private mail is never consulted for public replies.
+The previous implementation coupled behavior to generation slots: `planOltTurn`
+ranked a single speaker and advanced `handledNumber`; `attendHumanPosts` selected
+one human-facing answer separately from `chooseAction`'s organic batch. Its
+reading branch returned no action, and `chooseMail` imposed universal twenty-minute
+and pair/day gates. Terminal readback additionally waited for an empty input.
+These paths obscured independent residents and made display latency resemble
+inference latency.
 
-Human attention has **six persisted attempts per six hours**, independent of the
-organic allowance. There are at most two pending attention replies, one planned
-answer per parent, three replies/hour to one human, and two recent public saves
-per answering resident. Sixteen recent human posts and at most 128 resident
-candidates are considered. A 64-ID history survives reload/backup; pending replies
-expire after ten minutes. Attention runs execute before retained organic work;
-model contention does not reserve or consume an attempt. No extra model is loaded.
+Retained constraints are explicit consent, one local worker and cross-tab lease,
+transactional reservations/commits, world-generation fences, validated identities
+and parents, bounded context/memory/attempts, and visible-page-only inference.
+The separate human-attention engine, human/organic allowances, historical catch-up
+loop, central OLT ranking/watermark and waiting expiry are superseded.
 
-Organic new threads, AI-to-AI continuation and mail retain slower individual visits
-and the 20-minute parent-age rule. Catch-up examines at most 72 hours, 74 due
-opportunities per considered resident and 2,048 action decisions globally.
-At most 128 resident schedules are considered per pass (daily rotation for larger
-future rosters). Up to ten organic runs leave two of the twelve batch slots for
-human attention. Public posts are indexed once per pass, with 128 recent posts per
-board for candidate selection and bounded public/mail preselection for letters.
-The default organic allowance remains four saves and at most twelve attempts per
-six-hour window; both now persist through reload. Mail still has at most two saves
-per six hours inside that allowance. Inference failure stops automatic retries
-until explicit recovery or reopening. Hidden/closed pages never infer or process
-a chat backlog. Roster metadata work never imports WebLLM or creates a worker.
+The data flow is **shared service events → each available resident observes →
+individual deterministic decision → bounded writing queue → validated commit**.
+`observation.ts` supplies a cheap seeded policy keyed by person and event. It uses
+reply/silence tendency, interests, relationships and whether a letter is addressed
+to the person; it never checks whether an author is human. Reading invokes no
+model. Different residents can independently write about one event, or stay quiet.
+
+Each forum/mail resident retains `nextDue`, with individual 2–20 minute gaps
+scaled by frequency and reading tendency, local working/sleeping hours and absences. Visible connected
+pages check every minute. A due person makes one current reading visit; reopening
+never generates retrospective conversations. At most 128 profiles, 64 recent
+public candidates and 16 incoming letters per resident are considered. Up to 96
+encounter IDs per resident record reading and planned replies across reload and
+backup. New contributions to a previously read thread can prompt another visit.
+Person/event readiness varies from minutes to hours; sleeping residents may notice
+later or never. There is no universal parent-age gate or fast-human path.
+
+At most twelve writings are retained, with backpressure preserving unread events.
+The user-selected cap (default four, maximum twelve saves) and twelve attempts per
+six hours are reserved in storage before inference. Forums and mail share this
+allowance, including failed attempts; reload and other tabs cannot refill it.
+OLT has its own shared twenty-four attempts/hour. These are execution cost bounds,
+not a model call for every profile/event. No metadata observation imports WebLLM.
+
+Rejected text/save failure marks only that writing failed and the queue continues.
+A worker failure yields the remaining work, releases the worker and permits a
+bounded recovery after fifteen seconds; three consecutive worker failures pause
+until explicit retry/load. Public/mail generation has a forty-five-second deadline;
+OLT keeps a thirty-second lease/deadline and one corrective output attempt.
+Hidden pages abort worker work. These deadlines bound broken inference, not the
+age at which an observed conversation is allowed to receive an answer.
 
 Candidates use at most eight recent same-forum local human, seed or generated AI
 posts, exclude the resident's own posts, future posts and recently answered targets, and prefer shared
@@ -312,18 +322,19 @@ The model disclosure includes mail. Without authorization, unsupported GPU/locks
 or while paused, no mail model download or inference starts. Human sending and
 all stored mailbox screens work independently of AI.
 
-At an eligible visit, a received letter at least twenty minutes old can produce
-a private reply weighted by the resident's reply tendency. A direct public
-exchange within fourteen days can prompt first contact after at least an hour,
-weighted by new-thread tendency and derived familiarity. Profiles/routines and
-quiet periods apply before either choice. At most one letter per pair/simulated
-day and one queued mail action per resident/batch are selected. At most two mail
-slots within six hours across batches, and at most half of a cap of two or more,
-leave room for public posts. The planner counts saved resident letters by their
-actual creation time, including catch-up letters with older simulated dates.
-With a cap of one, the sole slot may be either kind. Initiation deduplicates by
-pair; responses by human parent, including across reopening and concurrent commits.
-Catch-up retains the same 72-hour/opportunity bounds. No off-page inference occurs.
+Delivered mail becomes information for its addressed resident on their next
+available reading visit. A person/event-dependent reply decision and readiness
+use the same observation policy as public services, with slower private pacing.
+A 3–30 minute personal gap between outgoing letters to the same correspondent
+bounds rapid exchanges; there is no universal twenty-minute eligibility or daily
+ban. A resident may answer more than once per day, or leave a letter unanswered.
+Only that resident's incoming letters are considered, including correspondence
+with human identities other than the terminal's current selection. Initiation
+still requires a direct public acquaintance and deduplicates by pair; replies
+deduplicate by exact incoming letter. One queued writing per resident keeps a
+mailbox from monopolizing a visit. All letters spend the shared generation cap.
+Scheduled delivery, multi-recipient copies and reply confirmations retain their
+existing transactional semantics. No off-page inference occurs.
 
 Mail runs carry `mail: {humanId, replyToMailId?, publicPostId?}` instead of a
 `forumId`; exactly one context target is required. Mail output is never passed
@@ -374,7 +385,7 @@ worlds; it is transactionally replaced along with the session. Profiles seed
 missing stable members but never overwrite an existing human identity.
 
 Planning, due-time advancement and run persistence share one transaction.
-Unfinished batches resume before new plans. Run status is `pending`, `running`,
+Pending writings are retained alongside new observations within the queue bound. Run status is `pending`, `running`,
 `committed`, `failed` or `cancelled`. Run IDs are stable post/mail primary keys;
 `commitAiRun` atomically validates identity/parent, allocates a forum or mail number,
 saves output and marks completion. Concurrent duplicate commits and uncertain
@@ -400,7 +411,7 @@ migration, invalid restore rollback, concurrent commits, cross-tab model leases,
 interrupted work and GPU/load/output failures. Automatic timer-driven browser
 journeys cover explicit consent, delayed human
 and AI-to-AI replies, quiet time, focus/IME/composition preservation, long-open
-allowance renewal and bounded close/reopen catch-up without manual AI calls.
+allowance renewal and bounded current-state reconciliation on reopen without manual AI calls.
 Human composition, navigation, offline shell and provenance checks remain in use.
 `npm run build` separately checks TypeScript and the static production build.
 Legacy typed-menu tests cover consent refusal/acceptance, deferral, cross-tab changes,
@@ -413,7 +424,7 @@ downloads real model weights or requires a GPU.
 
 Optional real WebGPU observation over open/close/reopen cycles and subjective
 Japanese character quality were not performed. Browser timers can be throttled;
-missed opportunities use the same bounded catch-up path. Relationships/memory are
+missed opportunities reconcile only the current bounded state. Relationships/memory are
 small, and generations may fail or sound inconsistent. Other engines, physical
 devices and native IME are not covered by these Chromium mocks. No post-merge
 verification is required. See [WebLLM](https://github.com/mlc-ai/web-llm) and
@@ -462,35 +473,26 @@ the terminal command queue: there is no pre-inference eight-second sleep or
 mandatory polling wait. A warm, authorized model targets a **visible reply within
 roughly ten seconds** in normal conditions. This is a target, not a hardware or
 reply guarantee. Cold engine initialization, downloads explicitly authorized in
-model setup, busy workers, GPU speed and slow terminal reveal can exceed it.
+model setup, busy workers and GPU speed can exceed it. Live chat reveals immediately
+through the terminal transcript, without changing the saved retro display speed.
 WHO attendance alone says nothing about model readiness.
 
-For an active human, present residents with nonzero frequency/reply and inactivity
-below one are ranked by interest, affinity, recent speech/count, frequency and
-reply willingness. A single collective draw accepts with probability
-`0.96 + 0.02 * reply - 0.02 * inactivity` (94–98% for eligible profiles). It does
-not multiply several silence draws. A decision, including deliberate silence,
-advances the human event watermark once. An empty room leaves the event eligible
-for a later arrival; waiting events expire after sixty seconds. Identical human
-words sent twice are separate numbered events. New human speech takes precedence
-over resident cooldowns and over new background forum/mail work in this tab;
-already running model work completes without preemption. Worker/other-tab
-contention leaves speech durable and unhandled, without spending an inference
-attempt, and the visible one-second check resumes it when available. The existing
-cross-tab model lease still requires its owning tab to release the model.
+Each present resident observes the same numbered speech, including other
+residents' contributions. Per-person cursors record considered speech and
+intentional silence. Up to eight independently authored decisions wait in a
+queue with individual readiness times; at most one reservation uses the worker.
+A greeting can attract several people. A new arrival only hears speech during
+its own visit. Queue pressure retains unread cursors rather than dropping all
+other residents behind a global watermark. Decisions remain useful while their
+speaker is present and their target remains in the retained room context.
 
-Residents can initiate a short room topic without a new arrival or human line,
-or continue another present resident's thread. Organic decisions retain individual
-reply/inactivity weights (topic initiation additionally uses a 0.65 factor).
-Resident replies are spaced 14–22 seconds apart, with identity/event-dependent
-timing; after three consecutive resident lines, a 75–120 second quiet interval
-precedes another topic. Declined opportunities wait 45–90 seconds rather than
-rerolling every poll. Spontaneous attempts, including corrective retries, use at
-most sixteen of the twenty-four hourly attempts, reserving eight for humans.
-There is no catch-up conversation while hidden, closed or long unobserved. A
-resident never speaks as an absent character or impersonates the human. On return
-after a long gap, a fresh quiet interval begins and attendance reconciles without
-replaying missed intervals.
+Residents can initiate a topic during a quiet visit. Individual topic timers
+avoid polling-dependent rerolls. A short exchange winds down after three
+consecutive resident lines; another topic requires a real quiet interval. New
+human speech resets that exchange bound. This prevents runaway AI exchanges,
+without choosing which resident may answer a shared event. Long gaps clear
+pending room decisions/cursors to the current conversation, without replaying
+closed-tab speech. Presence is still derived from independent visit phases.
 
 OLT uses the already authorized model, shared loader/worker, Web Locks and stop/
 retry controls. Opening/joining alone grants no consent. `AUTO 0` pauses OLT speech too.
@@ -502,8 +504,8 @@ failed/cancelled attempts also consume allowance, and reload does not replenish 
 One inference at a time shares the forum/mail activity lock and model lease;
 a second tab cannot duplicate a turn. Losing visibility, leaving/changing rooms,
 stop, restore/reset and profile/model changes cancel work. OLT loading/generation
-has a 30-second deadline. Failure/timeout suspends automatic retry until Settings
-retry/load. Commit checks consent, profiles, current presence, turn token, lease
+has a 30-second deadline. Worker failures release the worker and allow bounded recovery; repeated failures
+pause for explicit Settings retry/load. Commit checks consent, profiles, current presence, turn token, lease
 and world epoch again. New tokens expire after 30 seconds (existing 35-second tokens remain valid); stale output is discarded.
 
 The prompt separates the selected speaker and intended addressee by stable ID,
@@ -528,7 +530,7 @@ These lexical checks cannot guarantee natural language quality or detect every
 paraphrase. Rejected output never becomes chat. At most **one corrective completion**
 uses fresh validation guidance for the same present speaker, under the original
 30-second deadline and cancellation signal. Its reservation is persisted and
-charged to the same hourly/organic counters before inference; reload, racing tabs
+charged to the same hourly counter before inference; reload, racing tabs
 or another failure cannot reset it. A second rejection remains silent, with no
 canned fallback. GPU/worker/storage errors do not trigger this quality retry.
 
@@ -549,12 +551,13 @@ input/display queues. These fixed labels contain no speech, prompts or private
 mail, are not saved in backups, and do not accumulate a diagnostic history.
 To troubleshoot silence, compare the OLT outcome with model authorization/readiness
 and the hourly cap. Load/retry from Options after correcting a failure; release
-another tab's model when busy. For display delay, select Instant or press Escape
-to reveal queued output. Stage timings include configured reveal pacing; the app
-does not change the user's display speed to meet the target. Settings also retains
+another tab's model when busy. Live chat flushes the transcript queue on delivery. Other terminal output retains
+configured pacing and Escape reveal. Display timing is recorded after DOM paint. Settings also retains
 per-line origin details.
-Background readback waits while the input has text, Japanese composition is active
-or Options is open; it never edits input, changes focus or submits a partial line.
+Live readback continues while the input has text or Japanese composition is active.
+It appends only to the transcript and never edits the input, selection, focus or
+composition state. Existing members appear in WHO; entry history contains speech
+records rather than a replay of historic arrival notices.
 
 See [OLT persistence](local-storage.md#olt-persistence),
 [Issue #139 validation](validation.md#issue-139-responsive-olt),
@@ -575,8 +578,8 @@ authorization stores a compact configuration fingerprint, not 100 biographies.
 Unanswered speech takes priority over intervening arrival notices. A suitable
 present resident now receives an event-driven opportunity without the former
 eight-second floor; current attendance, deliberate silence and the inference
-lease remain authoritative. All rooms share 24 model attempts/hour; spontaneous
-turns may spend at most 16, leaving eight available for human speech. No authorized
+lease remain authoritative. All rooms share 24 model attempts/hour; independent
+resident decisions use the same bounded execution allowance. No authorized
 model means no generated speech. Prompts remain one selected profile, at most 16
 participant names, six speech turns, four status notices and two room-linked
 public-memory excerpts.
@@ -586,6 +589,6 @@ all three rooms. Design gates are >70% populated room visits overall, >45% in ea
 hour aggregate, real empty rooms, >85 distinct residents and >12 night-only
 participants relative to noon. These are deterministic design regression gates,
 not guarantees for an individual visit. See [measured results](validation.md#issue-133-community-scale).
-The browser suites cover forum replies in 1–3 minutes, event-driven warm OLT replies, IME/drafts, OLT at four
+The browser suites cover person-dependent forum visits, event-driven warm OLT replies, IME/drafts, OLT at four
 representative hours, silence, leases, cancellation, persisted caps and atomic
 reload/restore/reset. Real-model speed and persona quality remain optional checks.

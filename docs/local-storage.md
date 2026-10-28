@@ -473,7 +473,7 @@ fields and database version as needed; never drop unknown content.
 
 `mail` is a dedicated IndexedDB store with unique global `number` plus sender,
 recipient and reply-parent indexes. It never inserts into `posts` or allocates
-forum numbers. Each resident letter has exactly one human and one of the stable ten
+forum numbers. Each resident letter has exactly one human and one of the saved fictional
 `fictional-ai:*` residents. An outbound Internet letter instead has one existing
 human sender and an explicit `internetAddress`. INBOX/SENT are projections by
 recipient/sender, not mutable duplicate copies. `readAt` belongs only to the human recipient; reading
@@ -626,9 +626,12 @@ OLT has no seeded transcript.
 The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly
 three rooms (`lounge`, `night`, `wakaba`). Each room stores a monotonic
 `nextNumber`, the last
-**200 lines**, resident leases, human visitor leases, `observedAt`, `nextTurnAt`,
-`handledNumber`, bounded consecutive-resident `chain`, and an optional pending
-turn token. `/LIST` displays the most recent 40 lines; terminal scrollback retains
+**200 lines**, resident leases, human visitor leases, `observedAt`, bounded
+consecutive-resident `chain`, and an optional pending turn token. Optional
+`observations` stores at most sixteen member cursors `{number, topicAt}`;
+`decisions` stores at most eight `{authorId, targetNumber?, readyAt}` writings.
+Legacy `nextTurnAt`/`handledNumber` remain import-compatible fields but do not
+select speakers or discard anyone else's observation. `/LIST` displays the most recent 40 lines; terminal scrollback retains
 what this session has displayed. Pruning never reuses a sequence or ID.
 
 Compatibility keeps the same version-1 representation: the validator accepts
@@ -674,7 +677,7 @@ keeps the observation watermark and cannot replay visits. Closing/hiding never
 claims continued live presence.
 A read-only unregistered visitor has no fictional member record.
 
-`reconcileOlt`, `observeRoom`, `speakRoom`, `claimRoomTurn`, `expireRoomSpeech`,
+`reconcileOlt`, `observeRoom`, `speakRoom`, `claimRoomTurn`,
 `retryRoomTurn` and `finishRoomTurn` each read/update
 the complete bounded setting in one repository transaction. Inference happens
 outside transactions. Confirmation contexts ignore only the OLT observation
@@ -690,16 +693,15 @@ normal lease cleanup clears the pending token without refunding its attempt.
 `retryRoomTurn` can atomically add only `retry: 1` and charge one more attempt
 before a corrective completion. Values other than one are rejected on import;
 no backup version change or reset is required. Retries preserve the original
-expiry, author and target, and also count against the sixteen organic attempts
-when applicable. Busy model work does not claim/handle human speech; numbered
-unhandled events can resume after reload or contention, subject to current
-presence and a sixty-second waiting limit. `expireRoomSpeech` advances only stale
-human watermarks without starting inference. `finishRoomTurn` returns whether an
-utterance committed; late, cancelled or withdrawn results cannot be displayed
-as successful replies. Diagnostic timings stay tab-local and outside JSON backups.
-Handled events, attempt counters and
-next-turn times survive cancellation, reload, backup and restore. Old pending
-leases expire; import never automatically infers a saved pending turn.
+expiry, author and target, and count against the twenty-four hourly attempts.
+Independent cursors and decisions survive contention and reload. There is no
+sixty-second human-event expiry or global reply watermark. Decisions are dropped
+when their speaker leaves or their target is pruned. A gap beyond ninety seconds
+reconciles current presence and clears pending conversation work, preventing
+closed-tab replay. `finishRoomTurn` returns whether text committed; late,
+cancelled or withdrawn results cannot appear as successful replies. Diagnostic
+timings stay tab-local and outside backups. Legacy organic counters remain
+accepted on import but are no longer used to ration residents' behavior.
 
 Strict import validation checks shapes, bounds, ordering, stable IDs, author
 references, actor/provenance consistency, attendance uniqueness and timestamps
@@ -861,14 +863,13 @@ Released Mail has `delivery: { scheduleId, submittedAt, availableAt }`. Its
 a fabricated creation timestamp. Backup validation checks metadata, exact queue/mail
 correspondence, actors, fields, terminal-state timestamps and scheduled-parent
 reply chronology. `mailAvailableAt()` supplies availability to resident selection,
-catch-up prompt filtering and commitment validation, with the ordinary effective
+observation prompt filtering and commitment validation, with the ordinary effective
 time fallback for other mail. Queue settings and references never enter prompts.
 Release itself neither runs AI nor writes recipient confirmation.
 
 Startup/resume, active-minute ticks, content refresh and planning reconcile without
 terminal output. Closed/suspended browsers run no delivery service; overdue letters
-remain recoverable and release at the next active visit regardless of the AI
-catch-up limit. Original due instants survive reload and JSON replacement.
+remain recoverable and release at the next active visit independently of AI availability. Original due instants survive reload and JSON replacement.
 Private world-generation transactions fence stale repository handles, even after
 identical replacement. Legacy/empty backups can omit the queue. Reset removes all
 pending and terminal records; restoration replaces rather than merges them.
@@ -924,13 +925,14 @@ recreates absent members on ordinary reload. Imported worlds retain their member
 and profiles. A legacy world without resident settings receives only the original
 ten profile definitions, never the ninety-person expansion.
 
-Activity `nextDue` validates known resident IDs with a bounded map, then normalizes
-to the saved roster. Optional `allowance` records its six-hour start, organic
-attempts/saves and human-response attempts; attempts are reserved transactionally
-before inference and survive reload/tabs/JSON restore. `attention` retains at most
-64 considered parent IDs; a `userResponse` run must be a public reply, never mail.
-Pending work remains at most twelve runs. OLT accepts up to sixteen residents per
-room/thirty-two total, retains strict author/member checks and optionally records
-`organicAttempts` (at most sixteen of twenty-four attempts/hour). Legacy records
-without these optional counters remain valid. No IndexedDB or outer JSON backup
-version bump, migration wizard or automatic model authorization is required.
+Activity `nextDue` validates known resident IDs and normalizes to the saved
+roster. Optional `observations` records up to 96 unique encountered event IDs per
+resident (at most 128 considered profiles). Public and mail keys are distinct;
+private letter text is never stored in this observation metadata. The
+optional `allowance` reserves six-hour generation attempts/saves transactionally,
+surviving reload, tabs and JSON restore. Legacy `responses`, `attention` and
+`userResponse` fields remain validated import data; no separate human-response
+scheduler or allowance uses them. Pending work remains at most twelve runs.
+OLT accepts up to sixteen residents per room/thirty-two total and retains strict
+author/member checks. No IndexedDB or outer backup version bump, migration wizard
+or automatic model authorization is required.

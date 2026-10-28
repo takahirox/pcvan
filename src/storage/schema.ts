@@ -106,7 +106,8 @@ export interface AiActivity {
   consent?: boolean; seed?: string; nextDue?: Record<string, string>;
   truncated?: boolean; bootstrap?: boolean; setupDeferred?: boolean;
   allowance?: { windowAt: string; attempts: number; responses: number; committed: number };
-  attention?: string[];
+  attention?: string[]; // Legacy import only.
+  observations?: Record<string, string[]>;
 }
 export interface ReadState { memberId: string; forumId: string; lastReadNumber: number }
 export interface Session {
@@ -207,7 +208,7 @@ function json(value: unknown): void {
 export function validateActivity(value: unknown): asserts value is AiActivity {
   object(value);
   const extra = value.version === 2 ? ['consent', 'seed', 'nextDue', 'truncated', 'bootstrap'] : [];
-  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch', ...extra], value.version === 2 ? ['setupDeferred', 'allowance', 'attention'] : []);
+  fields(value, ['version', 'maxPosts', 'modelId', 'lastActivityAt', 'batch', ...extra], value.version === 2 ? ['setupDeferred', 'allowance', 'attention', 'observations'] : []);
   if (value.setupDeferred !== undefined && typeof value.setupDeferred !== 'boolean') invalid('Invalid AI setup deferral.');
   if (value.version !== 1 && value.version !== 2) invalid('Unknown AI activity version.');
   if (value.version === 2) {
@@ -222,6 +223,14 @@ export function validateActivity(value: unknown): asserts value is AiActivity {
       fields(value.allowance, ['windowAt', 'attempts', 'responses', 'committed']); timestamp(value.allowance.windowAt);
       integer(value.allowance.attempts, 0); integer(value.allowance.responses, 0); integer(value.allowance.committed, 0);
       if ((value.allowance.attempts as number) > 12 || (value.allowance.responses as number) > 6 || (value.allowance.committed as number) > 12) invalid('Invalid resident allowance.');
+    }
+    if (value.observations !== undefined) {
+      object(value.observations);
+      if (Object.keys(value.observations).length > 128) invalid('Too many resident observations.');
+      for (const [id, events] of Object.entries(value.observations)) {
+        if (!personas.some((p) => p.id === id) || !Array.isArray(events) || events.length > 96 ||
+          new Set(events).size !== events.length || events.some((e) => typeof e !== 'string' || e.length > 280)) invalid('Invalid resident observations.');
+      }
     }
     if (value.attention !== undefined && (!Array.isArray(value.attention) || value.attention.length > 64 ||
       new Set(value.attention).size !== value.attention.length || value.attention.some((id) => typeof id !== 'string' || id.length > 128))) invalid('Invalid attention history.');
