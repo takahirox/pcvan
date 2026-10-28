@@ -102,7 +102,8 @@ export function createAiControls(actions: AiActions,
         const engine = await loadEngine(task, state.batch!.modelId);
         report('予定の活動を処理中…');
         await runActivityBatch(actions.activity, actions.read, state, engine, task.signal, budget,
-          (updated) => { if (!task.signal.aborted) activity = migrateActivity(updated); });
+          (updated) => { if (!task.signal.aborted) activity = migrateActivity(updated); },
+          () => Date.now() < roomPriorityUntil);
         if (!task.signal.aborted) report('予定の活動を確認しました。次の予定まで待機します。');
       });
     } catch (error) { if (!task.signal.aborted) {
