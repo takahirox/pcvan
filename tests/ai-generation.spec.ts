@@ -46,7 +46,7 @@ for (const [personaId, keyword] of [['hankote', 'LOCAL-DOSV'], ['soroban', 'LOCA
       const mail = buildMailPrompt(fixture, personaId, { humanId: 'human', replyToMailId: 'letter-6' });
       const olt = buildOltPrompt(fixture, room, turn);
       return { forum, mail, olt, profile, culture: boardCulture(keyword, 1), topic, instruction, residentId,
-        expectedRecent: room.lines.filter((l) => l.kind === 'say').slice(-6).map((l) => ({ number: l.number, kind: l.kind,
+        expectedRecent: room.lines.filter((l) => l.kind === 'say').slice(-3).map((l) => ({ number: l.number, kind: l.kind,
           speaker: { id: l.authorId, handle: fixture.members.find((m) => m.id === l.authorId)!.handle, actor: fixture.members.find((m) => m.id === l.authorId)!.actor },
           text: l.text.slice(0, 160) })),
         unchanged: before === JSON.stringify({ fixture, room, turn }), dates: room.lines.map((l) => l.createdAt) };
@@ -108,7 +108,7 @@ for (const [personaId, keyword] of [['hankote', 'LOCAL-DOSV'], ['soroban', 'LOCA
     expect(result.olt.system).toContain('1〜2文');
     expect(result.olt.system).toContain('相手はaddressee');
     expect(olt.recentSpeech).toEqual(result.expectedRecent);
-    expect(olt.recentSpeech).toHaveLength(6);
+    expect(olt.recentSpeech).toHaveLength(3);
     expect(olt.present.map((m: { id: string }) => m.id)).toEqual(['human', result.residentId]);
     expect(olt.publicMemory).toEqual([]); // unrelated LOCAL board is outside this room's context
     expect(olt).not.toHaveProperty('mail');

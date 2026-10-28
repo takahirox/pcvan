@@ -6,7 +6,7 @@ import { residentSetting } from './setting';
 
 export interface GenerationRequest { personaId: string; forumId: string; replyToPostId?: string }
 export interface GeneratedPost extends GenerationRequest { title: string; body: string }
-export interface GenerationPrompt { system: string; user: string; schema: string; purpose?: 'olt' }
+export interface GenerationPrompt { system: string; user: string; schema: string; instruction?: string; purpose?: 'olt' }
 export interface LocalLlmAdapter {
   load(modelId: string, progress: (fraction: number) => void, signal: AbortSignal): Promise<void>;
   generate(prompt: GenerationPrompt, signal: AbortSignal): Promise<string>;
@@ -68,6 +68,9 @@ export function buildPrompt(content: Backup, request: GenerationRequest): Genera
         id: post.id.slice(0, 128), author: content.members.find((m) => m.id === post.authorId)?.handle.slice(0, 40), title: post.title.slice(0, 80), body: post.body.slice(0, 300),
       })),
     }),
+    instruction: `あなたは${JSON.stringify(persona.handle)}です。他の投稿者の自己紹介を自分のものとして書かないでください。`
+      + (request.replyToPostId ? 'replyTargetの発言に直接答える、短い掲示板の返信を書いてください。' : '自分の関心から具体的な話題を一つ、短い掲示板の投稿にしてください。')
+      + 'タイトルに「タイトル：」などのラベルは不要です。本文は日本語で2〜3文、150文字程度。',
     schema: JSON.stringify({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false }),
   };
 }

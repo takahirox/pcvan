@@ -1,5 +1,6 @@
 /** One text-free, tab-local observation. Never persisted in backups or prompts. */
 export class OltDiagnostics {
+  private counts = { started: 0, completed: 0, failed: 0, rejected: 0, committed: 0, discarded: 0 };
   private started = 0;
   private event = '';
   private stages: Record<string, number> = {};
@@ -17,6 +18,12 @@ export class OltDiagnostics {
     this.outcome = '応答待ち'; this.warmth = '未確認';
   }
   stage(name: string) {
+    if (name === '生成開始' || name === '再生成開始') this.counts.started++;
+    if (name === '生成終了' || name === '再生成終了') this.counts.completed++;
+    if (['生成失敗', '生成時間切れ', '生成・保存失敗'].includes(name)) this.counts.failed++;
+    if (name.startsWith('不正な応答を拒否')) this.counts.rejected++;
+    if (name === '応答保存') this.counts.committed++;
+    if (name === '期限・在室・設定変更で破棄') this.counts.discarded++;
     if (!this.started) { this.started = Date.now(); this.stages = {}; }
     // Callers supply fixed labels only; never conversation or exception text.
     if (Object.keys(this.stages).length < 18) this.stages[name] ??= Math.max(0, Date.now() - this.started);
@@ -27,7 +34,7 @@ export class OltDiagnostics {
     else this.warmth = warm ? 'warm（読込済み）' : 'cold（読込が必要）';
   }
   status() {
-    return `OLT: ${this.outcome} / ${this.warmth} / ${this.availability}` + (this.started
+    return `OLT 生成集計: ${JSON.stringify(this.counts)}\nOLT: ${this.outcome} / ${this.warmth} / ${this.availability}` + (this.started
       ? `\nOLT 経過 ms（開始から）: ${Object.entries(this.stages).map(([name, ms]) => `${name}=${ms}`).join(' / ')}` : '');
   }
 }

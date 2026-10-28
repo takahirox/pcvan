@@ -197,7 +197,7 @@ for (const roomId of ['night', 'wakaba'] as const) {
       return { prompt, failures, before, after, final: room.lines.at(-1)! };
     }, { now, roomId, roomIndex });
     const prompt = JSON.parse(result.prompt.user);
-    expect(prompt.recentSpeech).toHaveLength(6); expect(prompt.recentSpeech.every((l: { text: string }) => l.text.length <= 160)).toBe(true);
+    expect(prompt.recentSpeech).toHaveLength(3); expect(prompt.recentSpeech.every((l: { text: string }) => l.text.length <= 160)).toBe(true);
     expect(prompt.publicMemory.length).toBeLessThanOrEqual(2);
     expect(result.failures).toEqual(Array(10).fill(true)); expect(result.after).toBe(result.before);
     expect(result.final).toMatchObject({ authorId: 'fictional-ai:hoshimori', kind: 'say', origin: 'local-ai:webllm:test-model' });
@@ -407,4 +407,53 @@ test('corrective completion reservation survives reload, races once and cannot e
   expect(result.capped).toBeUndefined(); expect(result.committed).toBe(true);
   expect(result.saved.attempts).toBe(120); expect(result.saved.rooms[1]!.pending).toBeNull();
   expect(result.saved.rooms[1]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
+});
+
+for (const interruption of ['cancel', 'lease-expired', 'second-rejection'] as const) test(`corrective turn retains its response and correction budget after ${interruption}`, async ({ page }) => {
+  const result = await page.evaluate(async ({ epoch, interruption }) => {
+    const repo = window.oltRepo, op = '/src/olt-state.ts';
+    const { emptyOlt, iso, oltState } = await import(op) as typeof import('../src/olt-state');
+    await repo.authorizeModel((await repo.openActivity()).modelId);
+    const data = await repo.exportBackup(), roster = data.settings.find((s) => s.id === 'ai-residents')!;
+    const profiles = (roster.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
+    profiles.forEach((p) => { p.participation = 0; p.reply = 1; p.inactivity = 0; });
+    await repo.put('settings', roster);
+    const human = data.members.find((m) => m.actor === 'human')!, at = Date.parse(epoch), state = emptyOlt(epoch);
+    state.rooms[1]!.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: epoch, until: iso(at + 600_000) }];
+    await repo.put('settings', { id: 'olt-rooms', value: state as never });
+    await repo.observeRoom('human', 'night', human.id, epoch);
+    await repo.speakRoom('night', 'human', '月を見る道具を教えてください。', epoch);
+    const turn = (await repo.claimRoomTurn('night', iso(at + 9000)))!;
+    try { await repo.finishRoomTurn('night', turn.id, '{', undefined, iso(at + 9000)); } catch { /* rejected initial output */ }
+    await repo.retryRoomTurn('night', turn.id, new AbortController().signal, iso(at + 9000));
+    if (interruption === 'second-rejection') {
+      try { await repo.finishRoomTurn('night', turn.id, '{}', undefined, iso(at + 10_000)); } catch { /* terminal rejection */ }
+      await repo.finishRoomTurn('night', turn.id, undefined, undefined, iso(at + 10_000), 'rejected');
+    } else if (interruption === 'cancel') {
+      await repo.finishRoomTurn('night', turn.id, undefined, undefined, iso(at + 10_000));
+    } else {
+      await repo.reconcileOlt(iso(at + 75_000));
+    }
+    const released = oltState(await repo.exportBackup());
+    const reclaimed = await repo.claimRoomTurn('night', iso(at + (interruption === 'lease-expired' ? 86_000 : 21_000)));
+    let extraCorrection, committed;
+    if (reclaimed) {
+      extraCorrection = await repo.retryRoomTurn('night', reclaimed.id, new AbortController().signal, iso(at + (interruption === 'lease-expired' ? 87_000 : 22_000)));
+      committed = await repo.finishRoomTurn('night', reclaimed.id, JSON.stringify({ kind: 'olt', roomId: 'night', personaId: 'hoshimori',
+        text: '双眼鏡なら月の輪郭を探しやすいですよ。' }), undefined, iso(at + (interruption === 'lease-expired' ? 87_000 : 22_000)));
+    }
+    return { targetNumber: turn.targetNumber, released, reclaimed, extraCorrection, committed, final: oltState(await repo.exportBackup()) };
+  }, { epoch: now, interruption });
+  expect(result.released.rooms[1]!.pending).toBeNull();
+  if (interruption === 'second-rejection') {
+    expect(result.reclaimed).toBeUndefined();
+    expect(result.released.rooms[1]!.decisions).toEqual([]);
+    expect(result.final.attempts).toBe(2);
+  } else {
+    expect(result.released.rooms[1]!.decisions).toEqual([expect.objectContaining({ targetNumber: result.targetNumber, retry: 1 })]);
+    expect(result.reclaimed).toMatchObject({ targetNumber: result.targetNumber, retry: 1 });
+    expect(result.extraCorrection).toBeUndefined(); expect(result.committed).toBe(true);
+    expect(result.final.attempts).toBe(3);
+    expect(result.final.rooms[1]!.lines.filter((l) => l.kind === 'say' && l.origin.startsWith('local-ai:'))).toHaveLength(1);
+  }
 });

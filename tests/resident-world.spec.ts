@@ -50,14 +50,16 @@ for (const hour of [0, 9, 15, 22]) test(`ordinary roster: one hour at ${hour} JS
   expect(rooms.rooms.every((r) => r.visitors.length === 0)).toBe(true);
 });
 
-test('production MAIN accumulates dialogue with unchanged 100 profiles, JOIN replays it, and greeting reaches independent readers during IME', async ({ page }) => {
+for (const hour of [0, 9, 15, 22]) test(`production ordinary world ${hour} JST: MAIN dialogue, JOIN history and greeting during IME`, async ({ page }) => {
+  test.setTimeout(90_000);
+  const epoch = new Date(`2026-10-21T${String((hour + 15) % 24).padStart(2, '0')}:04:00Z`);
   await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
   await mockWorker(page, 'ok'); await start(page, '世界を見る客');
   const before = await snapshot(page);
   const profiles = before.settings.find((s) => s.id === 'ai-residents')!.value;
   const activity = before.settings.find((s) => s.id === 'ai-activity')!;
   const fixed = activity.value as unknown as import('../src/storage/schema').AiActivity;
-  fixed.seed = 'ordinary-22'; fixed.nextDue = initialDue(epoch.toISOString(), fixed.seed, personas);
+  fixed.seed = `ordinary-${hour}`; fixed.nextDue = initialDue(epoch.toISOString(), fixed.seed, personas);
   await page.evaluate(async (rows) => {
     const db = await new Promise<IDBDatabase>((resolve) => { const r=indexedDB.open('pcvan-local'); r.onsuccess=()=>resolve(r.result); });
     await new Promise<void>((resolve) => { const tx=db.transaction('settings','readwrite'); rows.forEach((r)=>tx.objectStore('settings').put(r)); tx.oncomplete=()=>resolve(); }); db.close();
@@ -71,7 +73,7 @@ test('production MAIN accumulates dialogue with unchanged 100 profiles, JOIN rep
     r.lines.some((l) => l.replyToNumber !== undefined) && personas.some((p) =>
       r.residents.some((resident) => resident.memberId === personaMemberId(p.id)) &&
       observeResident(p,{id:'greeting',service:'olt',authorId:humanId,text:'こんにちは',at:epoch.getTime()},fixed.seed!).write));
-  for (let i = 0; i < 180 && !chooseRoom((await state(page))!); i++) await advance(page, 1);
+  for (let i = 0; i < 240 && !chooseRoom((await state(page))!); i++) await advance(page, 1);
   const unattended = await state(page);
   expect(unattended!.rooms.every((r) => r.visitors.length === 0)).toBe(true);
   const populated = chooseRoom(unattended!);
@@ -84,9 +86,11 @@ test('production MAIN accumulates dialogue with unchanged 100 profiles, JOIN rep
   await command(page, 'こんにちは', '<世界を見る客>');
   const input = page.locator('#command'); await input.fill('日本語の書きかけ');
   await input.evaluate((el: HTMLInputElement) => el.setSelectionRange(2,5,'backward')); await input.dispatchEvent('compositionstart');
+  const source = (await state(page))!.rooms.find((r) => r.id === populated!.id)!.lines.find((l) => l.origin === 'local-human' && l.text === 'こんにちは')!;
   const initial = (await speech(page)).length;
   await advance(page, 21);
   expect((await speech(page)).length).toBeGreaterThan(initial);
+  expect((await state(page))!.rooms.find((r) => r.id === populated!.id)!.lines.some((l) => l.replyToNumber === source.number)).toBe(true);
   await expect(input).toHaveValue('日本語の書きかけ'); await expect(input).toBeFocused();
   expect(await input.evaluate((el: HTMLInputElement) => [el.selectionStart,el.selectionEnd,el.selectionDirection])).toEqual([2,5,'backward']);
   const prompts = await page.evaluate(() => (window as any).journeyWorker.prompts);

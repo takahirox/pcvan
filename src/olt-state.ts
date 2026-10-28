@@ -26,7 +26,7 @@ export interface OltRoom {
   observedAt: string; nextTurnAt: string; handledNumber: number; chain: number;
   pending: OltTurn | null;
   observations?: Record<string, { number: number; topicAt: string }>;
-  decisions?: { authorId: string; targetNumber?: number; readyAt: string }[];
+  decisions?: { authorId: string; targetNumber?: number; readyAt: string; retry?: 1 }[];
 }
 export interface OltState {
   version: 1; windowAt: string; attempts: number; organicAttempts?: number; rooms: OltRoom[];
@@ -124,8 +124,8 @@ export function observeOlt(state: OltState, content: Backup, at: number): void {
     if (room.observations) room.observations = Object.fromEntries(Object.entries(room.observations).filter(([id]) => room.residents.some((r) => r.memberId === id)));
     if (room.pending && (Date.parse(room.pending.until) <= at || !room.residents.some((p) => p.memberId === room.pending!.authorId))) {
       const turn = room.pending;
-      if (!turn.retry && live && room.residents.some((p) => p.memberId === turn.authorId) && (room.decisions?.length ?? 0) < 8)
-        (room.decisions ??= []).push({ authorId: turn.authorId, targetNumber: turn.targetNumber, readyAt: iso(at + 10_000) });
+      if (live && room.residents.some((p) => p.memberId === turn.authorId) && (room.decisions?.length ?? 0) < 8)
+        (room.decisions ??= []).push({ authorId: turn.authorId, targetNumber: turn.targetNumber, readyAt: iso(at + 10_000), ...(turn.retry ? { retry: turn.retry } : {}) });
       room.pending = null;
     }
     if (at - previousAt > 90_000) {
@@ -228,7 +228,8 @@ export function validateOlt(value: unknown): asserts value is OltState {
       if (!Array.isArray(r.decisions) || r.decisions.length > 8) fail();
       const authors = new Set();
       for (const raw of r.decisions as unknown[]) {
-        const d = obj(raw, ['authorId', 'readyAt'], ['targetNumber']); text(d.authorId); time(d.readyAt);
+        const d = obj(raw, ['authorId', 'readyAt'], ['targetNumber', 'retry']); text(d.authorId); time(d.readyAt);
+        if (d.retry !== undefined && d.retry !== 1) fail();
         if (authors.has(d.authorId)) fail(); authors.add(d.authorId);
         if (d.targetNumber !== undefined) { int(d.targetNumber, 1); if ((d.targetNumber as number) >= (r.nextNumber as number)) fail(); }
       }

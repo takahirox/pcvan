@@ -39,7 +39,7 @@ export function createWebLlmAdapter(): LocalLlmAdapter {
     generate: (prompt: GenerationPrompt, signal) => run(signal, async () => {
       await engine.resetChat();
       const result = await engine.chat.completions.create({
-        messages: [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user }],
+        messages: [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user + (prompt.instruction ? `\n\n${prompt.instruction}` : '') }],
         response_format: { type: 'json_object', schema: prompt.schema },
         max_tokens: prompt.purpose === 'olt' ? 256 : 1024, temperature: prompt.purpose === 'olt' ? 0.65 : 0.8, stream: false,
       });

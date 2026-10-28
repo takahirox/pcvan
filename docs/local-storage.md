@@ -693,8 +693,11 @@ authorization/profile context,
 presence, expiry and token before atomically appending and clearing it. Repeated
 or stale commits cannot duplicate a line. Semantic rejection rolls back the write;
 failed/interrupted generation restores a still-relevant decision without refunding
-its attempt. A second semantic rejection consumes that writing and remains an
-explicit diagnostic rejection, never a fabricated line.
+its attempt, including interruption during a corrective completion. The queued
+decision retains optional `retry: 1`, so reclaiming cannot grant another correction.
+Cancellation and live lease expiry preserve this accounting; terminal output
+rejection is an explicit cleanup outcome. A second semantic rejection consumes
+that writing and remains an explicit diagnostic rejection, never a fabricated line.
 `retryRoomTurn` can atomically add only `retry: 1` and charge one more attempt
 before a corrective completion. Values other than one are rejected on import;
 no backup version change or reset is required. Retries preserve the original

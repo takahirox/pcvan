@@ -323,6 +323,8 @@ A busy worker leaves decisions queued. Interrupted/failed room generation restor
 its decision with a short recovery delay while the speaker and context remain
 valid; it is not recorded as voluntary silence. One rejected output may receive
 one charged correction; a second rejection is reported without invented fallback.
+An interrupted correction requeues the same target with its used correction
+allowance intact, rather than consuming the response or granting another repair.
 Repeated worker failures pause automatic work until explicit recovery.
 Navigation/LEAVE changes only the human visit. Hidden pages, STOP, world replacement
 and authorization/profile changes cancel model work. Long gaps reconcile current
@@ -546,8 +548,15 @@ canned fallback. GPU/worker/storage errors do not trigger this quality retry.
 
 OLT-only generation uses constrained JSON, a 256-output-token ceiling and
 `temperature: 0.65`, compared with forum/mail's existing 1024 tokens and 0.8.
-The shorter prompt retains explicit speaker/addressee/target identities, room
-culture, untrusted-data guidance and public-only context. This bounds work; mock
+The shorter prompt retains explicit speaker/addressee/target identities,
+untrusted-data guidance and public-only context. It asks the model to answer the
+target before introducing personal interests; generation tasks are no longer repeated
+inside the conversation data, where small models echoed them as speech. A final
+user instruction after that data identifies the current speaker and latest target.
+OLT retains three recent lines and one short public memory authored by that
+speaker, limiting exposure to another person's public biography. Forum and mail
+use the same final-instruction path to request a short, directly relevant reply
+without adopting the correspondent's identity. This bounds work; mock
 request checks cannot establish a real GPU speedup or language quality.
 
 Options → **AIモデル・活動** reports a single recent, tab-local OLT outcome and
@@ -559,6 +568,8 @@ activity, unsupported WebGPU/Web Locks, loading/cold versus warm engines, same-t
 or other-tab busy work, invalid output, quota/expiration, failure/timeout and
 input/display queues. These fixed labels contain no speech, prompts or private
 mail, are not saved in backups, and do not accumulate a diagnostic history.
+Text-free tab totals retain started/completed/failed/rejected/committed/discarded
+counts across successive turns, so a later idle tick cannot hide rejected output.
 To troubleshoot silence, compare the OLT outcome with model authorization/readiness
 and the hourly cap. Load/retry from Options after correcting a failure; release
 another tab's model when busy. Live chat flushes the transcript queue on delivery. Other terminal output retains

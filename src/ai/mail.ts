@@ -116,6 +116,9 @@ export function buildMailPrompt(content: Backup, personaId: string, target: Mail
       mail: mail.slice(-4).map((m) => ({ fromResident: m.senderId === residentId, subject: m.subject.slice(0, 60), body: m.body.slice(0, 120) })),
       publicPosts: publicPosts.map((p) => ({ fromResident: p.authorId === residentId, title: p.title.slice(0, 40), body: p.body.slice(0, 100) })),
     }),
+    instruction: `あなたは${JSON.stringify(persona.handle)}、宛先は${JSON.stringify(human.handle.slice(0, 80))}です。`
+      + (parent ? `相手の最新の手紙（replyTarget）に直接答えてください。相手は「${parent.body.slice(0, 240)}」と書いています。` : 'publicFollowUpの話に関連する短い私信を書いてください。')
+      + '相手や他の投稿者になりきらず、自分の口調で。本文は日本語で2〜3文、150文字程度。',
     schema: JSON.stringify({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false }),
   };
 }

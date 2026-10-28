@@ -19,7 +19,7 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           stats.settings.push(message.content.request);
           if ((mode === 'interrupt' && stats.generations === 2) || (mode === 'once-slow' && stats.generations === 1)) return;
           if (mode === 'failure') { queueMicrotask(() => this.onerror?.()); return; }
-          const data = JSON.parse(message.content.request.messages[1]!.content);
+          const data = JSON.parse(message.content.request.messages[1]!.content.split('\n\n')[0]!);
           stats.prompts.push(data);
           const raw = mode === 'invalid' || (mode === 'retry-ok' && stats.generations === 1) ? '{}' : data.kind === 'olt' ? JSON.stringify({
             kind: 'olt', personaId: data.personaId, roomId: data.roomId,

@@ -1118,7 +1118,7 @@ export class LocalRepository {
     }, now, signal);
   }
 
-  finishRoomTurn(roomId: RoomId, token: string, raw?: string, signal?: AbortSignal, now = new Date().toISOString()): Promise<boolean> {
+  finishRoomTurn(roomId: RoomId, token: string, raw?: string, signal?: AbortSignal, now = new Date().toISOString(), outcome: 'interrupted' | 'rejected' = 'interrupted'): Promise<boolean> {
     return this.changeOlt((state, content) => {
       const at = Date.parse(now);
       // Record intervening presence boundaries before speech at completion time.
@@ -1127,10 +1127,10 @@ export class LocalRepository {
       const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
       if (!turn || turn.id !== token) return false;
       room.pending = null;
-      if (raw === undefined && !turn.retry && oltEnabled(content) && turn.context === oltAuthorization(content) &&
+      if (raw === undefined && outcome === 'interrupted' && oltEnabled(content) && turn.context === oltAuthorization(content) &&
           room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at) && (room.decisions?.length ?? 0) < 8) {
         // Busy/failed/cancelled generation is not a decision to stay quiet.
-        (room.decisions ??= []).push({ authorId: turn.authorId, targetNumber: turn.targetNumber, readyAt: iso(at + 10_000) });
+        (room.decisions ??= []).push({ authorId: turn.authorId, targetNumber: turn.targetNumber, readyAt: iso(at + 10_000), ...(turn.retry ? { retry: turn.retry } : {}) });
       }
       if (raw === undefined || at < Date.parse(room.observedAt) || !oltEnabled(content) || turn.context !== oltAuthorization(content) || Date.parse(turn.until) <= at ||
         !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at)) return false;

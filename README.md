@@ -945,9 +945,10 @@ consent. Progress, cancellation, errors and readiness appear in the dialog.
 available. WebGPU on HTTPS/localhost is required.
 
 Current [Issue #143 validation](docs/validation.md#issue-143-resident-world)
-includes genuine WebGPU/Qwen measurements. Text routing and live display work,
-but repeated instructions and irrelevant follow-up answers remain blocking model
-quality findings; the resident rebuild is not yet accepted as complete.
+includes genuine WebGPU/Qwen unattended chat, prolonged listening, forum/mail
+and latency measurements. Interrupted corrections and four ordinary production
+worlds are covered. Copying, incomplete replies and weak persona voices remain
+blocking model-quality findings; the resident rebuild is not accepted as complete.
 
 New worlds default to an automatic cap of four saved posts and twelve generation
 attempts per persisted six-hour window. Closing or reconnecting does not

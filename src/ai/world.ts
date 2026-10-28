@@ -75,8 +75,9 @@ export class ResidentWorld {
         this.roomTurns++;
         const token = turn.id;
         let rejected: string | undefined;
+        let outcome: 'interrupted' | 'rejected' = 'interrupted';
         try {
-          for (let attempt = 0; attempt < 2; attempt++) {
+          for (let attempt = turn.retry ?? 0; attempt < 2; attempt++) {
             workerSignal.throwIfAborted();
             const snapshot = await this.actions.read();
             const room = oltState(snapshot).rooms.find((r) => r.id === selected.room.id)!;
@@ -93,13 +94,13 @@ export class ResidentWorld {
               if (!(error instanceof OltOutputRejected)) throw error;
               ai.olt.stage(`不正な応答を拒否（${error.message}）`);
               rejected = raw;
-              if (attempt) break;
+              if (attempt) { outcome = 'rejected'; break; }
               const retry = await repo.retryRoomTurn(room.id, token, workerSignal);
-              if (!retry) break;
+              if (!retry) { outcome = 'rejected'; break; }
               turn = retry;
             }
           }
-        } finally { await repo.finishRoomTurn(selected.room.id, token).catch(() => {}); }
+        } finally { await repo.finishRoomTurn(selected.room.id, token, undefined, undefined, undefined, outcome).catch(() => {}); }
       }, signal);
     } catch { ai.olt.stage('生成・保存失敗'); }
   }
