@@ -3761,3 +3761,136 @@ explain the retained execution limits and removed behavioral paths. No model
 weights were downloaded and no real WebGPU/Qwen conversation or native operating
 system IME candidate window was exercised. Japanese fluency and real-device
 latency remain optional manual validation; no post-merge verification is required.
+
+## Issue #143: resident world
+
+**Status: incomplete; do not close #143 or treat this checkpoint as merge-ready.**
+The resident world implementation and browser plumbing are implemented, and a
+real WebGPU/Qwen run was performed. The actual generated Japanese still fails
+conversational relevance/voice acceptance. Passing deterministic or mocked checks
+below does not waive this finding.
+
+The [implementation architecture](local-ai.md#resident-world-issue-143) describes
+state ownership, the single visible-page driver, independent observation,
+serialized generation and transactional commit/display. There are no visitor
+checks in room decision/claim/retry/commit and no terminal-owned inference.
+
+`resident-world.spec.ts` uses the unchanged authored 100 profiles. Four fixed
+worlds sample an hour at 00/09/15/22 JST, independently phased attendance,
+resident-to-resident replies and quiet periods without a human visitor. The final
+policy produced the following deterministic results (all rooms combined):
+
+| JST hour | Unique speakers | Authored actions | Replies | Seconds with no speech | Distinct scheduled arrivals | Largest room queue |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 00 | 18 | 94 | 58 | 3506 | 25 | 3 |
+| 09 | 11 | 38 | 18 | 3562 | 17 | 3 |
+| 15 | 14 | 63 | 43 | 3540 | 15 | 4 |
+| 22 | 12 | 70 | 44 | 3530 | 19 | 5 |
+
+These are cheap policy/commit tests with synthetic text, not model fluency or
+hardware latency measurements. None exhausts the 120-attempt safety ceiling.
+The production-assets test stays on MAIN until a populated room has stored a real
+mock-worker exchange, then joins and checks that exact history, normal-profile
+reader availability, a single greeting and sixty seconds without another command
+while a selected Japanese draft/composition remains intact. Unit fixtures still
+use controlled writers/listeners for zero/single/multiple response and rejection
+isolation. Their results are not evidence about the model's Japanese.
+
+Forum/mail checks exercise reading memory, human and resident posts, addressed
+private replies, same-day correspondence, pair privacy, resident-to-resident mail,
+scheduled availability, identity/threading, retries, quota rollback and deduplication.
+Existing suites cover consent, unsupported GPU, model/activity locks, long work,
+individual failures, visibility, import/reset, bounds and drafts. Repository-only
+checks that patch global clocks or IDB callbacks use `tests/module.html`, avoiding
+an unrelated live application loop in the module host page.
+
+### Genuine local-model evidence
+
+The run in [resident-model-evidence.json](resident-model-evidence.json) used:
+
+- `Qwen2.5-1.5B-Instruct-q4f16_1-MLC`, the shipped WebLLM worker and production
+  bundle `index-BSKVYzOy.js`; no worker replacement or profile edits.
+- Headed Chromium 156 on macOS 26.6.2, Apple M4 Max, 64 GiB RAM, WebGPU adapter
+  `apple` / `metal-3`, localhost secure context. Default headless Chromium exposed
+  `navigator.gpu` but returned no adapter; it was not used for the genuine run.
+- Seed `d7a175f838cdf1409a3a04cc2bfbe08d`; fixed starting world time
+  2026-10-21 22:04 JST advancing with real time. The full browser suite was also
+  running, so these measurements include that host contention.
+- Explicit model consent, cold initialization/download **76.784 seconds**, then
+  the same warm worker for all speech. Twelve worker completions took
+  **1.943–7.882 seconds**, median **5.922 seconds**. Nine AI lines committed; three
+  completions did not produce stored speech (25%). Captured output shows invalid/
+  overlong and duplicate responses. No browser page errors were recorded. This
+  capture lacks `finish_reason`, so an exact model-failure versus validation-
+  rejection split is not asserted; the reusable script now records it.
+
+While MAIN remained active with **zero visitors in every room**, Wakaba stored
+speech by `aozora` and a causal reply by `kikyo`; `night` also stored a separate
+resident utterance. JOIN displayed that exact stored history. The visitor then
+listened for thirty seconds without posting, sent `こんにちは` once, and made no
+further action for sixty seconds while composition/draft/selection/focus were
+preserved. A later follow-up received another committed response. The trace
+records source, cheap decision, worker start/end, durable commit and DOM paint:
+
+| Source → first responding resident | Decision | Worker start | Worker duration | Commit | Paint |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `こんにちは` → 桔梗ラジオ | same source transaction | 629 ms | 1943 ms | 2574 ms | 2585 ms |
+| `今夜は何を観察していますか。` → 桔梗ラジオ | same source transaction | 6576 ms | 2276 ms | 8855 ms | 8864 ms |
+
+Decision instrumentation occurs before the source transaction's completion event
+(about 1 ms in this capture); it is not a negative response latency. Another
+resident's corrected greeting response painted at 33.993 seconds, demonstrating
+that contention/rejection can exceed the ten-second target. The draft remained
+`書きかけの日本語`, selection `[2,5]`, focused, throughout the sixty-second wait.
+Composition events were synthetic; a native OS candidate window was not tested.
+
+**Quality findings remain blocking.** Actual short public test excerpts include:
+
+- Unattended `aozora`: `暮らしに関する具体的な話題を一つ出してください。`
+  This echoes an instruction rather than initiating a natural personal topic.
+- `kikyo` greeted and asked about computer startup automation, consistent with a
+  computer interest but overly repetitive across subsequent turns.
+- Asked `今夜は何を観察していますか。`, `kikyo` replied
+  `私はパソコン起動時の自動化について知りたいです。`
+  This is routed to the right source and speaker but fails the semantic question.
+
+An earlier 0.5B characterization loaded in 28.532 seconds and completed calls in
+about 6–7 seconds, but produced a wrong-time greeting and recited routine details.
+Earlier 1.5B runs also exposed a queued-source fatigue bug, now covered by a
+regression test, and rejected follow-up outputs. These are failure findings, not
+passing benchmarks or proof that the default 0.5B model is production-ready.
+
+Reproduce with `npm run build`, an owned production preview, then
+`PCVAN_MODEL_URL=http://127.0.0.1:<port> node scripts/check-resident-model.mjs`.
+The script opens an owned headed browser, requests normal UI consent, uses the
+shipped model (override with `PCVAN_MODEL_ID`), and writes bounded public-only
+fixtures/timings to the evidence JSON. It asserts routing/commit/draft behavior;
+review Japanese quality separately and retain failed results. No private user
+mail or prompts are included.
+
+### Remaining acceptance
+
+Tune and validate the shipped model's actual conversational output without canned
+text, actor-specific reply paths or weakened rejection checks. Repeat unattended
+conversation and relevant greetings/follow-ups with ordinary profiles, record the
+failure/rejection split and distinct voice findings, and retain a passing real-model
+quality review before claiming stage 5 or #143 complete. Real-model forum/mail
+quality and prolonged human listening are also not established by this short OLT
+run. Native IME candidate-window testing and the second model size remain optional
+additional validation. No publication or post-merge verification is claimed.
+
+### Final automated checks for this checkpoint
+
+- `npm test`: **583 passed, 0 failed, 0 skipped** (8.1 minutes), after the final
+  application code changes. The normal 14373/14374 test ports were occupied by
+  another worktree, so an owned temporary config and copies of tests remapped
+  only those local origins to 14573/14574. They used this worktree's normal Vite
+  build/preview and module server; temporary copies/configs were removed before
+  committing. The repository's default test configuration remains unchanged.
+- `npm run build`: TypeScript and the production Vite build passed after the final
+  code changes. Vite retains its large optional WebLLM chunk advisory.
+- Whitespace and affected local documentation link targets checked successfully.
+
+These passing checks establish deterministic behavior and browser plumbing, not
+Japanese relevance. The failed genuine-model quality review above remains the
+pre-merge blocker.

@@ -185,15 +185,17 @@ test('visible idle visit starts and continues resident topics, with quiet gaps a
     counts.push((await speech(page)).length);
   }
   const lines = await speech(page);
-  expect(lines.length).toBeGreaterThanOrEqual(3); expect(lines.length).toBeLessThanOrEqual(10);
+  expect(lines.length).toBeGreaterThanOrEqual(3); expect(lines.length).toBeLessThanOrEqual(24);
   expect(new Set(lines.map((l) => l.authorId)).size).toBe(2);
   expect(counts.some((n, i) => i > 3 && n === counts[i - 4])).toBe(true);
-  expect(lines.some((l, i) => i && Date.parse(l.createdAt) - Date.parse(lines[i - 1]!.createdAt) >= 60_000)).toBe(true);
+  expect(lines.some((l, i) => i && Date.parse(l.createdAt) - Date.parse(lines[i - 1]!.createdAt) >= 20_000) ||
+    epoch.getTime() + 300_000 - Date.parse(lines.at(-1)!.createdAt) >= 20_000).toBe(true);
   const worker = await page.evaluate(() => (window as any).journeyWorker);
   expect(worker.generations).toBe(lines.length);
   expect((await state(page))!.attempts).toBeLessThanOrEqual(24);
   await command(page, '/LEAVE', '退出');
-  const count = lines.length; await advance(page, 20); expect(await speech(page)).toHaveLength(count);
+  // Leaving ends only the human visit. The resident world continues.
+  await advance(page, 20); expect((await speech(page)).length).toBeGreaterThanOrEqual(lines.length);
 });
 
 
@@ -246,7 +248,7 @@ for (const mode of ['unconsented', 'quiet', 'capped'] as const) test(`Options ex
     const request = indexedDB.open('pcvan-local');
     const db = await new Promise<IDBDatabase>((resolve) => { request.onsuccess = () => resolve(request.result); });
     const tx = db.transaction('settings', 'readwrite'), row = tx.objectStore('settings').get('olt-rooms');
-    row.onsuccess = () => { row.result.value.attempts = 24; tx.objectStore('settings').put(row.result); };
+    row.onsuccess = () => { row.result.value.attempts = 120; tx.objectStore('settings').put(row.result); };
     await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); }); db.close();
   });
   await command(page, '月を見る道具を教えて', '<読む客>'); await advance(page, 1);

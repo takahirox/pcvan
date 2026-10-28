@@ -1,3 +1,4 @@
+import { OLT_ATTEMPT_LIMIT } from '../olt-state';
 import { activeHuman } from '../forums';
 import type { MailFile } from './mail-file';
 import { OSL_SETTING, oslState, validateOsl, validateOslMembers } from './schema';
@@ -38,9 +39,14 @@ export const ACTIVE_MEMBER_SETTING = 'active-human-member';
 export interface ForumDestination { keyword: string; boardNo: number; name: string }
 // Command activity watermarks and session history advance without editing the world.
 export const worldContext = (data: Backup): string => JSON.stringify([data.members, data.sigs, data.forums, data.posts, data.mail ?? [], data.readStates,
-  data.settings.map((row) => row.id === 'ai-activity' ? { ...row, value: { ...(row.value as object), lastActivityAt: null } }
-    : row.id === OLT_SETTING ? { ...row, value: { ...(row.value as unknown as OltState),
-      rooms: (row.value as unknown as OltState).rooms.map((room) => ({ ...room, observedAt: null })) } } : row)]);
+  data.settings.map((row) => {
+    if (row.id === ACTIVITY_SETTING) {
+      const state = row.value as unknown as AiActivity;
+      return { ...row, value: { modelId: state.modelId, maxPosts: state.maxPosts, consent: state.consent, seed: state.seed } };
+    }
+    if (row.id === OLT_SETTING) return { ...row, value: (row.value as unknown as OltState).rooms.map((r) => ({ id: r.id, lines: r.lines })) };
+    return row;
+  })]);
 /** Fence open profile editors across world replacement and concurrent edits. */
 export function residentContext(content: Pick<Backup, 'settings'>): string {
   return JSON.stringify([content.settings.find((row) => row.id === WORLD_SETTING)?.value, residentProfiles(content)]);
@@ -911,6 +917,26 @@ export class LocalRepository {
     });
   }
 
+  /** One visible-world step owns delivery, attendance, reading and decisions.
+   * IDB serializes competing tabs. No historical action loop is executed. */
+  advanceWorld(now = new Date().toISOString()): Promise<AiActivity> {
+    return this.transaction(allStores, 'readwrite', async (tx) => {
+      await this.releaseScheduledMail(tx, now);
+      const content = await this.snapshot(tx);
+      const saved = content.settings.find((r) => r.id === ACTIVITY_SETTING);
+      // A deliberately empty imported world must stay empty. Initialization is
+      // explicit at startup/configuration, never a background timer side effect.
+      if (!saved) return { ...emptyActivity(now), maxPosts: 0 };
+      const rooms = oltState(content, now);
+      observeOlt(rooms, content, Date.parse(now));
+      for (const room of rooms.rooms) observeRoomResidents(room, content, Date.parse(now));
+      validateOlt(rooms); validateOltMembers(rooms, content.members);
+      await request(tx.objectStore('settings').put({ id: OLT_SETTING, value: rooms }));
+      const state = saved.value; validateActivity(state);
+      return this.writeActivity(tx, scheduleActivity(content, state, now));
+    });
+  }
+
   touchActivity(now = new Date().toISOString()): Promise<AiActivity> {
     return this.transaction(allStores, 'readwrite', async (tx) => {
       const row: Records['settings'] | undefined = await request(tx.objectStore('settings').get(ACTIVITY_SETTING));
@@ -937,6 +963,9 @@ export class LocalRepository {
             return this.writeActivity(tx, state);
           }
           activityAllowance(state, Date.now()).attempts++;
+          run.simulatedAt = new Date().toISOString();
+          state.batch!.from = new Date(Math.min(Date.parse(state.batch!.from), Date.now() - 1)).toISOString();
+          state.batch!.to = new Date(Math.max(Date.parse(state.batch!.to), Date.now())).toISOString();
         }
         run.status = status;
       }
@@ -1081,8 +1110,7 @@ export class LocalRepository {
       observeOlt(state, content, at);
       const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
       if (!turn || turn.id !== token || turn.retry || Date.parse(turn.until) <= at ||
-        turn.context !== oltAuthorization(content) || !oltEnabled(content) || state.attempts >= 24 ||
-        !room.visitors.some((v) => Date.parse(v.until) > at) ||
+        turn.context !== oltAuthorization(content) || !oltEnabled(content) || state.attempts >= OLT_ATTEMPT_LIMIT ||
         !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at)) return;
       state.attempts++;
       turn.retry = 1;
@@ -1099,9 +1127,13 @@ export class LocalRepository {
       const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
       if (!turn || turn.id !== token) return false;
       room.pending = null;
+      if (raw === undefined && !turn.retry && oltEnabled(content) && turn.context === oltAuthorization(content) &&
+          room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at) && (room.decisions?.length ?? 0) < 8) {
+        // Busy/failed/cancelled generation is not a decision to stay quiet.
+        (room.decisions ??= []).push({ authorId: turn.authorId, targetNumber: turn.targetNumber, readyAt: iso(at + 10_000) });
+      }
       if (raw === undefined || at < Date.parse(room.observedAt) || !oltEnabled(content) || turn.context !== oltAuthorization(content) || Date.parse(turn.until) <= at ||
-        !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at) ||
-        !room.visitors.some((v) => Date.parse(v.until) > at)) return false;
+        !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at)) return false;
       commitOltText(room, turn, raw, at, content);
       return true;
     }, now, signal).catch((error: unknown) => {

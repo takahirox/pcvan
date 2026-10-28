@@ -49,3 +49,9 @@ presence, representative OLT slots, human attention and durable allowances) and
 `community-performance.spec.ts` (same-browser 10/100 metadata, planning, OLT,
 navigation and real IndexedDB timings). Existing mock-worker, IME, cross-tab,
 privacy, restore and reset journeys continue to exercise the shared runtime.
+
+
+Repository-only module checks that replace global clocks or IndexedDB callbacks
+can use `tests/module.html` on the existing Vite test server. That blank host does
+not boot the application's resident world alongside the isolated module exercise.
+Production journeys continue to use the built app and its normal world driver.

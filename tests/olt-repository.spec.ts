@@ -39,7 +39,7 @@ test('bounded monotonic lines, same-identity leases, atomic failure, strict rest
     for (const change of [
       (s: typeof goodState) => { s.version = 9 as never; },
       (s: typeof goodState) => { s.rooms[0]!.id = 'night'; },
-      (s: typeof goodState) => { s.attempts = 25; },
+      (s: typeof goodState) => { s.attempts = 121; },
       (s: typeof goodState) => { s.rooms[1]!.lines[0]!.authorId = 'missing'; },
       (s: typeof goodState) => { s.rooms[1]!.lines[0]!.origin = 'local-ai:webllm:fake'; },
       (s: typeof goodState) => { s.rooms[1]!.lines[0]!.id = 'wrong'; },
@@ -109,7 +109,7 @@ for (const roomId of ['night', 'wakaba'] as const) {
       const committed = oltState(await repo.exportBackup());
       // Replay cannot append a second line. Cancellation also consumes an attempt.
       await repo.finishRoomTurn(roomId, turn.id, raw, undefined, iso(at + 12_000));
-      state = oltState(await repo.exportBackup()); state.attempts = 24;
+      state = oltState(await repo.exportBackup()); state.attempts = 120;
       state.rooms[roomIndex]!.handledNumber = 0; state.rooms[roomIndex]!.nextTurnAt = now;
       await repo.put('settings', { id: 'olt-rooms', value: state as never });
       const capped = await repo.claimRoomTurn(roomId, iso(at + 20_000));
@@ -359,7 +359,7 @@ test('a delayed older reply cannot displace human speech sent during inference a
   expect(result.prompt.replyTo).toMatchObject({ number: 2, kind: 'say', text: result.greeting });
   expect(result.prompt.addressee).toMatchObject({ id: result.human.id, handle: result.human.handle, actor: 'human' });
   expect(result.prompt.speaker.id).not.toBe(result.human.id);
-  expect(result.saved.rooms[1]!.observations!['fictional-ai:hoshimori']!.number).toBe(2);
+  expect(result.saved.rooms[1]!.decisions?.some((d) => d.targetNumber === 2) || result.claims.some((d) => d?.targetNumber === 2)).toBe(true);
   expect(result.finished.rooms[1]!.lines.map((l) => l.kind)).toEqual(['say', 'say', 'say', 'say']);
   expect(result.finished.attempts).toBe(2);
   expect(result.finished.organicAttempts ?? 0).toBe(0);
@@ -378,7 +378,7 @@ test('corrective completion reservation survives reload, races once and cannot e
     profiles.forEach((p) => { p.participation = 0; p.reply = 1; p.inactivity = 0; });
     await repo.put('settings', roster);
     const human = data.members.find((m) => m.actor === 'human')!, at = Date.parse(now), state = emptyOlt(epoch);
-    state.attempts = 22;
+    state.attempts = 118;
     state.rooms[1]!.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: epoch, until: iso(at + 60_000) }];
     await repo.put('settings', { id: 'olt-rooms', value: state as never });
     await repo.observeRoom('human', 'night', human.id, epoch);
@@ -405,6 +405,6 @@ test('corrective completion reservation survives reload, races once and cannot e
   expect(result.rejection).toBe('OltOutputRejected');
   expect(result.retries.filter(Boolean)).toHaveLength(1); expect(result.retry.retry).toBe(1);
   expect(result.capped).toBeUndefined(); expect(result.committed).toBe(true);
-  expect(result.saved.attempts).toBe(24); expect(result.saved.rooms[1]!.pending).toBeNull();
+  expect(result.saved.attempts).toBe(120); expect(result.saved.rooms[1]!.pending).toBeNull();
   expect(result.saved.rooms[1]!.lines.filter((l) => l.origin.startsWith('local-ai:'))).toHaveLength(1);
 });

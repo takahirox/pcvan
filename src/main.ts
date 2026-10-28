@@ -7,6 +7,7 @@ import type { Backup } from './storage/schema';
 import { activeHuman, forumPosts, unreadPosts } from './forums';
 import { TerminalCommands } from './commands';
 import { createAiControls } from './ai/controls';
+import { ResidentWorld } from './ai/world';
 import { mountSettings } from './settings-dialog';
 import './style.css';
 
@@ -52,7 +53,7 @@ async function loadHistory(load: () => Promise<Session | null>) {
 }
 async function reconcilePresence() {
   if (document.visibilityState !== 'visible' || controller.screen === 'disconnected') return;
-  commands.olt.observePresence(await (await repository).reconcileOlt());
+  await (await repository).reconcileOlt();
 }
 async function readContent(background = false): Promise<Backup> {
   const repo = await repository;
@@ -155,10 +156,10 @@ const terminal = mountTerminal(root, {
       const repo = await repository, after = controller.screen;
       if (before === 'disconnected' && after !== 'disconnected') {
         showSessionTimes(await repo.startSession());
-        const activity = await repo.openActivity();
+        await repo.openActivity();
         await reconcilePresence();
         await refreshContent();
-        if (document.visibilityState === 'visible') void ai.openActivity(activity).catch(reportError);
+        if (document.visibilityState === 'visible') { ai.resume(); queueMicrotask(tickWorld); }
       }
       if (before !== 'disconnected' && after === 'disconnected') {
         ai.invalidate(); showSessionTimes(await repo.endSession());
@@ -201,7 +202,7 @@ const ai = createAiControls({
 });
 const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
-  speechSaved: () => queueMicrotask(tickRoom),
+  speechSaved: () => queueMicrotask(tickWorld),
   display: (lines: string[], visible: () => void) => { print(...lines); terminal.reveal(); terminal.whenVisible(visible); },
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   isTelnet: () => controller.isTelnet,
@@ -260,53 +261,34 @@ const startup = enqueue(async () => {
   updateConnection();
   return activity;
 });
-void startup.then((activity) => {
-  if (document.visibilityState === 'visible' && controller.screen !== 'disconnected') return ai.openActivity(activity);
+void startup.then(async (_activity) => {
+  if (document.visibilityState === 'visible' && controller.screen !== 'disconnected') { ai.refresh(await readContent()); tickWorld(); }
 }).catch(reportError);
 const touchActivity = () => {
   if (!resetting && controller.screen !== 'disconnected') void enqueue(async () => (await repository).touchActivity()).catch(reportError);
 };
-let residentTickRunning = false;
-let residentTickRequested = false;
-function tickResidents() {
-  if (resetting || document.visibilityState !== 'visible') return;
-  // Delivery must continue even while the previous tick awaits model work.
-  void enqueue(() => refreshContent(true)).catch(reportError);
-  residentTickRequested = true;
-  if (residentTickRunning) return;
-  residentTickRunning = true;
-  void (async () => {
-    try {
-      // Retain a boundary received while asynchronous delivery/context reads run.
-      while (residentTickRequested && !resetting && document.visibilityState === 'visible') {
-        residentTickRequested = false;
-        if (controller.screen !== 'disconnected') await ai.tick();
-      }
-    } finally { residentTickRunning = false; }
-  })().catch(reportError);
+const world = new ResidentWorld({ repository: () => repository, read: () => enqueue(readContent),
+  publish: async () => { await commands.olt.tick(); }, ai });
+function tickWorld() {
+  if (!resetting && document.visibilityState === 'visible' && controller.screen !== 'disconnected')
+    void world.tick().catch((error) => {
+      if (error instanceof RepositoryError && error.code === 'stale') { reloadWorld(); return; }
+      ai.olt.idle('保存・配達失敗');
+      applicationReport('ai', error instanceof RepositoryError && error.code === 'quota'
+        ? '保存容量が足りません。Options から BACKUP で保存し、空き容量を確認してください。'
+        : `住人の活動・配達の保存に失敗しました: ${String(error)}`);
+    });
 }
-setInterval(tickResidents, 60_000);
-// Presence advances outside OLT and without loading a model. Coalesce slow IDB
-// work so suspended tabs cannot accumulate an unbounded queue of timer writes.
-let presenceRunning = false;
-function tickPresence() {
-  if (presenceRunning || resetting || document.visibilityState !== 'visible' || controller.screen === 'disconnected') return;
-  presenceRunning = true;
-  void enqueue(async () => { await reconcilePresence(); await refreshContent(true); }).catch(reportError).finally(() => { presenceRunning = false; });
-}
-setInterval(tickPresence, 15_000);
+// One bounded visible-world loop across every service and screen. It does not
+// await inference: slow GPU work cannot stop attendance, reading or display.
+setInterval(tickWorld, 1_000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') { commands.olt.suspend(); ai.cancelBackground(); touchActivity(); }
-  else { commands.olt.resume(); tickPresence(); tickResidents(); tickRoom(); }
+  if (document.visibilityState === 'hidden') { world.suspend(); commands.olt.suspend(); ai.cancelBackground(); touchActivity(); }
+  else { commands.olt.resume(); tickWorld(); }
 });
-function tickRoom() {
-  if (!resetting && document.visibilityState === 'visible' && !settingsDialog?.open)
-    void commands.olt.tick().catch(reportError);
-}
-setInterval(tickRoom, 1_000);
-window.addEventListener('pagehide', () => { commands.olt.suspend(); ai.invalidate(); touchActivity(); });
+window.addEventListener('pagehide', () => { world.suspend(); commands.olt.suspend(); ai.invalidate(); touchActivity(); });
 window.addEventListener('pageshow', (event) => {
-  if (event.persisted) { commands.olt.resume(); ai.resume(); tickPresence(); tickResidents(); }
+  if (event.persisted) { commands.olt.resume(); ai.resume(); tickWorld(); }
 });
 if (typeof BroadcastChannel !== 'undefined') {
   try {
@@ -321,4 +303,4 @@ if (typeof BroadcastChannel !== 'undefined') {
     });
   } catch { /* Focus refresh covers missed notifications. */ }
 }
-window.addEventListener('focus', tickPresence);
+window.addEventListener('focus', tickWorld);

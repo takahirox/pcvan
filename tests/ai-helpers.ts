@@ -44,7 +44,7 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
                 `${data.addressee?.handle}さん、月なら小さな望遠鏡でも影が面白いですね。どの倍率でしたか。`,
                 '低倍率から試すと見つけやすいですよ。手すりに肘を置くと像が落ち着きました。',
               ][(stats.generations - 1) % 3]
-              : `星の観察、いいですね。${data.personaId}/${visit}/${stats.generations}`,
+              : `星の観察、いいですね。${visit}-${stats.generations}`,
           }) : data.kind === 'mail' ? JSON.stringify({
             personaId: data.personaId, recipientId: data.recipientId,
             ...(data.replyToMailId ? { replyToMailId: data.replyToMailId } : {}),

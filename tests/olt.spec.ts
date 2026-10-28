@@ -51,7 +51,7 @@ test('prompt human-to-resident and resident-to-resident chat preserve input, sha
   const lines = await speech(page); expect(lines[1]!.authorId).not.toBe(first.authorId);
   const data = await snapshot(page); expect(data.members.some((m) => m.id === first.authorId && m.actor === 'ai')).toBe(true);
   expect((data.settings.find((r) => r.id === 'ai-activity')!.value as unknown as AiActivity).batch).toBeNull();
-  const count = lines.length; await advance(page, 35); expect((await speech(page)).length).toBeLessThanOrEqual(6);
+  const count = lines.length; await advance(page, 35); expect((await speech(page)).length).toBeLessThanOrEqual(24);
   expect(count).toBeGreaterThan(0);
   const replay = await command(page, '/LIST', '日時 JST');
   const who = await command(page, '/WHO', '参加者');
@@ -139,26 +139,27 @@ test('JSON backup, import and reset preserve transcript and shared authors, then
 test('pending OLT generation times out, releases its worker, and keeps navigation usable', async ({ page }) => {
   await page.clock.install({ time: epoch }); await mockPendingWorker(page, 'generate'); await start(page, '待つ客');
   await residents(page); await consent(page); await room(page); await command(page, 'こんばんは', '<待つ客>');
-  await advance(page, 20); expect(await speech(page)).toEqual([]);
+  await advance(page, 24); expect(await speech(page)).toEqual([]);
   await command(page, '/WHO', '待つ客'); await command(page, '/LEAVE', '退出');
   await page.getByRole('button', { name: '設定 / Options', exact: true }).click();
   await page.locator('.ai-panel > summary').click(); await expect(page.locator('.ai-status')).toContainText('時間切れ');
 });
 
-test('leaving or hiding a tab cancels in-flight inference and never commits its late result', async ({ page }) => {
+test('room navigation preserves world inference; hiding cancels it and discards late output', async ({ page }) => {
   await page.clock.install({ time: epoch }); await mockPendingWorker(page, 'generate'); await start(page, '出入りする客');
   await residents(page); await consent(page); await room(page); await command(page, '星の話', '<出入りする客>');
   await advance(page, 5);
   await expect.poll(() => page.evaluate(() => (window as unknown as { pendingWork: string[] }).pendingWork.includes('chatCompletionNonStreaming'))).toBe(true);
+  const token = (await state(page))!.rooms.find((r) => r.id === 'night')!.pending!.id;
   await command(page, '/JOIN 1', '自然の談話室');
-  await expect.poll(async () => (await state(page))!.rooms.find((r) => r.id === 'night')!.pending).toBeNull();
+  expect((await state(page))!.rooms.find((r) => r.id === 'night')!.pending!.id).toBe(token);
   await command(page, '/JOIN 2', '星と道具'); await command(page, 'もう一度こんばんは', '<出入りする客>');
   await advance(page, 5);
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await advance(page, 20); expect(await speech(page)).toEqual([]);
+  await advance(page, 24); expect(await speech(page)).toEqual([]);
   await expect.poll(async () => (await state(page))!.rooms.find((r) => r.id === 'night')!.pending).toBeNull();
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
@@ -323,7 +324,7 @@ test('connection, visible world ticks and resume reconcile all rooms before dire
   expect(initial!.rooms.every((r) => r.observedAt === epoch.toISOString())).toBe(true);
   expect(initial!.rooms.flatMap((r) => r.lines)).toEqual([]);
   await residents(page);
-  await advance(page, 5); // still on MAIN, never visited OLT
+  await advance(page, 6); // still on MAIN; allow the next coalesced world step
   expect((await state(page))!.rooms.flatMap((r) => r.residents)).toHaveLength(2);
   for (const context of ['daisizen', 'wakaba'] as const) {
     await directory(page, context);

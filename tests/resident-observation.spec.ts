@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { activityFixture } from './backup-fixture';
 import { originalPersonas, personaMemberId } from '../src/ai/personas';
-import { emptyActivity, scheduleActivity } from '../src/ai/activity';
+import { emptyActivity, scheduleActivity, availableResident } from '../src/ai/activity';
 import { observeResident } from '../src/ai/observation';
 import { appendOlt, emptyOlt, iso, observeOlt, validateOlt } from '../src/olt-state';
 import { planOltTurn, commitOltText } from '../src/ai/olt';
@@ -59,7 +59,7 @@ for (const actor of ['human', 'resident'] as const) test(`forum reading notices 
   let seed = '';
   for (let i = 0; i < 1000; i++) {
     seed = `read-${i}`;
-    if (profiles.slice(0, 2).every((p) => observeResident(p, { id: post.id, service: 'forum', authorId: post.authorId,
+    if (profiles.slice(0, 3).every((p) => availableResident(p, at + 180_000, seed)) && profiles.slice(0, 2).every((p) => observeResident(p, { id: post.id, service: 'forum', authorId: post.authorId,
       text: post.body, at, interested: true }, seed).readyAt <= at + 180_000)) break;
   }
   activity.seed = seed;
@@ -173,4 +173,53 @@ test('one rejected author does not block another, with persisted attempts, priva
   expect(saved.allowance).toMatchObject({ attempts: 2, committed: 1 });
   expect(result.duplicate!.id).toBe(saved.batch!.runs[1]!.id);
   expect(result.restored.posts).toEqual(result.saved.posts);
+});
+
+test('later resident replies cannot turn a queued fresh source event into voluntary silence', () => {
+  const { data, profiles } = world();
+  const state = emptyOlt(iso(at)), room = state.rooms[0]!;
+  room.residents = profiles.slice(0, 2).map((p) => ({memberId:personaMemberId(p.id),joinedAt:iso(at),until:iso(at+600_000)}));
+  const source = appendOlt(room,'human','say','こんにちは','local-human',at);
+  let parent = source.number;
+  for (let n=0; n<4; n++) {
+    const line=appendOlt(room,personaMemberId(profiles[1]!.id),'say',`続き${n}`,'local-ai:webllm:test',at+1000+n*1000);
+    line.replyToNumber=parent; parent=line.number;
+  }
+  expect(room.chain).toBe(3);
+  const turn=planOltTurn(state,room,data,at+9000,'delayed-source')!;
+  expect(turn.targetNumber).toBe(source.number);
+  expect(turn.authorId).toBe(personaMemberId(profiles[0]!.id));
+  validateOlt(state);
+});
+
+test('resident correspondence commits to the addressed pair, excludes other private mail and rejects self-mail', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(at)); await page.goto('http://127.0.0.1:14374');
+  const {data,activity}=world();
+  const result=await page.evaluate(async({data,activity,now})=>{
+    const rp='/src/storage/repository.ts',mp='/src/ai/mail.ts';
+    const {openRepository}=await import(rp) as typeof import('../src/storage/repository');
+    const {buildMailPrompt}=await import(mp) as typeof import('../src/ai/mail');
+    const repo=await openRepository('peer-correspondence');
+    data.mail=[{id:'peer-source',number:1,senderId:'fictional-ai:hoshimori',recipientId:'fictional-ai:kusabue',
+      subject:'庭の観察',body:'庭の種はどうしていますか。',createdAt:now,origin:`local-ai:webllm:${activity.modelId}`,
+      simulation:{runId:'peer-source',simulatedAt:now,fictional:true}},
+      {id:'other-pair',number:2,senderId:'human',recipientId:'fictional-ai:kusabue',subject:'別の私信',body:'OTHER_PRIVATE_SENTINEL',createdAt:now,origin:'local-human'}];
+    const target={humanId:'fictional-ai:hoshimori',replyToMailId:'peer-source'};
+    const prompt=buildMailPrompt(data,'kusabue',target);
+    activity.batch={id:'peer',from:new Date(Date.parse(now)-1).toISOString(),to:now,modelId:activity.modelId,
+      runs:[{id:'peer:kusabue',personaId:'kusabue',simulatedAt:now,status:'pending',mail:target}]};
+    await repo.replaceFromJson(JSON.stringify(data),{confirmReplace:true});
+    await repo.put('settings',{id:'ai-activity',value:activity as never});
+    await repo.setAiRunStatus('peer:kusabue','running');
+    const reply=await repo.commitAiRun('peer:kusabue',JSON.stringify({personaId:'kusabue',recipientId:target.humanId,
+      replyToMailId:'reply-target',subject:'種のこと',body:'紙袋に入れて乾かしています。'}));
+    const saved=await repo.exportBackup(),bad=structuredClone(saved);
+    bad.mail![0]!.recipientId=bad.mail![0]!.senderId;
+    let rejected=false;try{await repo.replaceFromJson(JSON.stringify(bad),{confirmReplace:true});}catch{rejected=true;}
+    const unchanged=JSON.stringify(saved)===JSON.stringify(await repo.exportBackup());repo.close();
+    return{prompt,reply,rejected,unchanged};
+  },{data,activity,now:iso(at)});
+  expect(result.prompt.user).not.toContain('OTHER_PRIVATE_SENTINEL');
+  expect(result.reply).toMatchObject({senderId:'fictional-ai:kusabue',recipientId:'fictional-ai:hoshimori',replyToMailId:'peer-source'});
+  expect(result.rejected&&result.unchanged).toBe(true);
 });

@@ -33,7 +33,7 @@ test('resident profile editor persists all field types with validation and stabl
 });
 
 
-test('imminent room replies defer new background work and share one busy engine', async ({ page }) => {
+test('room and background work share one busy engine', async ({ page }) => {
   await start(page, '待つ客', 'http://127.0.0.1:14374');
   const content = await snapshot(page);
   const result = await page.evaluate(async (content) => {
@@ -48,21 +48,21 @@ test('imminent room replies defer new background work and share one busy engine'
     const ai = createAiControls({ read: async () => content, print() {}, activity: {
       openActivity: async () => { opens++; return state; },
     } as never }, async () => { factories++; return { load: async () => { loads++; }, generate: async () => '{}', dispose() {} }; }, true);
-    ai.refresh(content); ai.prioritizeRoom(Date.now() + 60_000);
-    await ai.tick(); const deferred = opens;
+    ai.refresh(content);
+    const deferred = opens;
     const signal = new AbortController().signal;
     const first = ai.runRoom(async () => { work++; began(); await pending; }, signal);
     await started;
     await ai.runRoom(async () => { work++; }, signal); await ai.tick();
     const busy = ai.status().join(' '); release(); await first;
-    ai.prioritizeRoom(0); await ai.tick(); ai.invalidate();
+    await ai.tick(); ai.invalidate();
     return { deferred, opens, loads, factories, work, busy };
   }, content);
   expect(result).toMatchObject({ deferred: 0, opens: 1, loads: 1, factories: 1, work: 1 });
   expect(result.busy).toContain('モデル使用中・待機');
 });
 
-test('human OLT priority during a batch lets the current job commit, then yields and preserves remaining jobs', async ({ page }) => {
+test('each public worker opportunity commits one writing, then yields to OLT and retains other jobs', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-24T01:00:00.000Z'));
   await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async (fixture) => {
@@ -108,7 +108,6 @@ test('human OLT priority during a batch lets the current job commit, then yields
     const batch = ai.tick();
     await Promise.race([started, batch.then(() => { throw new Error(ai.status().join('\n')); })]);
     // The saved-human-speech event can arrive while a background job is running.
-    ai.prioritizeRoom(Date.now() + 60_000);
     const signal = new AbortController().signal;
     await ai.runRoom(async () => { events.push('premature-room'); }, signal);
     release(); await batch;
@@ -118,8 +117,11 @@ test('human OLT priority during a batch lets the current job commit, then yields
     // This acquires the same activity lock and reuses the same warm model.
     await ai.runRoom(async (shared) => {
       if (shared !== engine) throw new Error('OLT must reuse the background model');
-      events.push('room'); ai.prioritizeRoom(0);
+      events.push('room');
     }, signal);
+    await ai.tick();
+    const intermediate = await repo.exportBackup();
+    if (intermediate.posts.filter((p) => p.simulation).length !== 2) throw new Error('One background writing per worker opportunity');
     await ai.tick();
     const resumed = await repo.exportBackup();
     ai.invalidate(); repo.close();

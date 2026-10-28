@@ -156,7 +156,7 @@ test('all three rooms share the persistent cap, while Wakaba prompt/output and t
       await repo.observeRoom(`tab-${id}`, id, human.id, now);
       await repo.speakRoom(id, `tab-${id}`, `質問 ${id}`, now);
     }
-    let saved = oltState(await repo.exportBackup()); saved.attempts = 23;
+    let saved = oltState(await repo.exportBackup()); saved.attempts = 119;
     saved.rooms.forEach((room, i) => {
       room.residents = [{ memberId: `fictional-ai:${profiles[i]!.id}`, joinedAt: now, until: iso(at + 120_000) }];
       room.nextTurnAt = now;
@@ -184,8 +184,8 @@ test('all three rooms share the persistent cap, while Wakaba prompt/output and t
     const after = await repo.exportBackup(); other.close();
     return { claims, prompt, failures, unchanged, absentRejected, capped, state: oltState(after), content, after };
   }, now);
-  expect(r.claims.filter(Boolean)).toHaveLength(1); expect(r.capped).toEqual([undefined, undefined, undefined]); expect(r.state.attempts).toBe(24);
-  expect(r.prompt.system).toContain('beginner room'); expect(r.prompt.system).toContain('quiet reading'); expect(r.prompt.system).toContain('1996');
+  expect(r.claims.filter(Boolean)).toHaveLength(1); expect(r.capped).toEqual([undefined, undefined, undefined]); expect(r.state.attempts).toBe(120);
+  expect(r.prompt.system).toContain('初心者の質問'); expect(r.prompt.system).toContain('読むだけの人'); expect(r.prompt.system).toContain('1996');
   expect(r.prompt.user).not.toMatch(/PRIVATE_SUBJECT|PRIVATE_MAIL_SENTINEL|OTHER_OLT_TRANSCRIPT_SENTINEL/);
   const prompt = JSON.parse(r.prompt.user); expect(prompt.roomId).toBe('wakaba'); expect(prompt.room).toBe('はじめての談話室');
   expect(prompt.recentSpeech.length).toBeLessThanOrEqual(12); expect(prompt.publicMemory.length).toBeLessThanOrEqual(3);

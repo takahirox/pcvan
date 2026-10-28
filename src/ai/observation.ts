@@ -9,6 +9,8 @@ export interface ResidentObservation {
   at: number;
   interested?: boolean;
   addressed?: boolean;
+  depth?: number;
+  participations?: number;
 }
 export function random(seed: string): number {
   let hash = 2166136261;
@@ -21,12 +23,14 @@ export function observeResident(profile: ResidentProfile, event: ResidentObserva
   const affinity = profile.affinities[event.authorId.replace('fictional-ai:', '')] ?? 0;
   const interest = profile.interests.some((word) => event.text.includes(word));
   const relevant = event.service !== 'forum' || event.interested || event.addressed || interest || affinity > .5;
-  const greeting = event.service === 'olt' && /こんにちは|こんばんは|おはよう|はじめまして/.test(event.text);
-  const probability = Math.min(1, profile.reply + (event.addressed || greeting ? .25 : 0) + (interest ? .15 : 0) + affinity * .1) * (1 - profile.inactivity);
-  // Individual response readiness; execution may wait for the one worker. OLT
-  // uses seconds, boards and private correspondence use a person's reading pace.
-  const delay = event.service === 'olt' ? random(`${key}:pace`) * (greeting ? 3000 : 8000)
-    : random(`${key}:pace`) ** 2 * (event.service === 'mail' ? 90 : 45) * 60_000 / Math.max(.2, profile.frequency);
-  return { write: relevant && profile.reply > 0 && profile.frequency > 0 && random(`${key}:reply`) < probability,
+  // A resident's conversational disposition is stable. Context, rather than a
+  // fresh coin toss for each event, determines whether they have something to add.
+  const engagement = profile.reply * (1 - profile.inactivity) +
+    (event.addressed ? .25 : 0) + (interest ? .25 : 0) + Math.max(0, affinity) * .2;
+  const threshold = .35 + random(`${seed}:${profile.id}:listening`) * .3 + (event.depth ?? 0) * .15 + (event.participations ?? 0) * .25;
+  // Reading opportunities provide the slower board/mail pace. There is no
+  // second probabilistic gate or human-specific greeting rule.
+  const delay = event.service === 'olt' ? random(`${key}:pace`) * 3000 : 0;
+  return { write: relevant && profile.reply > 0 && profile.frequency > 0 && engagement >= threshold,
     readyAt: event.at + delay };
 }

@@ -1,3 +1,4 @@
+import { OLT_ATTEMPT_LIMIT } from '../olt-state';
 import type { OltState } from '../olt-state';
 import { OltDiagnostics } from './olt-diagnostics';
 import { WORLD_SETTING } from '../storage/schema';
@@ -21,7 +22,6 @@ export function createAiControls(actions: AiActions,
   supported = requireWebGpu(),
   probeCache: (id: string) => Promise<boolean> = async (id) => (await import('./webllm-adapter')).modelWeightsCached(id)) {
   const olt = new OltDiagnostics();
-  let roomPriorityUntil = 0;
   let content: Backup | undefined;
   let activity: AiActivity | undefined;
   let adapter: LocalLlmAdapter | undefined;
@@ -40,7 +40,6 @@ export function createAiControls(actions: AiActions,
   const budget = { attempts: 0, committed: 0 };
   function report(text: string) { message = text; actions.print(text); }
   function cancel() {
-    roomPriorityUntil = 0;
     revision++; authorizingContext = undefined;
     operation?.abort(); operation = undefined;
     adapter?.dispose(); adapter = undefined; loadedModel = undefined;
@@ -98,7 +97,6 @@ export function createAiControls(actions: AiActions,
     return created;
   }
   async function simulate() {
-    if (Date.now() < roomPriorityUntil) return;
     if (document.visibilityState !== 'visible' || !supported || !activity?.maxPosts || !activity.consent || !activity.batch || operation || autoBlocked) return;
     if (activity.batch.modelId !== activity.modelId || !navigator.locks) return;
     const state = activity;
@@ -110,9 +108,10 @@ export function createAiControls(actions: AiActions,
         if (!lock) { report('別のタブで活動を処理中です。次回、自動で確認します。'); return; }
         const engine = await loadEngine(task, state.batch!.modelId);
         report('予定の活動を処理中…');
+        const attemptsBefore = budget.attempts;
         await runActivityBatch(actions.activity, actions.read, state, engine, task.signal, budget,
           (updated) => { if (!task.signal.aborted) activity = migrateActivity(updated); },
-          () => Date.now() < roomPriorityUntil);
+          () => budget.attempts > attemptsBefore);
         if (!task.signal.aborted) { generationFailures = 0; report('予定の活動を確認しました。次の予定まで待機します。'); }
       });
     } catch (error) { if (!task.signal.aborted) {
@@ -121,7 +120,7 @@ export function createAiControls(actions: AiActions,
     finally { if (operation === task) operation = undefined; }
   }
   async function advance(planned?: AiActivity) {
-    if (operation || checking || autoBlocked || Date.now() < Math.max(roomPriorityUntil, retryAt)) return;
+    if (operation || checking || autoBlocked || Date.now() < retryAt) return;
     checking = true;
     const before = revision;
     try {
@@ -154,7 +153,6 @@ export function createAiControls(actions: AiActions,
   return {
     refresh,
     olt,
-    prioritizeRoom(until: number) { roomPriorityUntil = until; },
     cancelBackground() { cancel(); },
     async runRoom(work: (engine: LocalLlmAdapter, signal: AbortSignal) => Promise<void>, external: AbortSignal) {
       if (external.aborted || document.visibilityState !== 'visible') return;
@@ -170,7 +168,7 @@ export function createAiControls(actions: AiActions,
       const abort = () => { if (operation === task) cancel(); };
       external.addEventListener('abort', abort, { once: true });
       let timedOut = false;
-      const timeout = setTimeout(() => { timedOut = true; abort(); }, 30_000);
+      let timeout = setTimeout(() => { timedOut = true; abort(); }, 180_000);
       try {
         await navigator.locks.request('pcvan-ai-activity', { ifAvailable: true }, async (lock) => {
           if (!lock) { olt.stage('別タブで活動中・待機'); return; }
@@ -179,6 +177,8 @@ export function createAiControls(actions: AiActions,
           if (!adapter || loadedModel !== activity!.modelId) olt.stage('モデル読込中');
           const engine = await loadEngine(task, activity!.modelId);
           task.signal.throwIfAborted();
+          clearTimeout(timeout);
+          timeout = setTimeout(() => { timedOut = true; abort(); }, 60_000);
           await work(engine, task.signal);
           generationFailures = 0;
         });
@@ -201,8 +201,8 @@ export function createAiControls(actions: AiActions,
         `6時間の自動投稿上限: ${activity?.maxPosts ?? 0} / 同意: ${activity?.consent ? 'あり' : 'なし'} / 試行 ${budget.attempts}/${MAX_SESSION_POSTS} / 保存 ${budget.committed}`,
         ...(activity?.allowance ? [`保存済みの6時間枠: 通常試行 ${activity.allowance.attempts}/12 / 通常保存 ${activity.allowance.committed}`] : []),
         '掲示板とメールは同じ保存済み生成上限を使います。読むだけなら生成しません。',
-        'OLT は別枠で全室1時間24試行まで。自動活動0で OLT も休止。可視タブのみで動作します。',
-        `OLT 保存済み時間枠: 試行 ${roomBudget?.attempts ?? 0}/24（再生成も含む）`,
+        `OLT は別枠で全室1時間${OLT_ATTEMPT_LIMIT}試行まで。自動活動0で OLT も休止。可視タブのみで動作します。`,
+        `OLT 保存済み時間枠: 試行 ${roomBudget?.attempts ?? 0}/${OLT_ATTEMPT_LIMIT}（再生成も含む）`,
         'OLT: 在室住人・読込済みモデルがある時は表示まで約10秒が目標です。保証ではありません。住人ごとの観察・応答待ちを保持します。',
         ...(activity?.batch?.runs.map((run) => `${run.id} / ${run.status} / ${run.personaId} / simulatedAt=${run.simulatedAt}`) ?? [])];
     },
@@ -243,7 +243,7 @@ export function createAiControls(actions: AiActions,
       finally { if (operation === task) { authorizingContext = undefined; operation = undefined; } }
     },
     openActivity(planned?: AiActivity) { autoBlocked = false; return advance(planned); },
-    tick() { return advance(); },
+    tick(planned?: AiActivity) { return advance(planned); },
     async retry() {
       autoBlocked = false; generationFailures = 0; retryAt = 0;
       for (const run of activity?.batch?.runs ?? []) if (run.status === 'failed' || run.status === 'cancelled')

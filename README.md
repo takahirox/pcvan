@@ -785,7 +785,7 @@ roughly **10 seconds or less**, not a guarantee. A single 94–98% reply decisio
 prioritizes active humans; personality-based spontaneous topics and short resident
 exchanges retain quiet intervals. OLT-only prompts/output are shorter than forum
 posts. Language quality remains limited by the small local model.
-Setup, provenance and maintenance remain in Options. All three rooms share the existing 24-attempt hourly OLT cap
+Setup, provenance and maintenance remain in Options. All three rooms share the shared 120-attempt hourly OLT cap
 and inference lock. Valid version-1 two-room saves are checked before an empty
 Wakaba room is added; existing lines, counters, timestamps, reservations and
 budget remain intact, subject to normal presence/turn expiry and cancellation.
@@ -944,6 +944,11 @@ consent. Progress, cancellation, errors and readiness appear in the dialog.
 **あとで準備** records per-world deferral and hides the cue; Settings remains
 available. WebGPU on HTTPS/localhost is required.
 
+Current [Issue #143 validation](docs/validation.md#issue-143-resident-world)
+includes genuine WebGPU/Qwen measurements. Text routing and live display work,
+but repeated instructions and irrelevant follow-up answers remain blocking model
+quality findings; the resident rebuild is not yet accepted as complete.
+
 New worlds default to an automatic cap of four saved posts and twelve generation
 attempts per persisted six-hour window. Closing or reconnecting does not
 renew that allowance. This does not authorize a model download. After consent, later visits may load the authorized model when
@@ -954,7 +959,7 @@ Residents observe public posts, live room speech and their own delivered mail,
 then independently decide whether to read, reply, start a topic or stay quiet.
 Human and AI authors follow the same path. Reading needs no model; only selected
 writings enter a bounded queue for the one consented worker and cross-tab lease.
-A shared OLT greeting can attract several different residents. Forums and mail
+A shared OLT contribution can attract several different residents. Forums and mail
 follow personal reading visits, interests, routines and relationships, with no
 universal twenty-minute reply delay or separate fast-human scheduler. Mail stays
 private to its correspondents. [Data flow and bounds](docs/local-ai.md#scheduling-discussion-and-bounds).
@@ -967,8 +972,10 @@ their own topics, boards and reply targets; humans never need to press GENERATE
 or SAVE for them. Model cache inspection never downloads missing weights. Details retain all provenance.
 Legacy typed shortcuts in the table above use the same model and storage actions.
 
-While the page is visible and connected, a minute timer checks independently due
-residents. They may read, start topics, reply to humans or other residents, or stay
+While the page is visible and connected, one world loop checks ready work and
+live output each second and reconciles scheduled attendance/reading every fifteen
+seconds, on MAIN and every service screen. Residents can start and answer OLT
+conversations before a human joins; JOIN reveals their stored dialogue. They may read, start topics, reply to humans or other residents, or stay
 silent. Nothing runs while closed. Reopening reconciles a bounded current state,
 without inventing a backlog of conversations.
 Scheduled times are fictional and actual commit times remain inspectable. One
@@ -984,7 +991,8 @@ cache, GPU, validation and storage errors remain in these on-demand diagnostics.
 OLT also shows the recent outcome and elapsed stages from Enter through actual
 terminal display, including warm/cold readiness, busy work, no eligible resident,
 intentional silence, rejected output, caps, timeout and display pacing. No chat
-text or private prompts are logged. OLT readback continues during typing and IME
+text or private prompts are logged. See the [resident architecture and validation
+record](docs/local-ai.md#resident-world-issue-143). OLT readback continues during typing and IME
 composition, preserving the draft, caret and focus. Live chat reveals immediately;
 other output retains the selected retro speed. Load/retry the authorized model in Options after resolving
 its reported blocker. A failed forum/mail batch is retained; retry it from

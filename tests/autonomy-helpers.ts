@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { snapshot } from './terminal-helpers';
-import { random } from '../src/ai/activity';
+import { availableResident, random } from '../src/ai/activity';
 import type { AiActivity, JsonValue } from '../src/storage/schema';
 import type { ResidentSettings } from '../src/ai/personas';
 
@@ -26,11 +26,17 @@ export async function lifestyles(page: Page, cap = 4) {
   Object.assign(state, { seed, maxPosts: cap, nextDue: Object.fromEntries(profiles.map((p, i) =>
     [p.id, new Date(now + (i + 1) * hour).toISOString()])) });
   for (const [i, p] of profiles.entries()) Object.assign(p, {
-    frequency: i < 2 ? 1 : 0, participation: 1, absence: 0, preferredBoards: ['MITI:9'],
+    frequency: i < 2 ? 1 : 0, participation: 1, absence: 0, sessionMinutes: 160, preferredBoards: ['MITI:9'],
     weekdayHours: Array.from({ length: 24 }, (_, i) => i), weekendHours: Array.from({ length: 24 }, (_, i) => i),
     reading: 0, inactivity: 0, newThread: 0, reply: 1,
     interests: i === 0 ? ['人間の星'] : ['創作'], affinities: i === 1 ? { hoshimori: 1 } : {},
   });
+  for (let n = 0; n < 1000; n++) {
+    const candidate = `visits-${n}`;
+    if (profiles.slice(0, 2).every((p) => [1, 2, 6, 7].every((h) => availableResident(p, now + h * hour, candidate)))) {
+      state.seed = candidate; break;
+    }
+  }
   await page.evaluate(async (rows) => {
     const db = await new Promise<IDBDatabase>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => resolve(r.result); });
     await new Promise<void>((resolve, reject) => {

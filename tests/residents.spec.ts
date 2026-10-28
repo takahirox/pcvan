@@ -4,7 +4,7 @@ import { activityFixture, backupFixture } from './backup-fixture';
 const start = '2026-10-21T00:00:00.000Z';
 const modelId = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
 test('all ten seeded profiles are distinct; routines obey local dates and seeded decisions include quiet periods', async ({ page }) => {
-  await page.goto('http://127.0.0.1:14374');
+  await page.goto('http://127.0.0.1:14374/tests/module.html');
   const result = await page.evaluate(async ({ fixture, start }) => {
     const a = '/src/ai/activity.ts'; const p = '/src/ai/personas.ts';
     const { emptyActivity, scheduleActivity, routineFactor, HOUR } = await import(a) as typeof import('../src/ai/activity');
@@ -60,7 +60,7 @@ test('all ten seeded profiles are distinct; routines obey local dates and seeded
 });
 
 test('profile edits, pause/resume and old-backup migration preserve identities, pending work and atomic restore', async ({ page }) => {
-  await page.goto('http://127.0.0.1:14374');
+  await page.goto('http://127.0.0.1:14374/tests/module.html');
   const result = await page.evaluate(async ({ fixture, start, modelId }) => {
     const r = '/src/storage/repository.ts'; const p = '/src/ai/personas.ts';
     const { openRepository } = await import(r) as typeof import('../src/storage/repository');

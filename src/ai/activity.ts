@@ -25,18 +25,10 @@ export function migrateActivity(state: AiActivity): AiActivity {
     ...state, version: 2, consent: state.maxPosts > 0 };
 }
 
-export function routineFactor(profile: ResidentProfile, at: number): number {
-  const local = new Date(at + profile.utcOffsetMinutes * 60_000);
-  const hours = [0, 6].includes(local.getUTCDay()) ? profile.weekendHours : profile.weekdayHours;
-  // Personal local hours distinguish reading visits from work and sleep.
-  return hours.includes(local.getUTCHours()) ? 1 : .04;
-}
-/** Eligibility is pure metadata; it neither loads nor invokes a model. */
+export { routineFactor } from './life';
+import { residentSession } from './life';
 export function availableResident(profile: ResidentProfile, at: number, seed: string): boolean {
-  const day = Math.floor((at + profile.utcOffsetMinutes * 60_000) / (24 * HOUR));
-  return profile.frequency > 0 && routineFactor(profile, at) === 1 &&
-    random(`${seed}:${profile.id}:away:${Math.floor(day / 3)}`) >= (profile.absence ?? .12) &&
-    random(`${seed}:${profile.id}:attention:${Math.floor(at / 300_000)}`) < Math.min(1, profile.participation * profile.frequency);
+  return residentSession(profile, at, seed).online;
 }
 export function activityAllowance(state: AiActivity, at: number) {
   if (!state.allowance || at - Date.parse(state.allowance.windowAt) >= 6 * HOUR)
@@ -96,7 +88,10 @@ function observeVisit(index: PlanningIndex, profile: ResidentProfile, at: number
   }
   if (writing) return writing;
   const topicBoards = forums.length ? forums : index.forums;
-  if (topicBoards.length && random(`${seed}:${profile.id}:${at}:topic`) < profile.newThread * (1 - profile.inactivity)) {
+  const lastTopic = [...seen].reverse().find((id) => id.startsWith('topic:'));
+  const topicDue = !lastTopic || at - Number(lastTopic.slice(6)) >= 30 * 60_000 / Math.max(.05, profile.newThread * profile.frequency);
+  if (topicDue && topicBoards.length && profile.newThread > 0 && profile.inactivity < .7) {
+    seen.push(`topic:${at}`);
     const forum = topicBoards[Math.floor(random(`${seed}:${profile.id}:${at}:board`) * topicBoards.length)]!;
     return { personaId: profile.id, forumId: forum.id };
   }
@@ -123,7 +118,6 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
   const runs = (state.batch?.runs ?? []).filter((r) => ['pending', 'running', 'failed'].includes(r.status))
     .filter((r) => members.has(personaMemberId(r.personaId)) && profiles.some((p) => p.id === r.personaId && p.frequency > 0));
   if (!state.maxPosts || !state.consent) {
-    state.nextDue = initialDue(timestamp, state.seed!, profiles);
     return { ...state, lastActivityAt: timestamp };
   }
   const index = planningIndex(content);
@@ -136,12 +130,12 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
     if (!availableResident(profile, to, state.seed!)) continue;
     if (runs.some((r) => r.personaId === profile.id)) continue;
     const seen = state.observations[profile.id] ?? [];
+    const beforeReading = [...seen];
     const action = observeVisit(index, profile, to, state.seed!, runs, seen);
     state.observations[profile.id] = [...new Set(seen)].slice(-96);
     if (action && runs.filter((r) => r.status !== 'failed').length >= Math.min(12, state.maxPosts)) {
       state.nextDue[profile.id] = previousDue;
-      const key = action.mail ? `mail:${action.mail.replyToMailId ?? action.mail.publicPostId}` : `forum:${action.replyToPostId}`;
-      state.observations[profile.id] = state.observations[profile.id]!.filter((id) => id !== key);
+      state.observations[profile.id] = beforeReading;
       continue;
     }
     if (action) {

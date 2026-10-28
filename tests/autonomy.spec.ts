@@ -15,12 +15,13 @@ test('visible timer saves delayed human and resident replies, preserves input, r
   // This person's next reading visit is soon; the other reader returns later.
   const data = await snapshot(page);
   const { observeResident } = await import('../src/ai/observation');
+  const { availableResident } = await import('../src/ai/activity');
   const profiles = (data.settings.find((s) => s.id === 'ai-residents')!.value as unknown as import('../src/ai/personas').ResidentSettings).profiles;
   const activity = data.settings.find((s) => s.id === 'ai-activity')!;
   const state = activity.value as unknown as AiActivity;
   for (let i = 0; i < 1000; i++) {
     state.seed = `nearby-${i}`;
-    if (observeResident(profiles[0]!, { id: human.id, service: 'forum', authorId: human.authorId,
+    if (availableResident(profiles[0]!, Date.parse(human.createdAt) + 110_000, state.seed) && observeResident(profiles[0]!, { id: human.id, service: 'forum', authorId: human.authorId,
       text: human.body, at: Date.parse(human.createdAt), interested: true }, state.seed).readyAt <= Date.parse(human.createdAt) + 110_000) break;
   }
   state.nextDue!.hoshimori = new Date(Date.parse(human.createdAt) + 110_000).toISOString();
@@ -93,12 +94,13 @@ for (const mode of ['invalid', 'failure'] as const) {
   });
 }
 
-test('automatic activity waits for the other tab model lease and resumes when that tab closes', async ({ page, context }) => {
+test('the tab holding the model serves the shared world without a second tab loading or duplicating work', async ({ page, context }) => {
   await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page); await lifestyles(page); await consent(page);
   const other = await context.newPage(); await other.clock.install({ time: new Date(epoch.getTime() + hour + 60_000) });
   await mockWorker(other, 'ok'); await other.goto('/'); await expect(other.locator('.output')).toContainText('MAIN');
   await expect.poll(async () => (await snapshot(other)).settings.find((r) => r.id === 'ai-activity')!.value).toMatchObject({ batch: { runs: expect.any(Array) } });
-  expect(await generated(other)).toEqual([]);
+  // The active owner may serve the now-due shared world while the second tab waits.
+  expect((await generated(other)).length).toBeLessThanOrEqual(1);
   expect(await other.evaluate(() => (window as unknown as { journeyWorker: { loads: number } }).journeyWorker.loads)).toBe(0);
   await page.close(); await other.clock.fastForward(60_000);
   await expect.poll(async () => (await generated(other)).length).toBe(1);
