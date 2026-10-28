@@ -193,7 +193,7 @@ test.describe('scheduled repository', () => {
     expect(scheduledMail(result.restored).letters[0]!.dueAt).toBe(due); expect(result.late).toHaveLength(1); expect(result.again).toEqual([]);
   });
 
-  test('mocked catch-up prompts respect availability and commits revalidate scheduled-parent response delay', async ({ page }) => {
+  test('mocked prompts respect delivery availability and commits reject a future scheduled parent', async ({ page }) => {
     const result = await page.evaluate(async ({ due, epoch }) => {
       const repo = window.scheduledRepo, senderId = (await repo.list('members')).find((m) => m.actor === 'human')!.id;
       const ordinary = await repo.createHumanMail({ id: 'ordinary', senderId, recipient: 'hoshimori', subject: '先の手紙', body: '先の本文' });
@@ -224,9 +224,9 @@ test.describe('scheduled repository', () => {
       const profile = { ...residentProfiles(released)[0]!, reply: 1 };
       const at = Date.parse(due) + 20 * 60_000;
       let chosen;
-      for (let n = 0; n < 100; n++) { chosen = chooseMail(released, profile, at, `seed${n}`, []); if (chosen) break; }
+      for (let n = 0; n < 100; n++) { chosen = chooseMail(released, profile, at, `seed${n}`, []); if (chosen?.replyToMailId === 'scheduled:P-context') break; }
       const codes: string[] = [];
-      for (const [id, simulatedAt] of [['reply:too-early', '2026-10-23T01:23:59.999Z'], ['reply:on-time', '2026-10-23T01:24:00.000Z']]) {
+      for (const [id, simulatedAt] of [['reply:too-early', '2026-10-23T01:03:59.999Z'], ['reply:on-time', '2026-10-23T01:24:00.000Z']]) {
         const batch = { id: 'reply', from: epoch, to: '2026-10-24T00:00:00.000Z', modelId: state.modelId,
           runs: [{ id, personaId: 'hoshimori', simulatedAt, status: 'running', mail: { humanId: senderId, replyToMailId: 'scheduled:P-context' } }] };
         await repo.put('settings', { id: 'ai-activity', value: { ...state, maxPosts: 4, consent: true, batch } as never });

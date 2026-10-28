@@ -1,16 +1,14 @@
 import type { Backup } from '../storage/schema';
 import type { GenerationPrompt } from './generation';
 import { aiOrigin, personaMemberId, residentProfiles, personas } from './personas';
-import { random } from './activity';
+import { random, observeResident } from './observation';
 import { appendOlt, attendance, iso, oltAuthorization, oltEnabled, roomDefinitions, validOltText } from '../olt-state';
 import type { OltRoom, OltState, OltTurn } from '../olt-state';
 import { localConversation } from '../storage/community';
 import { residentSetting } from './setting';
 
-/** One collective active-human draw: 94–98%, instead of independent resident gates.
- * Explicitly quiet/disabled profiles are ineligible; organic turns retain personality.
- * All decisions and inference reservations run in the repository write transaction.
- */
+/** Every present resident observes the shared room independently. Cursors record
+ * reading/silence per person; the queue serializes authored text only. */
 export function planOltTurn(state: OltState, room: OltRoom, content: Backup, at: number, token: string,
   report: (reason: string) => void = () => {}): OltTurn | undefined {
   const skip = (reason: string) => { report(reason); return undefined; };
@@ -21,51 +19,68 @@ export function planOltTurn(state: OltState, room: OltRoom, content: Backup, at:
   if (room.pending && Date.parse(room.pending.until) > at) return skip('生成予約中');
   if (at - Date.parse(state.windowAt) >= 3_600_000) { state.windowAt = iso(at); state.attempts = 0; state.organicAttempts = 0; }
   if (state.attempts >= 24) return skip('時間枠の上限');
-  // Preserve an unanswered human watermark even when an older inference finishes.
-  const human = room.lines.find((l) => l.kind === 'say' && l.origin === 'local-human' && l.number > room.handledNumber);
-  if (!human && at < Date.parse(room.nextTurnAt)) return;
-  if (human && at - Date.parse(human.createdAt) > 60_000) {
-    room.handledNumber = human.number; return skip('返信待ち期限切れ');
-  }
-  const utterance = [...room.lines].reverse().find((l) => l.kind === 'say');
-  const arrival = [...room.lines].reverse().find((l) => l.kind === 'enter' && l.number > room.handledNumber && attendance(room, at).includes(l.authorId));
-  let last = human ?? (utterance && utterance.number > room.handledNumber ? utterance : arrival);
-  const initiating = !human && (!last || room.chain >= 3);
-  if (initiating) {
-    // After a short exchange, allow another topic only after a real quiet interval.
-    if (utterance && at - Date.parse(utterance.createdAt) < 60_000) return;
-    last = undefined;
-  }
-  if (!human && (state.organicAttempts ?? 0) >= 16) return skip('自発発言の上限');
-  const byId = new Map(residentProfiles(content).map((p) => [personaMemberId(p.id), p]));
-  const profiles = room.residents.slice(0, 16).filter((v) => Date.parse(v.until) > at && v.memberId !== last?.authorId)
-    .map((v) => byId.get(v.memberId)).filter((p): p is NonNullable<typeof p> => !!p && p.frequency > 0 && p.inactivity < 1 && p.reply > 0);
-  const event = last?.id ?? `${room.id}:${room.nextTurnAt}`;
-  const score = (p: typeof profiles[number]) => {
-    const recent = room.lines.filter((l) => l.kind === 'say' && l.authorId === personaMemberId(p.id));
-    const recency = Math.max(0, 1 - (at - Date.parse(recent.at(-1)?.createdAt ?? iso(at - 60_000))) / 60_000);
-    return (p.affinities[last?.authorId.replace('fictional-ai:', '') ?? ''] ?? 0) * 2 +
-      p.interests.filter((i) => last?.text.includes(i)).length + p.reply * .3 + p.frequency * .2 - p.inactivity * .3 +
-      random(`${ai.seed}:olt:${event}:${p.id}:score`) - recency * .4 -
-      room.lines.slice(-12).filter((l) => l.kind === 'say' && l.authorId === personaMemberId(p.id)).length * .5;
-  };
-  profiles.sort((a, b) => score(b) - score(a));
-  const persona = profiles[0];
-  if (!persona) return skip('適任の在室住人なし');
-  if (last) room.handledNumber = last.number;
-  if (initiating) room.chain = 0;
-  // Persist the next opportunity even for silence; polling cannot reroll it.
-  room.nextTurnAt = iso(at + 45_000 + random(`${ai.seed}:olt:${event}:pause`) * 45_000);
-  const probability = human ? .96 + .02 * persona.reply - .02 * persona.inactivity
-    : persona.reply * (1 - persona.inactivity) * (initiating ? .65 : 1);
-  if (random(`${ai.seed}:olt:${event}:${persona.id}:response`) >= probability) return skip('意図的な静けさ');
+  const suitable = observeRoomResidents(room, content, at);
+  const index = room.decisions!.findIndex((d) => Date.parse(d.readyAt) <= at);
+  if (index < 0) return skip(!suitable ? '適任の在室住人なし' : room.decisions!.length ? '住人の応答待ち' : '意図的な静けさ');
+  const decision = room.decisions!.splice(index, 1)[0]!;
   state.attempts++;
-  if (!human) state.organicAttempts = (state.organicAttempts ?? 0) + 1;
-  const turn: OltTurn = { id: token, authorId: personaMemberId(persona.id), modelId: ai.modelId,
-    context: oltAuthorization(content), until: iso(at + 30_000), ...(last ? { targetNumber: last.number } : {}) };
+  const turn: OltTurn = { id: token, authorId: decision.authorId, modelId: ai.modelId,
+    context: oltAuthorization(content), until: iso(at + 30_000),
+    ...(decision.targetNumber ? { targetNumber: decision.targetNumber } : {}) };
   room.pending = turn;
   report('応答対象の確定');
   return turn;
+}
+
+/** Cheap room reading runs even while the shared worker is busy. */
+export function observeRoomResidents(room: OltRoom, content: Backup, at: number): boolean {
+  const ai = oltEnabled(content);
+  if (!ai || at < Date.parse(room.observedAt) || !room.visitors.some((v) => Date.parse(v.until) > at)) return false;
+  const profiles = new Map(residentProfiles(content).map((p) => [personaMemberId(p.id), p]));
+  room.observations ??= {};
+  room.decisions ??= [];
+  room.decisions = room.decisions.filter((d) => {
+    const p = profiles.get(d.authorId);
+    return !!p?.frequency && p.inactivity < 1 && (p.reply > 0 || p.newThread > 0) && room.residents.some((r) => r.memberId === d.authorId && Date.parse(r.until) > at) &&
+    (d.targetNumber === undefined || room.lines.some((l) => l.number === d.targetNumber));
+  });
+  let suitable = false;
+  for (const resident of room.residents) {
+    const profile = profiles.get(resident.memberId);
+    if (Date.parse(resident.until) <= at || !profile?.frequency) continue;
+    suitable ||= profile.inactivity < 1 && (profile.reply > 0 || profile.newThread > 0);
+    const memory = room.observations[resident.memberId] ??= { number: 0,
+      topicAt: iso(at + 60_000 + random(`${ai.seed}:${resident.memberId}:${resident.joinedAt}:topic`) * 120_000) };
+    if (room.pending?.authorId === resident.memberId || room.decisions.some((d) => d.authorId === resident.memberId)) continue;
+    // Bounded retained conversation, including AI lines. New arrivals hear only
+    // events during their visit. No global human-versus-organic reply track.
+    const events = room.lines.filter((l) => l.kind === 'say' && l.number > memory.number && Date.parse(l.createdAt) >= Date.parse(resident.joinedAt));
+    for (const event of events) {
+      if (event.authorId === resident.memberId) { memory.number = event.number; continue; }
+      const decision = observeResident(profile, { id: event.id, service: 'olt', authorId: event.authorId,
+        text: event.text, at: Date.parse(event.createdAt) }, ai.seed!);
+      // An AI exchange naturally winds down; all residents may still consider a
+      // new human contribution. This is a volume bound, not speaker selection.
+      const depth = room.chain;
+      if (decision.write && (event.origin === 'local-human' || depth < 3)) {
+        if (room.decisions.length >= 8) break; // Leave cursor unread under backpressure.
+        room.decisions.push({ authorId: resident.memberId, targetNumber: event.number, readyAt: iso(decision.readyAt) });
+        memory.number = event.number;
+        break;
+      }
+      memory.number = event.number;
+    }
+    const last = room.lines.filter((l) => l.kind === 'say').at(-1);
+    if (!room.decisions.some((d) => d.authorId === resident.memberId) && at >= Date.parse(memory.topicAt) &&
+      (!last || at - Date.parse(last.createdAt) >= 60_000)) {
+      memory.topicAt = iso(at + 90_000 + random(`${ai.seed}:${resident.memberId}:${at}:topic`) * 180_000);
+      if (room.decisions.length < 8 && random(`${ai.seed}:${resident.memberId}:${memory.topicAt}:initiate`) < profile.newThread * (1 - profile.inactivity))
+        room.decisions.push({ authorId: resident.memberId, readyAt: iso(at) });
+    }
+  }
+  room.observations = Object.fromEntries(Object.entries(room.observations).filter(([id]) => room.residents.some((r) => r.memberId === id)));
+  room.decisions.sort((a, b) => a.readyAt.localeCompare(b.readyAt) || a.authorId.localeCompare(b.authorId));
+  return suitable;
 }
 
 export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn): GenerationPrompt {
@@ -129,7 +144,14 @@ export function commitOltText(room: OltRoom, turn: OltTurn, raw: string, at: num
       room.lines.slice(-20).some((l) => l.text.trim() === (v.text as string).trim())) throw new Error('Invalid OLT output.');
     const handles = [content?.members.find((m) => m.id === turn.authorId)?.handle,
       personas.find((p) => personaMemberId(p.id) === turn.authorId)?.handle].filter((h): h is string => !!h);
+    if (content?.members.some((m) => {
+      const prefix = (v.text as string).trim().normalize('NFKC');
+      const name = m.handle.trim().normalize('NFKC');
+      return name && (prefix.startsWith(`${name}:`) || prefix.startsWith(`${name}：`));
+    })) throw new Error('Impersonated speaker label.');
     if (defectiveOltReply(v.text as string, handles, room)) throw new Error('Confused or repetitive OLT reply.');
+    // A fresh topic starts a new short exchange after the quiet interval.
+    if (turn.targetNumber === undefined) room.chain = 0;
     appendOlt(room, turn.authorId, 'say', v.text as string, aiOrigin(turn.modelId), at);
   } catch { throw new OltOutputRejected('Invalid or repetitive OLT output.'); }
 }

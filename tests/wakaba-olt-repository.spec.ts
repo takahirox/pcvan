@@ -80,7 +80,7 @@ test('legacy normalization preserves every old field, is pure/idempotent and per
   expect(upgraded.attempts).toBe(17); expect(upgraded.windowAt).toBe(legacy.windowAt);
   // Presence reconciles without consent; normalization still preserves history,
   // sequence numbers, budgets and leases rather than replaying arrivals.
-  const metadata = (rooms: typeof upgraded.rooms) => rooms.map(({ residents: _residents, ...room }) => room);
+  const metadata = (rooms: typeof upgraded.rooms) => rooms.map(({ residents: _residents, observations: _observations, decisions: _decisions, ...room }) => room);
   expect(metadata(upgraded.rooms.slice(0, 2))).toEqual(metadata((r.before.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState).rooms));
   const fresh = r.missingAfter.settings.find((s) => s.id === 'olt-rooms')!.value as unknown as import('../src/olt-state').OltState;
   expect(fresh.rooms.map((r) => r.id)).toEqual(['lounge', 'night', 'wakaba']); expect(fresh.rooms.every((r) => !r.lines.length && !r.visitors.length)).toBe(true);

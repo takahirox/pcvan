@@ -116,14 +116,15 @@ for (const [timezoneId, anchor, stamp, forumStamp, replyStamp] of [
     await consent(page);
     const joined = await command(page, 'JOIN 2', '日時 JST');
     const oltLabel = `(${identityToken(data.members.find((m) => m.id === own.authorId))}) <暦の旅人>`;
-    expect(joined).toContain(`${stamp} (${identityToken(data.members.find((m) => m.id === own.authorId))}) * 暦の旅人 入室`);
+    expect(joined).toContain('参加者：');
+    expect(joined).not.toContain('* 暦の旅人 入室');
     const live = await command(page, literal, `${stamp} ${oltLabel} ${literal}`);
     // A queued /LIST waits for the live write and replays the identical dated line.
     const replay = await command(page, '/LIST', `<暦の旅人> ${literal}`);
     expect(replay).toContain(`${stamp} ${oltLabel} ${literal}`);
     expect(live).toContain(`${stamp} ${oltLabel} ${literal}`);
     // Cross JST midnight/year rollover while the model receives only bounded room context.
-    await page.clock.setFixedTime(new Date(Date.parse(anchor) + 20_000));
+    await page.clock.setFixedTime(new Date(Date.parse(anchor) + 20_000)); await advance(page, 1);
     await expect.poll(() => page.evaluate(() => (window as any).journeyWorker.generations)).toBe(1);
     await page.evaluate(() => (window as any).completeOlt());
     await advance(page, 6);
@@ -133,7 +134,8 @@ for (const [timezoneId, anchor, stamp, forumStamp, replyStamp] of [
     expect(await command(page, '/LIST', reply.text)).toContain(`${replyStamp} (`);
     await command(page, '/LEAVE', '部屋を退出');
     const rejoined = await command(page, 'JOIN 2', '日時 JST');
-    expect(rejoined).toContain(`${replyStamp} (${identityToken(data.members.find((m) => m.id === own.authorId))}) * 暦の旅人 退室`);
+    expect(rejoined).toContain('参加者：');
+    expect(rejoined).not.toContain('* 暦の旅人 退室');
     await command(page, '/MAIN', 'MAIN');
     await command(page, 'SETTINGS', '設定 / SETTINGS'); await command(page, '3', 'コマンド=');
     await command(page, 'AUTO 0', '休止');

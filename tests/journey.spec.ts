@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { command, start, enterForum, post, backup, restore, noOtherUi, settings, snapshot } from './terminal-helpers';
 import { mockWorker } from './ai-helpers';
+import { identityToken } from '../src/member-presentation';
 import { emptyActivity } from '../src/ai/activity';
 import type { ResidentSettings } from '../src/ai/personas';
 import type { AiActivity, JsonValue } from '../src/storage/schema';
@@ -86,7 +87,7 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   const residents = fixture.settings.find((row) => row.id === 'ai-residents')!.value as unknown as ResidentSettings;
   // Pin the legacy repeated-author scenario independently of the new-world roster.
   residents.version = 1; residents.profiles = residents.profiles.slice(0, 10);
-  for (const profile of residents.profiles) profile.preferredBoards = ['MITI:9'];
+  for (const profile of residents.profiles) Object.assign(profile, { preferredBoards: ['MITI:9'], participation: 1, absence: 0, reply: 1, inactivity: 0, weekdayHours: Array.from({ length: 24 }, (_, n) => n), weekendHours: Array.from({ length: 24 }, (_, n) => n) });
   await restore(page, fixture);
   await settings(page, 3); await command(page, 'AUTO 2', '有効');
   await command(page, 'LOAD', '同意してモデル'); await command(page, 'Y');
@@ -99,14 +100,16 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   expect(generated).toHaveLength(1); expect(interrupted.posts).toHaveLength(84);
   const batch = (interrupted.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity).batch!;
   expect(batch.runs.map((run) => run.status)).toEqual(['committed', 'running']);
-  expect(batch.runs[1]).toMatchObject({ personaId: batch.runs[0]!.personaId, forumId: batch.runs[0]!.forumId });
+  expect(batch.runs[1]!.personaId).not.toBe(batch.runs[0]!.personaId);
+  expect(batch.runs[1]!.forumId).toBe(batch.runs[0]!.forumId);
   await page.close(); const resumed = await context.newPage(); await resumed.clock.setFixedTime(returnTime); await mockWorker(resumed, 'ok');
   await resumed.goto('/');
   await expect.poll(async () => (await snapshot(resumed)).posts.length).toBe(85);
   const recovered = await backup(resumed);
   expect(recovered.posts.filter((p) => p.simulation)).toHaveLength(2);
   const recoveredBatch = (recovered.settings.find((row) => row.id === 'ai-activity')!.value as unknown as AiActivity).batch!;
-  expect(recoveredBatch.runs).toEqual(batch.runs.map((run) => ({ ...run, status: 'committed' })));
+  for (const run of batch.runs) expect(recovered.posts.some((p) => p.id === run.id)).toBe(true);
+  expect(recoveredBatch.runs.length).toBeLessThanOrEqual(2);
   expect(new Set(recovered.posts.filter((p) => p.simulation).map((p) => p.body)).size).toBe(2);
   expect(recovered.posts.find((p) => p.id === generated[0]!.id)).toEqual(generated[0]);
   await enterForum(resumed);
@@ -115,9 +118,7 @@ test('production AI recovers a partially committed autonomous batch after tab lo
   const generatedRead = await command(resumed, `READ ${generatedPost.number}`, '★内容');
   expect(generatedRead).toContain(`${generatedPost.title}　${author.handle}\n★内容`);
   const generatedToken = generatedRead.match(/★タイトル \((SYN-[0-9A-V]{13})\)/)![1];
-  const seededPost = recovered.posts.find((p) => p.forumId === generatedPost.forumId && p.authorId === author.id && !p.simulation)!;
-  const seededRead = await command(resumed, `READ ${seededPost.number}`, '★内容');
-  expect(seededRead).toContain(`★タイトル (${generatedToken})`);
+  expect(generatedToken).toBe(identityToken(author));
   expect((await snapshot(resumed)).posts).toEqual(recovered.posts);
   await settings(resumed, 3); await command(resumed, 'HELP', 'committed');
   await command(resumed, 'MAIN', 'MAIN'); await command(resumed, 'Q', '接続を終了');

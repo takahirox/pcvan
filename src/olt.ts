@@ -4,7 +4,7 @@ import type { Backup, JsonValue } from './storage/schema';
 import type { LocalRepository } from './storage/repository';
 import { activeHuman } from './forums';
 import { identityToken, penName } from './member-presentation';
-import { OLT_SETTING, attendance, oltState, roomDefinitions, contextRooms } from './olt-state';
+import { OLT_SETTING, attendance, oltState, roomDefinitions, contextRooms, oltEnabled } from './olt-state';
 import type { OltContext, OltLine, OltRoom, OltState, RoomId } from './olt-state';
 import { buildOltPrompt, OltOutputRejected } from './ai/olt';
 import { residentProfiles, personaMemberId } from './ai/personas';
@@ -65,7 +65,7 @@ export class TerminalOlt {
       : `* ${name} ${line.kind === 'enter' ? '入室' : '退室'}`}`;
   }
   private show(room: OltRoom, data: Backup, full: boolean) {
-    const lines = (full ? room.lines.slice(-40) : room.lines.filter((l) => l.number > this.seen && (l.kind === 'say' || Date.parse(l.createdAt) >= this.liveSince)));
+    const lines = (full ? room.lines.filter((l) => l.kind === 'say').slice(-40) : room.lines.filter((l) => l.number > this.seen && (l.kind === 'say' || Date.parse(l.createdAt) >= this.liveSince)));
     this.seen = room.nextNumber - 1;
     if (full) this.actions.print(`OLT / ${roomDefinitions.find((d) => d.id === room.id)!.name}`, this.who(room, data));
     if (full && lines.length) this.actions.print('最近の記録（表示日時は発生時刻）');
@@ -75,7 +75,8 @@ export class TerminalOlt {
         const visit = this.visit;
         this.actions.ai.olt.stage('表示キュー');
         this.actions.display(text, () => { if (visit === this.visit) this.actions.ai.olt.stage('表示完了'); });
-      } else this.actions.print(...text);
+      } else if (!full && this.actions.display) this.actions.display(text, () => {});
+      else this.actions.print(...text);
     }
     if (full) this.actions.print(roomHelp, 'そのまま入力: 発言（400文字まで）/ //文字: 先頭の / を発言 / /HANDLE: ハンドル設定', '日時 JST / 発言=');
   }
@@ -151,14 +152,14 @@ export class TerminalOlt {
       this.actions.ai.olt.begin(enteredAt, saved.lines.at(-1)!.id);
       this.show(saved, data, false);
       this.actions.ai.olt.stage('発言保存');
-      this.actions.ai.prioritizeRoom(Date.now() + 60_000);
+      this.actions.ai.prioritizeRoom(Date.now() + 2_000);
       this.actions.speechSaved?.();
     }
     catch (error) { this.actions.print(String(error)); }
     return true;
   }
   /** Inference never holds the terminal command queue. */
-  async tick(quiet: () => boolean) {
+  async tick() {
     const id = this.roomId, context = this.actions.oltContext(), visit = this.visit;
     if (id && (!context || !contextRooms(context).some((r) => r.id === id))) { await this.leave(); return; }
     const current = () => id === this.roomId && visit === this.visit && context === this.actions.oltContext();
@@ -170,7 +171,7 @@ export class TerminalOlt {
         const repo = await this.actions.repository(), data = await this.actions.read();
         if (current() && document.visibilityState === 'visible') {
           const state = await repo.observeRoom(this.clientId, id, activeHuman(data));
-          if (current()) this.observePresence(state);
+          if (current()) { this.observePresence(state); this.show(state.rooms.find((r) => r.id === id)!, data, false); }
         }
       } finally { this.observing = false; }
       return;
@@ -181,22 +182,23 @@ export class TerminalOlt {
       if (!current() || document.visibilityState !== 'visible') return;
       const state = await repo.observeRoom(this.clientId, id, activeHuman(data));
       if (!current()) return;
-      if (!quiet()) this.show(state.rooms.find((r) => r.id === id)!, data, false);
+      this.show(state.rooms.find((r) => r.id === id)!, data, false);
       const observed = state.rooms.find((r) => r.id === id)!;
       if (Date.now() < Date.parse(observed.observedAt)) { this.actions.ai.olt.stage('時計の巻き戻り'); return; }
-      const waiting = observed.lines.find((l) => l.kind === 'say' && l.origin === 'local-human' && l.number > observed.handledNumber);
-      if (waiting && Date.now() - Date.parse(waiting.createdAt) > 60_000) {
-        await repo.expireRoomSpeech(id);
-        this.actions.ai.olt.stage('返信待ち期限切れ'); this.actions.ai.prioritizeRoom(0); return;
-      }
-      if (!waiting && Date.now() < Date.parse(observed.nextTurnAt)) return;
-      this.actions.ai.olt.prepare(waiting?.id ?? `${id}:${observed.nextTurnAt}`, waiting ? Date.parse(waiting.createdAt) : undefined);
+      const waiting = observed.lines.filter((l) => l.kind === 'say' && l.origin === 'local-human').at(-1);
+      this.actions.ai.olt.prepare(waiting?.id ?? id, waiting ? Date.parse(waiting.createdAt) : undefined);
+      if (!oltEnabled(data)) { this.actions.ai.olt.stage('モデル未同意・活動休止'); this.actions.ai.prioritizeRoom(0); return; }
       if (state.attempts >= 24 && Date.now() - Date.parse(state.windowAt) < 3_600_000) {
         this.actions.ai.olt.stage('時間枠の上限'); this.actions.ai.prioritizeRoom(0); return;
       }
-      const suitable = residentProfiles(data).some((p) => p.frequency > 0 && p.reply > 0 && p.inactivity < 1 &&
+      const suitable = residentProfiles(data).some((p) => p.frequency > 0 && (p.reply > 0 || p.newThread > 0) && p.inactivity < 1 &&
         observed.residents.some((r) => r.memberId === personaMemberId(p.id) && Date.parse(r.until) > Date.now()));
       if (!suitable) { this.actions.ai.olt.stage('適任の在室住人なし'); this.actions.ai.prioritizeRoom(0); return; }
+      if (!observed.decisions?.some((d) => Date.parse(d.readyAt) <= Date.now())) {
+        this.actions.ai.olt.stage(observed.decisions?.length ? '住人の応答待ち' : '意図的な静けさ');
+        this.actions.ai.prioritizeRoom(0); return;
+      }
+      this.actions.ai.prioritizeRoom(Date.now() + 2_000);
       const task = new AbortController(); this.task = task;
       await this.actions.ai.runRoom(async (engine, signal) => {
         let turn = await repo.claimRoomTurn(id, undefined, (reason) => this.actions.ai.olt.stage(reason));
@@ -223,8 +225,7 @@ export class TerminalOlt {
                 // Readback must not mistake that success for a withdrawn turn.
                 if (this.turnId === token) this.turnId = undefined;
                 const latest = await this.actions.read(); signal.throwIfAborted();
-                if (current() && !quiet()) this.show(oltState(latest).rooms.find((r) => r.id === id)!, latest, false);
-                else if (current()) this.actions.ai.olt.stage('表示待ち（入力・設定中）');
+                if (current()) this.show(oltState(latest).rooms.find((r) => r.id === id)!, latest, false);
               }
               break;
             } catch (error) {

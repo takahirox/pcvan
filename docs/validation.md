@@ -3708,3 +3708,56 @@ Real supported-GPU/Qwen 0.5B/1.5B sessions and low-end hardware checks were **no
 performed**. Ten seconds remains a warm-model UX target, not a guarantee for cold
 downloads, busy work, exhausted allowance or slow display settings. No post-merge
 verification is required for this change.
+
+## Issue #141: resident observations across services
+
+Validated on 2026-10-28 with the production build, Chromium, IndexedDB and the
+existing WebLLM worker protocol mocked at the worker boundary:
+
+- `npm test -- --workers=4`: **572 passed (8.4 minutes)**. The default test ports
+  were occupied by another worktree; this run temporarily used 24373/24374 in
+  place of 14373/14374. All test URLs and configuration were restored afterward.
+- After the final expired-reservation cleanup, `npm test --
+  tests/resident-safety.spec.ts tests/olt-repository.spec.ts
+  tests/olt-latency.spec.ts tests/olt.spec.ts tests/wakaba-olt-repository.spec.ts
+  --workers=4`: **53 passed (46.4 seconds)**, including the lost-tab regression.
+- `npm run build`: passed again after that cleanup (TypeScript and Vite). The
+  existing large WebLLM chunk warning remains.
+- `git diff --check`: passed, including staged new files.
+
+The shared observation policy has deterministic checks for multiple residents
+answering one human or AI event, listeners recording reading without inference,
+100 readers producing only two willing authors, returning to a thread, prompt
+and same-day private correspondence, and bounded durable memory. Transactional
+checks cover one rejected author followed by another successful author,
+concurrent duplicate commits, private prompt isolation, scheduled delivery,
+multiple recipients, unknown observation IDs, restore rollback and reset fences.
+
+Production-asset journeys in DAISIZEN and Wakaba submit `こんにちは`, then observe
+for sixty seconds without another submission. Idle, nonempty-draft and synthetic
+IME-composition cases each receive two distinct residents. Draft text, selection
+direction, caret and focus remain unchanged; composition Enter cannot submit.
+A separate 300-bps journey receives committed chat immediately during composition,
+then checks LIST/room switching and the unchanged saved display preference.
+
+Controlled-clock warm-worker measurements from the final suite (milliseconds
+from Enter; these are mock execution measurements, **not GPU benchmarks**):
+
+| Room, across idle/draft/IME | Stored event | Generation start/end | Committed reply | Visible DOM |
+| --- | ---: | ---: | ---: | ---: |
+| DAISIZEN | 0 | 1000 | 1000 | 1000–1100 |
+| Wakaba | 0 | 1000 | 1000 | 1000–1100 |
+
+Other journeys hold the worker lock beyond sixty seconds and recover without
+another human action, reject self-address/echo/impersonated output with bounded
+correction, and let another resident recover after one completion stalls and
+hits its deadline. Expired reservations from lost tabs release their sole
+resident for current speech. Resident-only topics can restart a conversation after a quiet
+interval. Existing multi-day presence samples, hour/day jumps, two-tab leases,
+hidden-page cancellation, legacy normalization and current-JST checks pass.
+
+The [architecture review and final data flow](local-ai.md#architecture-review-issue-141)
+explain the retained execution limits and removed behavioral paths. No model
+weights were downloaded and no real WebGPU/Qwen conversation or native operating
+system IME candidate window was exercised. Japanese fluency and real-device
+latency remain optional manual validation; no post-merge verification is required.

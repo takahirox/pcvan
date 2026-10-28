@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { PcvanController } from '../src/navigation';
 import { ConnectionController } from '../src/connection';
+import { emptyActivity } from '../src/ai/activity';
 import { TerminalOlt } from '../src/olt';
 import { about } from '../src/settings';
 import { emptyOlt, appendOlt } from '../src/olt-state';
@@ -118,6 +119,8 @@ for (const mode of ['context', 'reentry']) test(`late output is fenced after ${m
   const data = backupFixture(), saved = emptyOlt(now), w = saved.rooms.find((r) => r.id === 'wakaba')!;
   data.settings.push({ id: 'olt-rooms', value: saved as never });
   data.members.push({ id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' });
+  data.settings.push({ id: 'ai-activity', value: { ...emptyActivity(now), consent: true } as never });
+  w.decisions = [{ authorId: 'fictional-ai:hoshimori', readyAt: now }];
   w.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: '2099-01-01T00:00:00.000Z' }];
   appendOlt(w, 'human', 'say', '質問', 'local-human', Date.parse(now));
   let context: OltContext | null = 'wakaba', release!: () => void, started!: () => void;
@@ -134,7 +137,7 @@ for (const mode of ['context', 'reentry']) test(`late output is fenced after ${m
     } } as never,
   });
   try {
-    await olt.submit('JOIN 1'); const running = olt.tick(() => false); await began;
+    await olt.submit('JOIN 1'); const running = olt.tick(); await began;
     context = 'daisizen';
     if (mode === 'reentry') { await olt.submit('JOIN 1'); context = 'wakaba'; await olt.submit('JOIN 1'); }
     const before = [...printed]; release(); await running;
@@ -153,6 +156,8 @@ test('successful commit is not cancelled when presence reconciliation races the 
   const now = new Date().toISOString(), at = Date.parse(now), data = backupFixture(), saved = emptyOlt(now), w = saved.rooms[2]!;
   data.settings.push({ id: 'olt-rooms', value: saved as never });
   data.members.push({ id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' });
+  data.settings.push({ id: 'ai-activity', value: { ...emptyActivity(now), consent: true } as never });
+  w.decisions = [{ authorId: 'fictional-ai:hoshimori', readyAt: now }];
   w.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: '2099-01-01T00:00:00.000Z' }];
   appendOlt(w, 'human', 'say', '窓から月が見えます。', 'local-human', at);
   let committed = false, aborted = false; const printed: string[] = [];
@@ -177,7 +182,7 @@ test('successful commit is not cancelled when presence reconciliation races the 
     } as never,
   });
   try {
-    await olt.submit('JOIN 1'); await olt.tick(() => false);
+    await olt.submit('JOIN 1'); await olt.tick();
     expect(committed).toBe(true); expect(aborted).toBe(false);
     expect(printed.join('\n')).toContain('双眼鏡で月の縁を眺めていました。');
   } finally { if (previous) Object.defineProperty(globalThis, 'document', previous); else Reflect.deleteProperty(globalThis, 'document'); }

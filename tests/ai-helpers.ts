@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation' | 'retry-ok' | 'slow' | 'chatter') {
+export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation' | 'retry-ok' | 'slow' | 'once-slow' | 'chatter') {
   await page.addInitScript((mode) => {
     Object.defineProperty(navigator, 'gpu', { value: {} });
     // Keep outputs distinct when a new page resumes the same persona/forum run.
@@ -17,7 +17,7 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
         if (message.kind === 'chatCompletionNonStreaming') {
           stats.generations++;
           stats.settings.push(message.content.request);
-          if (mode === 'interrupt' && stats.generations === 2) return;
+          if ((mode === 'interrupt' && stats.generations === 2) || (mode === 'once-slow' && stats.generations === 1)) return;
           if (mode === 'failure') { queueMicrotask(() => this.onerror?.()); return; }
           const data = JSON.parse(message.content.request.messages[1]!.content);
           stats.prompts.push(data);

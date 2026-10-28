@@ -29,6 +29,8 @@ export function createAiControls(actions: AiActions,
   let operation: AbortController | undefined;
   let releaseModelLock: (() => void) | undefined;
   let autoBlocked = false;
+  let generationFailures = 0;
+  let retryAt = 0;
   let revision = 0;
   let authorizingContext: string | undefined;
   let message = 'モデル未読込';
@@ -47,6 +49,13 @@ export function createAiControls(actions: AiActions,
   function failure(error: unknown) {
     autoBlocked = true; cancel();
     report(`AI を利用できません。通信・保存領域・GPU を確認し、設定のモデル読込または再試行を利用してください。端末・閲覧・手動投稿は利用できます。 ${String(error)}`);
+  }
+  function generationFailure(error: unknown) {
+    generationFailures++;
+    cancel();
+    retryAt = Date.now() + 15_000;
+    if (generationFailures >= 3) { failure(error); return; }
+    report('生成に失敗しました。他の住人の予定は保持し、モデルを再確認します。');
   }
   function refresh(snapshot: Backup) {
     const residentsChanged = content && JSON.stringify(residentProfiles(content)) !== JSON.stringify(residentProfiles(snapshot));
@@ -94,7 +103,7 @@ export function createAiControls(actions: AiActions,
     if (activity.batch.modelId !== activity.modelId || !navigator.locks) return;
     const state = activity;
     if (!state.batch!.runs.some((run) => run.status !== 'committed' && canAttempt(state, run, Date.now()) &&
-      (run.userResponse || (budget.attempts < MAX_SESSION_POSTS && budget.committed < state.maxPosts)))) return;
+      ['pending', 'running'].includes(run.status))) return;
     const task = new AbortController(); operation = task;
     try {
       await navigator.locks.request('pcvan-ai-activity', { ifAvailable: true }, async (lock) => {
@@ -104,15 +113,15 @@ export function createAiControls(actions: AiActions,
         await runActivityBatch(actions.activity, actions.read, state, engine, task.signal, budget,
           (updated) => { if (!task.signal.aborted) activity = migrateActivity(updated); },
           () => Date.now() < roomPriorityUntil);
-        if (!task.signal.aborted) report('予定の活動を確認しました。次の予定まで待機します。');
+        if (!task.signal.aborted) { generationFailures = 0; report('予定の活動を確認しました。次の予定まで待機します。'); }
       });
     } catch (error) { if (!task.signal.aborted) {
-      if (error instanceof ModelBusy) report(error.message); else failure(error);
+      if (error instanceof ModelBusy) report(error.message); else if (loadedModel) generationFailure(error); else failure(error);
     } }
     finally { if (operation === task) operation = undefined; }
   }
   async function advance(planned?: AiActivity) {
-    if (operation || checking || autoBlocked || Date.now() < roomPriorityUntil) return;
+    if (operation || checking || autoBlocked || Date.now() < Math.max(roomPriorityUntil, retryAt)) return;
     checking = true;
     const before = revision;
     try {
@@ -137,7 +146,8 @@ export function createAiControls(actions: AiActions,
     if (!navigator.locks) return '自動活動: 利用不可（Web Locks 非対応）';
     if (autoBlocked) return '自動活動: 停止・失敗（設定から再試行できます）';
     if (operation) return loadedModel ? '自動活動: 処理中' : '自動活動: モデル読込中';
-    if (budget.attempts >= MAX_SESSION_POSTS || budget.committed >= activity.maxPosts) return '自動活動: 有効・次の上限更新待ち（6時間）';
+    if (activity.allowance && (activity.allowance.attempts >= MAX_SESSION_POSTS || activity.allowance.committed >= activity.maxPosts)) return '自動活動: 有効・次の上限更新待ち（6時間）';
+    if (activity.batch?.runs.some((run) => run.status === 'failed')) return '自動活動: 個別の生成・保存失敗あり（他の住人は継続）';
     if (activity.batch?.runs.some((run) => run.status !== 'committed')) return '自動活動: 有効・未完了の予定あり';
     return '自動活動: 有効・次の予定待ち（静かな時間もあります）';
   }
@@ -150,7 +160,7 @@ export function createAiControls(actions: AiActions,
       if (external.aborted || document.visibilityState !== 'visible') return;
       if (!supported) { olt.stage('WebGPU 非対応'); return; }
       if (!navigator.locks) { olt.stage('Web Locks 非対応'); return; }
-      if (autoBlocked) { olt.stage('失敗後の再試行待ち'); return; }
+      if (autoBlocked || Date.now() < retryAt) { olt.stage('失敗後の再試行待ち'); return; }
       if (operation) { olt.stage(loadedModel ? 'モデル使用中・待機' : 'モデル読込中・待機'); return; }
       const snapshot = await actions.read(); refresh(snapshot);
       if (!activity?.consent || !activity.maxPosts) { olt.stage('モデル未同意・活動休止'); return; }
@@ -170,16 +180,17 @@ export function createAiControls(actions: AiActions,
           const engine = await loadEngine(task, activity!.modelId);
           task.signal.throwIfAborted();
           await work(engine, task.signal);
+          generationFailures = 0;
         });
       } catch (error) {
         if (!task.signal.aborted) {
           if (error instanceof ModelBusy) { olt.stage('別タブでモデル使用中・待機'); report(error.message); }
-          else { olt.stage('生成失敗'); failure(error); }
+          else { olt.stage('生成失敗'); if (loadedModel) generationFailure(error); else failure(error); }
         }
       } finally {
         clearTimeout(timeout); external.removeEventListener('abort', abort);
         if (operation === task) operation = undefined;
-        if (timedOut) { olt.stage('生成時間切れ'); autoBlocked = true; report('OLT の生成が時間切れです。設定から再試行できます。'); }
+        if (timedOut) { generationFailure(new Error('OLT deadline')); olt.stage('生成時間切れ'); }
       }
     },
     get supported() { return supported; },
@@ -188,11 +199,11 @@ export function createAiControls(actions: AiActions,
       const roomBudget = content?.settings.find((row) => row.id === 'olt-rooms')?.value as unknown as OltState | undefined;
       return [olt.status(), activityStatus(), supported ? message : 'WebGPU が利用できません。端末・閲覧・手動投稿は利用できます。',
         `6時間の自動投稿上限: ${activity?.maxPosts ?? 0} / 同意: ${activity?.consent ? 'あり' : 'なし'} / 試行 ${budget.attempts}/${MAX_SESSION_POSTS} / 保存 ${budget.committed}`,
-        ...(activity?.allowance ? [`保存済みの6時間枠: 通常試行 ${activity.allowance.attempts}/12 / 通常保存 ${activity.allowance.committed} / 人間への返信 ${activity.allowance.responses}/6`] : []),
-        'メールも同じ生成上限を使います。人間の掲示板投稿への返信は別枠で6時間6試行まで（再読込でも維持）。',
+        ...(activity?.allowance ? [`保存済みの6時間枠: 通常試行 ${activity.allowance.attempts}/12 / 通常保存 ${activity.allowance.committed}`] : []),
+        '掲示板とメールは同じ保存済み生成上限を使います。読むだけなら生成しません。',
         'OLT は別枠で全室1時間24試行まで。自動活動0で OLT も休止。可視タブのみで動作します。',
-        `OLT 保存済み時間枠: 試行 ${roomBudget?.attempts ?? 0}/24 / 自発 ${roomBudget?.organicAttempts ?? 0}/16（再生成も含む）`,
-        'OLT: 在室住人・読込済みモデルがある時は表示まで約10秒が目標です。保証ではありません。使用中の返信待ちは最大60秒。',
+        `OLT 保存済み時間枠: 試行 ${roomBudget?.attempts ?? 0}/24（再生成も含む）`,
+        'OLT: 在室住人・読込済みモデルがある時は表示まで約10秒が目標です。保証ではありません。住人ごとの観察・応答待ちを保持します。',
         ...(activity?.batch?.runs.map((run) => `${run.id} / ${run.status} / ${run.personaId} / simulatedAt=${run.simulatedAt}`) ?? [])];
     },
     invalidate() { autoBlocked = true; cancel(); message = 'モデル解放済み'; },
@@ -224,6 +235,7 @@ export function createAiControls(actions: AiActions,
         if (setupContext(latest) !== authorizingContext) throw new Error('世界や設定が変わりました。再試行してください。');
         refresh(latest); authorizingContext = undefined; autoBlocked = false;
         await loadEngine(task, modelId);
+        generationFailures = 0; retryAt = 0;
         report('モデル準備完了。活動は生活時間に沿って自動で進みます。');
       } catch (error) { if (!task.signal.aborted) {
         if (error instanceof ModelBusy) report(error.message); else failure(error);
@@ -232,6 +244,11 @@ export function createAiControls(actions: AiActions,
     },
     openActivity(planned?: AiActivity) { autoBlocked = false; return advance(planned); },
     tick() { return advance(); },
-    retry() { autoBlocked = false; return advance(); },
+    async retry() {
+      autoBlocked = false; generationFailures = 0; retryAt = 0;
+      for (const run of activity?.batch?.runs ?? []) if (run.status === 'failed' || run.status === 'cancelled')
+        await actions.activity.setAiRunStatus(run.id, 'pending');
+      return advance();
+    },
   };
 }
