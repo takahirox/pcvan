@@ -21,6 +21,8 @@ export function displayCost(text: string): number {
 }
 
 export class OutputRenderer {
+  private painted = 0;
+  private observers: { at: number; callback: () => void }[] = [];
   private logical: string[] = [];
   private queue: { text: string; cost: number }[] = [];
   private head = 0;
@@ -37,6 +39,18 @@ export class OutputRenderer {
   ) {}
 
   get text(): string { return this.logical.join(''); }
+
+  whenVisible(callback: () => void): void {
+    const at = this.text.length;
+    if (this.painted >= at) callback();
+    else this.observers.push({ at, callback });
+  }
+  private render(text: string): void {
+    this.paint(text); this.painted += text.length;
+    const ready = this.observers.filter((o) => o.at <= this.painted);
+    this.observers = this.observers.filter((o) => o.at > this.painted);
+    ready.forEach((o) => o.callback());
+  }
 
   append(...lines: readonly string[]): void {
     if (!lines.length) return;
@@ -71,7 +85,7 @@ export class OutputRenderer {
     if (this.frame !== undefined) cancelAnimationFrame(this.frame);
     this.frame = undefined;
     const text = this.queue.slice(this.head).map((item) => item.text).join('') + extra;
-    if (text) this.paint(text);
+    if (text) this.render(text);
     this.finish();
   };
 
@@ -96,7 +110,7 @@ export class OutputRenderer {
       batch.push(item.text);
       this.head += 1;
     }
-    if (batch.length) this.paint(batch.join(''));
+    if (batch.length) this.render(batch.join(''));
     if (this.head === this.queue.length) this.finish();
     else {
       // Release consumed entries even if producers keep appending indefinitely.

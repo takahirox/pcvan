@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { personas, originalPersonas, personaMemberId, type ResidentSettings } from '../src/ai/personas';
 import { emptyActivity, scheduleActivity, HOUR } from '../src/ai/activity';
 import { emptyOlt, observeOlt, appendOlt, iso, MAX_PRESENT } from '../src/olt-state';
-import { planOltTurn, buildOltPrompt } from '../src/ai/olt';
+import { planOltTurn, buildOltPrompt, commitOltText } from '../src/ai/olt';
 import { validateBackup, validateResidents, type Backup } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
 
@@ -78,8 +78,7 @@ for (const hour of [3, 8, 13, 22]) test(`present interested OLT resident gets a 
   appendOlt(room, 'human', 'say', '星の観察はどう始めればいいですか', 'local-human', at);
   // An arrival must not swallow an unanswered human utterance.
   appendOlt(room, personaMemberId(profiles[1]!.id), 'enter', '', 'local-presence', at + 1000);
-  expect(planOltTurn(state, room, data, at + 7000, 'early')).toBeUndefined();
-  const turn = planOltTurn(state, room, data, at + 9000, 'reply')!;
+  const turn = planOltTurn(state, room, data, at + 1000, 'reply')!;
   expect(turn.authorId).toBe(personaMemberId(p.id)); expect(state.attempts).toBe(1);
   expect(buildOltPrompt(data, room, turn).user.length).toBeLessThan(6000);
   expect(turn.context.length).toBeLessThan(256);
@@ -250,4 +249,44 @@ test('individual visit boundaries, absence and live event times stay staggered o
     const resumed = JSON.stringify(state); observeOlt(state, data, start + HOUR);
     expect(JSON.stringify(state)).toBe(resumed); // clock reversal never replays
   }
+});
+
+
+test('human-first policy accepts a high majority across seeds, JST hours, rooms and utterance types', () => {
+  let suitable = 0, accepted = 0, quiet = 0, empty = 0;
+  const byHour: number[] = [];
+  for (const hour of [3, 8, 13, 22]) {
+    let eligibleAtHour = 0, acceptedAtHour = 0;
+    for (let seed = 0; seed < 64; seed++) for (const text of ['こんにちは、初めて来ました。', '月や草花を観察する道具を教えてください。', 'ありがとう。窓辺からでも試せますか。']) {
+      const at = Date.parse('2026-10-20T15:00:00Z') + hour * HOUR;
+      const data = world(100, `human-${seed}`), state = emptyOlt(iso(at));
+      observeOlt(state, data, at);
+      for (const room of state.rooms) {
+        room.visitors = [{ clientId: 'human', memberId: 'human', until: iso(at + 45_000) }];
+        appendOlt(room, 'human', 'say', text, 'local-human', at);
+        const hasSuitable = room.residents.some((r) => {
+          const p = personas.find((p) => personaMemberId(p.id) === r.memberId)!;
+          return p.frequency > 0 && p.reply > 0 && p.inactivity < 1;
+        });
+        let reason = '';
+        const turn = planOltTurn(state, room, data, at, 'reply', (value) => { reason = value; });
+        if (!hasSuitable) { empty++; expect(turn).toBeUndefined(); expect(reason).toBe('適任の在室住人なし'); continue; }
+        suitable++; eligibleAtHour++;
+        if (turn) {
+          accepted++; acceptedAtHour++;
+          const prompt = JSON.parse(buildOltPrompt(data, room, turn).user);
+          expect(prompt.replyTo.text).toBe(text); expect(prompt.addressee.id).toBe('human');
+          commitOltText(room, turn, JSON.stringify({ kind: 'olt', roomId: room.id,
+            personaId: turn.authorId.replace('fictional-ai:', ''), text: '窓辺の明るさを調べて、見やすい場所から試すとよさそうです。' }), at, data);
+        } else { quiet++; expect(reason).toBe('意図的な静けさ'); }
+        expect(room.handledNumber).toBe(1);
+        expect(planOltTurn(state, room, data, at + 100, 'reroll')).toBeUndefined();
+      }
+    }
+    byHour.push(acceptedAtHour / eligibleAtHour);
+  }
+  console.log('HUMAN_POLICY', { suitable, accepted, quiet, empty, byHour });
+  expect(suitable).toBeGreaterThan(1000); expect(empty).toBeGreaterThan(0); expect(quiet).toBeGreaterThan(0);
+  expect(accepted / suitable).toBeGreaterThan(.93); expect(accepted / suitable).toBeLessThan(.995);
+  expect(Math.min(...byHour)).toBeGreaterThan(.90);
 });

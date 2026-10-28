@@ -13,7 +13,7 @@ import type { Contribution } from './schema';
 import { OLT_SETTING, oltState, observeOlt, appendOlt, attendance, VISITOR_LEASE, iso, validOltText,
   validateOlt, validateOltMembers, oltAuthorization, oltEnabled } from '../olt-state';
 import type { OltRoom, OltState, OltTurn, RoomId } from '../olt-state';
-import { planOltTurn, commitOltText } from '../ai/olt';
+import { planOltTurn, commitOltText, OltOutputRejected } from '../ai/olt';
 import {
   SCHEDULED_MAIL_SETTING, scheduledMail, validateScheduledMail, validateScheduledRelations, mailAvailableAt,
   invalid, RepositoryError, stores, validateActivity, validateBackup, validateRecord, validateSession, validateResidents, validateMailRelations, resolveMailDestination, resolveMailResident,
@@ -1073,27 +1073,69 @@ export class LocalRepository {
     }, now);
   }
 
-  claimRoomTurn(roomId: RoomId, now = new Date().toISOString()): Promise<OltTurn | undefined> {
+  claimRoomTurn(roomId: RoomId, now = new Date().toISOString(), report?: (reason: string) => void): Promise<OltTurn | undefined> {
     return this.changeOlt((state, content) => {
       observeOlt(state, content, Date.parse(now));
-      return planOltTurn(state, state.rooms.find((r) => r.id === roomId)!, content, Date.parse(now), createRecordId());
+      return planOltTurn(state, state.rooms.find((r) => r.id === roomId)!, content, Date.parse(now), createRecordId(), report);
     }, now);
   }
 
-  finishRoomTurn(roomId: RoomId, token: string, raw?: string, signal?: AbortSignal, now = new Date().toISOString()): Promise<void> {
+  /** Busy workers never consume a reply decision; abandon stale waits without inference. */
+  expireRoomSpeech(roomId: RoomId, now = new Date().toISOString()): Promise<void> {
+    return this.changeOlt((state, content) => {
+      const at = Date.parse(now);
+      observeOlt(state, content, at);
+      const room = state.rooms.find((r) => r.id === roomId)!;
+      if (at < Date.parse(room.observedAt)) return;
+      if (room.pending && Date.parse(room.pending.until) > at) return;
+      for (const line of room.lines) {
+        if (line.kind === 'say' && line.origin === 'local-human' && line.number > room.handledNumber && at - Date.parse(line.createdAt) > 60_000) {
+          room.handledNumber = line.number;
+          room.nextTurnAt = iso(Math.max(Date.parse(room.nextTurnAt), at + 60_000));
+        }
+      }
+    }, now);
+  }
+
+  /** One corrective completion, charged atomically to the same persisted caps. */
+  retryRoomTurn(roomId: RoomId, token: string, signal: AbortSignal, now = new Date().toISOString()): Promise<OltTurn | undefined> {
+    return this.changeOlt((state, content) => {
+      const at = Date.parse(now);
+      observeOlt(state, content, at);
+      const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
+      if (!turn || turn.id !== token || turn.retry || Date.parse(turn.until) <= at ||
+        turn.context !== oltAuthorization(content) || !oltEnabled(content) || state.attempts >= 24 ||
+        !room.visitors.some((v) => Date.parse(v.until) > at) ||
+        !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at)) return;
+      const organic = !room.lines.some((l) => l.number === turn.targetNumber && l.origin === 'local-human');
+      if (organic && (state.organicAttempts ?? 0) >= 16) return;
+      state.attempts++;
+      if (organic) state.organicAttempts = (state.organicAttempts ?? 0) + 1;
+      turn.retry = 1;
+      return turn;
+    }, now, signal);
+  }
+
+  finishRoomTurn(roomId: RoomId, token: string, raw?: string, signal?: AbortSignal, now = new Date().toISOString()): Promise<boolean> {
     return this.changeOlt((state, content) => {
       const at = Date.parse(now);
       // Record intervening presence boundaries before speech at completion time.
       // Reconciliation can also withdraw the pending turn if its speaker left.
       observeOlt(state, content, at);
       const room = state.rooms.find((r) => r.id === roomId)!, turn = room.pending;
-      if (!turn || turn.id !== token) return;
+      if (!turn || turn.id !== token) return false;
       room.pending = null;
       if (raw === undefined || at < Date.parse(room.observedAt) || !oltEnabled(content) || turn.context !== oltAuthorization(content) || Date.parse(turn.until) <= at ||
         !room.residents.some((p) => p.memberId === turn.authorId && Date.parse(p.until) > at) ||
-        !room.visitors.some((v) => Date.parse(v.until) > at)) return;
+        !room.visitors.some((v) => Date.parse(v.until) > at)) return false;
       commitOltText(room, turn, raw, at, content);
-    }, now, signal);
+      return true;
+    }, now, signal).catch((error: unknown) => {
+      // Preserve the validation category after transaction rollback, so callers
+      // can distinguish a correctable completion from a storage/GPU failure.
+      if (error instanceof RepositoryError && error.cause instanceof OltOutputRejected) throw error.cause;
+      throw error;
+    });
   }
 
   private async snapshot(tx: IDBTransaction): Promise<Backup> {

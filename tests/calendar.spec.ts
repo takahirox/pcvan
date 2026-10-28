@@ -93,7 +93,7 @@ for (const [timezoneId, anchor, stamp, forumStamp, replyStamp] of [
     const calendar = { version: 1, sourceAnchor: anchor };
     await page.clock.install({ time: new Date(anchor) });
     await page.clock.setFixedTime(new Date(anchor));
-    await mockWorker(page, 'ok');
+    await mockWorker(page, 'slow');
     await page.goto('/');
     await expect(page.locator('.output')).toContainText(`今回使用開始: ${stamp} (JST)`);
     await expect(page.locator('.output')).toContainText('前回使用終了: 記録なし (JST)');
@@ -124,6 +124,8 @@ for (const [timezoneId, anchor, stamp, forumStamp, replyStamp] of [
     expect(live).toContain(`${stamp} ${oltLabel} ${literal}`);
     // Cross JST midnight/year rollover while the model receives only bounded room context.
     await page.clock.setFixedTime(new Date(Date.parse(anchor) + 20_000));
+    await expect.poll(() => page.evaluate(() => (window as any).journeyWorker.generations)).toBe(1);
+    await page.evaluate(() => (window as any).completeOlt());
     await advance(page, 6);
     await expect.poll(async () => (await speech(page)).length).toBeGreaterThan(0);
     const reply = (await speech(page))[0]!;

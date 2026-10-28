@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { backupFixture } from './backup-fixture';
-import { emptyOlt, appendOlt, iso } from '../src/olt-state';
+import { emptyOlt, appendOlt, iso, validateOlt } from '../src/olt-state';
 import { buildOltPrompt, commitOltText, planOltTurn } from '../src/ai/olt';
 import { emptyActivity } from '../src/ai/activity';
 import { originalPersonas, personaMemberId } from '../src/ai/personas';
@@ -45,7 +45,7 @@ test('directed prompts keep stable speaker/addressee identities and pending spee
   commitOltText(room, turn, JSON.stringify({ kind: 'olt', roomId: 'night', personaId: turn.authorId.replace('fictional-ai:', ''),
     text: '月見客さん、ゆっくりどうぞ。今夜は双眼鏡で月の縁を眺めていました。' }), at + 10_000, data);
   room.pending = null;
-  const next = planOltTurn(state, room, data, at + 25_000, 'resident-reply')!;
+  const next = planOltTurn(state, room, data, at + 35_000, 'resident-reply')!;
   expect(next.authorId).not.toBe(turn.authorId);
   expect(JSON.parse(buildOltPrompt(data, room, next).user).addressee.id).toBe(turn.authorId);
 });
@@ -79,5 +79,17 @@ test('Japanese self-address, visitor echoes and nearby rephrase loops are reject
     'こんにちは、新しい星守です。月の観察が好きです。']) {
     const copy = structuredClone(room);
     expect(() => commitOltText(copy, turn, raw(text), at + 10_000, data)).not.toThrow();
+  }
+});
+
+
+test('optional persisted corrective retry flag is strictly bounded and legacy turns remain valid', () => {
+  const { state, room } = conversation();
+  room.pending = { id: 'turn', authorId: room.residents[0]!.memberId, modelId: 'test', context: '', until: iso(at + 30_000), targetNumber: 1 };
+  expect(() => validateOlt(state)).not.toThrow();
+  room.pending.retry = 1; expect(() => validateOlt(state)).not.toThrow();
+  for (const value of [0, 2, -1, '1', null]) {
+    room.pending.retry = value as never;
+    expect(() => validateOlt(state)).toThrow();
   }
 });

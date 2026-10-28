@@ -674,18 +674,29 @@ keeps the observation watermark and cannot replay visits. Closing/hiding never
 claims continued live presence.
 A read-only unregistered visitor has no fictional member record.
 
-`reconcileOlt`, `observeRoom`, `speakRoom`, `claimRoomTurn` and `finishRoomTurn` each read/update
+`reconcileOlt`, `observeRoom`, `speakRoom`, `claimRoomTurn`, `expireRoomSpeech`,
+`retryRoomTurn` and `finishRoomTurn` each read/update
 the complete bounded setting in one repository transaction. Inference happens
 outside transactions. Confirmation contexts ignore only the OLT observation
 watermark so routine bookkeeping does not invalidate an import/reset confirmation;
 actual attendance, transcripts, budgets and other world edits remain fenced.
-A pending `{id, authorId, modelId, context, until, targetNumber?}` token
-reserves a turn for 35 seconds; optional `targetNumber` preserves the exact speech/arrival
-being answered (legacy tokens remain valid). Commit revalidates
+A pending `{id, authorId, modelId, context, until, targetNumber?, retry?}` token
+reserves a new turn for 30 seconds (old 35-second leases remain valid); optional
+`targetNumber` preserves the exact speech/arrival being answered (legacy tokens remain valid). Commit revalidates
 authorization/profile context,
 presence, expiry and token before atomically appending and clearing it. Repeated
 or stale commits cannot duplicate a line. Semantic rejection rolls back the write;
 normal lease cleanup clears the pending token without refunding its attempt.
+`retryRoomTurn` can atomically add only `retry: 1` and charge one more attempt
+before a corrective completion. Values other than one are rejected on import;
+no backup version change or reset is required. Retries preserve the original
+expiry, author and target, and also count against the sixteen organic attempts
+when applicable. Busy model work does not claim/handle human speech; numbered
+unhandled events can resume after reload or contention, subject to current
+presence and a sixty-second waiting limit. `expireRoomSpeech` advances only stale
+human watermarks without starting inference. `finishRoomTurn` returns whether an
+utterance committed; late, cancelled or withdrawn results cannot be displayed
+as successful replies. Diagnostic timings stay tab-local and outside JSON backups.
 Handled events, attempt counters and
 next-turn times survive cancellation, reload, backup and restore. Old pending
 leases expire; import never automatically infers a saved pending turn.

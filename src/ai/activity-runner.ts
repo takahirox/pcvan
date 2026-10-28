@@ -12,13 +12,15 @@ export type ActivityActions = Pick<LocalRepository, 'openActivity' | 'configureA
 /** One pass only. Failure stops the batch; an explicit retry or reopening can resume it. */
 export async function runActivityBatch(actions: ActivityActions, read: () => Promise<Backup>,
   state: AiActivity, engine: LocalLlmAdapter, signal: AbortSignal,
-  budget: { attempts: number; committed: number }, report: (state: AiActivity) => void): Promise<void> {
+  budget: { attempts: number; committed: number }, report: (state: AiActivity) => void,
+  shouldYield: () => boolean = () => false): Promise<void> {
   const batch = state.batch;
   if (!state.maxPosts || !batch) return;
   let current: AiRun | undefined;
   try {
     for (const planned of [...batch.runs].sort((a, b) => Number(!!b.userResponse) - Number(!!a.userResponse))) {
       signal.throwIfAborted();
+      if (shouldYield()) break;
       if (!planned.userResponse && (budget.attempts >= MAX_SESSION_POSTS || budget.committed >= state.maxPosts)) continue;
       const snapshot = await read();
       signal.throwIfAborted();
@@ -32,6 +34,9 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
         (!current!.userResponse || (routineFactor(profile, Date.now()) === 1 && Date.now() - Date.parse(current!.simulatedAt) <= 10 * 60_000)))) {
         current = undefined; continue;
       }
+      // Yield before claiming another run; an in-flight generation/commit finishes
+      // normally, and unclaimed runs retain their persisted status and allowance.
+      if (shouldYield()) break;
       const started = await actions.setAiRunStatus(current.id, 'running');
       report(started);
       if (!started.batch?.runs.some((run) => run.id === current!.id && run.status === 'running')) {

@@ -36,13 +36,13 @@ test('terminal directory, literal commands, IME, history, transitions, handles, 
   expect(await page.evaluate(() => (window as unknown as { journeyWorker: { loads: number } }).journeyWorker.loads)).toBe(0);
 });
 
-test('delayed human-to-resident and resident-to-resident chat preserve input, shared identities, and private mail', async ({ page }) => {
+test('prompt human-to-resident and resident-to-resident chat preserve input, shared identities, and private mail', async ({ page }) => {
   await page.clock.install({ time: epoch }); await mockWorker(page, 'ok'); await start(page, '星の客');
   await residents(page); await consent(page); await room(page);
-  await command(page, '今夜の星について教えて', '<星の客>'); expect(await speech(page)).toHaveLength(0);
-  await advance(page, 6); await expect.poll(async () => (await speech(page)).length).toBeGreaterThan(0);
+  await command(page, '今夜の星について教えて', '<星の客>');
+  await advance(page, 1); await expect.poll(async () => (await speech(page)).length).toBeGreaterThan(0);
   const first = (await speech(page))[0]!;
-  expect(Date.parse(first.createdAt) - epoch.getTime()).toBeGreaterThanOrEqual(8000);
+  expect(Date.parse(first.createdAt) - epoch.getTime()).toBeLessThan(10_000);
   const input = page.locator('#command'); await input.fill('日本語の途中'); await input.dispatchEvent('compositionstart');
   const output = await page.locator('.output').textContent(); await advance(page, 6);
   expect(await page.locator('.output').textContent()).toBe(output); await expect(input).toHaveValue('日本語の途中'); await expect(input).toBeFocused();
@@ -51,7 +51,7 @@ test('delayed human-to-resident and resident-to-resident chat preserve input, sh
   const lines = await speech(page); expect(lines[1]!.authorId).not.toBe(first.authorId);
   const data = await snapshot(page); expect(data.members.some((m) => m.id === first.authorId && m.actor === 'ai')).toBe(true);
   expect((data.settings.find((r) => r.id === 'ai-activity')!.value as unknown as AiActivity).batch).toBeNull();
-  const count = lines.length; await advance(page, 35); expect((await speech(page)).length).toBeLessThanOrEqual(3);
+  const count = lines.length; await advance(page, 35); expect((await speech(page)).length).toBeLessThanOrEqual(6);
   expect(count).toBeGreaterThan(0);
   const replay = await command(page, '/LIST', '日時 JST');
   const who = await command(page, '/WHO', '参加者');
@@ -96,8 +96,8 @@ test('two tabs share attendance and arbitrate each AI turn once', async ({ page,
   const joined = await state(page), night = joined!.rooms.find((r) => r.id === 'night')!;
   expect(night.visitors).toHaveLength(2); expect(night.lines.filter((l) => l.kind === 'enter' && l.authorId === night.visitors[0]!.memberId)).toHaveLength(1);
   await command(page, 'ふたりで星を見ています', '<同じ客>');
-  await advance(page, 7);
-  expect(await Promise.all([page, other].map((p) => p.evaluate(() => Date.now())))).toEqual([epoch.getTime() + 21_000, epoch.getTime() + 21_000]);
+  await advance(page, 3);
+  expect(await Promise.all([page, other].map((p) => p.evaluate(() => Date.now())))).toEqual([epoch.getTime() + 9000, epoch.getTime() + 9000]);
   await expect.poll(async () => (await speech(page)).length).toBe(1);
   const lines = await speech(page); expect(new Set(lines.map((l) => l.id)).size).toBe(lines.length);
   expect((await state(page))!.rooms.find((r) => r.id === 'night')!.pending).toBeNull();
@@ -403,7 +403,7 @@ for (const mode of ['conversation', 'self-greeting', 'echo'] as const) test(`fir
     expect(await speech(page)).toEqual([]);
     await command(page, '/LIST', '日時 JST');
     expect(await page.locator('.output').textContent()).not.toContain('ドキドキワクワク');
-    expect((await state(page))!.attempts).toBe(1);
+    expect((await state(page))!.attempts).toBe(2);
     expect((await state(page))!.rooms.find((r) => r.id === 'night')!.pending).toBeNull();
   }
 });

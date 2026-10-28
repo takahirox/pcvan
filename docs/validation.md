@@ -3593,3 +3593,118 @@ Optional real Qwen/WebGPU chat sessions were **not performed**. The deterministi
 and mocked tests establish context, persistence, rejection and timing behavior;
 they do not establish subjective real-model fluency or greeting diversity. No
 model download, backend or post-merge verification is required for this change.
+
+
+## Issue #139 responsive OLT
+
+Validated on 2026-10-28 against the worktree based on `50faa1a` (plus GitWeave
+checkpoint metadata). Issue #139 was read from GitHub before implementation.
+No real GPU model, model download, server inference, reset or deployment was used.
+
+### Baseline and full terminal timing
+
+Before tuning, the production browser route was instrumented with the existing
+warm mocked WebLLM worker, real IndexedDB transaction completion, the activity
+Web Lock and a DOM mutation observer. The visitor entered DAISIZEN `JOIN 1` and
+Wakaba `JOIN 1`, then submitted the same question. A paused clock advanced in
+100 ms increments with short wall-time yields for IndexedDB; reduced motion used
+Instant display. The baseline had a first available activity-lock check at 3 s
+that could not yet select a turn, eligible generation/commit at 9 s, and visible
+text only at 12 s in **both** rooms. Thus the initial eight-second floor, polling
+and delayed readback all mattered, even with zero mocked inference latency.
+
+| Stage (elapsed from Enter) | Baseline warm mock, each room | Event-driven warm mock, each room |
+| --- | ---: | ---: |
+| Durable human line | 0 ms | 0 ms |
+| Eligible turn reservation | 9,000 ms | 0 ms |
+| Worker claim | first check 3,000 ms; successful path 9,000 ms | 0 ms |
+| Generation start / end | 9,000 / 9,000 ms | 0 / 0 ms |
+| Reply transaction commit | 9,000 ms | 0 ms |
+| Visible terminal text | 12,000 ms | 0 ms |
+
+The focused after-change run additionally measured **159 ms DAISIZEN / 153 ms
+Wakaba of real wall time** through the test's command, storage and visible-output
+checks. Zero fake elapsed time means the immediate mock settled without advancing
+the paused clock, not zero browser/GPU work. Test attachments retain stage values
+and wall elapsed time. These are mock measurements, not real Qwen benchmarks.
+A separate cold-engine journey releases the authorized model on hide, then
+initializes it again and reports `cold`; the next human event reports `warm` and
+reuses the same engine. A controlled two-second completion plus IME/draft deferral
+and 300-bps reveal checks actual DOM completion independently from commit time.
+The application captures Enter before its command queue and reports only fixed
+stage labels and elapsed numbers in Options.
+
+### Policy, safety and contention evidence
+
+A deterministic sample spans 64 seeds × four JST hours (03/08/13/22) × three
+utterance types (greeting, question, follow-up) × three rooms, using actual default
+resident attendance. Of 2,304 room observations, 285 had no suitable resident;
+1,963 of 2,019 suitable events were selected and accepted (97.2%), with 56 deliberate
+silences. Per-hour acceptance was 97.6%, 99.0%, 96.5%, and 96.0%. Selection tests
+verify the exact target, separate speaker/addressee, validation and no reroll of a
+handled event. The existing weekly attendance sample still reaches all 100
+residents with 547 empty observations; attendance generation was not changed.
+
+The five-minute visible browser visit produces spontaneous multi-party speech
+and minute-long quiet intervals without human prompting; all completions share
+one worker. Tests cover a valid corrective completion after malformed JSON, an
+always-invalid model (exactly two completions for the turn), the previous
+self-greeting/echo failures, strict optional retry-state import, and an atomic
+two-connection race for the final persisted retry allowance. Cancellation,
+withdrawn consent, absent speakers, hidden tabs, clock changes, world replacement,
+restore, quotas and existing identities retain their checks.
+
+A held activity lock leaves human speech unhandled, spends no attempts, reports
+another-tab waiting, and resumes once released. A separate minute-long busy case
+expires without inference. The controls check defers new background work during
+room priority and rejects parallel work while one shared engine is busy. Repeated
+human text gets separate durable event numbers and bypasses resident cooldowns.
+The terminal remains free of technical diagnostic lines. Options tests distinguish
+missing consent, explicit quiet profiles, caps, busy work, warm/cold generation,
+quality rejection and output queues. Existing browser cases also exercise
+unsupported WebGPU, timeouts and late output after room/context changes.
+
+Mock worker requests compare forum/mail's existing JSON/1024-token/0.8 settings
+with OLT JSON/256-token/0.65 settings. OLT context uses six recent utterances
+instead of twelve and two public-memory posts instead of three; all strict ID,
+privacy, Japanese lexical quality and control-character checks remain. A lower
+output ceiling bounds potential decoding work but is not a measured GPU speedup.
+The tests cannot establish subjective Japanese fluency or quality across hardware.
+
+### Commands and limitations
+
+Dependencies installed with `npm ci`. The default test ports were held by another
+worktree, so the runs used a temporary equivalent Playwright configuration on
+14383/14384 and test copies with only the corresponding localhost port literals
+changed. Repository test configuration and source tests retain their normal ports.
+An initial full run was interrupted after URL assertions exposed incomplete
+port substitution in that temporary copy; this was a harness failure, corrected
+before the complete rerun. Earlier focused failures exposed obsolete delay/count
+assertions, an incomplete unit fixture and repetitive mock chatter; those fixtures
+were updated to test the new behavior without weakening output rejection.
+
+A subsequent full run completed with 555/563 passing: the remaining eight
+failures were two old prompt-bound assertions, two tests assuming the former
+pre-generation delay for timestamps, three overly broad new assertions matching
+ordinary `OLT:` navigation text, and an old fixed-cadence reservation fixture.
+Those tests now verify the new bounds, explicitly control delayed completions,
+and distinguish diagnostics from navigation. Review also added regression
+coverage for commit/readback cancellation and backward-clock wait expiration.
+
+Final checks:
+
+- `npm test -- --config=.gitweave-playwright.config.ts --workers=4`: **564 passed**, 8.2 minutes.
+- The final OLT/repository/Wakaba/calendar focused run, including the last
+  backward-clock guard: **45 passed**, 34.3 seconds. A preceding prompt/calendar/
+  conversation focused run passed all 53 cases.
+- `npm run build`: **passed** (TypeScript and production Vite assets); the existing
+  large-chunk warning remains.
+- Local Markdown link targets and `git diff --check`: **passed**.
+
+Temporary port-adjusted configuration, test copies and logs were removed before
+commit; the validation evidence above is the retained record.
+
+Real supported-GPU/Qwen 0.5B/1.5B sessions and low-end hardware checks were **not
+performed**. Ten seconds remains a warm-model UX target, not a guarantee for cold
+downloads, busy work, exhausted allowance or slow display settings. No post-merge
+verification is required for this change.

@@ -3,7 +3,7 @@ import type { Session, Setting, TerminalPreferences } from './storage/schema';
 import { OutputRenderer } from './output-renderer';
 
 interface TerminalActions {
-  submit(line: string): void;
+  submit(line: string, enteredAt: number): void;
   previous(current: string): string;
   next(current: string): string;
   completeConnection?(): void;
@@ -90,10 +90,11 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (composing) return;
+    const enteredAt = Date.now();
     const line = input.value;
     input.value = '';
     renderer.reveal();
-    actions.submit(line);
+    actions.submit(line, enteredAt);
     input.focus({ preventScroll: true });
   });
 
@@ -109,6 +110,7 @@ export function mountTerminal(root: HTMLElement, actions: TerminalActions) {
       apply(value);
     },
     logText: () => renderer.text,
+    whenVisible: (callback: () => void) => renderer.whenVisible(callback),
     get sessionTimes() { return times; },
     clearInput: () => { input.value = ''; },
     focus: () => input.focus({ preventScroll: true }),

@@ -6,7 +6,7 @@ import { residentSetting } from './setting';
 
 export interface GenerationRequest { personaId: string; forumId: string; replyToPostId?: string }
 export interface GeneratedPost extends GenerationRequest { title: string; body: string }
-export interface GenerationPrompt { system: string; user: string; schema: string }
+export interface GenerationPrompt { system: string; user: string; schema: string; purpose?: 'olt' }
 export interface LocalLlmAdapter {
   load(modelId: string, progress: (fraction: number) => void, signal: AbortSignal): Promise<void>;
   generate(prompt: GenerationPrompt, signal: AbortSignal): Promise<string>;

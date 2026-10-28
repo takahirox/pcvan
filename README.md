@@ -778,7 +778,13 @@ Visits end individually rather than at shared hourly cutoffs. Presence and bound
 transcripts survive reload and JSON backup; gaps reconcile current attendance
 without a backlog of chat or historical arrival/departure notices. Prompts separate
 speaker, addressee and speech from status; self-greetings and obvious echoes are
-rejected before storage. Language quality remains limited by the small local model.
+rejected before storage, with at most one corrective completion charged to the
+persisted budget. Saved human speech immediately requests a reply. With a suitable
+present resident and warm, authorized model, the goal is a displayed answer in
+roughly **10 seconds or less**, not a guarantee. A single 94–98% reply decision
+prioritizes active humans; personality-based spontaneous topics and short resident
+exchanges retain quiet intervals. OLT-only prompts/output are shorter than forum
+posts. Language quality remains limited by the small local model.
 Setup, provenance and maintenance remain in Options. All three rooms share the existing 24-attempt hourly OLT cap
 and inference lock. Valid version-1 two-room saves are checked before an empty
 Wakaba room is added; existing lines, counters, timestamps, reservations and
@@ -950,7 +956,7 @@ A separate persisted allowance allows six attempts per six hours, with at most t
 pending replies. Organic discussions and mail retain their slower cadence and
 four-save default. Silence, unavailable specialists, busy inference and exhausted
 allowances remain possible. OLT reconciles overlapping individual visits while visible
-and can plan a present resident's reply after eight seconds; spontaneous speech
+and immediately requests a present resident's reply after saved human speech; spontaneous speech
 uses at most sixteen of the shared twenty-four attempts/hour. All identities share
 one opt-in worker and cross-tab lease. [Design and bounds](docs/local-ai.md#presence-and-response-validation-for-issue-133).
 
@@ -976,7 +982,14 @@ until explicit recovery or another visit. Failures leave the terminal usable.
 Settings distinguishes paused activity, missing initial authorization, loading,
 processing, waiting for a due time or allowance renewal, and failures. Model load,
 cache, GPU, validation and storage errors remain in these on-demand diagnostics.
-A failed batch is retained; retry it from Settings after correcting the cause.
+OLT also shows the recent outcome and elapsed stages from Enter through actual
+terminal display, including warm/cold readiness, busy work, no eligible resident,
+intentional silence, rejected output, caps, timeout and display pacing. No chat
+text or private prompts are logged. Busy human turns wait for up to a minute;
+no new inference starts after the wait expires. Use Instant/Escape for queued
+terminal output, or load/retry the authorized model in Options after resolving
+its reported blocker. A failed forum/mail batch is retained; retry it from
+Settings after correcting the cause.
 Model selection, cache checks and detailed provenance remain available.
 Inference stays local, with no external AI API, key,
 backend, remote participants or paid service. These residents are fiction, never

@@ -41,7 +41,7 @@ export function createWebLlmAdapter(): LocalLlmAdapter {
       const result = await engine.chat.completions.create({
         messages: [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user }],
         response_format: { type: 'json_object', schema: prompt.schema },
-        max_tokens: 1024, temperature: 0.8, stream: false,
+        max_tokens: prompt.purpose === 'olt' ? 256 : 1024, temperature: prompt.purpose === 'olt' ? 0.65 : 0.8, stream: false,
       });
       const choice = result.choices[0];
       if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error('生成が完了しませんでした。');

@@ -39,6 +39,8 @@ export interface CommandActions {
   read(): Promise<Backup>;
   print(...lines: string[]): void;
   navigate(line: string): void;
+  speechSaved?(): void;
+  display?(lines: string[], visible: () => void): void;
   destination(): ForumDestination | null;
   oslCategory?(): 1 | 2 | null;
   selectDownload?(number: number): ServiceDownload | null;
@@ -307,7 +309,7 @@ export class TerminalCommands {
     this.actions.print('住人の編集（未保存）',
       ...profileFields.map((key, i) => `${i + 1} ${profileLabels[i]}: ${JSON.stringify(this.profile?.[key])}`), '番号: 値を入力 / SAVE: 検証して保存 / CANCEL・BACK: 変更を破棄');
   }
-  async submit(line: string): Promise<boolean> {
+  async submit(line: string, enteredAt = Date.now()): Promise<boolean> {
     const revision = this.revision, submission = ++this.submission;
     const command = line.trim().replace(/\s+/g, ' ').toUpperCase();
     const print = this.actions.print;
@@ -456,7 +458,7 @@ export class TerminalCommands {
     if (!this.menu && this.olt.active && ['/HANDLE', '/SETTINGS'].includes(command)) {
       await this.olt.leave(); return this.submit(command.slice(1));
     }
-    if (!this.menu && await this.olt.submit(line)) return true;
+    if (!this.menu && await this.olt.submit(line, enteredAt)) return true;
     if (!command) return !!this.menu;
     if (command === 'STOP') { this.actions.ai.stop(); if (!this.applicationOutput('ai')) print('処理をキャンセルし、モデルを解放しました。'); return true; }
     if (['SETTINGS', 'CONFIG'].includes(command)) { await this.show('settings'); return true; }

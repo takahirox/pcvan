@@ -83,7 +83,7 @@ test('Wakaba two-tab attendance and shared turn arbitration use the shared resid
   expect(joined.visitors).toHaveLength(2); expect(joined.residents).toHaveLength(2);
   expect(joined.lines.filter((l) => l.kind === 'enter' && l.authorId === joined.visitors[0]!.memberId)).toHaveLength(1);
   await command(page, '初めての質問です', '<同じ初心者>');
-  await advance(page, 7);
+  await advance(page, 3);
   await expect.poll(async () => (await speech(page)).length).toBeGreaterThan(0);
   const turns = await speech(page); expect(turns.every((l) => l.id.startsWith('olt:wakaba:'))).toBe(true);
   const generations = await Promise.all([page, other].map((p) => p.evaluate(() => (window as unknown as { journeyWorker: { generations: number } }).journeyWorker.generations)));
@@ -114,9 +114,12 @@ for (const action of ['departure', 'settings', 'hidden'] as const) {
 }
 
 for (const mode of ['context', 'reentry']) test(`late output is fenced after ${mode} changes`, async () => {
-  const data = backupFixture(), saved = emptyOlt(epoch.toISOString()), w = saved.rooms.find((r) => r.id === 'wakaba')!;
+  const now = new Date().toISOString();
+  const data = backupFixture(), saved = emptyOlt(now), w = saved.rooms.find((r) => r.id === 'wakaba')!;
   data.settings.push({ id: 'olt-rooms', value: saved as never });
-  appendOlt(w, 'human', 'say', '質問', 'local-human', epoch.getTime());
+  data.members.push({ id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' });
+  w.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: '2099-01-01T00:00:00.000Z' }];
+  appendOlt(w, 'human', 'say', '質問', 'local-human', Date.parse(now));
   let context: OltContext | null = 'wakaba', release!: () => void, started!: () => void;
   let committed = 0; const printed: string[] = [];
   const began = new Promise<void>((resolve) => { started = resolve; });
@@ -126,7 +129,7 @@ for (const mode of ['context', 'reentry']) test(`late output is fenced after ${m
   const olt = new TerminalOlt({ read: async () => data, oltContext: () => context, print: (...lines) => printed.push(...lines), navigate: () => {},
     repository: async () => ({ observeRoom: async () => saved, claimRoomTurn: async () => ({ id: 'turn', authorId: 'fictional-ai:hoshimori', modelId: 'test', context: '', until: '2099-01-01T00:00:00.000Z' }),
       finishRoomTurn: async (_id: string, _token: string, raw?: string) => { if (raw) committed++; } }) as never,
-    ai: { runRoom: async (run: (engine: unknown, signal: AbortSignal) => Promise<void>, signal: AbortSignal) => {
+    ai: { olt: { stage() {}, prepare() {} }, prioritizeRoom() {}, runRoom: async (run: (engine: unknown, signal: AbortSignal) => Promise<void>, signal: AbortSignal) => {
       try { await run({ generate: async () => { started(); await delayed; return '{}'; } }, signal); } catch (e) { if (!signal.aborted) throw e; }
     } } as never,
   });
@@ -143,4 +146,39 @@ for (const mode of ['context', 'reentry']) test(`late output is fenced after ${m
 test('About makes Wakaba capability, uncertainty, reconstruction and compatibility discoverable', () => {
   const text = about(backupFixture()).join('\n');
   for (const term of ['Issue #113', '2026-10-24', 'はじめての談話室', 'wakaba', 'カテゴリーD', '全室共通1時間24試行', '旧2室', '正確な構成は低確度', 'wakaba-beginner-olt-issue-113']) expect(text).toContain(term);
+});
+
+
+test('successful commit is not cancelled when presence reconciliation races the display read', async () => {
+  const now = new Date().toISOString(), at = Date.parse(now), data = backupFixture(), saved = emptyOlt(now), w = saved.rooms[2]!;
+  data.settings.push({ id: 'olt-rooms', value: saved as never });
+  data.members.push({ id: 'fictional-ai:hoshimori', handle: '星守', actor: 'ai' });
+  w.residents = [{ memberId: 'fictional-ai:hoshimori', joinedAt: now, until: '2099-01-01T00:00:00.000Z' }];
+  appendOlt(w, 'human', 'say', '窓から月が見えます。', 'local-human', at);
+  let committed = false, aborted = false; const printed: string[] = [];
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { visibilityState: 'visible' } });
+  const olt = new TerminalOlt({
+    read: async () => { if (committed) olt.observePresence(saved); return data; },
+    oltContext: () => 'wakaba', print: (...lines) => printed.push(...lines), navigate() {},
+    repository: async () => ({ observeRoom: async () => saved,
+      claimRoomTurn: async () => w.pending = { id: 'turn', authorId: 'fictional-ai:hoshimori', modelId: 'test', context: '', until: '2099-01-01T00:00:00.000Z', targetNumber: 1 },
+      finishRoomTurn: async (_id: string, _token: string, raw?: string) => {
+        if (!raw) return false;
+        appendOlt(w, 'fictional-ai:hoshimori', 'say', '双眼鏡で月の縁を眺めていました。', 'local-ai:webllm:test', at);
+        w.pending = null; committed = true; return true;
+      },
+    }) as never,
+    ai: { olt: { stage() {}, prepare() {} }, prioritizeRoom() {},
+      runRoom: async (work: (engine: unknown, signal: AbortSignal) => Promise<void>, signal: AbortSignal) => {
+        try { await work({ generate: async () => '{}' }, signal); } catch (e) { if (!signal.aborted) throw e; }
+        aborted = signal.aborted;
+      },
+    } as never,
+  });
+  try {
+    await olt.submit('JOIN 1'); await olt.tick(() => false);
+    expect(committed).toBe(true); expect(aborted).toBe(false);
+    expect(printed.join('\n')).toContain('双眼鏡で月の縁を眺めていました。');
+  } finally { if (previous) Object.defineProperty(globalThis, 'document', previous); else Reflect.deleteProperty(globalThis, 'document'); }
 });
