@@ -18,7 +18,7 @@ export interface OltLine {
 export interface OltPresence { memberId: string; joinedAt: string; until: string }
 export interface OltVisitor { clientId: string; memberId: string; until: string }
 export interface OltTurn {
-  id: string; authorId: string; modelId: string; context: string; until: string; targetNumber?: number;
+  id: string; authorId: string; modelId: string; context: string; until: string; targetNumber?: number; retry?: 1;
 }
 export interface OltRoom {
   id: RoomId; nextNumber: number; lines: OltLine[];
@@ -65,7 +65,9 @@ export function appendOlt(room: OltRoom, authorId: string, kind: OltLine['kind']
   room.lines.push(line); room.lines = room.lines.slice(-RETAIN_LINES);
   if (kind === 'say') {
     room.chain = origin === 'local-human' ? 0 : room.chain + 1;
-    room.nextTurnAt = iso(Date.parse(createdAt) + (origin === 'local-human' ? 8_000 : 14_000));
+    const rhythm = random(`olt:cadence:${authorId}:${number}:${createdAt}`);
+    room.nextTurnAt = iso(Date.parse(createdAt) + (origin === 'local-human' ? 0
+      : room.chain >= 3 ? 75_000 + rhythm * 45_000 : 14_000 + rhythm * 8_000));
   }
   return line;
 }
@@ -214,7 +216,8 @@ export function validateOlt(value: unknown): asserts value is OltState {
       }
     }
     if (r.pending !== null) {
-      const p = obj(r.pending, ['id', 'authorId', 'modelId', 'context', 'until'], ['targetNumber']);
+      const p = obj(r.pending, ['id', 'authorId', 'modelId', 'context', 'until'], ['targetNumber', 'retry']);
+      if (p.retry !== undefined && p.retry !== 1) fail();
       if (p.targetNumber !== undefined) { int(p.targetNumber, 1); if ((p.targetNumber as number) >= (r.nextNumber as number)) fail(); }
       text(p.id); text(p.authorId); text(p.modelId); time(p.until);
       if (typeof p.context !== 'string' || p.context.length > 100_000) fail();

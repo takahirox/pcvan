@@ -167,7 +167,7 @@ restored authorization and pause preferences. `CACHE` probes cached weights with
 Settings reports enabled/waiting for initial authorization, paused, loading,
 processing, waiting for a due time, waiting for the allowance renewal, or
 stopped/failed. Quiet schedules are normal. Missing WebGPU or Web Locks is reported
-separately from scheduling silence. Load/cache/validation/GPU/quota failures stop
+separately from scheduling silence. Load/cache/GPU/quota failures stop
 retries and retain unfinished work; use the model loader or activity retry after
 correcting the cause. Model contention waits for the other tab to release its
 lease and automatically retries on the next visible timer. Technical errors and
@@ -456,17 +456,41 @@ notices. Continuously observed transitions use actual visit/lease boundaries and
 are sorted before assigning line numbers. Explicit readback labels retained events
 as records with occurrence dates; visibility resume does not stream missed notices.
 
-An active visible room renews its human lease every three seconds. After human
-speech, the earliest response is eight seconds later, then subsequent resident
-turns are at least fourteen seconds apart (polling/GPU work may add delay).
-Interest, affinity, reply and inactivity weights choose a present speaker or
-silence. A resident may greet another arrival or respond to another resident;
-three consecutive resident utterances end that exchange until new room activity.
-A resident never replies as an absent character or impersonates the human.
-There is no guarantee of an answer. Only currently visible tabs infer; hidden,
-closed and long-unobserved intervals do not generate retrospective conversation.
-On return after a long gap, a fresh quiet interval begins. Reconciliation
-updates attendance without replaying missed intervals.
+An active visible room renews its human lease on a coalesced one-second check.
+Successfully stored human speech immediately requests the response path, outside
+the terminal command queue: there is no pre-inference eight-second sleep or
+mandatory polling wait. A warm, authorized model targets a **visible reply within
+roughly ten seconds** in normal conditions. This is a target, not a hardware or
+reply guarantee. Cold engine initialization, downloads explicitly authorized in
+model setup, busy workers, GPU speed and slow terminal reveal can exceed it.
+WHO attendance alone says nothing about model readiness.
+
+For an active human, present residents with nonzero frequency/reply and inactivity
+below one are ranked by interest, affinity, recent speech/count, frequency and
+reply willingness. A single collective draw accepts with probability
+`0.96 + 0.02 * reply - 0.02 * inactivity` (94–98% for eligible profiles). It does
+not multiply several silence draws. A decision, including deliberate silence,
+advances the human event watermark once. An empty room leaves the event eligible
+for a later arrival; waiting events expire after sixty seconds. Identical human
+words sent twice are separate numbered events. New human speech takes precedence
+over resident cooldowns and over new background forum/mail work in this tab;
+already running model work completes without preemption. Worker/other-tab
+contention leaves speech durable and unhandled, without spending an inference
+attempt, and the visible one-second check resumes it when available. The existing
+cross-tab model lease still requires its owning tab to release the model.
+
+Residents can initiate a short room topic without a new arrival or human line,
+or continue another present resident's thread. Organic decisions retain individual
+reply/inactivity weights (topic initiation additionally uses a 0.65 factor).
+Resident replies are spaced 14–22 seconds apart, with identity/event-dependent
+timing; after three consecutive resident lines, a 75–120 second quiet interval
+precedes another topic. Declined opportunities wait 45–90 seconds rather than
+rerolling every poll. Spontaneous attempts, including corrective retries, use at
+most sixteen of the twenty-four hourly attempts, reserving eight for humans.
+There is no catch-up conversation while hidden, closed or long unobserved. A
+resident never speaks as an absent character or impersonates the human. On return
+after a long gap, a fresh quiet interval begins and attendance reconciles without
+replaying missed intervals.
 
 OLT uses the already authorized model, shared loader/worker, Web Locks and stop/
 retry controls. Opening/joining alone grants no consent. `AUTO 0` pauses OLT speech too.
@@ -480,14 +504,14 @@ a second tab cannot duplicate a turn. Losing visibility, leaving/changing rooms,
 stop, restore/reset and profile/model changes cancel work. OLT loading/generation
 has a 30-second deadline. Failure/timeout suspends automatic retry until Settings
 retry/load. Commit checks consent, profiles, current presence, turn token, lease
-and world epoch again. Tokens expire after 35 seconds; stale output is discarded.
+and world epoch again. New tokens expire after 30 seconds (existing 35-second tokens remain valid); stale output is discarded.
 
 The prompt separates the selected speaker and intended addressee by stable ID,
 current handle and actor, and identifies the reserved reply target independently
 of later status notices. Unanswered speech remains eligible when no resident is
-available yet. It contains twelve typed speech turns (160-character excerpts),
+available yet. It contains six typed speech turns (160-character excerpts),
 four separate presence notices, up to sixteen present identities, a bounded
-speaker profile/interests and at most three public posts from this room's linked
+speaker profile/interests and at most two public posts from this room's linked
 board (180 characters each). **No mail
 records or private-mail excerpts are passed**, even for the speaking resident.
 Wakaba adds beginner culture through this same prompt: plain language, basic
@@ -495,19 +519,45 @@ questions welcome, no assumed experience, quiet reading respected and no promise
 reply. Other OLT rooms’ transcripts are excluded. This context is a category D
 choice, not an archived conversation. Prompt assertions verify construction, not
 real-model cultural quality. All supplied conversation is untrusted data. Output
-must be exact JSON for the selected speaker/room, one plain line of 1–400 UTF-16 units, without terminal
+must be exact JSON for the selected speaker/room, one plain line of 1–200 UTF-16 units (human speech remains 1–400), without terminal
 controls, invisible formatting, HTML or a repeated recent utterance. Before
 storage, conservative Japanese checks reject self-addressed greetings, extensive
 copying, first-visit excitement echoes and nearby rephrase loops. Short
 acknowledgements and attributed quotations with a new contribution are allowed.
 These lexical checks cannot guarantee natural language quality or detect every
-paraphrase. Rejected output never becomes chat; there is no automatic corrective
-inference or canned fallback, and the reserved attempt remains spent. Settings
-exposes technical status and per-line origin.
+paraphrase. Rejected output never becomes chat. At most **one corrective completion**
+uses fresh validation guidance for the same present speaker, under the original
+30-second deadline and cancellation signal. Its reservation is persisted and
+charged to the same hourly/organic counters before inference; reload, racing tabs
+or another failure cannot reset it. A second rejection remains silent, with no
+canned fallback. GPU/worker/storage errors do not trigger this quality retry.
+
+OLT-only generation uses constrained JSON, a 256-output-token ceiling and
+`temperature: 0.65`, compared with forum/mail's existing 1024 tokens and 0.8.
+The shorter prompt retains explicit speaker/addressee/target identities, room
+culture, untrusted-data guidance and public-only context. This bounds work; mock
+request checks cannot establish a real GPU speedup or language quality.
+
+Options → **AIモデル・活動** reports a single recent, tab-local OLT outcome and
+elapsed milliseconds from Enter (or the saved event for a recovered wait). It
+includes durable speech, worker acquisition, eligibility, generation start/end,
+corrective generation, transaction commit and actual DOM display completion.
+It distinguishes no eligible resident, deliberate silence, missing consent/paused
+activity, unsupported WebGPU/Web Locks, loading/cold versus warm engines, same-tab
+or other-tab busy work, invalid output, quota/expiration, failure/timeout and
+input/display queues. These fixed labels contain no speech, prompts or private
+mail, are not saved in backups, and do not accumulate a diagnostic history.
+To troubleshoot silence, compare the OLT outcome with model authorization/readiness
+and the hourly cap. Load/retry from Options after correcting a failure; release
+another tab's model when busy. For display delay, select Instant or press Escape
+to reveal queued output. Stage timings include configured reveal pacing; the app
+does not change the user's display speed to meet the target. Settings also retains
+per-line origin details.
 Background readback waits while the input has text, Japanese composition is active
 or Options is open; it never edits input, changes focus or submits a partial line.
 
 See [OLT persistence](local-storage.md#olt-persistence),
+[Issue #139 validation](validation.md#issue-139-responsive-olt),
 [Issue #135 validation](validation.md#issue-135-olt-presence-and-conversation) and
 [historical uncertainty](research/pcvan-1996-1997.md#olt-interaction-research-issue-53).
 
@@ -523,12 +573,12 @@ reuse the same visit. Three room transcripts retain 200 events each. Pending OLT
 authorization stores a compact configuration fingerprint, not 100 biographies.
 
 Unanswered speech takes priority over intervening arrival notices. A suitable
-present resident can receive a turn after eight seconds (three-second browser
-polling), while reply probability, silence, current attendance and the inference
+present resident now receives an event-driven opportunity without the former
+eight-second floor; current attendance, deliberate silence and the inference
 lease remain authoritative. All rooms share 24 model attempts/hour; spontaneous
 turns may spend at most 16, leaving eight available for human speech. No authorized
 model means no generated speech. Prompts remain one selected profile, at most 16
-participant names, twelve speech turns, four status notices and three room-linked
+participant names, six speech turns, four status notices and two room-linked
 public-memory excerpts.
 
 `community-scale.spec.ts` samples seven days × 24 JST hours × eight seeds across
@@ -536,6 +586,6 @@ all three rooms. Design gates are >70% populated room visits overall, >45% in ea
 hour aggregate, real empty rooms, >85 distinct residents and >12 night-only
 participants relative to noon. These are deterministic design regression gates,
 not guarantees for an individual visit. See [measured results](validation.md#issue-133-community-scale).
-The browser suites cover warm mock replies in 1–3 minutes, IME/drafts, OLT at four
+The browser suites cover forum replies in 1–3 minutes, event-driven warm OLT replies, IME/drafts, OLT at four
 representative hours, silence, leases, cancellation, persisted caps and atomic
 reload/restore/reset. Real-model speed and persona quality remain optional checks.

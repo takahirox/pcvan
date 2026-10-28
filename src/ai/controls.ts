@@ -1,3 +1,5 @@
+import type { OltState } from '../olt-state';
+import { OltDiagnostics } from './olt-diagnostics';
 import { WORLD_SETTING } from '../storage/schema';
 import type { AiActivity, Backup } from '../storage/schema';
 import { ACTIVITY_SETTING, MAX_SESSION_POSTS, HOUR, canAttempt, setupContext, migrateActivity } from './activity';
@@ -18,6 +20,8 @@ export function createAiControls(actions: AiActions,
   factory: AdapterFactory = async () => (await import('./webllm-adapter')).createWebLlmAdapter(),
   supported = requireWebGpu(),
   probeCache: (id: string) => Promise<boolean> = async (id) => (await import('./webllm-adapter')).modelWeightsCached(id)) {
+  const olt = new OltDiagnostics();
+  let roomPriorityUntil = 0;
   let content: Backup | undefined;
   let activity: AiActivity | undefined;
   let adapter: LocalLlmAdapter | undefined;
@@ -34,6 +38,7 @@ export function createAiControls(actions: AiActions,
   const budget = { attempts: 0, committed: 0 };
   function report(text: string) { message = text; actions.print(text); }
   function cancel() {
+    roomPriorityUntil = 0;
     revision++; authorizingContext = undefined;
     operation?.abort(); operation = undefined;
     adapter?.dispose(); adapter = undefined; loadedModel = undefined;
@@ -84,6 +89,7 @@ export function createAiControls(actions: AiActions,
     return created;
   }
   async function simulate() {
+    if (Date.now() < roomPriorityUntil) return;
     if (document.visibilityState !== 'visible' || !supported || !activity?.maxPosts || !activity.consent || !activity.batch || operation || autoBlocked) return;
     if (activity.batch.modelId !== activity.modelId || !navigator.locks) return;
     const state = activity;
@@ -105,7 +111,7 @@ export function createAiControls(actions: AiActions,
     finally { if (operation === task) operation = undefined; }
   }
   async function advance(planned?: AiActivity) {
-    if (operation || checking || autoBlocked) return;
+    if (operation || checking || autoBlocked || Date.now() < roomPriorityUntil) return;
     checking = true;
     const before = revision;
     try {
@@ -136,11 +142,19 @@ export function createAiControls(actions: AiActions,
   }
   return {
     refresh,
+    olt,
+    prioritizeRoom(until: number) { roomPriorityUntil = until; },
     cancelBackground() { cancel(); },
     async runRoom(work: (engine: LocalLlmAdapter, signal: AbortSignal) => Promise<void>, external: AbortSignal) {
-      if (operation || autoBlocked || !supported || !navigator.locks || external.aborted || document.visibilityState !== 'visible') return;
+      if (external.aborted || document.visibilityState !== 'visible') return;
+      if (!supported) { olt.stage('WebGPU 非対応'); return; }
+      if (!navigator.locks) { olt.stage('Web Locks 非対応'); return; }
+      if (autoBlocked) { olt.stage('失敗後の再試行待ち'); return; }
+      if (operation) { olt.stage(loadedModel ? 'モデル使用中・待機' : 'モデル読込中・待機'); return; }
       const snapshot = await actions.read(); refresh(snapshot);
-      if (!activity?.consent || !activity.maxPosts || operation || autoBlocked || external.aborted) return;
+      if (!activity?.consent || !activity.maxPosts) { olt.stage('モデル未同意・活動休止'); return; }
+      if (operation || autoBlocked || external.aborted) return;
+      olt.model(!!adapter && loadedModel === activity.modelId);
       const task = new AbortController(); operation = task;
       const abort = () => { if (operation === task) cancel(); };
       external.addEventListener('abort', abort, { once: true });
@@ -148,29 +162,36 @@ export function createAiControls(actions: AiActions,
       const timeout = setTimeout(() => { timedOut = true; abort(); }, 30_000);
       try {
         await navigator.locks.request('pcvan-ai-activity', { ifAvailable: true }, async (lock) => {
-          if (!lock || document.visibilityState !== 'visible') return;
+          if (!lock) { olt.stage('別タブで活動中・待機'); return; }
+          if (document.visibilityState !== 'visible') return;
+          olt.stage('ワーカー取得');
+          if (!adapter || loadedModel !== activity!.modelId) olt.stage('モデル読込中');
           const engine = await loadEngine(task, activity!.modelId);
           task.signal.throwIfAborted();
           await work(engine, task.signal);
         });
       } catch (error) {
         if (!task.signal.aborted) {
-          if (error instanceof ModelBusy) report(error.message); else failure(error);
+          if (error instanceof ModelBusy) { olt.stage('別タブでモデル使用中・待機'); report(error.message); }
+          else { olt.stage('生成失敗'); failure(error); }
         }
       } finally {
         clearTimeout(timeout); external.removeEventListener('abort', abort);
         if (operation === task) operation = undefined;
-        if (timedOut) { autoBlocked = true; report('OLT の生成が時間切れです。設定から再試行できます。'); }
+        if (timedOut) { olt.stage('生成時間切れ'); autoBlocked = true; report('OLT の生成が時間切れです。設定から再試行できます。'); }
       }
     },
     get supported() { return supported; },
     get busy() { return !!operation; },
     status() {
-      return [activityStatus(), supported ? message : 'WebGPU が利用できません。端末・閲覧・手動投稿は利用できます。',
+      const roomBudget = content?.settings.find((row) => row.id === 'olt-rooms')?.value as unknown as OltState | undefined;
+      return [olt.status(), activityStatus(), supported ? message : 'WebGPU が利用できません。端末・閲覧・手動投稿は利用できます。',
         `6時間の自動投稿上限: ${activity?.maxPosts ?? 0} / 同意: ${activity?.consent ? 'あり' : 'なし'} / 試行 ${budget.attempts}/${MAX_SESSION_POSTS} / 保存 ${budget.committed}`,
         ...(activity?.allowance ? [`保存済みの6時間枠: 通常試行 ${activity.allowance.attempts}/12 / 通常保存 ${activity.allowance.committed} / 人間への返信 ${activity.allowance.responses}/6`] : []),
         'メールも同じ生成上限を使います。人間の掲示板投稿への返信は別枠で6時間6試行まで（再読込でも維持）。',
         'OLT は別枠で全室1時間24試行まで。自動活動0で OLT も休止。可視タブのみで動作します。',
+        `OLT 保存済み時間枠: 試行 ${roomBudget?.attempts ?? 0}/24 / 自発 ${roomBudget?.organicAttempts ?? 0}/16（再生成も含む）`,
+        'OLT: 在室住人・読込済みモデルがある時は表示まで約10秒が目標です。保証ではありません。使用中の返信待ちは最大60秒。',
         ...(activity?.batch?.runs.map((run) => `${run.id} / ${run.status} / ${run.personaId} / simulatedAt=${run.simulatedAt}`) ?? [])];
     },
     invalidate() { autoBlocked = true; cancel(); message = 'モデル解放済み'; },

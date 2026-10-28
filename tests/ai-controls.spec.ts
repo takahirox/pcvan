@@ -30,3 +30,33 @@ test('resident profile editor persists all field types with validation and stabl
   await page.reload(); await expect(page.locator('.output')).toContainText('MAIN');
   expect((await snapshot(page)).members.find((m) => m.id === 'fictional-ai:tsumugi')!.handle).toBe('つむぎ便り');
 });
+
+
+test('imminent room replies defer new background work and share one busy engine', async ({ page }) => {
+  await start(page, '待つ客', 'http://127.0.0.1:14374');
+  const content = await snapshot(page);
+  const result = await page.evaluate(async (content) => {
+    const path = '/src/ai/controls.ts';
+    const { createAiControls } = await import(path) as typeof import('../src/ai/controls');
+    const state = content.settings.find((s) => s.id === 'ai-activity')!.value as unknown as import('../src/storage/schema').AiActivity;
+    state.consent = true; state.batch = null;
+    let opens = 0, loads = 0, factories = 0, work = 0;
+    let release!: () => void, began!: () => void;
+    const started = new Promise<void>((resolve) => { began = resolve; });
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const ai = createAiControls({ read: async () => content, print() {}, activity: {
+      openActivity: async () => { opens++; return state; },
+    } as never }, async () => { factories++; return { load: async () => { loads++; }, generate: async () => '{}', dispose() {} }; }, true);
+    ai.refresh(content); ai.prioritizeRoom(Date.now() + 60_000);
+    await ai.tick(); const deferred = opens;
+    const signal = new AbortController().signal;
+    const first = ai.runRoom(async () => { work++; began(); await pending; }, signal);
+    await started;
+    await ai.runRoom(async () => { work++; }, signal); await ai.tick();
+    const busy = ai.status().join(' '); release(); await first;
+    ai.prioritizeRoom(0); await ai.tick(); ai.invalidate();
+    return { deferred, opens, loads, factories, work, busy };
+  }, content);
+  expect(result).toMatchObject({ deferred: 0, opens: 1, loads: 1, factories: 1, work: 1 });
+  expect(result.busy).toContain('モデル使用中・待機');
+});

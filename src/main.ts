@@ -108,7 +108,7 @@ function updateConnection() {
 }
 function navigate(line: string) { print(...controller.submit(line)); }
 const terminal = mountTerminal(root, {
-  submit: (line) => {
+  submit: (line, enteredAt) => {
     if (resetting) return;
     cancelConnectionTimer();
     const acceptedRevision = revision, fileInputContext = commands.fileInputContext;
@@ -124,7 +124,7 @@ const terminal = mountTerminal(root, {
       if (recordable) { session.history.add(line); commandsDuringHistoryLoad?.push(line); }
       print(`> ${line}`); terminal.reveal();
       const before = controller.screen;
-      if (!await commands.submit(line)) {
+      if (!await commands.submit(line, enteredAt)) {
         let navigationLine = line;
         const enteringOlt = (controller.screen === 'daisizen' && line.trim().toUpperCase() === 'OLT') || (controller.screen === 'wakaba' && line.trim() === '2');
         if (enteringOlt) await reconcilePresence();
@@ -201,6 +201,8 @@ const ai = createAiControls({
 });
 const commandActions = {
   repository: () => repository, read: refreshContent, print, navigate,
+  speechSaved: () => queueMicrotask(tickRoom),
+  display: (lines: string[], visible: () => void) => { print(...lines); terminal.whenVisible(visible); },
   applicationPrint: (...lines: string[]) => applicationReport('offline', ...lines),
   isTelnet: () => controller.isTelnet,
   isGopher: () => controller.isGopher,
@@ -301,7 +303,7 @@ function tickRoom() {
   if (!resetting && document.visibilityState === 'visible' && !settingsDialog?.open)
     void commands.olt.tick(() => terminal.composing || terminal.hasInput || !!settingsDialog?.open).catch(reportError);
 }
-setInterval(tickRoom, 3_000);
+setInterval(tickRoom, 1_000);
 window.addEventListener('pagehide', () => { commands.olt.suspend(); ai.invalidate(); touchActivity(); });
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) { commands.olt.resume(); ai.resume(); tickPresence(); tickResidents(); }

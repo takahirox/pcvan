@@ -1,12 +1,12 @@
 import type { Page } from '@playwright/test';
-export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation') {
+export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation' | 'retry-ok' | 'slow' | 'chatter') {
   await page.addInitScript((mode) => {
     Object.defineProperty(navigator, 'gpu', { value: {} });
     // Keep outputs distinct when a new page resumes the same persona/forum run.
     const visitKey = 'pcvan-test-worker-visit';
     const visit = Number(localStorage.getItem(visitKey) ?? 0) + 1;
     localStorage.setItem(visitKey, String(visit));
-    const stats = { generations: 0, loads: 0, prompts: [] as Record<string, unknown>[] };
+    const stats = { generations: 0, loads: 0, prompts: [] as Record<string, unknown>[], settings: [] as unknown[] };
     Object.assign(window, { journeyWorker: stats });
     class MockWorker {
       onmessage?: (event: MessageEvent) => void;
@@ -16,14 +16,29 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
         if (message.kind === 'reload') stats.loads++;
         if (message.kind === 'chatCompletionNonStreaming') {
           stats.generations++;
+          stats.settings.push(message.content.request);
           if (mode === 'interrupt' && stats.generations === 2) return;
           if (mode === 'failure') { queueMicrotask(() => this.onerror?.()); return; }
           const data = JSON.parse(message.content.request.messages[1]!.content);
           stats.prompts.push(data);
-          const raw = mode === 'invalid' ? '{}' : data.kind === 'olt' ? JSON.stringify({
+          const raw = mode === 'invalid' || (mode === 'retry-ok' && stats.generations === 1) ? '{}' : data.kind === 'olt' ? JSON.stringify({
             kind: 'olt', personaId: data.personaId, roomId: data.roomId,
             text: mode === 'self-greeting' ? `こんにちは${data.speaker.handle}さん、初めてのOLTでドキドキワクワクしています。`
               : mode === 'echo' ? 'こんにちは、初めてのOLTでドキドキワクワクしています。'
+              : mode === 'chatter' ? [
+                '今夜は月の輪郭がくっきり見えました。窓から見える方はいますか。',
+                '双眼鏡を手すりに置くと、揺れが少なくて楽ですよ。',
+                '低倍率から試してみます。影の境目も面白そうですね。',
+                '鉢の朝顔に種ができました。来年のために取っておこうと思います。',
+                '乾燥させて紙袋に入れると、蒸れずに保管しやすいです。',
+                '袋に収穫した日を書いておけば忘れませんね。',
+                '散歩の途中で金木犀の香りがしました。季節が変わってきましたね。',
+                'こちらの公園でも咲いていました。夕方は特に良い香りです。',
+                '明日は少し遠回りして、近所の並木を眺めてみます。',
+                '机の小さなラジオで音楽を聞きながら、観察記録をまとめています。',
+                '日付と空模様だけでも残すと、読み返す楽しみがありますね。',
+                '写真だけだったので、短い言葉も添えてみようと思います。',
+              ][(stats.generations - 1) % 12]
               : mode === 'conversation' ? [
                 `${data.addressee?.handle}さん、ゆっくりどうぞ。私は今夜、双眼鏡で月の縁を眺めていました。`,
                 `${data.addressee?.handle}さん、月なら小さな望遠鏡でも影が面白いですね。どの倍率でしたか。`,
@@ -41,9 +56,11 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           });
           content = { choices: [{ finish_reason: 'stop', message: { content: raw } }] };
         }
-        queueMicrotask(() => this.onmessage?.(new MessageEvent('message', {
+        const deliver = () => this.onmessage?.(new MessageEvent('message', {
           data: { uuid: message.uuid, kind: 'return', content },
-        })));
+        }));
+        if (mode === 'slow' && message.kind === 'chatCompletionNonStreaming') Object.assign(window, { completeOlt: deliver });
+        else queueMicrotask(deliver);
       }
       terminate() {}
     }

@@ -102,3 +102,12 @@ focus/scroll/history, IME events, responsive layout, terminal-only participation
 and the modern Settings dialog.
 Physical Japanese keyboards, native IME candidate windows, mobile devices and
 screen-reader speech quality remain optional manual observations.
+
+OLT diagnostics in Options include the elapsed time until a newly appended reply
+has actually painted in the terminal. `表示キュー` includes the existing output
+backlog and configured reveal speed; `表示完了` is recorded after that reply's
+last character reaches the DOM, independently of later appends. Enter still
+reveals preceding output, and Escape/Instant settles the queue. Reading, typing
+and Japanese composition retain their existing focus/input ownership. The roughly
+ten-second warm-model reply target includes display time and does not override
+slow reveal preferences. See [OLT rooms](local-ai.md#olt-rooms).

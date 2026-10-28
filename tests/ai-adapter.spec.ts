@@ -55,6 +55,7 @@ test('real WebLLM adapter uses structured worker requests, forwards progress, re
       await adapter.load('Qwen2.5-0.5B-Instruct-q4f16_1-MLC', (value) => progress.push(value), new AbortController().signal);
       const prompt = { system: 'system', user: 'user', schema: '{"type":"object"}' };
       const text = await adapter.generate(prompt, new AbortController().signal);
+      await adapter.generate({ ...prompt, purpose: 'olt' }, new AbortController().signal);
       mode = 'truncated';
       let truncated = false;
       try { await adapter.generate(prompt, new AbortController().signal); } catch { truncated = true; }
@@ -84,6 +85,8 @@ test('real WebLLM adapter uses structured worker requests, forwards progress, re
     messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'user' }],
     response_format: { type: 'json_object', schema: '{"type":"object"}' }, max_tokens: 1024, stream: false,
   });
+  const oltCompletion = result.requests.filter((request) => request.kind === 'chatCompletionNonStreaming')[1]!;
+  expect(oltCompletion.content.request).toMatchObject({ max_tokens: 256, temperature: .65, stream: false });
   expect(result.requests[0]!.content.chatOpts).toEqual([{ context_window_size: 4096 }]);
   expect(result.requests[1]!.kind).toBe('resetChat');
 });
