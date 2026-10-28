@@ -8,7 +8,7 @@ import { emptyOlt, appendOlt } from '../src/olt-state';
 import type { OltContext } from '../src/olt-state';
 import type { Backup } from '../src/storage/schema';
 import { backupFixture } from './backup-fixture';
-import { mockWorker, mockPendingWorker } from './ai-helpers';
+import { mockWorker } from './ai-helpers';
 import { consent } from './autonomy-helpers';
 import { command, start, snapshot, noOtherUi, backup, restore } from './terminal-helpers';
 import { epoch, state, speech, room, advance, residents } from './olt-helpers';
@@ -96,10 +96,16 @@ test('Wakaba two-tab attendance and shared turn arbitration use the shared resid
 
 for (const action of ['departure', 'settings', 'hidden'] as const) {
   test(`Wakaba pending inference is cancelled on ${action} before another visit`, async ({ page }) => {
-    await page.clock.install({ time: epoch }); await mockPendingWorker(page, 'generate'); await start(page, '待つ初心者');
+    await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+    await mockWorker(page, 'slow'); await start(page, '待つ初心者');
     await residents(page, false, 'LOCAL-WAKABA:1'); await consent(page); await room(page, 1, 'wakaba');
     await command(page, '最初の質問です', '<待つ初心者>'); await advance(page, 5);
-    await expect.poll(() => page.evaluate(() => (window as unknown as { pendingWork: string[] }).pendingWork.includes('chatCompletionNonStreaming'))).toBe(true);
+    await expect.poll(() => page.evaluate(() => typeof (window as unknown as { completeOlt?: () => void }).completeOlt)).toBe('function');
+    const original = (await state(page))!.rooms.find((r) => r.id === 'wakaba')!.pending!;
+    expect(original).not.toBeNull();
+    // Re-entry may start a different resident's turn. Release only this turn's
+    // saved worker response, even if a newer generation replaces completeOlt.
+    const completeOriginal = await page.evaluateHandle(() => (window as unknown as { completeOlt: () => void }).completeOlt);
     if (action === 'departure') { await command(page, '/LEAVE', '部屋一覧'); await room(page); }
     if (action === 'settings') {
       await command(page, '/HANDLE', 'ハンドル設定'); await command(page, 'RENAME 学ぶ客', '学ぶ客');
@@ -108,8 +114,10 @@ for (const action of ['departure', 'settings', 'hidden'] as const) {
     if (action === 'hidden') await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); document.dispatchEvent(new Event('visibilitychange'));
     });
-    await expect.poll(async () => (await state(page))!.rooms.find((r) => r.id === 'wakaba')!.pending).toBeNull();
+    await expect.poll(async () => (await state(page))!.rooms.find((r) => r.id === 'wakaba')!.pending?.id).not.toBe(original.id);
+    await completeOriginal.evaluate((complete) => complete()); await completeOriginal.dispose();
     await advance(page, 20); expect(await speech(page)).toEqual([]);
+    await expect(page.locator('.output')).not.toContainText('星の観察、いいですね。');
     expect((await state(page))!.attempts).toBeGreaterThan(0);
   });
 }

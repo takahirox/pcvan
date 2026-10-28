@@ -106,6 +106,19 @@ test('addressed correspondence can be prompt, silent or later, stays private, an
   expect(chooseMail(data, profiles[0]!, at + 2 * 3_600_000, seed, [])!.replyToMailId).toBe('second-letter');
 });
 
+for (const failures of [1, 12]) test(`${failures} retained failures leave room for another resident within the batch bound`, () => {
+  const { data, profiles, activity } = world();
+  activity.maxPosts = 1;
+  activity.batch = { id: 'failed', from: iso(at - 1), to: iso(at), modelId: activity.modelId,
+    runs: Array.from({ length: failures }, (_, i) => ({ id: `failed:${i}`, personaId: profiles[0]!.id,
+      forumId: 'forum', replyToPostId: data.posts[0]!.id, simulatedAt: iso(at), status: 'failed' })) };
+  const planned = scheduleActivity(data, activity, iso(at + 3_600_000));
+  expect(planned.batch!.runs.filter((r) => r.status === 'pending').map((r) => r.personaId)).toEqual([profiles[1]!.id]);
+  expect(planned.batch!.runs.filter((r) => r.status === 'failed')).toEqual(activity.batch.runs.slice(failures === 12 ? 1 : 0));
+  expect(planned.batch!.runs).toHaveLength(Math.min(12, failures + 1));
+  validateActivity(planned);
+});
+
 test('one rejected author does not block another, with persisted attempts, private context and atomic duplicate commits', async ({ page }) => {
   await page.clock.setFixedTime(new Date(at)); await page.goto('http://127.0.0.1:14374');
   const { data, activity } = world();
@@ -119,25 +132,41 @@ test('one rejected author does not block another, with persisted attempts, priva
     const batch = { id: 'queue', from: new Date(Date.parse(now) - 1).toISOString(), to: now, modelId: activity.modelId,
       runs: ['hoshimori', 'kusabue'].map((personaId) => ({ id: `queue:${personaId}`, personaId, forumId: 'forum',
         replyToPostId: 'first', simulatedAt: now, status: 'pending' as const })) };
-    const state = { ...activity, batch };
+    const state = { ...activity, batch,
+      observations: Object.fromEntries(batch.runs.map((r) => [r.personaId, ['forum:first']])) };
     await repo.put('settings', { id: 'ai-activity', value: state as never });
     let calls = 0; const prompts: string[] = [];
     const engine = { async load() {}, dispose() {}, async generate(prompt: { user: string }) {
       calls++; prompts.push(prompt.user); const request = JSON.parse(prompt.user);
       return calls === 1 ? '{}' : JSON.stringify({ personaId: request.personaId, forumId: request.forumId,
-        replyToPostId: request.replyToPostId, title: '観察の続き', body: '土の湿り気を確かめてみました。' });
+        replyToPostId: request.replyToPostId, title: '観察の続き',
+        body: calls === 2 ? '土の湿り気を確かめてみました。' : '庭の朝顔に種ができていました。来年も育ててみます。' });
     } };
     const budget = { attempts: 0, committed: 0 };
-    await runActivityBatch(repo, () => repo.exportBackup(), state, engine, new AbortController().signal, budget, () => {});
+    await runActivityBatch(repo, () => repo.exportBackup(), state, engine, new AbortController().signal, budget, () => {}, () => budget.attempts >= 1);
+    // A normal planning tick must retain the failed writing and its seen event
+    // while another author is still queued, then allow that author to proceed.
+    const replanned = await repo.openActivity(new Date(Date.parse(now) + 1000).toISOString());
+    await runActivityBatch(repo, () => repo.exportBackup(), replanned, engine, new AbortController().signal, budget, () => {});
     const saved = await repo.exportBackup();
+    const failedOnly = await repo.openActivity(new Date(Date.parse(now) + 2000).toISOString());
+    await repo.setAiRunStatus(batch.runs[0]!.id, 'pending');
+    const retry = await repo.openActivity(new Date(Date.parse(now) + 3000).toISOString());
+    await runActivityBatch(repo, () => repo.exportBackup(), retry, engine, new AbortController().signal, budget, () => {});
+    const retried = await repo.exportBackup();
     const other = await openRepository('independent-queue');
     const post = saved.posts.find((p) => p.simulation)!;
     const duplicate = await other.commitAiRun(post.id, '{}');
     await repo.replaceFromJson(JSON.stringify(saved), { confirmReplace: true });
     const restored = await repo.exportBackup(); repo.close(); other.close();
-    return { calls, prompts, budget, saved, duplicate, restored };
+    return { calls, prompts, budget, replanned, failedOnly, retry, retried, saved, duplicate, restored };
   }, { data, activity, now: iso(at) });
-  expect(result.calls).toBe(2);
+  expect(result.calls).toBe(3);
+  expect(result.replanned.batch!.runs.map((r) => r.status)).toEqual(['failed', 'pending']);
+  expect(result.replanned.observations!.hoshimori).toContain('forum:first');
+  expect(result.failedOnly.batch!.runs.map((r) => r.status)).toEqual(['failed']);
+  expect(result.retry.batch!.runs.map((r) => r.status)).toEqual(['pending']);
+  expect(result.retried.posts.filter((p) => p.simulation)).toHaveLength(2);
   expect(result.saved.posts.filter((p) => p.simulation)).toHaveLength(1);
   const saved = result.saved.settings.find((s) => s.id === 'ai-activity')!.value as unknown as typeof activity;
   expect(saved.batch!.runs.map((r) => r.status)).toEqual(['failed', 'committed']);

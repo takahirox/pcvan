@@ -120,7 +120,7 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
       members.has(personaMemberId(r.personaId)) && profiles.some((p) => p.id === r.personaId && p.frequency > 0));
     if (!state.batch.runs.length) state.batch = null;
   }
-  const runs = (state.batch?.runs ?? []).filter((r) => r.status === 'pending' || r.status === 'running')
+  const runs = (state.batch?.runs ?? []).filter((r) => ['pending', 'running', 'failed'].includes(r.status))
     .filter((r) => members.has(personaMemberId(r.personaId)) && profiles.some((p) => p.id === r.personaId && p.frequency > 0));
   if (!state.maxPosts || !state.consent) {
     state.nextDue = initialDue(timestamp, state.seed!, profiles);
@@ -138,13 +138,18 @@ export function scheduleActivity(content: Backup, previous: AiActivity, now: str
     const seen = state.observations[profile.id] ?? [];
     const action = observeVisit(index, profile, to, state.seed!, runs, seen);
     state.observations[profile.id] = [...new Set(seen)].slice(-96);
-    if (action && runs.length >= Math.min(12, state.maxPosts)) {
+    if (action && runs.filter((r) => r.status !== 'failed').length >= Math.min(12, state.maxPosts)) {
       state.nextDue[profile.id] = previousDue;
       const key = action.mail ? `mail:${action.mail.replyToMailId ?? action.mail.publicPostId}` : `forum:${action.replyToPostId}`;
       state.observations[profile.id] = state.observations[profile.id]!.filter((id) => id !== key);
       continue;
     }
-    if (action) runs.push({ ...action, id: `${id}:${profile.id}:${to}`, simulatedAt: timestamp, status: 'pending' });
+    if (action) {
+      // Keep failures visible and retryable without consuming writing capacity.
+      // Only the oldest failure yields when the bounded batch itself is full.
+      if (runs.length >= 12) runs.splice(runs.findIndex((r) => r.status === 'failed'), 1);
+      runs.push({ ...action, id: `${id}:${profile.id}:${to}`, simulatedAt: timestamp, status: 'pending' });
+    }
   }
   state.observations = Object.fromEntries(profiles.map((p) => [p.id, state.observations![p.id] ?? []]));
   return { ...state, lastActivityAt: timestamp, truncated: to - Date.parse(previous.lastActivityAt) > HOUR,
