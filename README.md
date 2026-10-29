@@ -950,6 +950,8 @@ four ordinary production worlds. Captured copied phrases, unfinished replies,
 profile text used as titles and promised-but-absent mail steps now have rejection
 regressions. These lexical checks do not establish factual or conversational
 quality; genuine model-quality acceptance still blocks completing the rebuild.
+The compact output grammar prevents ASCII whitespace continuations from consuming
+a mail generation; successful completion alone does not establish relevant advice.
 
 New worlds default to an automatic cap of four saved posts and twelve generation
 attempts per persisted six-hour window. Closing or reconnecting does not

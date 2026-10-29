@@ -396,9 +396,14 @@ and read markers participate in backup/reset/world fences; see
 
 ## Validation and provenance
 
-WebLLM JSON mode uses an explicit response schema, a 1,024-token output limit,
-4,096-token context and reset chat per request. Oversized/incomplete requests fail
-without posting. Raw results over 8,000 UTF-16 units, malformed/extra/missing fields,
+WebLLM uses a compact JSON grammar derived from each prompt's fixed references
+and authored fields, a 768-token forum/mail output limit, a 4,096-token context
+and reset chat per request. The grammar bounds ASCII whitespace between fields
+and disallows repeated ASCII spaces or escaped whitespace inside prose. This
+prevents the observed whitespace-only continuation from exhausting a mail request.
+Generated prose is one line; existing stored multiline text is preserved.
+Oversized/incomplete requests fail without posting. Raw results over 8,000 UTF-16
+units, malformed/extra/missing fields,
 wrong IDs/types, missing or cross-forum references, HTML and control/direction
 characters are rejected. Titles are 1–120 units on one line; bodies 1–1,200 units.
 Exact copies of recent bodies are rejected. There is no automatic JSON repair.
@@ -532,10 +537,10 @@ up speech. Room navigation does not cancel resident-to-resident work.
 The prompt separates the selected speaker and intended addressee by stable ID,
 current handle and actor, and identifies the reserved reply target independently
 of later status notices. Unanswered speech remains eligible when no resident is
-available yet. It contains six typed speech turns (160-character excerpts),
+available yet. It contains three typed speech turns (160-character excerpts),
 four separate presence notices, up to sixteen present identities, a bounded
-speaker voice/occupation/interests and at most two public posts from this room's linked
-board (180 characters each). **No mail
+speaker voice/occupation/interests and at most one public post from this room's linked
+board (120 characters). **No mail
 records or private-mail excerpts are passed**, even for the speaking resident.
 Wakaba adds beginner culture through this same prompt: plain language, basic
 questions welcome, no assumed experience, quiet reading respected and no promised
@@ -556,12 +561,14 @@ or another failure cannot reset it. A second rejection remains silent, with no
 canned fallback. GPU/worker/storage errors do not trigger this quality retry.
 
 OLT-only generation uses constrained JSON, a 256-output-token ceiling and
-`temperature: 0.65`, compared with forum/mail's existing 1024 tokens and 0.8.
+`temperature: 0.65`, compared with forum/mail's 768 tokens and 0.8.
 The shorter prompt retains explicit speaker/addressee/target identities,
 untrusted-data guidance and public-only context. It asks the model to answer the
 target before introducing personal interests; generation tasks are no longer repeated
 inside the conversation data, where small models echoed them as speech. A final
 user instruction after that data identifies the current speaker and latest target.
+Each action still uses one completion, with fixed identity fields before authored
+text in the output grammar.
 OLT retains three recent lines and one short public memory authored by that
 speaker, limiting exposure to another person's public biography. Forum and mail
 use the same final-instruction path to request a short, directly relevant reply

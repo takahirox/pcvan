@@ -962,3 +962,7 @@ compatibility, but may also address another authored resident. Pair-only prompts
 reply threading and identity/provenance validation still apply. Scheduled mail is
 eligible at delivery, then waits for the recipient's reading opportunity; there is
 no additional twenty-minute reply ban.
+
+Compact output grammar changes neither the backup schema nor existing records.
+Generated text still passes the same identity, reference and content validators
+before its transactional commit; imported multiline posts and letters remain intact.

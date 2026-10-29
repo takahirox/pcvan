@@ -53,7 +53,9 @@ test('real WebLLM adapter uses structured worker requests, forwards progress, re
       const progress: number[] = [];
       const adapter = createWebLlmAdapter();
       await adapter.load('Qwen2.5-0.5B-Instruct-q4f16_1-MLC', (value) => progress.push(value), new AbortController().signal);
-      const prompt = { system: 'system', user: 'user', schema: '{"type":"object"}' };
+      const prompt = { system: 'system', user: 'user', schema: JSON.stringify({ type: 'object', properties: {
+        title: { type: 'string', maxLength: 120 }, personaId: { type: 'string', enum: ['selected-resident'] },
+      } }) };
       const text = await adapter.generate(prompt, new AbortController().signal);
       await adapter.generate({ ...prompt, purpose: 'olt', instruction: '相手の質問に答えてください。' }, new AbortController().signal);
       mode = 'truncated';
@@ -82,12 +84,12 @@ test('real WebLLM adapter uses structured worker requests, forwards progress, re
   expect(result.failure).toEqual({ rejected: true, terminated: true });
   const completion = result.requests.find((request) => request.kind === 'chatCompletionNonStreaming')!;
   expect(completion.content.request).toMatchObject({
-    messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'user' }],
-    response_format: { type: 'json_object', schema: '{"type":"object"}' }, max_tokens: 1024, stream: false,
+    messages: [{ role: 'system', content: expect.stringContaining('personaId="selected-resident"') }, { role: 'user', content: 'user' }],
+    response_format: { type: 'grammar', grammar: expect.stringContaining('ws ::= [ \\t\\n\\r]{0,2}') }, max_tokens: 768, stream: false,
   });
   const oltCompletion = result.requests.filter((request) => request.kind === 'chatCompletionNonStreaming')[1]!;
   expect(oltCompletion.content.request).toMatchObject({ max_tokens: 256, temperature: .65, stream: false,
-    messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'user\n\n相手の質問に答えてください。' }] });
+    messages: [{ role: 'system', content: expect.stringContaining('system') }, { role: 'user', content: 'user\n\n相手の質問に答えてください。' }] });
   expect(result.requests[0]!.content.chatOpts).toEqual([{ context_window_size: 4096 }]);
   expect(result.requests[1]!.kind).toBe('resetChat');
 });
