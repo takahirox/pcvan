@@ -171,7 +171,7 @@ for (const [timezoneId, anchor, stamp, forumStamp, replyStamp] of [
 }
 
 test('atomic initialization, pending catch-up legacy imports, historical imports and reset preserve the source clock', async ({ page }) => {
-  await page.goto('http://127.0.0.1:14374');
+  await page.goto('http://127.0.0.1:14374/tests/module.html');
   const result = await page.evaluate(async ({ fixture, anchor }) => {
     const repositoryPath = '/src/storage/repository.ts', calendarPath = '/src/calendar.ts';
     const { openRepository } = await import(repositoryPath) as typeof import('../src/storage/repository');
@@ -206,7 +206,7 @@ test('atomic initialization, pending catch-up legacy imports, historical imports
       () => repo.delete('settings', 'historical-calendar'),
     ]) { try { await action(); } catch { immutable++; } }
     const catchUp = serviceDate('2026-10-18T14:30:00.000Z', calendarSetting(first));
-    // Committing a pending event later must still display its old operational simulatedAt.
+    // A retained intent is authored during the current visit, never backdated.
     await repo.setAiRunStatus('pending:1', 'running');
     await repo.commitAiRun('pending:1', JSON.stringify({ personaId: 'hoshimori', forumId: 'forum', title: '遅れた便り', body: '本文' }));
     const afterCommit = await repo.exportBackup();
@@ -232,10 +232,10 @@ test('atomic initialization, pending catch-up legacy imports, historical imports
   expect(calendarSetting(result.second)).toEqual(calendarSetting(result.first));
   expect(result.first.posts).toEqual(backupFixture().posts); expect(result.first.session).toEqual(backupFixture().session);
   expect(result.rolledBack).toBe(true); expect(result.immutable).toBe(2); expect(result.catchUp).toBe('2026年10月18日 23:30:00');
-  expect(result.committedDisplay).toBe('2026年10月18日 23:30:00');
+  expect(result.committedDisplay).toBe(serviceDate(result.committed!.simulation!.simulatedAt, calendarSetting(result.first)));
   expect(result.first.settings.find((s) => s.id === 'ai-activity')!.value).toEqual(result.second.settings.find((s) => s.id === 'ai-activity')!.value);
-  expect(result.committed?.simulation?.simulatedAt).toBe('2026-10-18T14:30:00.000Z');
-  expect(result.committed?.createdAt).not.toBe(result.committed?.simulation?.simulatedAt);
+  expect(Date.parse(result.committed!.simulation!.simulatedAt)).toBeGreaterThan(Date.parse('2026-10-18T14:30:00.000Z'));
+  expect(Date.parse(result.committed!.createdAt)).toBeGreaterThanOrEqual(Date.parse(result.committed!.simulation!.simulatedAt));
   expect(result.eraDisplay).toBe('1996年11月20日 10:00:00');
   expect(calendarSetting(result.historicalAgain)).toEqual(calendarSetting(result.historical));
   expect(result.historical.settings.find((s) => s.id === 'community-world')!.value).toMatchObject({ createdAt: '1996-11-20T01:00:00.000Z' });

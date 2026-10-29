@@ -529,8 +529,9 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
     }
     const recipient = members.find((m) => m.id === row.recipientId);
     const resident = sender?.actor === 'ai' ? sender : recipient;
-    if (!sender || !recipient || sender.actor === recipient.actor ||
+    if (!sender || !recipient || sender.id === recipient.id || (sender.actor === 'human' && recipient.actor === 'human') ||
         !personas.some((p) => `fictional-ai:${p.id}` === resident?.id) ||
+        (recipient.actor === 'ai' && !personas.some((p) => `fictional-ai:${p.id}` === recipient.id)) ||
         (row.readAt !== undefined && recipient.actor !== 'human') ||
         (sender.actor === 'human' ? row.origin !== 'local-human' || row.simulation !== undefined
           : !row.origin.startsWith('local-ai:webllm:') || !row.simulation)) invalid('Invalid mail correspondents or provenance.');
@@ -538,7 +539,7 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
     if (row.recipientConfirmation !== undefined) {
       const confirmation = row.recipientConfirmation;
       const reply = mail.find((m) => m.id === confirmation.replyMailId);
-      if (sender.actor !== 'human' || !reply?.simulation || !reply.origin.startsWith('local-ai:webllm:') ||
+      if (!reply?.simulation || !reply.origin.startsWith('local-ai:webllm:') ||
           reply.replyToMailId !== row.id || reply.senderId !== row.recipientId || reply.recipientId !== row.senderId ||
           reply.number <= row.number || Date.parse(confirmation.at) < Date.parse(reply.createdAt)) {
         invalid('Recipient confirmation requires a resident reply to this letter.');
@@ -549,7 +550,7 @@ export function validateMailRelations(mail: readonly Mail[], members: readonly M
       if (!parent || parent.file !== undefined || parent.senderInternetAddress !== undefined || parent.internetAddress !== undefined ||
           parent.number >= row.number || parent.senderId !== row.recipientId ||
           parent.recipientId !== row.senderId || (parent.delivery !== undefined &&
-            Date.parse(mailAvailableAt(row)) < Date.parse(mailAvailableAt(parent)) + 20 * 60_000)) invalid('Mail replies require an earlier letter from the correspondent.');
+            Date.parse(mailAvailableAt(row)) < Date.parse(mailAvailableAt(parent)))) invalid('Mail replies require an earlier letter from the correspondent.');
     }
   }
 }

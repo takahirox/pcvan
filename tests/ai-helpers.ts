@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
-export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation' | 'retry-ok' | 'slow' | 'once-slow' | 'chatter') {
+export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation' | 'retry-ok' | 'copy-once' | 'slow' | 'once-slow' | 'chatter') {
   await page.addInitScript((mode) => {
     Object.defineProperty(navigator, 'gpu', { value: {} });
-    // Keep outputs distinct when a new page resumes the same persona/forum run.
+    // Short unique records isolate plumbing from the near-copy prose validator.
+    // Japanese quality regressions use captured substantive text separately.
     const visitKey = 'pcvan-test-worker-visit';
     const visit = Number(localStorage.getItem(visitKey) ?? 0) + 1;
     localStorage.setItem(visitKey, String(visit));
@@ -19,11 +20,13 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           stats.settings.push(message.content.request);
           if ((mode === 'interrupt' && stats.generations === 2) || (mode === 'once-slow' && stats.generations === 1)) return;
           if (mode === 'failure') { queueMicrotask(() => this.onerror?.()); return; }
-          const data = JSON.parse(message.content.request.messages[1]!.content);
+          const data = JSON.parse(message.content.request.messages[1]!.content.split('\n\n')[0]!);
           stats.prompts.push(data);
           const raw = mode === 'invalid' || (mode === 'retry-ok' && stats.generations === 1) ? '{}' : data.kind === 'olt' ? JSON.stringify({
             kind: 'olt', personaId: data.personaId, roomId: data.roomId,
-            text: mode === 'self-greeting' ? `こんにちは${data.speaker.handle}さん、初めてのOLTでドキドキワクワクしています。`
+            text: mode === 'copy-once' && stats.generations === 1 ? 'モデムは昔からある技術だから、その価値には変わりないね。'
+              : mode === 'copy-once' ? 'こんにちは。どうぞゆっくりしていってください。'
+              : mode === 'self-greeting' ? `こんにちは${data.speaker.handle}さん、初めてのOLTでドキドキワクワクしています。`
               : mode === 'echo' ? 'こんにちは、初めてのOLTでドキドキワクワクしています。'
               : mode === 'chatter' ? [
                 '今夜は月の輪郭がくっきり見えました。窓から見える方はいますか。',
@@ -44,15 +47,15 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
                 `${data.addressee?.handle}さん、月なら小さな望遠鏡でも影が面白いですね。どの倍率でしたか。`,
                 '低倍率から試すと見つけやすいですよ。手すりに肘を置くと像が落ち着きました。',
               ][(stats.generations - 1) % 3]
-              : `星の観察、いいですね。${data.personaId}/${visit}/${stats.generations}`,
+              : `星の観察、いいですね。${visit}-${stats.generations}`,
           }) : data.kind === 'mail' ? JSON.stringify({
             personaId: data.personaId, recipientId: data.recipientId,
             ...(data.replyToMailId ? { replyToMailId: data.replyToMailId } : {}),
-            subject: '星見のお便り', body: `お便りありがとう。夜空を見上げました。${data.personaId}/${visit}/${stats.generations}`,
+            subject: '星見のお便り', body: `便りの記録${visit}-${stats.generations}`,
           }) : JSON.stringify({
             personaId: data.personaId, forumId: data.forumId,
             ...(data.replyToPostId ? { replyToPostId: data.replyToPostId } : {}),
-            title: '架空の旅だより', body: `これは創作の活動です。${data.personaId}/${visit}/${stats.generations}`,
+            title: '架空の旅だより', body: `創作の記録${visit}-${stats.generations}`,
           });
           content = { choices: [{ finish_reason: 'stop', message: { content: raw } }] };
         }

@@ -36,7 +36,8 @@ export async function runActivityBatch(actions: ActivityActions, read: () => Pro
       if (shouldYield()) break;
       const started = await actions.setAiRunStatus(current.id, 'running');
       report(started);
-      if (!started.batch?.runs.some((run) => run.id === current!.id && run.status === 'running')) {
+      current = started.batch?.runs.find((run) => run.id === planned.id && run.status === 'running');
+      if (!current) {
         current = undefined; continue;
       }
       signal.throwIfAborted();

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('file controller pins identities, invalidates asynchronous waits and consumes failed/repeated acquisition', async ({ page }) => {
-  await page.goto('http://127.0.0.1:14374');
+  await page.goto('http://127.0.0.1:14374/tests/module.html');
   const result = await page.evaluate(async () => {
     const rp = '/src/storage/repository.ts', cp = '/src/commands.ts';
     const { openRepository, ACTIVE_MEMBER_SETTING } = await import(rp);

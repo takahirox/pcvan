@@ -33,7 +33,7 @@ test('resident profile editor persists all field types with validation and stabl
 });
 
 
-test('imminent room replies defer new background work and share one busy engine', async ({ page }) => {
+test('room and background work share one busy engine', async ({ page }) => {
   await start(page, '待つ客', 'http://127.0.0.1:14374');
   const content = await snapshot(page);
   const result = await page.evaluate(async (content) => {
@@ -48,21 +48,96 @@ test('imminent room replies defer new background work and share one busy engine'
     const ai = createAiControls({ read: async () => content, print() {}, activity: {
       openActivity: async () => { opens++; return state; },
     } as never }, async () => { factories++; return { load: async () => { loads++; }, generate: async () => '{}', dispose() {} }; }, true);
-    ai.refresh(content); ai.prioritizeRoom(Date.now() + 60_000);
-    await ai.tick(); const deferred = opens;
+    ai.refresh(content);
+    const deferred = opens;
     const signal = new AbortController().signal;
     const first = ai.runRoom(async () => { work++; began(); await pending; }, signal);
     await started;
     await ai.runRoom(async () => { work++; }, signal); await ai.tick();
     const busy = ai.status().join(' '); release(); await first;
-    ai.prioritizeRoom(0); await ai.tick(); ai.invalidate();
+    await ai.tick(); ai.invalidate();
     return { deferred, opens, loads, factories, work, busy };
   }, content);
   expect(result).toMatchObject({ deferred: 0, opens: 1, loads: 1, factories: 1, work: 1 });
   expect(result.busy).toContain('モデル使用中・待機');
 });
 
-test('human OLT priority during a batch lets the current job commit, then yields and preserves remaining jobs', async ({ page }) => {
+test('a stalled background load releases both locks, retains its job and recovers on retry', async ({ page }) => {
+  const epoch = new Date('2026-10-24T01:00:00.000Z');
+  await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+  await page.goto('http://127.0.0.1:14374');
+  await page.evaluate(async (fixture) => {
+    const cp = '/src/ai/controls.ts', rp = '/src/storage/repository.ts', ap = '/src/ai/activity.ts';
+    const { createAiControls } = await import(cp) as typeof import('../src/ai/controls');
+    const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
+    const { emptyActivity } = await import(ap) as typeof import('../src/ai/activity');
+    const repo = await openRepository('background-load-deadline');
+    await repo.replaceFromJson(JSON.stringify(fixture), { confirmReplace: true });
+    const now = new Date().toISOString();
+    const state = { ...emptyActivity(now), consent: true, batch: {
+      id: 'load-deadline', from: '2026-10-24T00:00:00.000Z', to: now, modelId: emptyActivity(now).modelId,
+      runs: [{ id: 'load-deadline:hoshimori', personaId: 'hoshimori', forumId: 'forum',
+        simulatedAt: now, status: 'pending' as const }],
+    } };
+    await repo.put('settings', { id: 'ai-activity', value: state as never });
+    await repo.openActivity(now);
+    let began!: () => void, finishLoad!: () => void;
+    const started = new Promise<void>((resolve) => { began = resolve; });
+    const pending = new Promise<void>((resolve) => { finishLoad = resolve; });
+    const stats = { loads: 0, disposed: 0, signal: undefined as AbortSignal | undefined, reports: [] as string[] };
+    const ai = createAiControls({ read: () => repo.exportBackup(), print: (text) => stats.reports.push(text),
+      activity: {
+        openActivity: () => repo.openActivity(),
+        setAiRunStatus: (...args: Parameters<typeof repo.setAiRunStatus>) => repo.setAiRunStatus(...args),
+        commitAiRun: (...args: Parameters<typeof repo.commitAiRun>) => repo.commitAiRun(...args),
+      } as never }, async () => ({
+      async load(_id, _progress, signal) {
+        if (++stats.loads === 1) { stats.signal = signal; began(); await pending; }
+      },
+      async generate(prompt) {
+        const request = JSON.parse(prompt.user);
+        return JSON.stringify({ personaId: request.personaId, forumId: request.forumId,
+          title: '夜空の記録', body: '窓辺で月の輪郭を眺めました。' });
+      },
+      dispose() { stats.disposed++; },
+    }), true);
+    ai.refresh(await repo.exportBackup());
+    const job = ai.tick();
+    await Promise.race([started, job.then(() => { throw new Error(ai.status().join('\n')); })]);
+    Object.assign(window, { backgroundLoad: { ai, repo, job, stats, finishLoad } });
+  }, activityFixture());
+  await page.clock.runFor(179_999);
+  expect(await page.evaluate(() => (window as any).backgroundLoad.ai.busy)).toBe(true);
+  await page.clock.runFor(1);
+  const result = await page.evaluate(async () => {
+    const { ai, repo, job, stats, finishLoad } = (window as any).backgroundLoad;
+    await job; // The adapter's load promise is still pending and ignores abort.
+    const busy = ai.busy, aborted = stats.signal.aborted, disposed = stats.disposed;
+    const held = (await navigator.locks.query()).held!.map((lock) => lock.name);
+    const saved = await repo.exportBackup();
+    const queued = saved.settings.find((s: { id: string }) => s.id === 'ai-activity').value;
+    let roomRuns = 0;
+    // Retry is explicit after a load failure; no consent or budget is reset.
+    ai.resume();
+    await ai.runRoom(async () => { roomRuns++; }, new AbortController().signal);
+    // A late return from the disposed adapter cannot replace the new warm model.
+    finishLoad(); await Promise.resolve(); await Promise.resolve();
+    await ai.retry();
+    const recovered = await repo.exportBackup();
+    ai.invalidate(); repo.close();
+    return { busy, aborted, disposed, held, queued, roomRuns, loads: stats.loads,
+      reports: stats.reports, posts: recovered.posts.filter((p: { simulation?: unknown }) => p.simulation) };
+  });
+  expect(result).toMatchObject({ busy: false, aborted: true, disposed: 1, roomRuns: 1, loads: 2 });
+  expect(result.held).not.toContain('pcvan-ai-activity');
+  expect(result.held).not.toContain('pcvan-local-ai-model');
+  expect(result.queued.batch.runs).toMatchObject([{ id: 'load-deadline:hoshimori', status: 'pending' }]);
+  expect(result.queued.allowance?.attempts ?? 0).toBe(0);
+  expect(result.reports.join('\n')).toContain('モデル読込時間切れ');
+  expect(result.posts.map((p: { id: string }) => p.id)).toEqual(['load-deadline:hoshimori']);
+});
+
+test('each public worker opportunity commits one writing, then yields to OLT and retains other jobs', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-24T01:00:00.000Z'));
   await page.goto('http://127.0.0.1:14374');
   const result = await page.evaluate(async (fixture) => {
@@ -108,7 +183,6 @@ test('human OLT priority during a batch lets the current job commit, then yields
     const batch = ai.tick();
     await Promise.race([started, batch.then(() => { throw new Error(ai.status().join('\n')); })]);
     // The saved-human-speech event can arrive while a background job is running.
-    ai.prioritizeRoom(Date.now() + 60_000);
     const signal = new AbortController().signal;
     await ai.runRoom(async () => { events.push('premature-room'); }, signal);
     release(); await batch;
@@ -118,8 +192,11 @@ test('human OLT priority during a batch lets the current job commit, then yields
     // This acquires the same activity lock and reuses the same warm model.
     await ai.runRoom(async (shared) => {
       if (shared !== engine) throw new Error('OLT must reuse the background model');
-      events.push('room'); ai.prioritizeRoom(0);
+      events.push('room');
     }, signal);
+    await ai.tick();
+    const intermediate = await repo.exportBackup();
+    if (intermediate.posts.filter((p) => p.simulation).length !== 2) throw new Error('One background writing per worker opportunity');
     await ai.tick();
     const resumed = await repo.exportBackup();
     ai.invalidate(); repo.close();

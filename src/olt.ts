@@ -4,10 +4,8 @@ import type { Backup, JsonValue } from './storage/schema';
 import type { LocalRepository } from './storage/repository';
 import { activeHuman } from './forums';
 import { identityToken, penName } from './member-presentation';
-import { OLT_SETTING, attendance, oltState, roomDefinitions, contextRooms, oltEnabled } from './olt-state';
-import type { OltContext, OltLine, OltRoom, OltState, RoomId } from './olt-state';
-import { buildOltPrompt, OltOutputRejected } from './ai/olt';
-import { residentProfiles, personaMemberId } from './ai/personas';
+import { OLT_SETTING, attendance, oltState, roomDefinitions, contextRooms } from './olt-state';
+import type { OltContext, OltLine, OltRoom, RoomId } from './olt-state';
 import type { createAiControls } from './ai/controls';
 
 export const roomHelp = '/PROFILE 宛先ID・表示ID・ハンドル: 公開プロフィール / /WHO: 参加者 / /LIST: 最近の会話 / /JOIN 番号: 移動 / /LEAVE・/BACK: 退出 / /MAIN: MAIN / /HELP: 案内';
@@ -38,19 +36,14 @@ export class TerminalOlt {
   private visit = 0;
   private submission = 0;
   private working = false;
-  private observing = false;
-  private task: AbortController | undefined;
-  private turnId: string | undefined;
+  private leaseAt = 0;
   private liveSince = Date.now();
   private readonly clientId = crypto.randomUUID();
   constructor(private readonly actions: OltActions) {}
   get active() { return !!this.roomId; }
   invalidate() { this.suspend(); this.roomId = undefined; this.seen = 0; }
-  suspend() { if (this.task) this.actions.ai.olt?.stage('中止'); this.actions.ai.prioritizeRoom?.(0); this.visit++; this.task?.abort(); this.task = undefined; this.turnId = undefined; this.liveSince = Date.now(); }
+  suspend() { this.visit++; this.liveSince = Date.now(); }
   resume() { this.liveSince = Date.now(); }
-  observePresence(state: OltState) {
-    if (this.turnId && state.rooms.find((r) => r.id === this.roomId)?.pending?.id !== this.turnId) this.task?.abort();
-  }
   private who(room: OltRoom, data: Backup) {
     const ids = attendance(room);
     return `参加者：${ids.length}人 / ${ids.map((id) => {
@@ -152,94 +145,24 @@ export class TerminalOlt {
       this.actions.ai.olt.begin(enteredAt, saved.lines.at(-1)!.id);
       this.show(saved, data, false);
       this.actions.ai.olt.stage('発言保存');
-      this.actions.ai.prioritizeRoom(Date.now() + 2_000);
       this.actions.speechSaved?.();
     }
     catch (error) { this.actions.print(String(error)); }
     return true;
   }
-  /** Inference never holds the terminal command queue. */
+  /** Presentation and the human presence lease only; the world owns inference. */
   async tick() {
     const id = this.roomId, context = this.actions.oltContext(), visit = this.visit;
     if (id && (!context || !contextRooms(context).some((r) => r.id === id))) { await this.leave(); return; }
-    const current = () => id === this.roomId && visit === this.visit && context === this.actions.oltContext();
-    if (!id || !context || document.visibilityState !== 'visible') return;
-    if (this.working) {
-      if (this.observing) return;
-      this.observing = true;
-      try {
-        const repo = await this.actions.repository(), data = await this.actions.read();
-        if (current() && document.visibilityState === 'visible') {
-          const state = await repo.observeRoom(this.clientId, id, activeHuman(data));
-          if (current()) { this.observePresence(state); this.show(state.rooms.find((r) => r.id === id)!, data, false); }
-        }
-      } finally { this.observing = false; }
-      return;
-    }
+    if (!id || !context || this.working || document.visibilityState !== 'visible') return;
     this.working = true;
     try {
       const repo = await this.actions.repository(), data = await this.actions.read();
-      if (!current() || document.visibilityState !== 'visible') return;
-      const state = await repo.observeRoom(this.clientId, id, activeHuman(data));
-      if (!current()) return;
-      this.show(state.rooms.find((r) => r.id === id)!, data, false);
-      const observed = state.rooms.find((r) => r.id === id)!;
-      if (Date.now() < Date.parse(observed.observedAt)) { this.actions.ai.olt.stage('時計の巻き戻り'); return; }
-      const waiting = observed.lines.filter((l) => l.kind === 'say' && l.origin === 'local-human').at(-1);
-      this.actions.ai.olt.prepare(waiting?.id ?? id, waiting ? Date.parse(waiting.createdAt) : undefined);
-      if (!oltEnabled(data)) { this.actions.ai.olt.stage('モデル未同意・活動休止'); this.actions.ai.prioritizeRoom(0); return; }
-      if (state.attempts >= 24 && Date.now() - Date.parse(state.windowAt) < 3_600_000) {
-        this.actions.ai.olt.stage('時間枠の上限'); this.actions.ai.prioritizeRoom(0); return;
-      }
-      const suitable = residentProfiles(data).some((p) => p.frequency > 0 && (p.reply > 0 || p.newThread > 0) && p.inactivity < 1 &&
-        observed.residents.some((r) => r.memberId === personaMemberId(p.id) && Date.parse(r.until) > Date.now()));
-      if (!suitable) { this.actions.ai.olt.stage('適任の在室住人なし'); this.actions.ai.prioritizeRoom(0); return; }
-      if (!observed.decisions?.some((d) => Date.parse(d.readyAt) <= Date.now())) {
-        this.actions.ai.olt.stage(observed.decisions?.length ? '住人の応答待ち' : '意図的な静けさ');
-        this.actions.ai.prioritizeRoom(0); return;
-      }
-      this.actions.ai.prioritizeRoom(Date.now() + 2_000);
-      const task = new AbortController(); this.task = task;
-      await this.actions.ai.runRoom(async (engine, signal) => {
-        let turn = await repo.claimRoomTurn(id, undefined, (reason) => this.actions.ai.olt.stage(reason));
-        this.actions.ai.prioritizeRoom(0);
-        if (!turn) return;
-        this.turnId = turn.id;
-        const token = turn.id;
-        try {
-          // A retry shares this worker, cancellation signal and original deadline.
-          for (let attempt = 0; attempt < 2; attempt++) {
-            const snapshot = await this.actions.read(); signal.throwIfAborted();
-            if (!current()) { task.abort(); return; }
-            const room = oltState(snapshot).rooms.find((r) => r.id === id)!;
-            this.actions.ai.olt.stage(attempt ? '再生成開始' : '生成開始');
-            const raw = await engine.generate(buildOltPrompt(snapshot, room, turn), signal);
-            this.actions.ai.olt.stage(attempt ? '再生成終了' : '生成終了');
-            signal.throwIfAborted();
-            if (!current()) { task.abort(); return; }
-            try {
-              const committed = await repo.finishRoomTurn(id, token, raw, signal);
-              this.actions.ai.olt.stage(committed ? '応答保存' : '期限・在室・設定変更で破棄');
-              if (committed) {
-                // A committed token is intentionally gone from presence state.
-                // Readback must not mistake that success for a withdrawn turn.
-                if (this.turnId === token) this.turnId = undefined;
-                const latest = await this.actions.read(); signal.throwIfAborted();
-                if (current()) this.show(oltState(latest).rooms.find((r) => r.id === id)!, latest, false);
-              }
-              break;
-            } catch (error) {
-              if (!(error instanceof OltOutputRejected)) throw error;
-              this.actions.ai.olt.stage('不正な応答を拒否');
-              if (attempt) break;
-              const retry = await repo.retryRoomTurn(id, token, signal);
-              if (!retry) { this.actions.ai.olt.stage('再生成の上限・期限'); break; }
-              turn = retry;
-            }
-          }
-        } finally { if (this.turnId === token) this.turnId = undefined; await repo.finishRoomTurn(id, token).catch(() => {}); }
-      }, task.signal);
-      if (this.task === task) this.task = undefined;
+      if (id !== this.roomId || visit !== this.visit || context !== this.actions.oltContext()) return;
+      const renew = Date.now() >= this.leaseAt;
+      const state = renew ? await repo.observeRoom(this.clientId, id, activeHuman(data)) : oltState(data);
+      if (renew) this.leaseAt = Date.now() + 15_000;
+      if (id === this.roomId && visit === this.visit && context === this.actions.oltContext()) this.show(state.rooms.find((r) => r.id === id)!, data, false);
     } finally { this.working = false; }
   }
 }

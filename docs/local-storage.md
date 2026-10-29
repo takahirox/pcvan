@@ -623,11 +623,11 @@ members, posts, mail and counters are preserved. Reset removes OLT and recreates
 the 100 residents/82 forum posts and three conference contributions;
 OLT has no seeded transcript.
 
-The setting contains `windowAt`, global `attempts` (0–24 per hour), and exactly
+The setting contains `windowAt`, global `attempts` (0–120 per hour), and exactly
 three rooms (`lounge`, `night`, `wakaba`). Each room stores a monotonic
 `nextNumber`, the last
 **200 lines**, resident leases, human visitor leases, `observedAt`, bounded
-consecutive-resident `chain`, and an optional pending turn token. Optional
+legacy exchange `chain` (not a decision gate), and an optional pending turn token. Optional
 `observations` stores at most sixteen member cursors `{number, topicAt}`;
 `decisions` stores at most eight `{authorId, targetNumber?, readyAt}` writings.
 Legacy `nextTurnAt`/`handledNumber` remain import-compatible fields but do not
@@ -652,7 +652,10 @@ rejected. Write/import failure rolls back the entire transaction. Ordinary
 consent, presence expiry, departure and cancellation still apply to old leases
 and pending turns. Compatibility does not reseed any community records.
 
-Every line has `{id, number, authorId, createdAt, kind, text, origin}`. IDs are
+Every line has `{id, number, authorId, createdAt, kind, text, origin}` and may
+include `replyToNumber` for a generated response. The optional earlier sequence
+reference records its causal exchange; fatigue uses that source chain, so later
+unrelated speech cannot silence a queued fresh contribution. IDs are
 `olt:<roomId>:<number>`; timestamps are canonical UTC ISO strings, nondecreasing
 within the room even if the system clock moves backwards. `kind` is `enter`,
 `leave`, or `say`. Presence lines have empty text and `local-presence` origin;
@@ -680,20 +683,25 @@ A read-only unregistered visitor has no fictional member record.
 `reconcileOlt`, `observeRoom`, `speakRoom`, `claimRoomTurn`,
 `retryRoomTurn` and `finishRoomTurn` each read/update
 the complete bounded setting in one repository transaction. Inference happens
-outside transactions. Confirmation contexts ignore only the OLT observation
-watermark so routine bookkeeping does not invalidate an import/reset confirmation;
-actual attendance, transcripts, budgets and other world edits remain fenced.
+outside transactions. Confirmation contexts ignore scheduling cursors, decisions, leases and execution
+budgets. Actual transcripts, posts, mail, roster/configuration and other content
+edits remain fenced, so routine world bookkeeping does not prevent confirmation.
 A pending `{id, authorId, modelId, context, until, targetNumber?, retry?}` token
-reserves a new turn for 30 seconds (old 35-second leases remain valid); optional
+reserves a new turn for 65 seconds (legacy leases retain their saved expiry); optional
 `targetNumber` preserves the exact speech/arrival being answered (legacy tokens remain valid). Commit revalidates
 authorization/profile context,
 presence, expiry and token before atomically appending and clearing it. Repeated
 or stale commits cannot duplicate a line. Semantic rejection rolls back the write;
-normal lease cleanup clears the pending token without refunding its attempt.
+failed/interrupted generation restores a still-relevant decision without refunding
+its attempt, including interruption during a corrective completion. The queued
+decision retains optional `retry: 1`, so reclaiming cannot grant another correction.
+Cancellation and live lease expiry preserve this accounting; terminal output
+rejection is an explicit cleanup outcome. A second semantic rejection consumes
+that writing and remains an explicit diagnostic rejection, never a fabricated line.
 `retryRoomTurn` can atomically add only `retry: 1` and charge one more attempt
 before a corrective completion. Values other than one are rejected on import;
 no backup version change or reset is required. Retries preserve the original
-expiry, author and target, and count against the twenty-four hourly attempts.
+expiry, author and target, and count against the 120 hourly attempts.
 Independent cursors and decisions survive contention and reload. There is no
 sixty-second human-event expiry or global reply watermark. Decisions are dropped
 when their speaker leaves or their target is pruned. A gap beyond ninety seconds
@@ -936,3 +944,25 @@ scheduler or allowance uses them. Pending work remains at most twelve runs.
 OLT accepts up to sixteen residents per room/thirty-two total and retains strict
 author/member checks. No IndexedDB or outer backup version bump, migration wizard
 or automatic model authorization is required.
+
+
+## Resident world step (Issue #143)
+
+`advanceWorld` atomically reconciles scheduled delivery, current resident sessions,
+room observations and public/private reading opportunities. A deliberately empty
+restored world is never initialized by this background step. `life.ts` provides the
+shared routine/session eligibility; the existing `nextDue`, OLT location/lease and
+observation fields own live state without adding a second roster or transcript.
+Reading and intentional silence are durable bounded observations. Generation
+occurs outside transactions through one worker; forum/mail batches yield after one
+writing. An actual public/private execution updates its authored timestamp and
+batch bounds atomically, retaining the stable run ID for deduplication after loss.
+Private correspondent targets retain the legacy `humanId` field name for backup
+compatibility, but may also address another authored resident. Pair-only prompts,
+reply threading and identity/provenance validation still apply. Scheduled mail is
+eligible at delivery, then waits for the recipient's reading opportunity; there is
+no additional twenty-minute reply ban.
+
+Compact output grammar changes neither the backup schema nor existing records.
+Generated text still passes the same identity, reference and content validators
+before its transactional commit; imported multiline posts and letters remain intact.

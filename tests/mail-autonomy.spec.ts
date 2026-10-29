@@ -43,7 +43,7 @@ test('planning indexes large mailboxes by correspondence and retains answered pa
   const result = await page.evaluate(async () => {
     const rp = '/src/storage/repository.ts', ap = '/src/ai/activity.ts', mp = '/src/ai/mail.ts', pp = '/src/ai/personas.ts';
     const { openRepository } = await import(rp) as typeof import('../src/storage/repository');
-    const { emptyActivity, scheduleActivity, random, HOUR } = await import(ap) as typeof import('../src/ai/activity');
+    const { emptyActivity, scheduleActivity, random, availableResident, HOUR } = await import(ap) as typeof import('../src/ai/activity');
     const { chooseMail } = await import(mp) as typeof import('../src/ai/mail');
     const { residentProfiles } = await import(pp) as typeof import('../src/ai/personas');
     const repo = await openRepository('large-planning-mailbox'); await repo.openActivity();
@@ -57,7 +57,7 @@ test('planning indexes large mailboxes by correspondence and retains answered pa
       nextDue: Object.fromEntries(profiles.map((p) => [p.id, new Date(p.id === 'hoshimori' ? due : now + HOUR).toISOString()])) };
     for (let i = 0; ; i++) {
       state.seed = `large-mail-${i}`;
-      if (random(`${state.seed}:hoshimori:${due}:mail`) < .5) break;
+      if (availableResident(profiles[0]!, now + HOUR, state.seed!)) break;
     }
     const letter = { id: 'a-recent-human', number: 257, senderId: human.id, recipientId: 'fictional-ai:hoshimori',
       subject: '星の便り', body: '観察の続きです。', createdAt: new Date(now - HOUR).toISOString(), origin: 'local-human' };

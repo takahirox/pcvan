@@ -1,6 +1,6 @@
 import type { AiActivity, Backup, Member } from './storage/schema';
 import { personas, personaMemberId, residentProfiles } from './ai/personas';
-import { random, routineFactor } from './ai/activity';
+import { residentSession } from './ai/life';
 
 export const OLT_SETTING = 'olt-rooms';
 export const roomDefinitions = [
@@ -13,7 +13,7 @@ export const contextRooms = (context: OltContext) => roomDefinitions.filter((r) 
 export type RoomId = typeof roomDefinitions[number]['id'];
 export interface OltLine {
   id: string; number: number; authorId: string; createdAt: string;
-  kind: 'enter' | 'leave' | 'say'; text: string; origin: string;
+  kind: 'enter' | 'leave' | 'say'; text: string; origin: string; replyToNumber?: number;
 }
 export interface OltPresence { memberId: string; joinedAt: string; until: string }
 export interface OltVisitor { clientId: string; memberId: string; until: string }
@@ -26,12 +26,13 @@ export interface OltRoom {
   observedAt: string; nextTurnAt: string; handledNumber: number; chain: number;
   pending: OltTurn | null;
   observations?: Record<string, { number: number; topicAt: string }>;
-  decisions?: { authorId: string; targetNumber?: number; readyAt: string }[];
+  decisions?: { authorId: string; targetNumber?: number; readyAt: string; retry?: 1 }[];
 }
 export interface OltState {
   version: 1; windowAt: string; attempts: number; organicAttempts?: number; rooms: OltRoom[];
 }
 export const RETAIN_LINES = 200;
+export const OLT_ATTEMPT_LIMIT = 120;
 export const VISITOR_LEASE = 45_000;
 export const iso = (n: number) => new Date(n).toISOString();
 export function emptyOlt(now: string): OltState {
@@ -121,7 +122,12 @@ export function observeOlt(state: OltState, content: Backup, at: number): void {
     if (room.decisions) room.decisions = room.decisions.filter((d) => room.residents.some((r) => r.memberId === d.authorId) &&
       (d.targetNumber === undefined || room.lines.some((l) => l.number === d.targetNumber)));
     if (room.observations) room.observations = Object.fromEntries(Object.entries(room.observations).filter(([id]) => room.residents.some((r) => r.memberId === id)));
-    if (room.pending && (Date.parse(room.pending.until) <= at || !room.residents.some((p) => p.memberId === room.pending!.authorId))) room.pending = null;
+    if (room.pending && (Date.parse(room.pending.until) <= at || !room.residents.some((p) => p.memberId === room.pending!.authorId))) {
+      const turn = room.pending;
+      if (live && room.residents.some((p) => p.memberId === turn.authorId) && (room.decisions?.length ?? 0) < 8)
+        (room.decisions ??= []).push({ authorId: turn.authorId, targetNumber: turn.targetNumber, readyAt: iso(at + 10_000), ...(turn.retry ? { retry: turn.retry } : {}) });
+      room.pending = null;
+    }
     if (at - previousAt > 90_000) {
       room.pending = null; room.handledNumber = room.nextNumber - 1;
       room.nextTurnAt = iso(at + 15_000); room.chain = 0;
@@ -136,18 +142,8 @@ export function observeOlt(state: OltState, content: Backup, at: number): void {
     const p = profiles[(offset + index) % profiles.length]!;
     const memberId = personaMemberId(p.id);
     if (!members.has(memberId) || present.has(memberId) || !p.frequency) continue;
-    const minutes = p.sessionMinutes ?? 14;
-    const cycle = (minutes + 5) * 60_000;
-    const phase = random(`${seed}:olt:${p.id}:phase`) * cycle;
-    const slot = Math.floor((at - phase) / cycle);
-    const draw = (key: string) => random(`${seed}:olt:${p.id}:${slot}:${key}`);
-    const start = slot * cycle + phase;
-    const end = start + minutes * (.7 + draw('duration') * .3) * 60_000;
-    // Check the resident's routine/absence at the actual individual visit start,
-    // not the observation hour. Sessions can finish naturally across midnight.
-    if (at >= end || routineFactor(p, start) !== 1 ||
-      draw('visit') >= Math.min(.95, p.participation * p.frequency) ||
-      random(`${seed}:olt:${p.id}:away:${Math.floor((start + p.utcOffsetMinutes * 60_000) / 86_400_000)}`) < (p.absence ?? .12)) continue;
+    const { online, since: start, until: end, draw } = residentSession(p, at, seed);
+    if (!online) continue;
     const preferred = roomDefinitions.filter((r) => p.preferredBoards.includes(r.board));
     const pool = preferred.length && draw('explore') > .15 ? preferred : roomDefinitions;
     const selected = pool[Math.floor(draw('room') * pool.length)]!;
@@ -186,7 +182,7 @@ export function validateOlt(value: unknown): asserts value is OltState {
   const state = obj(value, ['version', 'windowAt', 'attempts', 'rooms'], ['organicAttempts']);
   if (state.organicAttempts !== undefined) { int(state.organicAttempts); if ((state.organicAttempts as number) > 16 || (state.organicAttempts as number) > (state.attempts as number)) fail(); }
   if (state.version !== 1) fail(); time(state.windowAt); int(state.attempts);
-  if ((state.attempts as number) > 24 || !Array.isArray(state.rooms) || ![2, 3].includes(state.rooms.length)) fail();
+  if ((state.attempts as number) > OLT_ATTEMPT_LIMIT || !Array.isArray(state.rooms) || ![2, 3].includes(state.rooms.length)) fail();
   const roomIds = new Set();
   const residentIds = new Set();
   for (const raw of state.rooms as unknown[]) {
@@ -198,7 +194,8 @@ export function validateOlt(value: unknown): asserts value is OltState {
     if (!Array.isArray(r.lines) || r.lines.length > RETAIN_LINES) fail();
     let previous = 0, previousTime = '';
     for (const rawLine of r.lines as unknown[]) {
-      const l = obj(rawLine, ['id', 'number', 'authorId', 'createdAt', 'kind', 'text', 'origin']);
+      const l = obj(rawLine, ['id', 'number', 'authorId', 'createdAt', 'kind', 'text', 'origin'], ['replyToNumber']);
+      if (l.replyToNumber !== undefined) { int(l.replyToNumber, 1); if (l.kind !== 'say' || (l.replyToNumber as number) >= (l.number as number)) fail(); }
       int(l.number, 1); text(l.authorId); time(l.createdAt); text(l.origin);
       if (l.id !== `olt:${r.id}:${l.number}` || (l.number as number) <= previous || (l.number as number) >= (r.nextNumber as number) ||
         (l.createdAt as string) < previousTime || !['say', 'enter', 'leave'].includes(l.kind as string)) fail();
@@ -231,7 +228,8 @@ export function validateOlt(value: unknown): asserts value is OltState {
       if (!Array.isArray(r.decisions) || r.decisions.length > 8) fail();
       const authors = new Set();
       for (const raw of r.decisions as unknown[]) {
-        const d = obj(raw, ['authorId', 'readyAt'], ['targetNumber']); text(d.authorId); time(d.readyAt);
+        const d = obj(raw, ['authorId', 'readyAt'], ['targetNumber', 'retry']); text(d.authorId); time(d.readyAt);
+        if (d.retry !== undefined && d.retry !== 1) fail();
         if (authors.has(d.authorId)) fail(); authors.add(d.authorId);
         if (d.targetNumber !== undefined) { int(d.targetNumber, 1); if ((d.targetNumber as number) >= (r.nextNumber as number)) fail(); }
       }

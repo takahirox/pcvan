@@ -62,6 +62,7 @@ test('Japanese self-address, visitor echoes and nearby rephrase loops are reject
     '初めてのOLTで緊張しております。',
     '初めてのOLTでドキドキしていますね。',
     '草笛：こんにちは。私が草笛です。',
+    '暮らしに関する具体的な話題を一つ出してください。',
   ];
   for (const text of invalid) {
     const before = structuredClone(room);
