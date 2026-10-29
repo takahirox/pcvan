@@ -3764,11 +3764,14 @@ latency remain optional manual validation; no post-merge verification is require
 
 ## Issue #143: resident world
 
-**Status: incomplete; do not close #143 or treat this checkpoint as merge-ready.**
-The resident world implementation and browser plumbing are implemented, and a
-real WebGPU/Qwen run was performed. The actual generated Japanese still fails
-conversational relevance/voice acceptance. Passing deterministic or mocked checks
-below does not waive this finding.
+**Scope assessment:** the resident world implementation, browser plumbing and
+genuine WebGPU/Qwen functional validation are recorded below. Per the
+[Issue #143 clarification](https://github.com/takahirox/pcvan/issues/143#issuecomment-6487457036),
+further conversation-quality tuning is tracked in
+[Issue #145](https://github.com/takahirox/pcvan/issues/145) and is not a completion
+gate for #143. The captured Japanese limitations remain real; functional checks
+do not establish fluent, relevant or factually reliable conversation. The review
+fix and its checks are recorded at the end of this section; no merge is claimed.
 
 The [implementation architecture](local-ai.md#resident-world-issue-143) describes
 state ownership, the single visible-page driver, independent observation,
@@ -3834,14 +3837,14 @@ retaining the existing text-length, identity and transaction validators.
 Forum/mail output is capped at 768 tokens; OLT remains at 256. Each intended
 action still uses one completion through the existing consented worker.
 
-This is a partial reliability fix. It does not establish relevant replies,
-Japanese fluency, factual accuracy or distinct resident voices. Required genuine
-model-quality acceptance remains separate from structured-output success.
+This reliability fix does not establish relevant replies, Japanese fluency,
+factual accuracy or distinct resident voices. Genuine model-quality assessment
+remains separate from structured-output success; further tuning is deferred to #145.
 
-### Genuine Qwen evidence for the final patch
+### Genuine Qwen evidence for the captured implementation
 
 The current [resident-model-evidence.json](resident-model-evidence.json) records
-production asset `index-BGNDEBBv.js`, matching the final build, and genuine
+production asset `index-BGNDEBBv.js` from the preceding implementation checkpoint, and genuine
 `Qwen2.5-1.5B-Instruct-q4f16_1-MLC` through the consented WebLLM worker. All 100
 shipped profiles remained unchanged. The initial world seed was
 `0046b7c97f978224a1052effc70981ac`, starting 2026-10-21 at 22:04 JST. The harness
@@ -3852,8 +3855,8 @@ The environment was headed Chromium 156 on macOS 26.6.2, Apple M4 Max, 64 GiB RA
 with a secure-context WebGPU adapter (`apple` / `metal-3`). A fresh worker loaded
 cached model assets in **2.396 seconds**. Automated browser tests shared the host
 during part of the observation period; these are observed timings, not dedicated
-GPU benchmarks. WebGPU was available. The remaining blocker is generated content,
-not missing hardware or human confirmation.
+GPU benchmarks. WebGPU was available. The observed generated-content limitations
+are tracked in #145, rather than treated as missing hardware or human confirmation.
 
 All **73 physical requests returned `stop`**, with zero token-limit exits,
 unfinished requests or page errors:
@@ -3867,7 +3870,7 @@ unfinished requests or page errors:
 The addressed private reply now completes and commits instead of exhausting its
 budget after 42.035 seconds as in the reviewed evidence. This demonstrates the
 reliability improvement, **not a useful private answer**: the delivered content
-still fails acceptance below.
+still has the quality limitations below.
 
 On MAIN, all rooms had zero visitors. 火鉢猫 and 半田ごて authored two topics, and
 火鉢猫 replied to the latter's lighting comment. JOIN displayed that exact stored
@@ -3889,7 +3892,7 @@ before advancing again. It is an hour of schedules, not an hour of wall-clock
 listening. Forum replies include human and resident targets; the delivered mail
 retains its actual addressed sender, recipient and parent reference.
 
-The actual Japanese still fails both review findings:
+The actual Japanese retains these quality defects, now deferred to #145:
 
 - The unattended reply mostly repeats the previous resident's lighting comment.
   Later exchanges continue paraphrase loops, awkward Japanese and stray JSON
@@ -3920,16 +3923,19 @@ harness resets only that profile's application database, requests normal UI mode
 consent, and leaves the roster unchanged. Its routing results and the actual
 captured Japanese must both be assessed.
 
-### Remaining acceptance
+### Completion assessment after the scope clarification
 
-**Both agent-fixable P1 findings remain unresolved; Issue #143 remains incomplete.**
-Whitespace stalls are addressed, but conversational relevance, persona voice and
-useful private correspondence still fail genuine-model validation. These are
-remaining generation/behavior problems, not requests for human confirmation.
-Documentation and green mocks do not complete stages 3–5. Qwen 0.5B and native IME
-were not evaluated. No publication, merge or post-merge verification is claimed.
+The earlier assessment classified conversational relevance, persona voice and
+useful private answers as unresolved P1 completion gates. The supplied #143
+clarification supersedes that assessment: iterative quality improvements belong
+to #145. Core stages 1–5 have functional implementation and validation evidence,
+including a genuine Qwen run; no perfect-conversation requirement is inferred.
+The saved `qualityReview.status` remains **failed** and its excerpts, timings and
+rejection counts are preserved. Quality failure is a follow-up limitation, not a
+claim that routing failed or a request for human confirmation. Qwen 0.5B and native
+IME were not evaluated. No merge or post-merge verification is claimed.
 
-### Final automated checks for this checkpoint
+### Automated checks for the preceding checkpoint
 
 - Final `npm test -- --config playwright.quality.config.ts --workers=4`:
   **593 passed, zero failed, zero skipped** (8.2 minutes), after the final code
@@ -3946,5 +3952,38 @@ were not evaluated. No publication, merge or post-merge verification is claimed.
   source changes. The optional WebLLM chunk retains Vite's size advisory.
 - Evidence JSON, modified Markdown targets and staged whitespace were checked.
 
-Automated correctness and genuine model quality are separate results. The latter
-still fails; this checkpoint is a partial reliability fix and is not merge-ready.
+Automated correctness and genuine model quality are separate results. The quality
+review still fails; further tuning is tracked in #145. The checks above belong to
+the preceding checkpoint. The model was not rerun for the background load-deadline
+revision; its captured asset hash identifies exactly what was measured.
+
+### Review revision: background load deadline and quality deferral
+
+Background forum/mail work now races model loading against a 180-second deadline.
+A non-settling adapter cannot retain the shared activity lock indefinitely.
+Timeout reports a load failure, aborts/disposes the adapter and releases the model
+lock through the existing failure path. Pending work remains uncharged and queued
+for explicit retry. The regression uses a load promise that ignores cancellation:
+it checks busy state before the deadline, both released locks after timeout, the
+aborted/disposed adapter, unchanged queued work, subsequent OLT access and successful
+forum retry even after the old load returns late.
+
+Conversation-quality follow-up [#145](https://github.com/takahirox/pcvan/issues/145)
+was created as requested in #143. README, local AI documentation and the PR
+completion assessment now distinguish that deferred tuning from required
+functional validation. The genuine model evidence and failed quality assessment
+remain unchanged; this revision does not claim a new Qwen run or improved Japanese.
+
+- Focused controls/resident safety checks: **10 passed, zero failed/skipped**.
+- Full `npm test -- --config playwright.gitweave-fix.config.ts --workers=4`:
+  **594 passed, zero failed/skipped** (8.2 minutes) after the final code changes.
+  Default ports belonged to other worktrees. Disposable test copies/config changed
+  only local origins to **52678/52679** and were removed afterward.
+- During regression development, initial runs rejected an invalid fixture batch
+  interval or cancelled on first-time world initialization. The fixture was
+  corrected to initialize the world before testing the stalled load; the focused
+  and full results above use the corrected fixture.
+- Standalone `npm run build`: **passed** after the final code changes (TypeScript
+  and Vite). The optional WebLLM chunk-size advisory remains.
+- Local Markdown file targets and evidence JSON were checked; no captured model
+  outputs were edited. No push, merge or deployment verification is claimed.

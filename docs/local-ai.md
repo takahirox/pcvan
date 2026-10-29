@@ -326,7 +326,8 @@ No model work occurs without explicit consent; cap zero pauses every service.
 
 Generation is outside the command/storage transaction queue. Claim, identity,
 number allocation and commit remain transactional and cross-tab safe. Loading has
-an independent 180-second deadline; a room generation/correction has 60 seconds
+an independent 180-second deadline for both OLT and background forum/mail work;
+a room generation/correction has 60 seconds
 and a 65-second reservation. Loading completes before claiming a resident's turn.
 A busy worker leaves decisions queued. Interrupted/failed room generation restores
 its decision with a short recovery delay while the speaker and context remain
@@ -335,6 +336,9 @@ one charged correction; a second rejection is reported without invented fallback
 An interrupted correction requeues the same target with its used correction
 allowance intact, rather than consuming the response or granting another repair.
 Repeated worker failures pause automatic work until explicit recovery.
+Background load timeout aborts and disposes the adapter, releases the activity
+and model locks, reports failure and leaves pending writings uncharged for retry.
+It releases the activity lock even if the adapter's load promise never settles.
 Navigation/LEAVE changes only the human visit. Hidden pages, STOP, world replacement
 and authorization/profile changes cancel model work. Long gaps reconcile current
 attendance silently and discard obsolete room decisions; no historical speech is
@@ -464,8 +468,11 @@ does not download model weights or require a GPU; the explicit real-model script
 is separate.
 
 The required Issue #143 real WebGPU/Qwen run was performed and exposed
-conversational-quality failures. See the [measured results and remaining
-acceptance](validation.md#issue-143-resident-world); the issue is not complete. Browser timers can be throttled;
+conversational-quality limitations. See the [measured results and scope
+assessment](validation.md#issue-143-resident-world). Further naturalness, relevance
+and persona improvements are deferred to
+[Issue #145](https://github.com/takahirox/pcvan/issues/145), as clarified in #143;
+these do not waive functional real-model validation. Browser timers can be throttled;
 missed opportunities reconcile only the current bounded state. Relationships/memory are
 small, and generations may fail or sound inconsistent. Other engines, physical
 devices and native IME are not covered by these Chromium mocks. No post-merge

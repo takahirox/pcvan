@@ -949,7 +949,9 @@ records genuine WebGPU/Qwen chat, forum/mail and latency observations alongside
 four ordinary production worlds. Captured copied phrases, unfinished replies,
 profile text used as titles and promised-but-absent mail steps now have rejection
 regressions. These lexical checks do not establish factual or conversational
-quality; genuine model-quality acceptance still blocks completing the rebuild.
+quality. Further dialogue-quality improvements are tracked in
+[Issue #145](https://github.com/takahirox/pcvan/issues/145), following the scope
+clarification in #143; functional real-model validation remains required.
 The compact output grammar prevents ASCII whitespace continuations from consuming
 a mail generation; successful completion alone does not establish relevant advice.
 

@@ -106,7 +106,15 @@ export function createAiControls(actions: AiActions,
     try {
       await navigator.locks.request('pcvan-ai-activity', { ifAvailable: true }, async (lock) => {
         if (!lock) { report('別のタブで活動を処理中です。次回、自動で確認します。'); return; }
-        const engine = await loadEngine(task, state.batch!.modelId);
+        let loadTimeout: ReturnType<typeof setTimeout> | undefined;
+        let engine: LocalLlmAdapter;
+        try {
+          // Release the activity lock even if an adapter ignores cancellation.
+          engine = await Promise.race([loadEngine(task, state.batch!.modelId),
+            new Promise<never>((_, reject) => {
+              loadTimeout = setTimeout(() => reject(new Error('モデル読込時間切れ (180秒)')), 180_000);
+            })]);
+        } finally { clearTimeout(loadTimeout); }
         report('予定の活動を処理中…');
         const attemptsBefore = budget.attempts;
         await runActivityBatch(actions.activity, actions.read, state, engine, task.signal, budget,
