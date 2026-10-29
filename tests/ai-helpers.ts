@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation' | 'retry-ok' | 'slow' | 'once-slow' | 'chatter') {
+export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid' | 'failure' | 'self-greeting' | 'echo' | 'conversation' | 'retry-ok' | 'copy-once' | 'slow' | 'once-slow' | 'chatter') {
   await page.addInitScript((mode) => {
     Object.defineProperty(navigator, 'gpu', { value: {} });
     // Short unique records isolate plumbing from the near-copy prose validator.
@@ -24,7 +24,9 @@ export async function mockWorker(page: Page, mode: 'interrupt' | 'ok' | 'invalid
           stats.prompts.push(data);
           const raw = mode === 'invalid' || (mode === 'retry-ok' && stats.generations === 1) ? '{}' : data.kind === 'olt' ? JSON.stringify({
             kind: 'olt', personaId: data.personaId, roomId: data.roomId,
-            text: mode === 'self-greeting' ? `こんにちは${data.speaker.handle}さん、初めてのOLTでドキドキワクワクしています。`
+            text: mode === 'copy-once' && stats.generations === 1 ? 'モデムは昔からある技術だから、その価値には変わりないね。'
+              : mode === 'copy-once' ? 'こんにちは。どうぞゆっくりしていってください。'
+              : mode === 'self-greeting' ? `こんにちは${data.speaker.handle}さん、初めてのOLTでドキドキワクワクしています。`
               : mode === 'echo' ? 'こんにちは、初めてのOLTでドキドキワクワクしています。'
               : mode === 'chatter' ? [
                 '今夜は月の輪郭がくっきり見えました。窓から見える方はいますか。',

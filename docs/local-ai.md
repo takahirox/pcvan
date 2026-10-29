@@ -561,7 +561,9 @@ copying, first-visit excitement echoes and nearby rephrase loops. Short
 acknowledgements and attributed quotations with a new contribution are allowed.
 These lexical checks cannot guarantee natural language quality or detect every
 paraphrase. Rejected output never becomes chat. At most **one corrective completion**
-uses fresh validation guidance for the same present speaker, under the original
+retains the same present speaker, persona and source event, but drops recent
+speech, presence notices and public memory to escape copied-context loops. It
+receives the validation reason rather than the rejected prose, under the original
 60-second generation deadline and cancellation signal. Its reservation is persisted and
 charged to the same hourly counter before inference; reload, racing tabs
 or another failure cannot reset it. A second rejection remains silent, with no

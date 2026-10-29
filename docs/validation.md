@@ -3987,3 +3987,77 @@ remain unchanged; this revision does not claim a new Qwen run or improved Japane
   and Vite). The optional WebLLM chunk-size advisory remains.
 - Local Markdown file targets and evidence JSON were checked; no captured model
   outputs were edited. No push, merge or deployment verification is claimed.
+
+### Review revision: recover from a copied OLT completion (#143)
+
+The reported single-greeting failure was a generation recovery defect: the first
+completion copied a recent modem remark, and the corrective prompt supplied that
+same remark again as `rejectedOutput` alongside the original history. The
+correction now retains the selected speaker, persona and source event but omits
+secondary speech/presence/public memory and supplies the validation reason instead
+of failed prose. The existing single charged correction, deadline, transactional
+claim, cancellation and output validators still apply to every OLT turn.
+
+A production-assets regression reproduces the captured modem-line rejection,
+then verifies correction for the same source/speaker, a durable visible reply
+without another submission, no copied line appended, charged attempts, and
+preserved Japanese IME draft, selection and focus. Existing tests continue to
+cover permanent rejection, cancellation/reload, racing claims and correction caps.
+
+- Final `npm test -- --config=.gitweave-playwright.config.ts --workers=4`:
+  **595 passed, zero failed/skipped** (8.6 minutes). Default ports belonged to
+  another worktree; disposable test copies/config changed only local origins to
+  **15373/15374** and were removed afterward. No other worktree was modified.
+- Standalone `npm run build`: **passed** after the final source changes
+  (TypeScript and Vite); the existing WebLLM chunk-size advisory remains.
+- The new regression passed alone (**1 passed**). Its initial focused run had
+  **32 passes and one failure** because the injected old speech preceded existing
+  presence timestamps. Corrected fixture chronology; application validation was
+  retained. An earlier default-port launch executed no tests due to the collision.
+
+Genuine-model acceptance reran successfully with
+`node scripts/check-resident-model.mjs`, using this worktree's production asset
+`index-DOcW-8eQ.js`, the unchanged 100-resident roster and default validation seed
+`0046b7c97f978224a1052effc70981ac`. The new capture and agent inspection are saved
+separately in [resident-model-recovery-evidence.json](resident-model-recovery-evidence.json);
+the preceding capture remains intact. Environment: headed Chromium 156, Apple
+Metal-3 WebGPU, macOS 26.6.2, Apple M4 Max / 64 GiB;
+`Qwen2.5-1.5B-Instruct-q4f16_1-MLC` loaded in a fresh owned profile in **76.759 s**.
+Generation was warm after the explicit UI consent/load flow.
+
+MAIN accumulated persisted talk between 火鉢猫 and 半田ごて with no visitor;
+JOIN displayed those exact lines. After 180 seconds of quiet listening, a single
+`こんにちは` received **「こんにちは！今何をやっているの？」** during the
+**60.068-second** observation, with draft/selection/focus preserved.
+
+| Human source | Worker start | Worker complete | Durable commit | Visible paint |
+| --- | ---: | ---: | ---: | ---: |
+| `こんにちは` | 3.180 s | 5.197 s | 5.200 s | 5.218 s |
+| Follow-up question | 1.084 s | 3.491 s | 3.498 s | 3.509 s |
+
+Both decisions were recorded in the source transaction (instrumentation precedes
+its completion callback by 2 ms). Both human replies succeeded on their initial
+completion; **11 other OLT turns exercised correction**, each committing after
+one rejected output. Their paired raw texts and commit timings are in the capture.
+There were **71/71 completed worker requests**, zero worker failures or unfinished
+requests, and no page errors or acceptance failures.
+
+| Service | Completions | Commits | Rejected/not committed | Worker median / maximum |
+| --- | ---: | ---: | ---: | ---: |
+| OLT | 59 | 48 | 11 rejected (18.6%); all corrected | 3.061 / 5.523 s |
+| Forum | 11 | 4 | 7 not committed | 9.539 / 14.721 s |
+| Mail | 1 | 1 | 0 | 11.152 / 11.152 s |
+
+The final visible-world hour used 30-second clock advances only after inference
+settled; it is not an hour of wall-clock listening. Public threads and addressed
+private correspondence committed through the same world/worker. This run used
+synthetic letters, one model/GPU and synthetic IME events; Qwen 0.5B and native
+candidate-window interaction were not tested. Browser tests shared the host during
+part of the run, so these are observed timings rather than dedicated benchmarks.
+
+Japanese quality remains limited: the follow-up says **「今夜は太陽の光を観察しています。」**;
+the unattended reply paraphrases its source, forum posts include invented events
+and unhelpful questions, and the mail explanation is incoherent. These findings
+are recorded honestly for #145, not presented as a quality pass or human signoff.
+This revision fixes the reviewed generation/recovery failure and passes the
+functional rerun; it does not claim comprehensive dialogue-quality tuning.

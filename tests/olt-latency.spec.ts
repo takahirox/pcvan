@@ -114,6 +114,46 @@ for (const mode of ['retry-ok', 'invalid'] as const) test(`quality retry is pers
   await expect(page.locator('.ai-status')).toContainText(mode === 'retry-ok' ? '表示完了' : '不正な応答を拒否');
 });
 
+test('a copied completion recovers for the same source and paints during IME without another submission', async ({ page }) => {
+  await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+  await mockWorker(page, 'copy-once'); await start(page, '話す客'); await residents(page); await consent(page); await room(page);
+  const copied = 'モデムは昔からある技術だから、その価値には変わりないね。';
+  await page.evaluate(async ({ copied, at }) => {
+    const db = await new Promise<IDBDatabase>((resolve) => { const r = indexedDB.open('pcvan-local'); r.onsuccess = () => resolve(r.result); });
+    const tx = db.transaction('settings', 'readwrite'), store = tx.objectStore('settings'), request = store.get('olt-rooms');
+    request.onsuccess = () => {
+      const room = request.result.value.rooms[1], number = room.nextNumber++;
+      room.lines.push({ id: `olt:night:${number}`, number, authorId: 'fictional-ai:hoshimori', kind: 'say', text: copied,
+        origin: 'local-ai:webllm:Qwen2.5-0.5B-Instruct-q4f16_1-MLC', createdAt: new Date(at).toISOString() });
+      for (const resident of room.residents) room.observations[resident.memberId].number = number;
+      store.put(request.result);
+    };
+    await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); }); db.close();
+  }, { copied, at: epoch.getTime() });
+  await command(page, 'こんにちは', '<話す客>');
+  const input = page.locator('#command'); await input.fill('書きかけの日本語');
+  await input.evaluate((el: HTMLInputElement) => el.setSelectionRange(2, 5)); await input.dispatchEvent('compositionstart');
+  await advance(page, 3);
+  await expect(page.locator('.output')).toContainText('こんにちは。どうぞゆっくりしていってください。');
+  const rooms = (await state(page))!, night = rooms.rooms[1]!;
+  const source = night.lines.find((l) => l.origin === 'local-human' && l.text === 'こんにちは')!;
+  const reply = night.lines.find((l) => l.replyToNumber === source.number)!;
+  expect(reply.text).toBe('こんにちは。どうぞゆっくりしていってください。');
+  expect(night.lines.filter((l) => l.text === copied)).toHaveLength(1);
+  const worker = await page.evaluate(() => (window as any).journeyWorker);
+  expect(worker.prompts[0].recentSpeech.some((l: any) => l.text === copied)).toBe(true);
+  const correction = worker.prompts[1];
+  expect(correction.speaker).toEqual(worker.prompts[0].speaker);
+  expect(correction.replyTo).toEqual(worker.prompts[0].replyTo);
+  expect(correction.replyTo.number).toBe(source.number);
+  expect(correction.rejectionReason).toContain('重複');
+  expect(JSON.stringify(correction)).not.toContain(copied);
+  expect(rooms.attempts).toBe(worker.generations);
+  await expect(input).toHaveValue('書きかけの日本語'); await expect(input).toBeFocused();
+  expect(await input.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([2, 5]);
+  await input.dispatchEvent('compositionend');
+});
+
 test('another tab activity lock queues the durable human event without spending attempts, then resumes', async ({ page, context }) => {
   await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
   await mockWorker(page, 'ok'); await start(page, '待つ客'); await residents(page); await consent(page); await room(page);

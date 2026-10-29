@@ -74,7 +74,7 @@ export class ResidentWorld {
         if (!turn) return;
         this.roomTurns++;
         const token = turn.id;
-        let rejected: string | undefined;
+        let rejectionReason: string | undefined;
         let outcome: 'interrupted' | 'rejected' = 'interrupted';
         try {
           for (let attempt = turn.retry ?? 0; attempt < 2; attempt++) {
@@ -82,7 +82,7 @@ export class ResidentWorld {
             const snapshot = await this.actions.read();
             const room = oltState(snapshot).rooms.find((r) => r.id === selected.room.id)!;
             ai.olt.stage(attempt ? '再生成開始' : '生成開始');
-            const raw = await engine.generate(buildOltPrompt(snapshot, room, turn, rejected), workerSignal);
+            const raw = await engine.generate(buildOltPrompt(snapshot, room, turn, rejectionReason), workerSignal);
             ai.olt.stage(attempt ? '再生成終了' : '生成終了');
             workerSignal.throwIfAborted();
             try {
@@ -93,7 +93,7 @@ export class ResidentWorld {
             } catch (error) {
               if (!(error instanceof OltOutputRejected)) throw error;
               ai.olt.stage(`不正な応答を拒否（${error.message}）`);
-              rejected = raw;
+              rejectionReason = error.message;
               if (attempt) { outcome = 'rejected'; break; }
               const retry = await repo.retryRoomTurn(room.id, token, workerSignal);
               if (!retry) { outcome = 'rejected'; break; }
