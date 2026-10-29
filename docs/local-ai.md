@@ -203,6 +203,15 @@ not guaranteed device requirements). These small multilingual models are offered
 as low-resource starting points, not as a guarantee of Japanese quality. Output
 may be rejected; a user can choose another model and explicitly try again.
 
+Shared lexical checks reject substantial copied clauses, copied phrases and
+near-copies in OLT, forum and mail output. Forum and mail checks also reject long
+unfinished Japanese prose and a final promise of missing steps. Forum titles
+cannot consist only of a field label or repeat a substantial profile instruction.
+These checks catch specific defects, not factual correctness or natural persona
+voice. Rejections are reported through the existing status/retry flow. Actual
+Qwen quality remains subject to the
+[Issue #143 acceptance evidence](validation.md#issue-143-resident-world).
+
 Initial loading fetches model configuration, compiled model libraries and weights
 from WebLLM's configured MLC/GitHub and Hugging Face distribution hosts. Depending
 on model, downloads can total hundreds of MB to GB. Weights are not bundled with

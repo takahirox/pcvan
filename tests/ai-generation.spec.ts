@@ -140,7 +140,7 @@ test('prompts bound persona, SIG and four recent local posts; strict validation 
     const noReply = { personaId: 'kusabue', forumId: 'forum' };
     let unexpectedReply = false;
     try { validateGeneration(JSON.stringify({ ...valid, ...noReply }), fixture, noReply); } catch { unexpectedReply = true; }
-    const maxAccepted = validateGeneration(JSON.stringify({ ...valid, title: 'あ'.repeat(120), body: 'い'.repeat(1200) }), fixture, request);
+    const maxAccepted = validateGeneration(JSON.stringify({ ...valid, title: 'あ'.repeat(120), body: 'い'.repeat(1199) + '。' }), fixture, request);
     const missingTargets = [
       { ...request, personaId: 'missing' }, { ...request, forumId: 'missing' },
       { ...request, replyToPostId: 'missing' }, { ...request, replyToPostId: 'third' },

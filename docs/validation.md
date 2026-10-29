@@ -3804,131 +3804,128 @@ individual failures, visibility, import/reset, bounds and drafts. Repository-onl
 checks that patch global clocks or IDB callbacks use `tests/module.html`, avoiding
 an unrelated live application loop in the module host page.
 
-### Review revisions and genuine local-model evidence
+### Review revision: copied and unfinished generated text
 
-The review follow-up fixes interrupted corrective OLT work. Cancellation or live
-lease expiry now restores the original response target with its used `retry: 1`
-allowance intact. Reclaiming charges a new physical attempt, but cannot authorize
-another corrective completion. A second output rejection explicitly terminates
-that decision. Repository regressions cover all three outcomes and durable commit.
+The captured failures exposed commit checks that accepted near-copied forum and
+mail prose, a copied first-person question inside a longer reply, profile text
+used as a title, and Japanese text cut off mid-sentence. Shared lexical checks now
+reject substantial copied clauses, copied phrases and near-copies across OLT,
+forums and mail. Forum/mail checks reject long unfinished Japanese prose and a
+final promise of steps with no subsequent steps. Forum titles also reject bare
+field labels and substantial profile-instruction copies. Prompts explicitly ask
+for a concrete answer first and an honest admission when the resident does not know.
 
-Ordinary-profile production greeting coverage now runs four fixed worlds at
-00/09/15/22 JST, with unchanged shipped profiles. Each stays on MAIN for a stored
-multi-speaker exchange, joins its exact history, sends one greeting and observes
-63 seconds while preserving a selected Japanese IME draft. Assertions require a
-committed response to that exact source, rather than merely any additional speech.
+`resident-text-quality.spec.ts` uses captured Japanese examples to exercise those
+rejections, a copied sub-sentence from a longer contribution, and useful original
+replies/attributed quotations that should remain valid. Existing transactional
+and OLT tests retain identity/privacy checks and the bounded corrective retry.
+Plumbing-worker fixtures now use short unique records: changing a trailing counter
+on otherwise identical prose no longer makes a valid new contribution. Those
+fixtures are not Japanese-quality evidence.
 
-Generation prompts now place a direct speaker/target instruction after structured
-context. OLT retains three recent lines and one short public memory by its own
-speaker; forum/mail instructions request shorter replies without adopting another
-person's identity. Validators still reject invalid output. Tab-local counters
-separate completed calls, rejected output, commits, failures and stale discards.
-These changes improve some responses but **do not resolve the quality finding**.
+### Genuine Qwen evidence for the final patch
 
-The latest [resident-model-evidence.json](resident-model-evidence.json) records:
+The current [resident-model-evidence.json](resident-model-evidence.json) records
+production asset `index-OeZcq4wd.js`, matching the final build, and genuine
+`Qwen2.5-1.5B-Instruct-q4f16_1-MLC` through the consented WebLLM worker. All 100
+shipped profiles remained unchanged. The initial world seed was
+`0046b7c97f978224a1052effc70981ac`, starting 2026-10-21 at 22:04 JST. The harness
+fixes only the initial seed ID and asserts it after startup; resident schedules
+and decisions use the production implementation. Other record IDs and model
+sampling remain random.
 
-- Shipped `Qwen2.5-1.5B-Instruct-q4f16_1-MLC`, genuine WebGPU and production asset
-  `index-BIrFOwh5.js`, matching the final application build. No worker replacement
-  or resident-profile edits. Seed `0046b7c97f978224a1052effc70981ac`, fixed starting
-  world time 2026-10-21 22:04 JST.
-- Headed Chromium 156, macOS 26.6.2, Apple M4 Max, 64 GiB RAM, adapter
-  `apple` / `metal-3`. The owned profile retained downloaded model cache; a fresh
-  engine initialized in **2.370 seconds**, then the same warm worker served all
-  calls. Concurrent automated browser tests contributed host load.
-- **78 completed calls, zero worker failures, zero unfinished calls.** OLT:
-  **66 completions, 32 commits, 34 output rejections (51.5%), zero lifecycle
-  discards**. Forum: **11 completions, seven commits, four exact-copy rejections**.
-  Mail: **one completion and one committed reply**. Overall: **40 commits and
-  38 validator rejections (48.7%)**. These are execution/validation categories;
-  committed text is not necessarily a semantically correct answer.
-- Worker durations: OLT **1.117–6.743 seconds**, median **1.472**; forum
-  **10.347–14.800 seconds**, median **13.160**; mail **11.722 seconds**.
-  The longer phase used thirty-second visible clock increments, settling actual
-  generation and commit before advancing. It covers an hour of schedules, not
-  an hour of wall-clock listening or normal display-rate behavior.
+The environment was headed Chromium 156 on macOS 26.6.2, Apple M4 Max, 64 GiB RAM,
+with a genuine secure-context WebGPU adapter (`apple` / `metal-3`). A fresh worker
+loaded cached model assets in **2.327 seconds**. The full automated browser suite
+shared the host during part of the run. This is supported hardware; the remaining
+blocker is generated behavior and content, not missing WebGPU or human confirmation.
 
-On MAIN, with zero visitors in every room, `hibachi` authored a DIY/modem topic
-and `hankote` replied to it. JOIN showed that same persisted dialogue. During
-**180 wall-clock seconds** of listening, the selected room gained another line;
-that line also exposed a first-person echo, retained as a quality failure. The
-visitor then sent one greeting, waited sixty seconds with a selected composing
-draft, sent the follow-up and waited another sixty seconds. Draft, selection
-`[2,5]` and focus survived. IME events were synthetic, not a native candidate window.
+There were **65 physical requests: 64 `stop` returns, one `length` return, zero
+unfinished requests and zero page errors**. At the final diagnostic snapshot:
 
-| Source → first responding resident | Decision | Worker start | Worker completed | Commit | Paint |
+| Service | Completed `stop` outputs | Durable commits | Output rejections | Token-limit exits |
+| --- | ---: | ---: | ---: | ---: |
+| OLT | 55 | 27 | 28 | 0 |
+| Forum | 9 | 4 | 5 | 0 |
+| Mail | 0 | 0 | 0 | 1 |
+
+OLT worker durations were **1.254–7.021 seconds**, median **1.793**. Forum worker
+durations were **10.842–12.415 seconds**, median **11.316**. The failed mail call
+took **42.035 seconds**. The slower-service phase advances one visible world hour
+in thirty-second steps, waiting for real inference/commit to settle before each
+advance. It is an hour of schedules, not an hour of wall-clock listening.
+
+On MAIN, with no visitors in any room, 火鉢猫 started an old-tools topic and 半田ごて
+replied. JOIN displayed that same persisted history. The visitor listened for
+**180 wall-clock seconds**, sent `こんにちは` once, waited sixty seconds with a
+selected composing draft, then sent the follow-up and waited another sixty seconds.
+The draft `書きかけの日本語`, selection `[2,5]` and focus survived. IME events were
+synthetic; no physical native candidate window was tested.
+
+| Source → first reply | Decision | Worker start | Worker completed | Commit | Paint |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `こんにちは` → 火鉢猫 | same source transaction | 2789 ms | 3986 ms | 3989 ms | 4009 ms |
-| `今夜は何を観察していますか。` → 火鉢猫 | same source transaction | 3667 ms | 5291 ms | 5293 ms | 5310 ms |
+| `こんにちは` → 火鉢猫 | -2 ms | 2922 ms | 4335 ms | 4337 ms | 4355 ms |
+| `今夜は何を観察していますか。` → 火鉢猫 | -3 ms | 814 ms | 2308 ms | 2310 ms | 2331 ms |
 
-Decision instrumentation occurs before source transaction completion by 1–6 ms;
-this is not negative user-visible latency. Actual public excerpts include:
+Decision instrumentation runs inside the source transaction, before its durable
+completion callback; the negative 2–3 ms values reflect that ordering. The other
+columns are deltas from that source completion callback.
 
-- Unattended: `最近、新しい電波モデムをDIYで作ってみました。`
-  Another resident replied `DIYに挑戦したモデム、初めての経験だね。`
-- Greeting: `こんにちは！`; follow-up:
-  `今夜は電波の世界に足を運ぶことにします。`
-  The follow-up fits the radio topic but is vague about actual observation.
-- OLT later emitted `今夜は、星守星守の明るさに出会いたいです。` and mixed
-  Japanese/Chinese wording. Themes differ across twelve stored speakers, but
-  copying and flattened voices remain; distinct natural voices are not established.
-- Forum output copied a visitor's novice first-person question, propagated nearly
-  identical advice through a resident thread, and stored one answer ending
-  `バランスの良`. A new-thread title reproduced the persona's writing-style
-  instruction. Correct IDs/threading did not establish appropriate authorship.
-- The synthetic private letter asked for one concrete way to steady binoculars.
-  The delivered reply promised `以下の手順で補正することができます。` but supplied
-  no actual step. Delivery, addressed-pair identity and reading opportunity worked;
-  answer quality failed. No real private user correspondence was used.
+The actual Japanese still fails acceptance:
 
-Additional genuine, minimal-prompt characterization used ordinary `hibachi` and
-`hoshimori` profiles and text-only JSON schemas. Both Japanese and English system
-instructions still produced irrelevant or invented advice; one answer invented a
-`防手ぶれフィルター`. These probes are recorded as failed characterization, not
-app-world acceptance, and text-only output serialization was not adopted.
+- The unattended reply largely rephrased the first resident's repair/restoration
+  claim. Distinct natural persona voices remain unestablished.
+- The greeting was `こんにちは、あなたもおはようございます。` at night. The
+  follow-up was `今夜は星の魅力に触れたいですね。`, a wish instead of an answer
+  about what the speaker was observing.
+- An accepted forum title adopted the visitor's novice first-person question;
+  its body asked the visitor to answer. Another accepted post contained
+  `足掄えて`. Lexical validation does not establish semantic quality.
+- The only addressed private reply hit the token limit. Its captured prefix
+  promised `以下の工夫をお勧めします。`, followed by whitespace; the recorded
+  excerpt stops at 1000 characters. No actual tip or letter was delivered.
+  The script's correspondence assertion failed. All letters were synthetic test
+  material, not real private user correspondence.
 
-An earlier revision in this run completed 130 calls with no worker failures, but
-rejected 88 of 119 OLT outputs, missed the follow-up semantically and generated no
-mail response. That result was not treated as success. The latest harness selects
-three ordinary conversational correspondents with early reading opportunities,
-uses the normal UI to send synthetic letters, sets the public/mail cap to twelve,
-and verifies that all 100 profiles remain unchanged. It does not force decisions,
-attendance or resident scheduling times.
+A genuine experiment with separate dialogue roles and a prose-only worker schema
+also failed: 42/63 completed OLT outputs were rejected, no greeting reply committed,
+and a delivered letter gave unusable optical advice. That additional prompt/adapter
+path was removed. Its bounded summary is retained in the evidence; it is not the
+final implementation or a passing quality result.
 
 Reproduce with `npm run build`, an owned production preview, then
 `PCVAN_MODEL_URL=http://127.0.0.1:<port> node scripts/check-resident-model.mjs`.
-The script requests UI model consent, waits up to fifteen minutes for downloads,
-asserts routing/display/forum/mail execution and records a **pending** quality
-review. A successful script exit does not grade Japanese relevance. Optional
-`PCVAN_MODEL_PROFILE` names an owned profile whose model cache is retained;
-the harness resets only that profile's application database before each run.
+Optional `PCVAN_WORLD_SEED` selects a 32-digit lowercase hexadecimal initial seed;
+`PCVAN_MODEL_PROFILE` names an owned profile whose model cache is retained. The
+harness resets only that profile's application database, requests normal UI model
+consent, and leaves the roster unchanged. An unattended-dialogue assertion failure
+is preserved while independent human/forum/mail diagnostics continue; any such
+failure still causes an unsuccessful exit. The saved quality review requires
+inspection of actual output, even when routing assertions pass.
 
 ### Remaining acceptance
 
-**Review finding P1 remains unresolved and Issue #143 remains incomplete.** The
-model receives clearer context and some live replies improved, but genuine Qwen
-output still copies contributions, loses persona voice, produces incomplete prose
-and fails to answer a private question. The completed real-model coverage is a
-failed quality result, not documentation standing in for confirmation. Further
-generation work and another genuine passing quality run are required before
-claiming acceptance. The revised 0.5B model and native IME were not evaluated;
-other-device/second-model checks remain additional validation. No publication,
+**P1 remains unresolved and Issue #143 remains incomplete.** The patch blocks
+specific reproduced bad commits. It does not resolve the model's paraphrase loops,
+weak voices, irrelevant answers or failed private correspondence. A genuine passing
+quality run covering all required services is still required. These are remaining
+generation/behavior failures, not requests for a human confirmation or documentation
+standing in for one. Qwen 0.5B and native IME were not evaluated. No publication,
 merge or post-merge verification is claimed.
 
 ### Final automated checks for this checkpoint
 
-- `npm test -- --config playwright.review.config.ts --workers=4`: **589 passed,
-  zero failed, zero skipped** (8.2 minutes), after the final source and test changes.
-  The default test ports belonged to another worktree, so disposable copies of
-  tests/config remapped only local origins to **14573/14574**, using this
-  worktree's normal production build/preview and module server. The copies and
-  config were removed before committing; repository defaults are unchanged.
-- Focused generation, correction, forum/mail and ordinary-world checks:
-  **50 passed**, before the final full suite. An earlier full run had one failure
-  because the prompt simplification omitted Wakaba's beginner/listener guidance;
-  that guidance was restored, and subsequent full runs passed all 589 cases.
+- `npm test -- --config playwright.quality.config.ts --workers=4`: **593 passed,
+  zero failed, zero skipped** (8.5 minutes), after final source/test changes.
+  Another worktree owned the default ports. Disposable copies of tests/config
+  remapped only local origins to **15373/15374**, using this worktree's production
+  build/preview and Vite module server; the copies/config were removed afterward.
+- Focused captured-output, prompt, OLT attribution and bounded-correction checks:
+  **28 passed** (32.4 seconds). An earlier full run exposed the repetitive mock prose;
+  the plumbing fixture was corrected before the final full run.
 - `npm run build`: TypeScript and Vite production build passed after final source
   changes. The optional WebLLM chunk retains Vite's size advisory.
-- Whitespace, changed documentation links and evidence JSON syntax checked.
+- Evidence JSON, modified Markdown links and whitespace were checked.
 
-Automated correctness and real-model content quality are separate results. The
-remaining quality failures above must not be waived because the suite is green.
+Automated correctness and actual model quality remain separate results. The genuine
+run failed correspondence and semantic acceptance; green mocks do not waive P1.

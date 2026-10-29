@@ -5,7 +5,9 @@ import { writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const url = process.env.PCVAN_MODEL_URL ?? 'http://127.0.0.1:14375';
-const result = { qualityReview: {status:'pending',note:'Routing assertions do not grade Japanese relevance or persona quality.'}, date: new Date().toISOString(), model: process.env.PCVAN_MODEL_ID ?? 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', errors: [], stages: [] };
+const worldSeed = process.env.PCVAN_WORLD_SEED ?? '0046b7c97f978224a1052effc70981ac';
+if (!/^[a-f0-9]{32}$/.test(worldSeed)) throw new Error('PCVAN_WORLD_SEED must be 32 lowercase hex digits.');
+const result = { worldSeed, qualityReview: {status:'pending',note:'Routing assertions do not grade Japanese relevance or persona quality.'}, date: new Date().toISOString(), model: process.env.PCVAN_MODEL_ID ?? 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', errors: [], acceptanceFailures: [], stages: [] };
 const profile = process.env.PCVAN_MODEL_PROFILE ?? await mkdtemp(join(tmpdir(), 'pcvan-model-'));
 const browser = await chromium.launchPersistentContext(profile, { headless: false, reducedMotion: 'reduce' });
 const page = await browser.newPage();
@@ -18,6 +20,18 @@ const snapshot = () => page.evaluate(async () => {
 });
 const command = async (text) => { const input=page.locator('#command'); await input.fill(text); await input.press('Enter'); await expect(page.locator('.output')).toContainText(`> ${text}`); };
 try {
+ // Fix only readActivity's seed ID at world initialization. All authored
+ // profiles and schedule calculations remain exactly as shipped. Later IDs
+ // and worker sampling stay random. Assert the intended seed after startup.
+ await page.addInitScript((seed) => {
+  const native = crypto.getRandomValues.bind(crypto); let used = false;
+  crypto.getRandomValues = (view) => {
+   if (!used && view instanceof Uint8Array && view.length === 16 && new Error().stack?.includes('.readActivity')) {
+    used = true; view.set(seed.match(/../g).map((hex) => parseInt(hex, 16))); return view;
+   }
+   return native(view);
+  };
+ }, worldSeed);
  await page.clock.install({time:new Date('2026-10-21T13:04:00Z')});
  // Reset only this owned validation profile's app records; preserve model cache.
  await page.route('**/__model_evidence_reset__', route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Owned validation setup</title>'}));
@@ -31,6 +45,8 @@ try {
  await expect(page.locator('.output')).toContainText('ハンドル名を登録しますか');
  await command('Y'); await expect(page.locator('.output')).toContainText('ハンドル名='); await command('検証の客'); await expect(page.locator('.output')).toContainText('登録しました');
  const initialWorld=await snapshot(), initialRoster=initialWorld.roster;
+ expect(initialWorld.seed,'Reproducible ordinary-world seed').toBe(worldSeed);
+ result.profiles=initialWorld.profiles;
  const correspondents=initialRoster.profiles.filter(p=>p.weekdayHours.includes(22)&&p.reply>=.5&&p.inactivity<.7)
   .sort((a,b)=>initialWorld.activity.nextDue[a.id].localeCompare(initialWorld.activity.nextDue[b.id])).slice(0,3);
  result.testCorrespondents=correspondents.map(p=>p.id);
@@ -72,9 +88,16 @@ try {
  result.loadMs=Math.round(performance.now()-loadAt);
  await page.getByRole('button',{name:'閉じる',exact:true}).click();
  console.log('Loaded',result.loadMs,'ms; observing MAIN without joining');
- await expect.poll(async()=> (await snapshot()).rooms.rooms.some(r=>new Set(r.lines.filter(l=>l.kind==='say').map(l=>l.authorId)).size>=2 && r.lines.some(l=>l.replyToNumber!==undefined)),{timeout:240000,intervals:[3000]}).toBe(true);
- const before=await snapshot(); result.worldSeed=before.seed; result.profiles=before.profiles; result.unattended=before.rooms.rooms.map(r=>({room:r.id,visitors:r.visitors.length,speech:r.lines.filter(l=>l.kind==='say')})); result.stages.push('unattended persisted speech');
- const room=before.rooms.rooms.find(r=>new Set(r.lines.filter(l=>l.kind==='say').map(l=>l.authorId)).size>=2) ?? before.rooms.rooms.find(r=>r.lines.some(l=>l.kind==='say'));
+ // Preserve a failed autonomous-chat assertion, then collect the independent
+ // human/forum/mail diagnostics too. The run still exits unsuccessfully.
+ try {
+  await expect.poll(async()=> (await snapshot()).rooms.rooms.some(r=>new Set(r.lines.filter(l=>l.kind==='say').map(l=>l.authorId)).size>=2 && r.lines.some(l=>l.replyToNumber!==undefined)),{timeout:240000,intervals:[3000]}).toBe(true);
+ } catch (error) {
+  result.acceptanceFailures.push({stage:'unattended resident dialogue',message:error.message.slice(0,500)});
+  console.log('Unattended exchange assertion failed; continuing independent diagnostics');
+ }
+ const before=await snapshot(); result.worldSeed=before.seed; result.profiles=before.profiles; result.unattended=before.rooms.rooms.map(r=>({room:r.id,visitors:r.visitors.length,speech:r.lines.filter(l=>l.kind==='say')})); result.unattendedDialogueVerified=before.rooms.rooms.some(r=>new Set(r.lines.filter(l=>l.kind==='say').map(l=>l.authorId)).size>=2 && r.lines.some(l=>l.replyToNumber!==undefined)); if(result.unattendedDialogueVerified) result.stages.push('unattended persisted dialogue');
+ const room=before.rooms.rooms.find(r=>new Set(r.lines.filter(l=>l.kind==='say').map(l=>l.authorId)).size>=2) ?? before.rooms.rooms.find(r=>r.lines.some(l=>l.kind==='say')) ?? [...before.rooms.rooms].sort((a,b)=>b.residents.length-a.residents.length)[0];
  if(room.id==='wakaba'){await command('16'); await command('2'); await command('JOIN 1');}
  else {await command('13'); await command('2'); await command('OLT'); await command(`JOIN ${room.id==='night'?2:1}`);}
  await expect(page.locator('.output')).toContainText('発言=');
@@ -145,5 +168,5 @@ try {
  await browser.close();
  if(!process.env.PCVAN_MODEL_PROFILE) await rm(profile,{recursive:true,force:true});
  console.log('Evidence: docs/resident-model-evidence.json');
- if(result.blocker) process.exitCode=1;
+ if(result.blocker || result.acceptanceFailures.length) process.exitCode=1;
 }

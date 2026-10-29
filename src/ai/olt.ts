@@ -5,6 +5,7 @@ import { random, observeResident } from './observation';
 import { appendOlt, attendance, iso, oltAuthorization, oltEnabled, OLT_ATTEMPT_LIMIT, roomDefinitions, validOltText } from '../olt-state';
 import type { OltRoom, OltState, OltTurn } from '../olt-state';
 import { localConversation } from '../storage/community';
+import { copiedContribution } from './text';
 import { serviceDate } from '../calendar';
 
 /** Every present resident observes the shared room independently. Cursors record
@@ -157,7 +158,7 @@ export function buildOltPrompt(content: Backup, room: OltRoom, turn: OltTurn, re
     instruction: `あなたは${JSON.stringify(persona.handle)}です。`
       + (target ? `今、相手から届いた発言は「${target.text.slice(0, 400)}」です。この発言だけに直接答える一言をtextに書いてください。`
         : '直前の発言とは違う、具体的で身近な話を一つtextに書いてください。')
-      + '他の人の言葉や自己紹介をコピーせず、日本語で1〜2文だけ。',
+      + '質問なら具体的な答えを最初に一つ書き、分からないことはそう伝えます。他の人の言葉や自己紹介をコピーせず、自分の口調の日本語で1〜2文だけ。',
     schema: JSON.stringify({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false }),
   };
 }
@@ -197,6 +198,7 @@ export function commitOltText(room: OltRoom, turn: OltTurn, raw: string, at: num
 const comparable = (text: string) => text.normalize('NFKC').toLowerCase().replace(/[\p{P}\p{S}\s]/gu, '');
 /** Conservative lexical checks, not a claim of general Japanese understanding. */
 export function defectiveOltReply(text: string, ownHandles: string[], room: OltRoom): boolean {
+  if (copiedContribution(text, room.lines.filter((l) => l.kind === 'say').slice(-12).map((l) => l.text))) return true;
   const normalized = comparable(text);
   if (/^(こんにちは|こんばんは|おはよう|はじめまして)/.test(normalized) &&
     room.lines.filter((l) => l.kind === 'say' && l.origin.startsWith('local-ai:')).slice(-4)
