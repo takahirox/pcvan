@@ -38,6 +38,11 @@ For documentation and templates, check syntax, links, whitespace, and consistenc
 do not require new runtime tooling or unrelated runtime, hardware/device, or
 deployment checks.
 
+Apply the [test and CI performance principles](development-flow.md#test-and-ci-performance-principles):
+review additional defect coverage, duplication, and execution/maintenance cost
+together. Ask: **Does this change provide sufficient confidence with the lightest
+appropriate validation, without redundant execution?**
+
 Mandatory pre-merge acceptance must be achievable and verifiable before merge.
 Keep optional validation separate. Human confirmation, physical-device testing,
 subjective evaluation, or external approval should be mandatory only when
