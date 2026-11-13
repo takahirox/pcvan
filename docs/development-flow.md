@@ -1,8 +1,9 @@
 # Development flow
 
 This is the default contribution flow for pcvan, including AI-assisted work:
-Issue → implementation → PR → review → revision as needed → merge → required
-post-merge verification, if any. The default branch is `main`.
+Issue → implementation → PR → review → revision as needed → merge and close the
+original Issue → required post-merge verification, if any. The default branch is
+`main`.
 
 ## Collaboration language
 
@@ -63,7 +64,8 @@ For templates and documentation, check Markdown and template syntax, local links
 `git diff --check` checks whitespace in tracked changes; stage newly added files
 and use `git diff --cached --check` to include them. Read the final diff and confirm
 the change stays within the Issue's scope. Documentation-only changes require no
-unrelated runtime suites, hardware/device checks, or deployed-site verification.
+unrelated runtime suites, manual approval, hardware/device checks, heavyweight
+model downloads, or deployed-site verification.
 
 ### Test and CI performance principles
 
@@ -134,10 +136,12 @@ the Issue specifies another base. Explain the problem, resulting behavior,
 focused changes, related Issues, and validation actually performed. Report
 failures, skipped checks, and unperformed checks accurately, with reasons.
 
-Only claim to close an Issue when the implementation fully addresses it. If the
-change is intentionally partial, say so and leave the Issue open. Record required
-post-merge verification separately as pending until performed; pending post-merge
-checks alone do not make a complete implementation partial.
+Use and preserve the normal `Closes #N` reference when the implementation fully
+addresses the Issue and applicable mandatory pre-merge acceptance is satisfied.
+If the change is intentionally partial, state its remaining scope, use a
+non-closing Issue link, and leave the parent Issue open. Record required
+post-merge verification separately as pending until performed; pending checks
+possible only after merge do not make a complete implementation partial.
 
 ## 4. Review and revise
 
@@ -155,9 +159,24 @@ answer.
 
 Approve and merge through the authorized repository workflow once implementation
 and mandatory pre-merge checks are sufficient and no blocking review findings
-remain. Checks possible only after merge do not block that approval.
+remain. Missing implementation, mandatory pre-merge tests, required repository
+protections, and genuinely necessary pre-merge human acceptance remain blockers.
+Checks possible only after merge do not block that approval.
 
-Perform required post-merge verification only when applicable. Keep it pending
-until performed, then record actual results, failures, and necessary follow-up.
-Pre-merge validation does not prove deployment or publication succeeded. No
-post-merge verification is required for a templates/documentation-only change.
+Close the original Issue after successful merge, then perform genuinely required
+post-merge verification. Keep unperformed checks pending, including any precise
+environment blocker. Record actual evidence and results in the merged PR, closed
+Issue, or a linked validation report. Issue closure does not claim those checks
+passed; pre-merge validation does not prove deployment or publication succeeded.
+An unavailable test environment alone is not evidence of a product defect.
+
+If verification finds an actual defect, check for an existing equivalent Issue
+first. Use that Issue or create a new one with reproduction steps, the affected
+revision, expected and actual behavior, and links to the original Issue and PR.
+Do not keep or reopen the original Issue solely for post-merge follow-up.
+
+This lifecycle supersedes older instructions to keep an implemented Issue open
+solely until post-merge verification finishes. Preserve historical test outcomes
+and evidence, including failures, pending checks, and environment limitations;
+do not rewrite those results as passes. No post-merge verification is required
+for a templates/documentation-only change.

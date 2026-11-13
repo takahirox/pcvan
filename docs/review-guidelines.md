@@ -15,7 +15,9 @@ Check both directions:
 
 - **No missing work:** all required behavior and acceptance criteria the PR
   claims to resolve are implemented and appropriately validated. An intentionally
-  partial PR must say so and must not claim to close the whole Issue.
+  partial PR must state its remaining scope and must not automatically close the
+  parent Issue. Pending post-merge-only verification does not make an otherwise
+  complete implementation partial.
 - **No unnecessary work:** reject unnecessary abstractions, speculative
   extensibility, unrelated refactoring, frameworks/subsystems, or extra policies
   and configuration without a demonstrated need tied to the Issue.
@@ -35,8 +37,8 @@ unperformed checks must be disclosed with reasons.
 Follow the [current repository validation guidance](development-flow.md#validation-for-the-current-repository).
 Application build/test commands are documented in the [README](../README.md#validation).
 For documentation and templates, check syntax, links, whitespace, and consistency;
-do not require new runtime tooling or unrelated runtime, hardware/device, or
-deployment checks.
+do not require new runtime tooling, unrelated runtime or hardware/device checks,
+routine manual approval, heavyweight model downloads, or deployment gates.
 
 Apply the [test and CI performance principles](development-flow.md#test-and-ci-performance-principles):
 review additional defect coverage, duplication, and execution/maintenance cost
@@ -69,8 +71,19 @@ implementation or applicable pre-merge checks.
   no unjustified scope or complexity, has sufficient passing mandatory pre-merge
   checks, and has no blocking review findings remaining.
 
-Record genuinely required post-merge verification separately. Pending checks
-possible only after merge do not prevent approval under the conditions above.
-After merge, record their actual results, including failures and follow-up; do
-not claim they passed before performing them. No post-merge verification is
-required for templates/documentation-only changes.
+Preserve the normal `Closes #N` reference when these merge conditions are met.
+Do not request removing it, keeping the source Issue open, or withholding approval
+solely because post-merge-only verification is pending. ProjectWeave publication
+adds this reference and its merge/close stages close the source Issue; undoing
+that solely for pending post-merge checks causes repeated Review → Fix → Publish
+→ Review loops. Missing implementation, mandatory pre-merge tests, required
+protections, and genuinely necessary pre-merge human acceptance remain blockers.
+
+Follow the [merge and follow-up lifecycle](development-flow.md#5-merge-and-handle-required-follow-up):
+merge and close the original Issue, then record actual post-merge evidence in the
+merged PR, closed Issue, or linked validation report. Keep unperformed or
+environment-blocked checks pending; closure does not claim they passed, and an
+unavailable environment alone does not establish a product defect. For actual
+defects, check for an equivalent Issue before filing a new linked Issue with the
+required reproduction details. Do not reopen the original solely for follow-up.
+No post-merge verification is required for templates/documentation-only changes.

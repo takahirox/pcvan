@@ -19,7 +19,7 @@ Describe what should be true when the Issue is resolved.
 ## Context
 
 Add relevant context, examples, logs, or related Issues. Include reproduction
-steps and actual versus expected results when applicable.
+steps, the affected revision, and actual versus expected results when applicable.
 
 ## Pre-merge acceptance
 
@@ -42,3 +42,8 @@ State that none is required unless this Issue needs checks possible only after
 merge. If needed, describe the checks and expected results separately; report
 them as pending until performed. Pre-merge checks do not prove publication or
 deployment succeeded.
+
+Follow the [merge and follow-up lifecycle](https://github.com/takahirox/pcvan/blob/main/docs/development-flow.md#5-merge-and-handle-required-follow-up):
+close the implemented Issue after merge, then record verification evidence and
+track actual defects in linked Issues. Closure does not claim pending checks
+passed.
